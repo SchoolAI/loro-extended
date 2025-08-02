@@ -1,18 +1,18 @@
 # Loro Change
 
-Provides a simple, Immer-style `change()` method for mutating [Loro](https://github.com/loro-dev/loro) docs and plain JavaScript objects. This utility simplifies state updates, making them more declarative and easier to read, similar to the experience in libraries like Automerge.
-
-## The Problem
+This package provides a simple `change()` function to mutate [Loro](https://github.com/loro-dev/loro) docs, starting with plain JavaScript objects. This utility simplifies state updates, making them more declarative and easier to read, similar to the experience in libraries like Automerge.
 
 Loro is a powerful CRDT library for building local-first applications. However, performing deep or complex mutations on a Loro document can sometimes involve imperative, multi-step operations.
 
-## The Solution
-
 `loro-change` offers two key functions, `change` and `from`, to streamline this process.
 
-### `change(doc, mutator)`
+# Documentation
+
+## `change(doc, mutator)`
 
 The `change` function takes a Loro document (or a plain object) and a mutator function. It provides the mutator with a proxied draft of the document. You can make direct, seemingly-mutative changes to this draft, and `loro-change` will handle the complexities of applying these changes correctly to the original Loro document under the hood.
+
+All mutations within a `change` block are transactional. They are queued and applied together as a single, atomic operation when the block completes. This ensures that the document remains in a consistent state, even if multiple, complex changes are made.
 
 **Example:**
 
@@ -32,11 +32,11 @@ console.log(list.toJSON());
 // Output: [{ text: "A new item", completed: false }]
 ```
 
-### `from<T>(initialState)`
+## `from<T>(initialState)`
 
 The `from` function creates a new Loro document from a plain JavaScript object, making it easy to initialize state.
 
-### Working with Types
+# Working with Types
 
 To get the full benefit of TypeScript, you can define a type for your document's schema. This type is then used by `from` and `change` to provide strong type-checking and autocompletion for your mutations.
 
@@ -82,11 +82,11 @@ change(doc, (draft) => {
 
 By providing a type to `from<MyDoc>`, you ensure that all subsequent calls to `change` are type-safe, preventing common errors and making your code easier to refactor.
 
-## Contributing
+# Contributing
 
 This project is a lightweight utility within the Loro ecosystem. Contributions are welcome!
 
-### Tooling
+## Tooling
 
 - **Build**: This package uses `tsup` for efficient bundling. Run `pnpm build`.
 - **Testing**: Tests are run with `vitest`. Use `pnpm test` to run the test suite.
