@@ -128,38 +128,47 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Plain objects and arrays are converted to detached LoroMaps and LoroLists.
  */
 function toLoroValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    const list = new LoroList()
-    for (const item of value) {
-      const loroItem = toLoroValue(item)
-      if (
-        loroItem instanceof LoroMap ||
-        loroItem instanceof LoroList ||
-        loroItem instanceof LoroText
-      ) {
-        list.pushContainer(loroItem)
-      } else {
-        list.push(loroItem)
-      }
+    if (typeof value === "string") {
+        const text = new LoroText();
+        text.insert(0, value);
+        return text;
     }
-    return list
-  } else if (isPlainObject(value)) {
-    const map = new LoroMap()
-    for (const [key, subValue] of Object.entries(value)) {
-      const loroSubValue = toLoroValue(subValue)
-      if (
-        loroSubValue instanceof LoroMap ||
-        loroSubValue instanceof LoroList ||
-        loroSubValue instanceof LoroText
-      ) {
-        map.setContainer(key, loroSubValue)
-      } else {
-        map.set(key, loroSubValue)
-      }
+
+    if (Array.isArray(value)) {
+        const list = new LoroList();
+        for (const item of value) {
+            const loroItem = toLoroValue(item);
+            if (
+                loroItem instanceof LoroMap ||
+                loroItem instanceof LoroList ||
+                loroItem instanceof LoroText
+            ) {
+                list.pushContainer(loroItem);
+            } else {
+                list.push(loroItem);
+            }
+        }
+        return list;
     }
-    return map
-  }
-  return value
+
+    if (isPlainObject(value)) {
+        const map = new LoroMap();
+        for (const [key, subValue] of Object.entries(value)) {
+            const loroSubValue = toLoroValue(subValue);
+            if (
+                loroSubValue instanceof LoroMap ||
+                loroSubValue instanceof LoroList ||
+                loroSubValue instanceof LoroText
+            ) {
+                map.setContainer(key, loroSubValue);
+            } else {
+                map.set(key, loroSubValue);
+            }
+        }
+        return map;
+    }
+
+    return value;
 }
 
 /**
@@ -171,6 +180,9 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   get(target, prop, receiver) {
     if (target instanceof LoroMap) {
       const value = target.get(String(prop))
+			if (value instanceof LoroText) {
+				return value;
+			}
       if (value instanceof LoroMap || value instanceof LoroList) {
         return createProxy(value)
       }
@@ -251,13 +263,20 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   set(target, prop, value: unknown) {
     if (target instanceof LoroMap) {
-      const loroValue = toLoroValue(value)
-      if (loroValue instanceof LoroMap || loroValue instanceof LoroList) {
-        target.setContainer(String(prop), loroValue)
-      } else {
-        target.set(String(prop), loroValue)
-      }
-      return true
+        const current = target.get(String(prop));
+        if (current instanceof LoroText && typeof value === 'string') {
+            current.delete(0, current.length);
+            current.insert(0, value);
+            return true;
+        }
+
+        const loroValue = toLoroValue(value);
+        if (loroValue instanceof LoroMap || loroValue instanceof LoroList || loroValue instanceof LoroText) {
+            target.setContainer(String(prop), loroValue as LoroMap | LoroList | LoroText);
+        } else {
+            target.set(String(prop), loroValue);
+        }
+        return true;
     }
 
     if (target instanceof LoroList) {

@@ -1,4 +1,4 @@
-import type { LoroDoc } from "loro-crdt"
+import { type LoroDoc, LoroText } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 
 import { change, from } from "./index"
@@ -12,6 +12,9 @@ function toJS(doc: LoroDoc): JSONValue {
   const clean = (obj: unknown): JSONValue => {
     if (Array.isArray(obj)) {
       return obj.map(clean)
+    }
+    if (obj instanceof LoroText) {
+      return obj.toString()
     }
     if (obj !== null && typeof obj === "object") {
       const newObj: PlainObject = {}
@@ -97,100 +100,94 @@ describe("from", () => {
 describe("change", () => {
   it("should modify a document", () => {
     const doc = from({ counter: 0 })
-    const modifiedDoc = change(doc, (d: { counter: number }) => {
+    change(doc, (d: { counter: number }) => {
       d.counter = 1
     })
-    expect(toJS(modifiedDoc)).toEqual({ counter: 1 })
+    expect(toJS(doc)).toEqual({ counter: 1 })
   })
 
   it("should add new properties", () => {
     const doc = from({ name: "Alice" })
-    const modifiedDoc = change(doc, (d: { name: string; age?: number }) => {
+    change(doc, (d: { name: string; age?: number }) => {
       d.age = 30
     })
-    expect(toJS(modifiedDoc)).toEqual({ name: "Alice", age: 30 })
+    expect(toJS(doc)).toEqual({ name: "Alice", age: 30 })
   })
 
   it("should modify nested objects", () => {
     const doc = from({ user: { name: "Bob" } })
-    const modifiedDoc = change(doc, (d: { user: { name: string } }) => {
+    change(doc, (d: { user: { name: string } }) => {
       d.user.name = "Charlie"
     })
-    expect(toJS(modifiedDoc)).toEqual({ user: { name: "Charlie" } })
+    expect(toJS(doc)).toEqual({ user: { name: "Charlie" } })
   })
 
   it("should add properties to nested objects", () => {
     const doc = from({ user: { name: "David" } })
-    const modifiedDoc = change(
-      doc,
-      (d: { user: { name: string; email?: string } }) => {
-        d.user.email = "david@example.com"
-      },
-    )
-    expect(toJS(modifiedDoc)).toEqual({
+    change(doc, (d: { user: { name: string; email?: string } }) => {
+      d.user.email = "david@example.com"
+    })
+    expect(toJS(doc)).toEqual({
       user: { name: "David", email: "david@example.com" },
     })
   })
 
   it("should modify arrays", () => {
     const doc = from({ tasks: ["task 1"] })
-    const modifiedDoc = change(doc, (d: { tasks: string[] }) => {
+    change(doc, (d: { tasks: string[] }) => {
       d.tasks[0] = "task 1 modified"
     })
-    expect(toJS(modifiedDoc)).toEqual({ tasks: ["task 1 modified"] })
+    expect(toJS(doc)).toEqual({ tasks: ["task 1 modified"] })
   })
 
   it("should push items to arrays", () => {
     const doc = from({ tasks: ["task 1"] })
-    const modifiedDoc = change(doc, (d: { tasks: string[] }) => {
+    change(doc, (d: { tasks: string[] }) => {
       d.tasks.push("task 2")
     })
-    expect(toJS(modifiedDoc)).toEqual({ tasks: ["task 1", "task 2"] })
+    expect(toJS(doc)).toEqual({ tasks: ["task 1", "task 2"] })
   })
 
   it("should delete properties", () => {
     const doc = from({ name: "Eve", age: 25 })
-    const modifiedDoc = change(doc, (d: { name: string; age?: number }) => {
+    change(doc, (d: { name: string; age?: number }) => {
       delete d.age
     })
-    expect(toJS(modifiedDoc)).toEqual({ name: "Eve" })
+    expect(toJS(doc)).toEqual({ name: "Eve" })
   })
 
   it("should handle multiple changes in one block", () => {
     const doc = from({ a: 1, b: 2 })
-    const modifiedDoc = change(
-      doc,
-      (d: { a: number; b?: number; c?: number }) => {
-        d.a = 10
-        d.c = 30
-        delete d.b
-      },
-    )
-    expect(toJS(modifiedDoc)).toEqual({ a: 10, c: 30 })
+    change(doc, (d: { a: number; b?: number; c?: number }) => {
+      d.a = 10
+      d.c = 30
+      delete d.b
+    })
+    expect(toJS(doc)).toEqual({ a: 10, c: 30 })
   })
 
   it("should handle splice to replace a range of values in a list", () => {
     const doc = from({ list: [1, 2, 3, 4] })
-    const modifiedDoc = change(doc, (d: { list: number[] }) => {
+    change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 2, 5, 6, 7)
     })
-    expect(toJS(modifiedDoc)).toEqual({ list: [1, 5, 6, 7, 4] })
+    expect(toJS(doc)).toEqual({ list: [1, 5, 6, 7, 4] })
   })
 
   it("should handle splice to insert into a list", () => {
     const doc = from({ list: [1, 2, 3] })
-    const modifiedDoc = change(doc, (d: { list: number[] }) => {
+    change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 0, 4, 5)
     })
-    expect(toJS(modifiedDoc)).toEqual({ list: [1, 4, 5, 2, 3] })
+    expect(toJS(doc)).toEqual({ list: [1, 4, 5, 2, 3] })
   })
 
   it("should handle splice to delete a range in a list", () => {
     const doc = from({ list: [1, 2, 3, 4, 5] })
-    const modifiedDoc = change(doc, (d: { list: number[] }) => {
+    change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 3)
     })
-    expect(toJS(modifiedDoc)).toEqual({ list: [1, 5] })
+    expect(toJS(doc)).toEqual({ list: [1, 5] })
   })
 
   it("should handle pop from a list", () => {
@@ -258,5 +255,38 @@ describe("change", () => {
     })
 
     expect(toJS(doc)).toEqual({ list: [4, 5, 6] })
+  })
+})
+
+describe("LoroText handling", () => {
+  it("should automatically convert strings to LoroText containers", () => {
+    const doc = from({ title: "hello" })
+    const map = doc.getMap("root")
+    const title = map.get("title") as LoroText
+    expect(title).toBeInstanceOf(LoroText)
+    expect(title.toString()).toBe("hello")
+  })
+
+  it("should update LoroText when a new string is assigned", () => {
+    const doc = from({ title: "hello" })
+    change(doc, (d: { title: string }) => {
+      d.title = "world"
+    })
+
+    const map = doc.getMap("root")
+    const title = map.get("title") as LoroText
+    expect(title).toBeInstanceOf(LoroText)
+    expect(title.toString()).toBe("world")
+  })
+
+  it("should allow fine-grained edits on string properties", () => {
+    const doc = from({ title: "hello" })
+    change(doc, (d: { title: LoroText }) => {
+      d.title.insert(5, " world")
+    })
+
+    const map = doc.getMap("root")
+    const title = map.get("title") as LoroText
+    expect(title.toString()).toBe("hello world")
   })
 })
