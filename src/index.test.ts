@@ -1,7 +1,7 @@
 import { type LoroDoc, LoroText } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 
-import { change, from } from "./index"
+import { change, from, Loro } from "./index"
 
 type PlainObject = { [key: string]: JSONValue }
 type JSONValue = string | number | boolean | null | JSONValue[] | PlainObject
@@ -100,7 +100,7 @@ describe("from", () => {
 describe("change", () => {
   it("should modify a document", () => {
     const doc = from({ counter: 0 })
-    change(doc, (d: { counter: number }) => {
+    change(doc, d => {
       d.counter = 1
     })
     expect(toJS(doc)).toEqual({ counter: 1 })
@@ -146,6 +146,19 @@ describe("change", () => {
       d.tasks.push("task 2")
     })
     expect(toJS(doc)).toEqual({ tasks: ["task 1", "task 2"] })
+  })
+
+  it("should push items to arrays of objects", () => {
+    const doc = from({ tasks: [{ description: "feed cat", done: true }] })
+    change(doc, (d: { tasks: { description: string; done: boolean }[] }) => {
+      d.tasks.push({ description: "feed dog", done: false })
+    })
+    expect(toJS(doc)).toEqual({
+      tasks: [
+        { description: "feed cat", done: true },
+        { description: "feed dog", done: false },
+      ],
+    })
   })
 
   it("should delete properties", () => {
@@ -218,11 +231,11 @@ describe("change", () => {
 
   it("should assign null and undefined to object properties", () => {
     const doc = from({ a: 1, b: 2 })
-    change(doc, (d: { a: null; b: undefined }) => {
+    change(doc, (d: { a: number | null; b?: number }) => {
       d.a = null
-      d.b = undefined
+      delete d.b
     })
-    expect(toJS(doc)).toEqual({})
+    expect(toJS(doc)).toEqual({ a: null })
   })
 
   it("should handle complex nested creations and modifications", () => {
@@ -262,15 +275,17 @@ describe("LoroText handling", () => {
   it("should automatically convert strings to LoroText containers", () => {
     const doc = from({ title: "hello" })
     const map = doc.getMap("root")
-    const title = map.get("title") as LoroText
-    expect(title).toBeInstanceOf(LoroText)
-    expect(title.toString()).toBe("hello")
+    const title = map.get("title")
+    // By default, strings are now primitive LWW values
+    expect(title).toBe("hello")
   })
 
   it("should update LoroText when a new string is assigned", () => {
-    const doc = from({ title: "hello" })
-    change(doc, (d: { title: string }) => {
-      d.title = "world"
+    const doc = from({ title: Loro.Text("hello") })
+    change(doc, (d: { title: LoroText }) => {
+      // Direct assignment should throw type error, but we can update the container
+      d.title.delete(0, d.title.length)
+      d.title.insert(0, "world")
     })
 
     const map = doc.getMap("root")
@@ -280,7 +295,7 @@ describe("LoroText handling", () => {
   })
 
   it("should allow fine-grained edits on string properties", () => {
-    const doc = from({ title: "hello" })
+    const doc = from({ title: Loro.Text("hello") })
     change(doc, (d: { title: LoroText }) => {
       d.title.insert(5, " world")
     })

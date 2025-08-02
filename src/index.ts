@@ -1,4 +1,48 @@
-import { LoroDoc, LoroMap, LoroList, LoroText } from "loro-crdt"
+import { type Container, LoroDoc, LoroList, LoroMap, LoroText } from "loro-crdt"
+
+// #################
+// ### Loro Object
+// #################
+
+class LoroTextWrapper {
+  constructor(public initialValue: string) {}
+}
+
+export const Loro = {
+  Text: (initialValue = "") => new LoroTextWrapper(initialValue),
+}
+
+// #################
+// ### Types
+// #################
+
+export type AsLoro<T> = {
+  [K in keyof T]: T[K] extends LoroTextWrapper
+    ? LoroText
+    : T[K] extends (infer E)[]
+      ? AsLoro<E>[]
+      : T[K] extends Record<string, unknown>
+        ? AsLoro<T[K]>
+        : T[K]
+}
+
+/**
+ * A LoroDoc that is "branded" with a type representing the shape of its proxy.
+ * This allows for better type inference in the `change` function.
+ */
+export type LoroProxyDoc<T> = LoroDoc & {
+  /**
+   * @hidden
+   * A phantom property to hold the type for inference.
+   */
+  readonly __proxy_type?: T
+}
+
+/**
+ * @hidden
+ * A helper type to infer the proxy shape from a LoroProxyDoc.
+ */
+type InferProxyType<D> = D extends LoroProxyDoc<infer P> ? P : object
 
 /**
  * @hidden
@@ -40,12 +84,19 @@ const proxyCache = new WeakMap<LoroMap | LoroList, object>()
  */
 export function from<T extends Record<string, unknown>>(
   initialState: T,
-): LoroDoc {
+): LoroProxyDoc<AsLoro<T>> {
   const doc = new LoroDoc()
   // Use the change function to set the initial state transactionally.
-  return change<T>(doc, d => {
-    Object.assign(d, initialState)
+  change(doc, d => {
+    // `d` is inferred as `object` here, so we can't use Object.assign
+    // without a cast. A loop is more explicit and type-safe.
+    for (const key in initialState) {
+      if (Object.prototype.hasOwnProperty.call(initialState, key)) {
+        ;(d as any)[key] = initialState[key]
+      }
+    }
   })
+  return doc as LoroProxyDoc<AsLoro<T>>
 }
 
 // #################
@@ -55,7 +106,7 @@ export function from<T extends Record<string, unknown>>(
 /**
  * A function that receives a mutable proxy of the document state.
  */
-type ChangeFn<T extends object> = (doc: T) => void
+type ChangeFn<T> = (doc: T) => void
 
 /**
  * Modifies a Loro document within a transactional change block.
@@ -67,14 +118,14 @@ type ChangeFn<T extends object> = (doc: T) => void
  * @param callback A function that mutates the document proxy.
  * @returns The same Loro document instance.
  */
-export function change<T extends object>(
-  doc: LoroDoc,
-  callback: ChangeFn<T>,
-): LoroDoc {
+export function change<D extends LoroDoc>(
+  doc: D,
+  callback: ChangeFn<InferProxyType<D>>,
+): D {
   // The root container is always a map.
   const rootContainer = doc.getMap("root")
   const proxy = createProxy(rootContainer)
-  callback(proxy as T)
+  callback(proxy as InferProxyType<D>)
   doc.commit()
   return doc
 }
@@ -84,8 +135,14 @@ export function change<T extends object>(
  * Creates a proxy for a Loro container if one doesn't already exist in the cache.
  * Text containers are returned directly as they don't support proxying.
  */
-function createProxy(container: LoroMap | LoroList | LoroText): object {
+function createProxy(container: Container): object {
   if (container instanceof LoroText) {
+    return container
+  }
+
+  if (!(container instanceof LoroMap || container instanceof LoroList)) {
+    // Only Map and List containers can be proxied.
+    // Return other container types directly.
     return container
   }
 
@@ -128,47 +185,52 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Plain objects and arrays are converted to detached LoroMaps and LoroLists.
  */
 function toLoroValue(value: unknown): unknown {
-    if (typeof value === "string") {
-        const text = new LoroText();
-        text.insert(0, value);
-        return text;
-    }
+  if (value instanceof LoroTextWrapper) {
+    const text = new LoroText()
+    text.insert(0, value.initialValue)
+    return text
+  }
 
-    if (Array.isArray(value)) {
-        const list = new LoroList();
-        for (const item of value) {
-            const loroItem = toLoroValue(item);
-            if (
-                loroItem instanceof LoroMap ||
-                loroItem instanceof LoroList ||
-                loroItem instanceof LoroText
-            ) {
-                list.pushContainer(loroItem);
-            } else {
-                list.push(loroItem);
-            }
-        }
-        return list;
-    }
+  if (typeof value === "string") {
+    // Strings are treated as LWW primitives by default
+    return value
+  }
 
-    if (isPlainObject(value)) {
-        const map = new LoroMap();
-        for (const [key, subValue] of Object.entries(value)) {
-            const loroSubValue = toLoroValue(subValue);
-            if (
-                loroSubValue instanceof LoroMap ||
-                loroSubValue instanceof LoroList ||
-                loroSubValue instanceof LoroText
-            ) {
-                map.setContainer(key, loroSubValue);
-            } else {
-                map.set(key, loroSubValue);
-            }
-        }
-        return map;
+  if (Array.isArray(value)) {
+    const list = new LoroList()
+    for (const item of value) {
+      const loroItem = toLoroValue(item)
+      if (
+        loroItem instanceof LoroMap ||
+        loroItem instanceof LoroList ||
+        loroItem instanceof LoroText
+      ) {
+        list.pushContainer(loroItem)
+      } else {
+        list.push(loroItem)
+      }
     }
+    return list
+  }
 
-    return value;
+  if (isPlainObject(value)) {
+    const map = new LoroMap()
+    for (const [key, subValue] of Object.entries(value)) {
+      const loroSubValue = toLoroValue(subValue)
+      if (
+        loroSubValue instanceof LoroMap ||
+        loroSubValue instanceof LoroList ||
+        loroSubValue instanceof LoroText
+      ) {
+        map.setContainer(key, loroSubValue)
+      } else {
+        map.set(key, loroSubValue)
+      }
+    }
+    return map
+  }
+
+  return value
 }
 
 /**
@@ -180,9 +242,9 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   get(target, prop, receiver) {
     if (target instanceof LoroMap) {
       const value = target.get(String(prop))
-			if (value instanceof LoroText) {
-				return value;
-			}
+      if (value instanceof LoroText) {
+        return value
+      }
       if (value instanceof LoroMap || value instanceof LoroList) {
         return createProxy(value)
       }
@@ -198,6 +260,39 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
     if (target instanceof LoroList) {
       if (prop === "length") {
         return target.length
+      }
+
+      if (prop === "push") {
+        return (...items: unknown[]) => {
+          for (const item of items) {
+            const loroValue = toLoroValue(item)
+            if (
+              loroValue instanceof LoroMap ||
+              loroValue instanceof LoroList ||
+              loroValue instanceof LoroText
+            ) {
+              target.pushContainer(loroValue)
+            } else {
+              target.push(loroValue)
+            }
+          }
+          return target.length
+        }
+      }
+
+      if (prop === "pop") {
+        return () => {
+          if (target.length === 0) {
+            return undefined
+          }
+          const index = target.length - 1
+          const value = target.get(index)
+          target.delete(index, 1)
+          if (value instanceof LoroMap || value instanceof LoroList) {
+            return createProxy(value)
+          }
+          return value
+        }
       }
 
       if (prop === "splice") {
@@ -263,20 +358,27 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   set(target, prop, value: unknown) {
     if (target instanceof LoroMap) {
-        const current = target.get(String(prop));
-        if (current instanceof LoroText && typeof value === 'string') {
-            current.delete(0, current.length);
-            current.insert(0, value);
-            return true;
-        }
+      const current = target.get(String(prop))
+      if (current instanceof LoroText && typeof value === "string") {
+        current.delete(0, current.length)
+        current.insert(0, value)
+        return true
+      }
 
-        const loroValue = toLoroValue(value);
-        if (loroValue instanceof LoroMap || loroValue instanceof LoroList || loroValue instanceof LoroText) {
-            target.setContainer(String(prop), loroValue as LoroMap | LoroList | LoroText);
-        } else {
-            target.set(String(prop), loroValue);
-        }
-        return true;
+      const loroValue = toLoroValue(value)
+      if (
+        loroValue instanceof LoroMap ||
+        loroValue instanceof LoroList ||
+        loroValue instanceof LoroText
+      ) {
+        target.setContainer(
+          String(prop),
+          loroValue as LoroMap | LoroList | LoroText,
+        )
+      } else {
+        target.set(String(prop), loroValue)
+      }
+      return true
     }
 
     if (target instanceof LoroList) {
