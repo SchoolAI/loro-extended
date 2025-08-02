@@ -7,7 +7,7 @@ import {
 } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 
-import { CRDT, change, from } from "./change"
+import { CRDT, change, from } from "./index.js"
 
 type PlainObject = { [key: string]: JSONValue }
 type JSONValue = string | number | boolean | null | JSONValue[] | PlainObject

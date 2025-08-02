@@ -1,0 +1,35 @@
+{
+  "name": "loro-change",
+  "version": "1.0.0",
+  "description": "Simple change method for LoroDoc and plain JSON objects, similar to Automerge",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "loro-crdt": "catalog:"
+  },
+  "devDependencies": {
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

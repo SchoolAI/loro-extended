@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+
+# Dependencies that are shared across the pnpm-workspace
+# See https://pnpm.io/catalogs
+catalog:
+  loro-crdt: ^1.5.9
+  tsup: ^8.5.0
+  typescript: ^5.9.2
+  vitest: ^3.2.4

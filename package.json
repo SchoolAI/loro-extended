@@ -1,19 +1,11 @@
 {
   "name": "loro-extended",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "vitest"
-  },
+  "description": "Extended capabilities for the Loro CRDT library",
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Duane Johnson",
+  "license": "MIT",
   "devDependencies": {
-    "@biomejs/biome": "^2.1.3",
-    "vitest": "^3.2.4"
-  },
-  "dependencies": {
-    "loro-crdt": "^1.5.9"
+    "@biomejs/biome": "^2.1.3"
   }
 }
