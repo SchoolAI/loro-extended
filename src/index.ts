@@ -58,6 +58,36 @@ type InferProxyType<D> = D extends LoroProxyDoc<infer P> ? P : object
 
 /**
  * @hidden
+ * A utility type to extract the optional keys from a type T.
+ */
+type OptionalKeys<T> = {
+  // For each key K in T, make it non-optional (-?).
+  // Then check if an empty object `{}` can be assigned to `Pick<T, K>`.
+  // If `K` is optional (e.g., `_key?: string`), `Pick<T, K>` will be `{ _key?: string }`,
+  // and `{}` is assignable to it. In this case, we keep the key `K`.
+  // If `K` is required (e.g., `_key: string`), `Pick<T, K>` will be `{ _key: string }`,
+  // and `{}` is NOT assignable to it. In this case, we map it to `never`.
+  // Finally, `[keyof T]` retrieves all keys that were not mapped to `never`.
+  [K in keyof T]-?: Record<string, never> extends Pick<T, K> ? K : never
+}[keyof T]
+
+/**
+ * @hidden
+ * A utility type that enforces a type `T` to have no optional properties.
+ *
+ * It works by checking if the `OptionalKeys<T>` type resolves to `never`.
+ * If it does, it means `T` has no optional properties, and the original type `T` is returned.
+ * If `OptionalKeys<T>` resolves to a union of keys (the optional ones), it triggers a
+ * type mismatch by returning a specific error string, which is incompatible with the
+ * `initialState` object type in the `from` function, thus generating a compile-time error.
+ * The `[... extends ...]` syntax is a robust way to check if a type is `never`.
+ */
+type NoOptional<T> = [OptionalKeys<T>] extends [never]
+  ? T
+  : "Error: Optional properties are not supported. Use 'T | null' instead."
+
+/**
+ * @hidden
  * Cache to store proxies, mapping a Loro container to its proxy.
  * This prevents re-creating proxies for the same container, improving performance
  * and maintaining object identity.
@@ -95,7 +125,7 @@ const proxyCache = new WeakMap<LoroMap | LoroList, object>()
  * @returns A new Loro document.
  */
 export function from<T extends Record<string, unknown>>(
-  initialState: T,
+  initialState: T & NoOptional<T>,
 ): LoroProxyDoc<AsLoro<T>> {
   const doc = new LoroDoc()
   // Use the change function to set the initial state transactionally.
@@ -434,21 +464,11 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
     return false
   },
   deleteProperty(target, prop) {
-    if (target instanceof LoroMap) {
-      // Loro "deletes" a key by setting its value to undefined.
-      target.set(String(prop), undefined)
-      return true
-    }
-
-    if (target instanceof LoroList) {
-      const index = Number(prop)
-      if (!Number.isNaN(index)) {
-        target.delete(index, 1)
-        return true
-      }
-    }
-
-    return false
+    throw new Error(
+      `The 'delete' operator is not supported. To remove property "${String(
+        prop,
+      )}", assign its value to null.`,
+    )
   },
   has(target, prop) {
     if (target instanceof LoroMap) {
@@ -473,10 +493,20 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   ownKeys(target) {
     if (target instanceof LoroMap) {
-      const json = target.toJSON() as Record<string, unknown>
-      return Object.keys(json).filter(
-        key => json[key] !== null && json[key] !== undefined,
-      )
+      // We don't use toJSON() here because it stringifies `undefined` to `null`,
+      // which makes it impossible to distinguish between a deleted property and
+      // a property that is explicitly set to `null`.
+      const keys: string[] = []
+      for (const key of target.keys()) {
+        // We filter out `null` and `undefined` here because Loro's `get` returns
+        // `null` for a key that was set to `undefined` (i.e. deleted). This
+        // means we cannot distinguish a deleted key from one explicitly set to
+        // Per the Loro docs, the `keys()` method is intended to return only
+        // non-deleted keys. The `toJSON()` method, however, represents deleted
+        // keys as `null`. We align with that here by simply returning all keys.
+        return target.keys() as string[]
+      }
+      return keys
     }
 
     if (target instanceof LoroList) {
