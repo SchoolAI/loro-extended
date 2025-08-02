@@ -1,7 +1,13 @@
-import { type LoroDoc, LoroText } from "loro-crdt"
+import {
+  LoroCounter,
+  type LoroDoc,
+  type LoroList,
+  type LoroMap,
+  LoroText,
+} from "loro-crdt"
 import { describe, expect, it } from "vitest"
 
-import { change, from, Loro } from "./index"
+import { CRDT, change, from } from "./index"
 
 type PlainObject = { [key: string]: JSONValue }
 type JSONValue = string | number | boolean | null | JSONValue[] | PlainObject
@@ -281,7 +287,7 @@ describe("LoroText handling", () => {
   })
 
   it("should update LoroText when a new string is assigned", () => {
-    const doc = from({ title: Loro.Text("hello") })
+    const doc = from({ title: CRDT.Text("hello") })
     change(doc, (d: { title: LoroText }) => {
       // Direct assignment should throw type error, but we can update the container
       d.title.delete(0, d.title.length)
@@ -295,7 +301,7 @@ describe("LoroText handling", () => {
   })
 
   it("should allow fine-grained edits on string properties", () => {
-    const doc = from({ title: Loro.Text("hello") })
+    const doc = from({ title: CRDT.Text("hello") })
     change(doc, (d: { title: LoroText }) => {
       d.title.insert(5, " world")
     })
@@ -303,5 +309,54 @@ describe("LoroText handling", () => {
     const map = doc.getMap("root")
     const title = map.get("title") as LoroText
     expect(title.toString()).toBe("hello world")
+  })
+})
+
+describe("LoroCounter handling", () => {
+  it("should create a document with a LoroCounter", () => {
+    const doc = from({ counter: CRDT.Counter(10) })
+    const counter = doc.getMap("root").get("counter") as LoroCounter
+    expect(counter).toBeInstanceOf(LoroCounter)
+    expect(counter.value).toBe(10)
+  })
+
+  it("should increment and decrement a LoroCounter", () => {
+    const doc = from({ counter: CRDT.Counter(0) })
+
+    change(doc, d => {
+      d.counter.increment(5)
+    })
+    expect((doc.getMap("root").get("counter") as LoroCounter).value).toBe(5)
+
+    change(doc, d => {
+      d.counter.decrement(3)
+    })
+    expect((doc.getMap("root").get("counter") as LoroCounter).value).toBe(2)
+  })
+
+  it("should handle counters in nested objects", () => {
+    const doc = from({ stats: { scores: CRDT.Counter(100) } })
+
+    change(doc, d => {
+      d.stats.scores.increment(50)
+    })
+
+    const root = doc.getMap("root")
+    const stats = root.get("stats") as LoroMap
+    const scores = stats.get("scores") as LoroCounter
+    expect(scores.value).toBe(150)
+  })
+
+  it("should handle counters in arrays", () => {
+    const doc = from({ counters: [CRDT.Counter(1), CRDT.Counter(2)] })
+
+    change(doc, d => {
+      d.counters[0].increment(1)
+      d.counters[1].decrement(1)
+    })
+
+    const counters = doc.getMap("root").get("counters") as LoroList
+    expect((counters.get(0) as LoroCounter).value).toBe(2)
+    expect((counters.get(1) as LoroCounter).value).toBe(1)
   })
 })

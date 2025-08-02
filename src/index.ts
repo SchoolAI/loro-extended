@@ -1,4 +1,11 @@
-import { type Container, LoroDoc, LoroList, LoroMap, LoroText } from "loro-crdt"
+import {
+  type Container,
+  LoroDoc,
+  LoroList,
+  LoroMap,
+  LoroText,
+  LoroCounter,
+} from "loro-crdt"
 
 // #################
 // ### Loro Object
@@ -8,23 +15,28 @@ class LoroTextWrapper {
   constructor(public initialValue: string) {}
 }
 
-export const Loro = {
+class LoroCounterWrapper {
+  constructor(public initialValue: number) {}
+}
+
+export const CRDT = {
   Text: (initialValue = "") => new LoroTextWrapper(initialValue),
+  Counter: (initialValue = 0) => new LoroCounterWrapper(initialValue),
 }
 
 // #################
 // ### Types
 // #################
 
-export type AsLoro<T> = {
-  [K in keyof T]: T[K] extends LoroTextWrapper
-    ? LoroText
-    : T[K] extends (infer E)[]
-      ? AsLoro<E>[]
-      : T[K] extends Record<string, unknown>
-        ? AsLoro<T[K]>
-        : T[K]
-}
+export type AsLoro<T> = T extends LoroTextWrapper
+  ? LoroText
+  : T extends LoroCounterWrapper
+  ? LoroCounter
+  : T extends (infer E)[]
+  ? AsLoro<E>[]
+  : T extends Record<string, unknown>
+  ? { [K in keyof T]: AsLoro<T[K]> }
+  : T
 
 /**
  * A LoroDoc that is "branded" with a type representing the shape of its proxy.
@@ -191,6 +203,12 @@ function toLoroValue(value: unknown): unknown {
     return text
   }
 
+  if (value instanceof LoroCounterWrapper) {
+    const counter = new LoroCounter()
+    counter.increment(value.initialValue)
+    return counter
+  }
+  
   if (typeof value === "string") {
     // Strings are treated as LWW primitives by default
     return value
@@ -203,9 +221,10 @@ function toLoroValue(value: unknown): unknown {
       if (
         loroItem instanceof LoroMap ||
         loroItem instanceof LoroList ||
-        loroItem instanceof LoroText
+        loroItem instanceof LoroText ||
+        loroItem instanceof LoroCounter
       ) {
-        list.pushContainer(loroItem)
+        list.pushContainer(loroItem as Container)
       } else {
         list.push(loroItem)
       }
@@ -220,9 +239,10 @@ function toLoroValue(value: unknown): unknown {
       if (
         loroSubValue instanceof LoroMap ||
         loroSubValue instanceof LoroList ||
-        loroSubValue instanceof LoroText
+        loroSubValue instanceof LoroText ||
+        loroSubValue instanceof LoroCounter
       ) {
-        map.setContainer(key, loroSubValue)
+        map.setContainer(key, loroSubValue as Container)
       } else {
         map.set(key, loroSubValue)
       }
@@ -242,7 +262,7 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   get(target, prop, receiver) {
     if (target instanceof LoroMap) {
       const value = target.get(String(prop))
-      if (value instanceof LoroText) {
+      if (value instanceof LoroText || value instanceof LoroCounter) {
         return value
       }
       if (value instanceof LoroMap || value instanceof LoroList) {
@@ -269,9 +289,10 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
             if (
               loroValue instanceof LoroMap ||
               loroValue instanceof LoroList ||
-              loroValue instanceof LoroText
+              loroValue instanceof LoroText ||
+              loroValue instanceof LoroCounter
             ) {
-              target.pushContainer(loroValue)
+              target.pushContainer(loroValue as Container)
             } else {
               target.push(loroValue)
             }
@@ -306,9 +327,10 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
             if (
               item instanceof LoroMap ||
               item instanceof LoroList ||
-              item instanceof LoroText
+              item instanceof LoroText ||
+              item instanceof LoroCounter
             ) {
-              target.insertContainer(start + i, item)
+              target.insertContainer(start + i, item as Container)
             } else {
               target.insert(start + i, item)
             }
@@ -333,9 +355,10 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
           if (
             item instanceof LoroMap ||
             item instanceof LoroList ||
-            item instanceof LoroText
+            item instanceof LoroText ||
+            item instanceof LoroCounter
           ) {
-            target.insertContainer(0, item)
+            target.insertContainer(0, item as Container)
           } else {
             target.insert(0, item)
           }
@@ -369,12 +392,10 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
       if (
         loroValue instanceof LoroMap ||
         loroValue instanceof LoroList ||
-        loroValue instanceof LoroText
+        loroValue instanceof LoroText ||
+        loroValue instanceof LoroCounter
       ) {
-        target.setContainer(
-          String(prop),
-          loroValue as LoroMap | LoroList | LoroText,
-        )
+        target.setContainer(String(prop), loroValue as Container)
       } else {
         target.set(String(prop), loroValue)
       }
@@ -391,9 +412,10 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
         if (
           loroValue instanceof LoroMap ||
           loroValue instanceof LoroList ||
-          loroValue instanceof LoroText
+          loroValue instanceof LoroText ||
+          loroValue instanceof LoroCounter
         ) {
-          target.insertContainer(index, loroValue)
+          target.insertContainer(index, loroValue as Container)
         } else {
           target.insert(index, loroValue)
         }
