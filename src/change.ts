@@ -1,10 +1,10 @@
 import {
   type Container,
+  LoroCounter,
   LoroDoc,
   LoroList,
   LoroMap,
   LoroText,
-  LoroCounter,
 } from "loro-crdt"
 
 // #################
@@ -31,12 +31,12 @@ export const CRDT = {
 export type AsLoro<T> = T extends LoroTextWrapper
   ? LoroText
   : T extends LoroCounterWrapper
-  ? LoroCounter
-  : T extends (infer E)[]
-  ? AsLoro<E>[]
-  : T extends Record<string, unknown>
-  ? { [K in keyof T]: AsLoro<T[K]> }
-  : T
+    ? LoroCounter
+    : T extends (infer E)[]
+      ? AsLoro<E>[]
+      : T extends Record<string, unknown>
+        ? { [K in keyof T]: AsLoro<T[K]> }
+        : T
 
 /**
  * A LoroDoc that is "branded" with a type representing the shape of its proxy.
@@ -130,13 +130,11 @@ export function from<T extends Record<string, unknown>>(
   const doc = new LoroDoc()
   // Use the change function to set the initial state transactionally.
   change(doc, d => {
-    // `d` is inferred as `object` here, so we can't use Object.assign
-    // without a cast. A loop is more explicit and type-safe.
-    for (const key in initialState) {
-      if (Object.prototype.hasOwnProperty.call(initialState, key)) {
-        ;(d as any)[key] = initialState[key]
-      }
+    if (!d || typeof d !== "object") {
+      throw new Error("doc under change must be an object")
     }
+
+    Object.assign(d, initialState)
   })
   return doc as LoroProxyDoc<AsLoro<T>>
 }
@@ -238,7 +236,7 @@ function toLoroValue(value: unknown): unknown {
     counter.increment(value.initialValue)
     return counter
   }
-  
+
   if (typeof value === "string") {
     // Strings are treated as LWW primitives by default
     return value
@@ -463,7 +461,7 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
 
     return false
   },
-  deleteProperty(target, prop) {
+  deleteProperty(_target, prop) {
     throw new Error(
       `The 'delete' operator is not supported. To remove property "${String(
         prop,
@@ -493,20 +491,8 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   ownKeys(target) {
     if (target instanceof LoroMap) {
-      // We don't use toJSON() here because it stringifies `undefined` to `null`,
-      // which makes it impossible to distinguish between a deleted property and
-      // a property that is explicitly set to `null`.
-      const keys: string[] = []
-      for (const key of target.keys()) {
-        // We filter out `null` and `undefined` here because Loro's `get` returns
-        // `null` for a key that was set to `undefined` (i.e. deleted). This
-        // means we cannot distinguish a deleted key from one explicitly set to
-        // Per the Loro docs, the `keys()` method is intended to return only
-        // non-deleted keys. The `toJSON()` method, however, represents deleted
-        // keys as `null`. We align with that here by simply returning all keys.
-        return target.keys() as string[]
-      }
-      return keys
+      // Loro's `keys()` method correctly returns only non-deleted keys.
+      return target.keys()
     }
 
     if (target instanceof LoroList) {
