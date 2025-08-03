@@ -1,12 +1,14 @@
-# Loro DocHandle
+# Loro Repo
 
-`@loro/doc-handle` is a core component for building local-first applications with [Loro](https://github.com/loro-dev/loro), a fast CRDTs-based state synchronization library.
-
-The `DocHandle` is a stateful wrapper around a single Loro document. It provides a higher-level API to manage the document's lifecycle, state, and mutations, abstracting away the complexities of the underlying CRDT. It is inspired by the `DocHandle` from `automerge-repo`.
+`@loro-extended/repo` is a core component for building distributed local-first applications with [Loro](https://github.com/loro-dev/loro), a fast CRDTs-based state synchronization library.
 
 ## What is Loro?
 
 Loro is a library of CRDTs (Conflict-free Replicated Data Types) that enables real-time collaboration and local-first applications. It allows multiple users to concurrently modify a shared JSON-like data structure, merging changes automatically without conflicts. Data is stored locally and can be synced with peers when a network connection is available.
+
+# DocHandle
+
+The `DocHandle` is a stateful wrapper around a single Loro document. It provides a higher-level API to manage the document's lifecycle, state, and mutations, abstracting away the complexities of the underlying CRDT. It is inspired by the `DocHandle` from `automerge-repo`.
 
 ## DocHandle Usage
 
@@ -23,7 +25,7 @@ The `DocHandle` provides a robust, event-driven way to interact with a Loro docu
 
 ```typescript
 import { LoroDoc } from "loro-crdt";
-import { DocHandle } from "@loro/doc-handle";
+import { DocHandle } from "@loro-extended/repo";
 
 // Define the shape of your document
 type MyDoc = {

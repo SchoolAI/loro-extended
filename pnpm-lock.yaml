@@ -27,7 +27,7 @@ importers:
         specifier: ^2.1.3
         version: 2.1.3
 
-  packages/loro-change:
+  packages/change:
     dependencies:
       loro-crdt:
         specifier: 'catalog:'
@@ -43,14 +43,14 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/node@20.19.9)
 
-  packages/loro-doc-handle:
+  packages/repo:
     dependencies:
+      '@loro-extended/change':
+        specifier: workspace:^
+        version: link:../change
       emittery:
         specifier: ^1.0.1
         version: 1.2.0
-      loro-change:
-        specifier: workspace:^
-        version: link:../loro-change
       loro-crdt:
         specifier: 'catalog:'
         version: 1.5.9

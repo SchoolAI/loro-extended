@@ -1,7 +1,7 @@
 {
-  "name": "loro-doc-handle",
-  "version": "0.0.0",
-  "description": "A handle for managing the lifecycle of a Loro document.",
+  "name": "@loro-extended/change",
+  "version": "0.1.0",
+  "description": "Simple change method for LoroDoc and plain JSON objects, similar to Automerge",
   "author": "Duane Johnson",
   "license": "MIT",
   "type": "module",
@@ -25,14 +25,9 @@
     "test": "vitest"
   },
   "dependencies": {
-    "emittery": "^1.0.1",
-    "loro-change": "workspace:^"
-  },
-  "peerDependencies": {
     "loro-crdt": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.12.12",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -87,7 +87,7 @@ class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
 
 The responsibility for persistence is delegated to the creator of the `DocHandle` (typically a `Repo` instance). The `DocHandle` itself is agnostic about where the document comes from; it simply orchestrates the state transitions based on the outcome of the `getDoc` promise provided to its `load()` method.
 
-1.  **Initiate Load**: The owner of the handle calls `handle.load(getDoc)`, where `getDoc` is an async function that the owner is responsible for implementing. This transitions the handle's state from `Idle` to `Loading`.
+1.  **Initiate Load**: The owner of the handle calls `handle.load(getDoc)`, where `getDoc` is an async function that the owner is responsible for implementing. This transitions the handle's state from `Idle` to `Loading`, or from `Idle` to `Unavailable` if getDoc returns null.
 2.  **Await Document**: The handle `await`s the `getDoc()` promise.
     -   **On Success**: If the promise resolves with a `LoroProxyDoc`, the handle transitions to the `Ready` state. It internally subscribes to the document to listen for local changes, which will be emitted as `sync-message` events.
     -   **On Failure**: If the promise rejects, the handle transitions to the `Unavailable` state.

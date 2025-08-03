@@ -1,5 +1,5 @@
+import { change, type AsLoro, type LoroProxyDoc } from "@loro-extended/change"
 import Emittery from "emittery"
-import { change, type AsLoro, type LoroProxyDoc } from "loro-change"
 
 export type DocumentId = string
 
@@ -81,9 +81,7 @@ export class DocHandle<T extends Record<string, any>> {
    *
    * @param getDoc A function that returns a promise resolving to the Loro document.
    */
-  public async load(
-    getDoc: () => Promise<LoroProxyDoc<AsLoro<T>> | null>,
-  ) {
+  public async load(getDoc: () => Promise<LoroProxyDoc<AsLoro<T>> | null>) {
     if (this.state !== "idle") {
       return
     }

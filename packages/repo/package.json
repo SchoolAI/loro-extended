@@ -1,7 +1,7 @@
 {
-  "name": "loro-change",
-  "version": "1.0.0",
-  "description": "Simple change method for LoroDoc and plain JSON objects, similar to Automerge",
+  "name": "@loro-extended/repo",
+  "version": "0.1.0",
+  "description": "A document repo for Loro",
   "author": "Duane Johnson",
   "license": "MIT",
   "type": "module",
@@ -25,9 +25,14 @@
     "test": "vitest"
   },
   "dependencies": {
+    "emittery": "^1.0.1",
+    "@loro-extended/change": "workspace:^"
+  },
+  "peerDependencies": {
     "loro-crdt": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "^20.12.12",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

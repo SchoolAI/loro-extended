@@ -1,10 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: ok for tests */
 
-import type { AsLoro, LoroProxyDoc } from "loro-change"
+import type { AsLoro, LoroProxyDoc } from "../../change/dist/index.js"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 
-import { DocHandle } from "./index.js"
+import { DocHandle } from "./doc-handle.js"
 
 // Helper to wait for a specific event
 const waitForEvent = (handle: DocHandle<any>, eventName: string) => {
