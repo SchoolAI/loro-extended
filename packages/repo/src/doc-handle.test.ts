@@ -205,16 +205,15 @@ describe("DocHandle", () => {
 
   it("whenReady() should not resolve if the document is unavailable", async () => {
     const handle = new DocHandle("test-doc")
-    let isReady = false
-    handle.whenReady().then(() => {
-      isReady = true
-    })
+    expect(handle.whenReady()).rejects.toThrow(
+      "Document entered state: unavailable",
+    )
 
     await handle.load(async () => null)
 
     // Give a chance for the promise to resolve if it were to do so incorrectly
     await new Promise(r => setTimeout(r, 0))
-    expect(isReady).toBe(false)
+
     expect(handle.state).toBe("unavailable")
   })
 })

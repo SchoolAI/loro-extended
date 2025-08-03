@@ -1,7 +1,8 @@
 import { change, type AsLoro, type LoroProxyDoc } from "@loro-extended/change"
 import Emittery from "emittery"
+import { LoroDoc } from "loro-crdt"
 
-export type DocumentId = string
+import type { DocumentId } from "./types.js"
 
 /** The possible states a DocHandle can be in. */
 export type HandleState =
@@ -57,9 +58,13 @@ export class DocHandle<T extends Record<string, any>> {
    * If the handle is already 'ready', the promise resolves immediately.
    */
   public whenReady(): Promise<void> {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       if (this.state === "ready") {
         resolve()
+        return
+      }
+      if (this.state === "unavailable" || this.state === "deleted") {
+        reject(new Error(`Document is in state: ${this.state}`))
         return
       }
 
@@ -67,6 +72,9 @@ export class DocHandle<T extends Record<string, any>> {
         if (newState === "ready") {
           this._emitter.off("state-change", listener)
           resolve()
+        } else if (newState === "unavailable" || newState === "deleted") {
+          this._emitter.off("state-change", listener)
+          reject(new Error(`Document entered state: ${newState}`))
         }
       }
 
@@ -96,6 +104,9 @@ export class DocHandle<T extends Record<string, any>> {
       }
 
       if (doc === null) {
+        // If the document is not in storage, it might be available
+        // in another storage adapter, or via network. But we return
+        // `unavailable` here for now until we support searching.
         this.#setState("unavailable")
         return
       }
@@ -150,13 +161,26 @@ export class DocHandle<T extends Record<string, any>> {
    * @param message The binary sync message.
    */
   public applySyncMessage(message: Uint8Array) {
-    if (this.state !== "ready") {
-      // Or, should this be queued? For now, we'll throw.
-      throw new Error(
-        `Cannot apply sync message to a document that is not ready.`,
-      )
+    if (this.state === "deleted") {
+      return // Don't apply changes to a deleted doc
     }
 
+    // If we're idle/loading, this sync message is the doc's initial state
+    if (!this.#doc) {
+      this.#setState("loading")
+      const doc = new LoroDoc()
+      // Note: `change` sets up the proxy, but doesn't apply changes itself.
+      // The proxy is needed so the user can interact with the doc later.
+      this.#doc = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
+      doc.import(message)
+      this.#doc.subscribeLocalUpdates(update => {
+        this._emitter.emit("sync-message", update)
+      })
+      this.#setState("ready")
+      return
+    }
+
+    // If we already have a doc, just import the new changes
     const doc = this.doc()
     doc.import(message)
     this._emitter.emit("change", { doc })
