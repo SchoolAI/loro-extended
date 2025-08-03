@@ -41,7 +41,32 @@ importers:
         version: 5.9.2
       vitest:
         specifier: 'catalog:'
-        version: 3.2.4
+        version: 3.2.4(@types/node@20.19.9)
+
+  packages/loro-doc-handle:
+    dependencies:
+      emittery:
+        specifier: ^1.0.1
+        version: 1.2.0
+      loro-change:
+        specifier: workspace:^
+        version: link:../loro-change
+      loro-crdt:
+        specifier: 'catalog:'
+        version: 1.5.9
+    devDependencies:
+      '@types/node':
+        specifier: ^20.12.12
+        version: 20.19.9
+      tsup:
+        specifier: 'catalog:'
+        version: 8.5.0(postcss@8.5.6)(typescript@5.9.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/node@20.19.9)
 
 packages:
 
@@ -384,6 +409,9 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/node@20.19.9':
+    resolution: {integrity: sha512-cuVNgarYWZqxRJDQHEB58GEONhOK79QVR/qYx4S7kcUObQvUwvFnYxJuuHUKm2aieN9X3yZB4LZsuYNU1Qphsw==}
+
   '@vitest/expect@3.2.4':
     resolution: {integrity: sha512-Io0yyORnB6sikFlt8QW5K7slY4OjqNX9jmJQ02QDda8lyM6B5oNgVWoSoKPac8/kgnCUzuHQKrSLtu/uOqqrig==}
 
@@ -506,6 +534,10 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  emittery@1.2.0:
+    resolution: {integrity: sha512-KxdRyyFcS85pH3dnU8Y5yFUm2YJdaHwcBZWrfG8o89ZY9a13/f9itbN+YG3ELbBo9Pg5zvIozstmuV8bX13q6g==}
+    engines: {node: '>=14.16'}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -811,6 +843,9 @@ packages:
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
+
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
@@ -1118,6 +1153,10 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/node@20.19.9':
+    dependencies:
+      undici-types: 6.21.0
+
   '@vitest/expect@3.2.4':
     dependencies:
       '@types/chai': 5.2.2
@@ -1126,13 +1165,13 @@ snapshots:
       chai: 5.2.1
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@3.2.4(vite@7.0.6)':
+  '@vitest/mocker@3.2.4(vite@7.0.6(@types/node@20.19.9))':
     dependencies:
       '@vitest/spy': 3.2.4
       estree-walker: 3.0.3
       magic-string: 0.30.17
     optionalDependencies:
-      vite: 7.0.6
+      vite: 7.0.6(@types/node@20.19.9)
 
   '@vitest/pretty-format@3.2.4':
     dependencies:
@@ -1228,6 +1267,8 @@ snapshots:
   deep-eql@5.0.2: {}
 
   eastasianwidth@0.2.0: {}
+
+  emittery@1.2.0: {}
 
   emoji-regex@8.0.0: {}
 
@@ -1540,13 +1581,15 @@ snapshots:
 
   ufo@1.6.1: {}
 
-  vite-node@3.2.4:
+  undici-types@6.21.0: {}
+
+  vite-node@3.2.4(@types/node@20.19.9):
     dependencies:
       cac: 6.7.14
       debug: 4.4.1
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.0.6
+      vite: 7.0.6(@types/node@20.19.9)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -1561,7 +1604,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite@7.0.6:
+  vite@7.0.6(@types/node@20.19.9):
     dependencies:
       esbuild: 0.25.8
       fdir: 6.4.6(picomatch@4.0.3)
@@ -1570,13 +1613,14 @@ snapshots:
       rollup: 4.46.2
       tinyglobby: 0.2.14
     optionalDependencies:
+      '@types/node': 20.19.9
       fsevents: 2.3.3
 
-  vitest@3.2.4:
+  vitest@3.2.4(@types/node@20.19.9):
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.0.6)
+      '@vitest/mocker': 3.2.4(vite@7.0.6(@types/node@20.19.9))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
@@ -1594,9 +1638,11 @@ snapshots:
       tinyglobby: 0.2.14
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
-      vite: 7.0.6
-      vite-node: 3.2.4
+      vite: 7.0.6(@types/node@20.19.9)
+      vite-node: 3.2.4(@types/node@20.19.9)
       why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 20.19.9
     transitivePeerDependencies:
       - jiti
       - less

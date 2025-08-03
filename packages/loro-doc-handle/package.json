@@ -1,0 +1,40 @@
+{
+  "name": "loro-doc-handle",
+  "version": "0.0.0",
+  "description": "A handle for managing the lifecycle of a Loro document.",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "emittery": "^1.0.1",
+    "loro-change": "workspace:^"
+  },
+  "peerDependencies": {
+    "loro-crdt": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
