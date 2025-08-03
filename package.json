@@ -5,6 +5,10 @@
   "keywords": [],
   "author": "Duane Johnson",
   "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.1.3"
   }
