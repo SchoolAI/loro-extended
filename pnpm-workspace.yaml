@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "examples/*"
 
 # Dependencies that are shared across the pnpm-workspace
 # See https://pnpm.io/catalogs
