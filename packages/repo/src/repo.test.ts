@@ -160,7 +160,7 @@ describe("CollectionSynchronizer with permissions", () => {
     await synchronizer.addPeer("peer-2")
 
     expect(mockPermissions.canRevealDocumentId).toHaveBeenCalledWith(
-      "test-peer",
+      "peer-2",
       handle.documentId,
     )
     expect(messageSpy).not.toHaveBeenCalled()
@@ -222,7 +222,7 @@ describe("CollectionSynchronizer with permissions", () => {
     await vi.runAllTimersAsync() // This makes the handle ready and triggers addDocument's .then()
 
     expect(mockPermissions.canRevealDocumentId).toHaveBeenCalledWith(
-      "test-peer",
+      "peer-2",
       handle.documentId,
     )
     // Check that no 'announce-document' message was emitted

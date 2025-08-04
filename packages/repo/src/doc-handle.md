@@ -60,12 +60,13 @@ class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
 
   public get state(): HandleState;
 
-  // Returns a promise that resolves when the handle is 'ready'.
-  public whenReady(): Promise<void>;
+  // Returns a promise that resolves when the handle is in a terminal state
+  // ('ready', 'unavailable', or 'deleted'). It does not throw.
+  public whenReady(): Promise<{ status: "ready" | "unavailable" | "deleted" }>;
 
   // Initiates loading by calling the provided async loader function.
   // Only callable when in the 'idle' state.
-  public async load(getDoc: () => Promise<LoroProxyDoc<AsLoro<T>>>): Promise<void>;
+  public async load(getDoc: () => Promise<LoroProxyDoc<AsLoro<T>> | null>): Promise<void>;
 
   // Returns the underlying LoroProxyDoc. Throws if not 'ready'.
   public doc(): LoroProxyDoc<AsLoro<T>>;
@@ -73,7 +74,7 @@ class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
   // The primary method for mutating the document. Throws if not 'ready'.
   public change(mutator: (doc: AsLoro<T>) => void): void;
 
-  // Applies a sync message from a remote peer. Throws if not 'ready'.
+  // Applies a sync message from a remote peer.
   public applySyncMessage(message: Uint8Array): void;
 
   // Marks the document for deletion.

@@ -30,7 +30,7 @@ A `DocHandle` is a reference to a single document within the `Repo`. It is not t
   - `ready`: The document is loaded and available.
   - `unavailable`: We couldn't find the document in storage or on the network.
   - `deleted`: The document has been marked for deletion.
-- **Asynchronous Loading**: The `whenReady()` promise on the handle allows code to wait until the document is in the `ready` state before interacting with it.
+- **Asynchronous Loading**: The `whenReady()` promise on the handle allows code to wait until the document is in the `ready` state before interacting with it. It does not throw, but resolves to a status that is `ready`, `unavailable`, or `deleted`.
 - **Event-Driven**: It emits `change` events whenever the underlying document is modified, either by the local user or through a sync message from a peer.
 
 ### 1.3. Adapters: Pluggable Backends
@@ -39,6 +39,7 @@ A core design principle is the use of adapters for abstracting away the concrete
 
 - **`StorageAdapter`**: Defines the interface for a key-value storage backend. Its responsibility is to save, load, and remove raw document data (`Uint8Array`). An `InMemoryStorageAdapter` is provided for testing and simple use cases.
 - **`NetworkAdapter`**: Defines the interface for a peer-to-peer communication channel. Its responsibility is to send and receive arbitrary messages between peers. An `InProcessNetworkAdapter` is provided, which allows multiple `Repo` instances within the same JavaScript process to communicate, facilitating robust testing.
+- **`PermissionAdapter`**: An optional interface for implementing access control. It provides a set of functions (`canRead`, `canWrite`, `canDelete`) that the `Repo` will call to authorize actions. If not provided, all actions are permitted.
 
 ## 2. System Architecture
 
@@ -86,9 +87,10 @@ Initially, the design was simpler: peers would broadcast any local changes, and 
 
 The architecture was refactored to an explicit **"Announce/Request/Sync"** protocol:
 
-1.  **Announce**: A peer periodically broadcasts a list of all `documentId`s it has.
-2.  **Request Sync**: When a peer receives an "announce" for a document it doesn't have, it sends a direct `request-sync` message to the announcer.
+1.  **Announce Document**: A peer periodically broadcasts the existence of a new `documentId`s it has.
+2.  **Request Sync**: When a peer receives an "announce-document" for a document it doesn't have, it sends a direct `request-sync` message to the announcer.
 3.  **Sync**: The announcing peer responds with a `sync` message containing the full document snapshot. Any subsequent changes to the document are also sent as incremental `sync` messages.
+4. **Broadcast Request (Optional)**: If a peer calls `find()` on a document ID it does not have, and it has not yet received an `announce` message for it, it will broadcast a `request-sync` message to all connected peers. This ensures that a document can be found even if the `announce` message was missed or has not yet been sent.
 
 This design is more complex and requires more network chatter, but it is **fundamentally more robust**. It guarantees that any peer can eventually acquire any document it learns about, which is a critical requirement for a distributed system.
 

@@ -28,10 +28,10 @@ export class Repo extends Emittery {
   networkSubsystem: NetworkSubsystem
   storageSubsystem: StorageSubsystem
   synchronizer: CollectionSynchronizer
-  #permissionAdapter?: PermissionAdapter
+  #permissionAdapter: PermissionAdapter
   #handleCache = new Map<DocumentId, DocHandle<any>>()
 
-  get permissions(): PermissionAdapter | undefined {
+  get permissions(): PermissionAdapter {
     return this.#permissionAdapter
   }
 
@@ -42,7 +42,7 @@ export class Repo extends Emittery {
   constructor({ storage, network, peerId, permissions }: RepoConfig = {}) {
     super()
     this.peerId = peerId ?? randomPeerId()
-    this.#permissionAdapter = permissions
+    this.#permissionAdapter = permissions ?? {}
 
     // Instantiate subsystems
     this.storageSubsystem = new StorageSubsystem(
@@ -79,8 +79,13 @@ export class Repo extends Emittery {
   // PUBLIC API
   //
 
-  create<T extends Record<string, any>>(): DocHandle<T> {
-    const documentId = crypto.randomUUID()
+  create<T extends Record<string, any>>(
+    options: { documentId?: DocumentId } = {},
+  ): DocHandle<T> {
+    const documentId = options.documentId ?? crypto.randomUUID()
+    if (this.#handleCache.has(documentId)) {
+      throw new Error(`A document with id ${documentId} already exists.`)
+    }
     const handle = this.#getHandle<T>(documentId)
     // A new document is ready immediately with an empty LoroDoc.
     handle.load(() => Promise.resolve(new LoroDoc()))
@@ -91,9 +96,10 @@ export class Repo extends Emittery {
   find<T extends Record<string, any>>(documentId: DocumentId): DocHandle<T> {
     const handle = this.#getHandle<T>(documentId)
     if (handle.state === "idle") {
-      // The synchronizer needs to know about the document immediately.
+      // The synchronizer needs to know about the document in order to sync it.
       this.synchronizer.addDocument(handle)
-      // loadDoc will either return a LoroDoc or null.
+      // loadDoc will either return a LoroDoc or null. The handle will transition
+      // to "searching" if it's not found in storage.
       handle.load(() => this.storageSubsystem.loadDoc(documentId))
     }
     return handle

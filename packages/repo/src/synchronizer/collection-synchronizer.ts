@@ -22,6 +22,8 @@ interface CollectionSynchronizerEvents {
 export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvents> {
   #repo: Repo
   #peers = new Set<PeerId>()
+  // A map of which peers have announced which documents.
+  #announcedDocs = new Map<DocumentId, Set<PeerId>>()
 
   constructor(repo: Repo) {
     super()
@@ -41,18 +43,16 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     }
 
     let documentIds: DocumentId[]
-    if (permissions) {
-      const results = await Promise.all(
-        handles.map(handle =>
-          permissions.canRevealDocumentId(this.#repo.peerId, handle.documentId),
-        ),
-      )
-      documentIds = handles
-        .filter((_, i) => results[i])
-        .map(handle => handle.documentId)
-    } else {
-      documentIds = handles.map(handle => handle.documentId)
-    }
+    const results = await Promise.all(
+      handles.map(handle =>
+        permissions.canRevealDocumentId
+          ? permissions.canRevealDocumentId(peerId, handle.documentId)
+          : true,
+      ),
+    )
+    documentIds = handles
+      .filter((_, i) => results[i])
+      .map(handle => handle.documentId)
 
     if (documentIds.length > 0) {
       this.emit("message", {
@@ -73,34 +73,38 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     // When the document is ready, announce it to all peers
     handle.whenReady().then(async ({ status }) => {
       if (status === "ready") {
-        const canRevealDocumentId = permissions
-          ? await permissions.canRevealDocumentId(this.#repo.peerId, handle.documentId)
-          : true
-        if (canRevealDocumentId) {
-          this.#peers.forEach(peerId => {
+        for (const peerId of this.#peers) {
+          const canReveal = permissions.canRevealDocumentId
+            ? await permissions.canRevealDocumentId(peerId, handle.documentId)
+            : true
+
+          if (canReveal) {
             this.emit("message", {
               type: "announce-document",
               senderId: this.#repo.peerId,
               targetId: peerId,
               documentIds: [handle.documentId],
             })
-          })
+          }
         }
       }
     })
 
     // When the document changes locally, send a sync message to all peers
     handle.on("sync-message", async (data: Uint8Array) => {
-      if (!permissions) {
-        this.#peers.forEach(peerId =>
-          this.#sendSyncMessage(peerId, handle.documentId, data),
-        )
-        return
-      }
-
       for (const peerId of this.#peers) {
-        const canWrite = await permissions.canWrite(peerId, handle.documentId)
-        if (canWrite) {
+        // A peer must have "write" permission to receive a sync message, but
+        // they also must have "reveal" permission to know the document exists.
+        const canWrite = permissions.canWrite
+          ? await permissions.canWrite(peerId, handle.documentId)
+          : true
+        const canReveal = permissions.canRevealDocumentId
+          ? await permissions.canRevealDocumentId(
+              peerId,
+              handle.documentId,
+            )
+          : true
+        if (canWrite && canReveal) {
           this.#sendSyncMessage(peerId, handle.documentId, data)
         }
       }
@@ -127,7 +131,25 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
       return
     }
 
-    // Set a timeout to transition to "unavailable" if no peer announces the doc.
+    // If we know which peer has the document, we can request it directly.
+    const knownPeers = this.#announcedDocs.get(handle.documentId)
+    if (knownPeers && knownPeers.size > 0) {
+      const peerId = knownPeers.values().next().value as PeerId
+      this.#requestSync(peerId, handle)
+      return
+    }
+
+    // If we don't know who has the document, we have to ask everyone.
+    this.#peers.forEach(peerId => {
+      this.emit("message", {
+        type: "request-sync",
+        senderId: this.#repo.peerId,
+        targetId: peerId,
+        documentId: handle.documentId,
+      })
+    })
+
+    // Set a timeout to transition to "unavailable" if no peer responds.
     handle._stateTimeoutId = setTimeout(() => {
       handle._setState("unavailable")
     }, DISCOVERY_TIMEOUT)
@@ -155,34 +177,45 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     documentIds,
   }: AnnounceDocumentMessage) {
     for (const documentId of documentIds) {
+      // Record that this peer has this document.
+      if (!this.#announcedDocs.has(documentId)) {
+        this.#announcedDocs.set(documentId, new Set())
+      }
+      this.#announcedDocs.get(documentId)!.add(senderId)
+
       const handle = this.#repo.find<any>(documentId)
 
       // If we are searching for this document, we can now request it.
       if (handle.state === "searching") {
-        // We found a peer, so clear the discovery timeout.
-        if (handle._stateTimeoutId) {
-          clearTimeout(handle._stateTimeoutId)
-        }
-
-        // Now we're in the "syncing" state, waiting for the actual data.
-        handle._setState("syncing")
-
-        // Set a new timeout for the sync process itself.
-        handle._stateTimeoutId = setTimeout(() => {
-          // If the peer doesn't deliver in time, go back to searching.
-          handle._setState("searching")
-          this.beginSync(handle) // Restart the discovery process.
-        }, SYNC_TIMEOUT)
-
-        // Request the document from the peer that has it.
-        this.emit("message", {
-          type: "request-sync",
-          senderId: this.#repo.peerId,
-          targetId: senderId,
-          documentId,
-        })
+        this.#requestSync(senderId, handle)
       }
     }
+  }
+
+  #requestSync(peerId: PeerId, handle: DocHandle<any>) {
+    // We found a peer, so clear the discovery timeout.
+    if (handle._stateTimeoutId) {
+      clearTimeout(handle._stateTimeoutId)
+      handle._stateTimeoutId = undefined
+    }
+
+    // Now we're in the "syncing" state, waiting for the actual data.
+    handle._setState("syncing")
+
+    // Set a new timeout for the sync process itself.
+    handle._stateTimeoutId = setTimeout(() => {
+      // If the peer doesn't deliver in time, go back to searching.
+      handle._setState("searching")
+      this.beginSync(handle) // Restart the discovery process.
+    }, SYNC_TIMEOUT)
+
+    // Request the document from the peer that has it.
+    this.emit("message", {
+      type: "request-sync",
+      senderId: this.#repo.peerId,
+      targetId: peerId,
+      documentId: handle.documentId,
+    })
   }
 
   async #handleRequestSync({ senderId, documentId }: RequestSyncMessage) {
@@ -207,16 +240,18 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     if (!data) return
 
     const handle = this.#repo.find<any>(documentId)
-    const permissions = this.#repo.permissions
-    if (permissions) {
-      const canWrite = await permissions.canWrite(senderId, documentId)
-      if (!canWrite) {
-        return
-      }
+    const canWrite = this.#repo.permissions.canWrite
+      ? await this.#repo.permissions.canWrite(senderId, documentId)
+      : true
+    if (!canWrite) {
+      return
     }
 
-    // If we were waiting for this sync message, clear the timeout.
-    if (handle.state === "syncing") {
+    // If we were waiting for this sync message, clear the timeout. A sync
+    // message can be received when the handle is in the "syncing" state (as a
+    // response to an announcement) or in the "searching" state (as a response
+    // to a direct request).
+    if (handle.state === "syncing" || handle.state === "searching") {
       if (handle._stateTimeoutId) {
         clearTimeout(handle._stateTimeoutId)
         handle._stateTimeoutId = undefined
@@ -230,12 +265,11 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     senderId,
     documentId,
   }: DeleteDocumentMessage) {
-    const permissions = this.#repo.permissions
-    if (permissions) {
-      const canDelete = await permissions.canDelete(senderId, documentId)
-      if (!canDelete) {
-        return
-      }
+    const canDelete = this.#repo.permissions.canDelete
+      ? await this.#repo.permissions.canDelete(senderId, documentId)
+      : true
+    if (!canDelete) {
+      return
     }
     this.#repo.delete(documentId)
   }
