@@ -45,8 +45,8 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     let documentIds: DocumentId[]
     const results = await Promise.all(
       handles.map(handle =>
-        permissions.canRevealDocumentId
-          ? permissions.canRevealDocumentId(peerId, handle.documentId)
+        permissions.canList
+          ? permissions.canList(peerId, handle.documentId)
           : true,
       ),
     )
@@ -74,8 +74,8 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     handle.whenReady().then(async ({ status }) => {
       if (status === "ready") {
         for (const peerId of this.#peers) {
-          const canReveal = permissions.canRevealDocumentId
-            ? await permissions.canRevealDocumentId(peerId, handle.documentId)
+          const canReveal = permissions.canList
+            ? await permissions.canList(peerId, handle.documentId)
             : true
 
           if (canReveal) {
@@ -98,8 +98,8 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
         const canWrite = permissions.canWrite
           ? await permissions.canWrite(peerId, handle.documentId)
           : true
-        const canReveal = permissions.canRevealDocumentId
-          ? await permissions.canRevealDocumentId(
+        const canReveal = permissions.canList
+          ? await permissions.canList(
               peerId,
               handle.documentId,
             )

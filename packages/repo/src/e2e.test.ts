@@ -51,7 +51,7 @@ describe("End-to-end synchronization", () => {
     const repo1 = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canRevealDocumentId: () => true,
+        canList: () => true,
         canWrite: () => repo1CanWrite,
         canDelete: () => true,
       },
@@ -84,7 +84,7 @@ describe("End-to-end synchronization", () => {
     const repo1 = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canRevealDocumentId: () => true,
+        canList: () => true,
         canWrite: () => true,
         canDelete: () => false,
       },
@@ -104,7 +104,7 @@ describe("End-to-end synchronization", () => {
   })
 })
 
-describe("canRevealDocumentId permission", () => {
+describe("canList permission", () => {
   let broker: InProcessNetworkBroker
   let repoA: Repo
   let repoB: Repo
@@ -118,11 +118,11 @@ describe("canRevealDocumentId permission", () => {
     vi.useRealTimers()
   })
 
-  it("should reveal all documents when canRevealDocumentId is always true", async () => {
+  it("should reveal all documents when canList is always true", async () => {
     repoA = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canRevealDocumentId: () => true,
+        canList: () => true,
         canWrite: () => true,
         canDelete: () => true,
       },
@@ -150,10 +150,10 @@ describe("canRevealDocumentId permission", () => {
     expect(bHandle2.state).toBe("ready")
   })
 
-  it("should not announce documents when canRevealDocumentId is false", async () => {
+  it("should not announce documents when canList is false", async () => {
     repoA = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
-      permissions: { canRevealDocumentId: () => false },
+      permissions: { canList: () => false },
     })
     repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
@@ -167,7 +167,7 @@ describe("canRevealDocumentId permission", () => {
   it("should sync a document on direct request even if not announced", async () => {
     repoA = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
-      permissions: { canRevealDocumentId: () => false },
+      permissions: { canList: () => false },
     })
     repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
@@ -191,7 +191,7 @@ describe("canRevealDocumentId permission", () => {
     repoA = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canRevealDocumentId: (peerId, documentId) =>
+        canList: (peerId, documentId) =>
           documentId.startsWith("allowed"),
       },
     })
@@ -213,7 +213,7 @@ describe("canRevealDocumentId permission", () => {
     repoA = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canRevealDocumentId: (peerId, documentId) =>
+        canList: (peerId, documentId) =>
           documentId.startsWith("allowed"),
       },
     })
