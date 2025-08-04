@@ -66,24 +66,41 @@ export class DocHandle<T extends Record<string, any>> {
   }
 
   /**
-   * Returns a promise that resolves when the handle is in the 'ready' state.
-   * If the handle is already 'ready', the promise resolves immediately.
+   * Returns a promise that resolves when the document is in a terminal state
+   * ('ready', 'unavailable', or 'deleted'). Unlike the old `whenReady`, this
+   * method does not throw an exception if the document becomes unavailable or is
+   * deleted.
+   *
+   * @returns A promise that resolves with the handle's terminal state.
    */
-  public async whenReady(): Promise<void> {
-    if (this.state === "ready") return Promise.resolve()
-
-    if (this.state === "unavailable" || this.state === "deleted") {
-      return Promise.reject(new Error(`Document is in state: ${this.state}`))
+  public async whenReady(): Promise<{
+    status: "ready" | "unavailable" | "deleted"
+  }> {
+    for await (const state of this.stateStream()) {
+      if (state === "ready") return { status: "ready" }
+      if (state === "unavailable") return { status: "unavailable" }
+      if (state === "deleted") return { status: "deleted" }
     }
+    // This line should be unreachable if the state machine is correct.
+    return { status: this.state as "ready" | "unavailable" | "deleted" }
+  }
 
-    for await (const result of this._emitter.events("state-change")) {
-      if (result.newState === "ready") return Promise.resolve()
-
-      if (result.newState === "unavailable" || result.newState === "deleted") {
-        return Promise.reject(
-          new Error(`Document entered state: ${this.state}`),
-        )
+  /**
+   * Returns an async iterable that yields the handle's state as it changes.
+   * The first value yielded is always the current state.
+   * @internal
+   */
+  async *stateStream(): AsyncIterable<HandleState> {
+    const events = this._emitter.events("state-change")
+    try {
+      yield this.state
+      for await (const { newState } of events) {
+        yield newState
       }
+    } finally {
+      // This is crucial to ensure the event listener is removed when the
+      // consumer of the stream is finished.
+      events.return?.()
     }
   }
 

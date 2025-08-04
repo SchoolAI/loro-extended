@@ -51,15 +51,17 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
 
   addDocument(handle: DocHandle<any>) {
     // When the document is ready, announce it to all peers
-    handle.whenReady().then(() => {
-      this.#peers.forEach(peerId => {
-        this.emit("message", {
-          type: "announce",
-          senderId: this.#repo.peerId,
-          targetId: peerId,
-          documentIds: [handle.documentId],
+    handle.whenReady().then(({ status }) => {
+      if (status === "ready") {
+        this.#peers.forEach(peerId => {
+          this.emit("message", {
+            type: "announce",
+            senderId: this.#repo.peerId,
+            targetId: peerId,
+            documentIds: [handle.documentId],
+          })
         })
-      })
+      }
     })
 
     // When the document changes locally, send a sync message to all peers
@@ -144,8 +146,9 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
 
   async #handleRequestSync({ senderId, documentId }: RequestSyncMessage) {
     const handle = this.#repo.find<any>(documentId)
-    try {
-      await handle.whenReady()
+    const { status } = await handle.whenReady()
+
+    if (status === "ready") {
       // Send the full document state to the requesting peer.
       this.emit("message", {
         type: "sync",
@@ -154,10 +157,9 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
         documentId,
         data: handle.doc().exportSnapshot(),
       })
-    } catch (e: any) {
-      // It's possible we don't have the doc, or it's in a bad state.
-      // We should probably let the other peer know.
     }
+    // If the document is not ready, we just don't respond.
+    // The requesting peer will time out and re-request if necessary.
   }
 
   async #handleSync({ documentId, data }: SyncMessage) {

@@ -16,7 +16,8 @@ describe("End-to-end synchronization", () => {
 
     // Create a document in repo1
     const handle1 = repo1.create<{ text: string }>()
-    await handle1.whenReady()
+    const { status: status1 } = await handle1.whenReady()
+    expect(status1).toBe("ready")
     handle1.change(doc => {
       doc.text = "hello"
     })
@@ -25,7 +26,8 @@ describe("End-to-end synchronization", () => {
     // Find the same document in repo2
     // This should trigger a request-sync/sync flow
     const handle2 = repo2.find<{ text: string }>(handle1.documentId)
-    await handle2.whenReady()
+    const { status: status2 } = await handle2.whenReady()
+    expect(status2).toBe("ready")
 
     // The document should have the content from repo1
     expect(handle2.doc().toJSON()).toEqual({ root: { text: "hello" } })

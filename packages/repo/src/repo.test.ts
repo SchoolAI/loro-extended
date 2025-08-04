@@ -27,7 +27,8 @@ describe("Repo", () => {
     const handle = repo.create()
     expect(handle).toBeInstanceOf(DocHandle)
     await vi.runAllTimersAsync()
-    await handle.whenReady()
+    const { status } = await handle.whenReady()
+    expect(status).toBe("ready")
     expect(handle.state).toBe("ready")
   })
 
@@ -46,16 +47,15 @@ describe("Repo", () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(handle.state).toBe("searching")
 
-    // Set up the expectation that whenReady() will reject *before* triggering the timeout.
-    const rejectionPromise = expect(handle.whenReady()).rejects.toThrow(
-      "Document entered state: unavailable",
-    )
+    // Set up the expectation that whenReady() will resolve with "unavailable".
+    const readyPromise = handle.whenReady()
 
-    // Advance the timers by the discovery timeout to trigger the state change and rejection
+    // Advance the timers by the discovery timeout to trigger the state change
     await vi.advanceTimersByTimeAsync(5000)
 
-    // Wait for the rejection assertion to complete
-    await rejectionPromise
+    // Wait for the resolution and confirm the status
+    const { status } = await readyPromise
+    expect(status).toBe("unavailable")
 
     // Finally, confirm the handle's state
     expect(handle.state).toBe("unavailable")
@@ -71,7 +71,8 @@ describe("Repo", () => {
     })
     const handleA = repoA.create<DocSchema>()
     await vi.runAllTimersAsync()
-    await handleA.whenReady()
+    const { status: statusA } = await handleA.whenReady()
+    expect(statusA).toBe("ready")
 
     // Mutate the document in Repo A
     handleA.change(doc => {
@@ -86,7 +87,8 @@ describe("Repo", () => {
     const handleB = repoB.find<DocSchema>(handleA.documentId)
 
     await vi.runAllTimersAsync()
-    await handleB.whenReady()
+    const { status: statusB } = await handleB.whenReady()
+    expect(statusB).toBe("ready")
 
     expect(handleB.state).toBe("ready")
     expect(handleB.doc().toJSON()).toEqual({ root: { text: "hello" } })
@@ -95,18 +97,30 @@ describe("Repo", () => {
   it("should delete a document", async () => {
     const handle = repo.create()
     await vi.runAllTimersAsync()
-    await handle.whenReady()
+    const { status } = await handle.whenReady()
+    expect(status).toBe("ready")
     repo.delete(handle.documentId)
 
     expect(handle.state).toBe("deleted")
 
     // The handle should be removed from the cache, so find creates a new one
-    // const foundHandle = repo.find(handle.documentId)
-    // expect(foundHandle).not.toBe(handle)
+    const foundHandle = repo.find(handle.documentId)
+    expect(foundHandle).not.toBe(handle)
 
-    // // The new handle for a deleted doc should be unavailable because it's gone from storage
-    // expect(foundHandle.state).toBe("loading")
-    // await foundHandle.whenReady().catch(() => {})
-    // expect(foundHandle.state).toBe("unavailable")
+    // The new handle for a deleted doc should be unavailable because it's gone from storage
+    expect(foundHandle.state).toBe("loading")
+    // The handle will try to load from storage, which will fail
+    await vi.advanceTimersByTimeAsync(0)
+    expect(foundHandle.state).toBe("searching")
+
+    // Set up the whenReady promise
+    const readyPromise = foundHandle.whenReady()
+
+    // The synchronizer will now time out waiting for a peer
+    await vi.advanceTimersByTimeAsync(5000)
+
+    const { status: foundStatus } = await readyPromise
+    expect(foundStatus).toBe("unavailable")
+    expect(foundHandle.state).toBe("unavailable")
   })
 })

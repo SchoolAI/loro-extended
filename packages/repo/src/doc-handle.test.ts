@@ -47,13 +47,15 @@ describe("DocHandle", () => {
 
     // 4. Manually resolve the loader, fulfilling the loading promise
     resolveLoad(new LoroDoc() as LoroProxyDoc<any>)
-    await readyPromise // This should now resolve
+    const result = await readyPromise // This should now resolve
+    expect(result.status).toBe("ready")
     expect(handle.state).toBe("ready")
 
     // 5. Call whenReady() again now that the handle is already 'ready'
     const alreadyReadyPromise = handle.whenReady()
-    await alreadyReadyPromise
+    const alreadyReadyResult = await alreadyReadyPromise
     // check that it resolves immediately
+    expect(alreadyReadyResult.status).toBe("ready")
     expect(handle.state).toBe("ready")
   })
 
@@ -188,12 +190,14 @@ describe("DocHandle", () => {
     })
   })
 
-  it("whenReady() should not resolve while the document is searching", async () => {
+  it("whenReady() should not resolve as 'ready' while the document is searching", async () => {
     const handle = new DocHandle("test-doc")
 
     let isReady = false
-    handle.whenReady().then(() => {
-      isReady = true
+    handle.whenReady().then(({ status }) => {
+      if (status === "ready") {
+        isReady = true
+      }
     })
 
     // a load that returns null will put the handle in a 'searching' state
@@ -205,5 +209,38 @@ describe("DocHandle", () => {
 
     // whenReady() promise should not have resolved
     expect(isReady).toBe(false)
+  })
+
+  it("whenReady() should resolve with { status: 'deleted' } if the handle is deleted", async () => {
+    const handle = new DocHandle("test-doc")
+    const readyPromise = handle.whenReady()
+    handle.delete()
+    const result = await readyPromise
+    expect(result.status).toBe("deleted")
+  })
+
+  it("whenReady() should resolve with { status: 'unavailable' } if the handle becomes unavailable", async () => {
+    const handle = new DocHandle("test-doc")
+    const readyPromise = handle.whenReady()
+
+    // Manually set the state to unavailable, simulating a timeout
+    handle._setState("unavailable")
+
+    const result = await readyPromise
+    expect(result.status).toBe("unavailable")
+  })
+
+  it("whenReady() should resolve immediately with the correct status if already in a terminal state", async () => {
+    // Test for 'deleted' state
+    const deletedHandle = new DocHandle("deleted-doc")
+    deletedHandle.delete()
+    const deletedResult = await deletedHandle.whenReady()
+    expect(deletedResult.status).toBe("deleted")
+
+    // Test for 'unavailable' state
+    const unavailableHandle = new DocHandle("unavailable-doc")
+    unavailableHandle._setState("unavailable")
+    const unavailableResult = await unavailableHandle.whenReady()
+    expect(unavailableResult.status).toBe("unavailable")
   })
 })
