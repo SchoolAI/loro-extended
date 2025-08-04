@@ -10,6 +10,10 @@ import type {
 import type { Repo } from "../repo.js"
 import type { DocumentId, PeerId } from "../types.js"
 
+// Constants for timeouts
+const DISCOVERY_TIMEOUT = 5000 // 5 seconds
+const SYNC_TIMEOUT = 5000 // 5 seconds
+
 interface CollectionSynchronizerEvents {
   message: RepoMessage
 }
@@ -17,7 +21,6 @@ interface CollectionSynchronizerEvents {
 export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvents> {
   #repo: Repo
   #peers = new Set<PeerId>()
-  #requestedDocs = new Set<DocumentId>()
 
   constructor(repo: Repo) {
     super()
@@ -74,7 +77,23 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
   }
 
   removeDocument(documentId: DocumentId) {
-    this.#requestedDocs.delete(documentId)
+    // No-op. This method is kept for API compatibility but might be removed later.
+    // We no longer need to track requested documents here.
+  }
+
+  /**
+   * Kicks off the synchronization process for a document handle.
+   * This is called by the repo when a handle transitions to the "searching" state.
+   */
+  beginSync(handle: DocHandle<any>) {
+    if (handle.state !== "searching") {
+      return
+    }
+
+    // Set a timeout to transition to "unavailable" if no peer announces the doc.
+    handle._stateTimeoutId = setTimeout(() => {
+      handle._setState("unavailable")
+    }, DISCOVERY_TIMEOUT)
   }
 
   async receiveMessage(message: RepoMessage) {
@@ -95,19 +114,31 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     for (const documentId of documentIds) {
       const handle = this.#repo.find<any>(documentId)
 
-      // If we're already tracking this doc, or have requested it, don't do it again.
-      if (handle.state !== "idle" || this.#requestedDocs.has(documentId)) {
-        continue
-      }
+      // If we are searching for this document, we can now request it.
+      if (handle.state === "searching") {
+        // We found a peer, so clear the discovery timeout.
+        if (handle._stateTimeoutId) {
+          clearTimeout(handle._stateTimeoutId)
+        }
 
-      // We've decided we want the doc. Mark it as requested and send the message.
-      this.#requestedDocs.add(documentId)
-      this.emit("message", {
-        type: "request-sync",
-        senderId: this.#repo.peerId,
-        targetId: senderId,
-        documentId,
-      })
+        // Now we're in the "syncing" state, waiting for the actual data.
+        handle._setState("syncing")
+
+        // Set a new timeout for the sync process itself.
+        handle._stateTimeoutId = setTimeout(() => {
+          // If the peer doesn't deliver in time, go back to searching.
+          handle._setState("searching")
+          this.beginSync(handle) // Restart the discovery process.
+        }, SYNC_TIMEOUT)
+
+        // Request the document from the peer that has it.
+        this.emit("message", {
+          type: "request-sync",
+          senderId: this.#repo.peerId,
+          targetId: senderId,
+          documentId,
+        })
+      }
     }
   }
 
@@ -133,6 +164,15 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     if (!data) return
 
     const handle = this.#repo.find<any>(documentId)
+
+    // If we were waiting for this sync message, clear the timeout.
+    if (handle.state === "syncing") {
+      if (handle._stateTimeoutId) {
+        clearTimeout(handle._stateTimeoutId)
+        handle._stateTimeoutId = undefined
+      }
+    }
+
     handle.applySyncMessage(data)
   }
 }

@@ -8,8 +8,12 @@ import type { DocumentId } from "./types.js"
 export type HandleState =
   /** The handle has been created but not yet loaded or requested. */
   | "idle"
-  /** We are waiting for storage to finish loading or a peer to respond. */
+  /** We are waiting for storage to finish loading. */
   | "loading"
+  /** We are searching for the document on the network. */
+  | "searching"
+  /** A peer has announced they have the document, and we are waiting for them to send it. */
+  | "syncing"
   /** The document is available and ready for interaction. */
   | "ready"
   /** The document was not found in storage or from any connected peers. */
@@ -35,6 +39,14 @@ export class DocHandle<T extends Record<string, any>> {
   public readonly documentId: DocumentId
   #state: HandleState = "idle"
   #doc?: LoroProxyDoc<AsLoro<T>>
+
+  /**
+   * The ID of a timeout that is running to transition the handle to a new state.
+   * This is used by the CollectionSynchronizer to manage timers.
+   * @internal
+   */
+  public _stateTimeoutId?: NodeJS.Timeout
+
   /** @internal */
   _emitter = new Emittery<DocHandleEvents<T>>()
 
@@ -57,35 +69,28 @@ export class DocHandle<T extends Record<string, any>> {
    * Returns a promise that resolves when the handle is in the 'ready' state.
    * If the handle is already 'ready', the promise resolves immediately.
    */
-  public whenReady(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.state === "ready") {
-        resolve()
-        return
-      }
-      if (this.state === "unavailable" || this.state === "deleted") {
-        reject(new Error(`Document is in state: ${this.state}`))
-        return
-      }
+  public async whenReady(): Promise<void> {
+    if (this.state === "ready") return Promise.resolve()
 
-      const listener = ({ newState }: { newState: HandleState }) => {
-        if (newState === "ready") {
-          this._emitter.off("state-change", listener)
-          resolve()
-        } else if (newState === "unavailable" || newState === "deleted") {
-          this._emitter.off("state-change", listener)
-          reject(new Error(`Document entered state: ${newState}`))
-        }
-      }
+    if (this.state === "unavailable" || this.state === "deleted") {
+      return Promise.reject(new Error(`Document is in state: ${this.state}`))
+    }
 
-      this._emitter.on("state-change", listener)
-    })
+    for await (const result of this._emitter.events("state-change")) {
+      if (result.newState === "ready") return Promise.resolve()
+
+      if (result.newState === "unavailable" || result.newState === "deleted") {
+        return Promise.reject(
+          new Error(`Document entered state: ${this.state}`),
+        )
+      }
+    }
   }
 
   /**
    * Kicks off the loading process by calling the provided async function.
    * The handle will transition to 'loading', then to 'ready' if the
-   * document is successfully loaded, or 'unavailable' if an error occurs.
+   * document is successfully loaded, or 'searching' if not found.
    *
    * @param getDoc A function that returns a promise resolving to the Loro document.
    */
@@ -94,33 +99,22 @@ export class DocHandle<T extends Record<string, any>> {
       return
     }
 
-    this.#setState("loading")
+    this._setState("loading")
 
-    try {
-      const doc = await getDoc()
-      if (this.#state !== "loading") {
-        // This could happen if the handle was deleted while loading
-        return
-      }
-
-      if (doc === null) {
-        // If the document is not in storage, it might be available
-        // in another storage adapter, or via network. But we return
-        // `unavailable` here for now until we support searching.
-        this.#setState("unavailable")
-        return
-      }
-
-      this.#doc = doc
-      this.#doc.subscribeLocalUpdates(update => {
-        this._emitter.emit("sync-message", update)
-      })
-
-      this.#setState("ready")
-    } catch (error) {
-      console.error("Error loading document:", error)
-      this.#setState("unavailable")
+    const doc = await getDoc()
+    if (this.#state !== "loading") {
+      // This could happen if the handle was deleted while loading
+      return
     }
+
+    if (doc === null) {
+      // If the document is not in storage, we need to ask the network.
+      // The Repo will trigger this by listening for the state change.
+      this._setState("searching")
+      return
+    }
+
+    this.#init(doc)
   }
 
   /**
@@ -136,7 +130,7 @@ export class DocHandle<T extends Record<string, any>> {
 
   /** Marks the document as deleted. */
   public delete() {
-    this.#setState("deleted")
+    this._setState("deleted")
     // In the future, this will trigger deletion from storage and notify peers.
   }
 
@@ -165,18 +159,13 @@ export class DocHandle<T extends Record<string, any>> {
       return // Don't apply changes to a deleted doc
     }
 
-    // If we're idle/loading, this sync message is the doc's initial state
+    // If we're idle, loading, or searching, this sync message is the doc's initial state
     if (!this.#doc) {
-      this.#setState("loading")
       const doc = new LoroDoc()
-      // Note: `change` sets up the proxy, but doesn't apply changes itself.
-      // The proxy is needed so the user can interact with the doc later.
-      this.#doc = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
       doc.import(message)
-      this.#doc.subscribeLocalUpdates(update => {
-        this._emitter.emit("sync-message", update)
-      })
-      this.#setState("ready")
+      // The `change` function returns a proxy, which is what we need.
+      const proxy = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
+      this.#init(proxy)
       return
     }
 
@@ -190,7 +179,7 @@ export class DocHandle<T extends Record<string, any>> {
    * Sets the handle's state and emits a 'state-change' event.
    * @param newState The state to transition to.
    */
-  #setState(newState: HandleState) {
+  _setState(newState: HandleState) {
     if (this.#state === newState) {
       return
     }
@@ -201,5 +190,16 @@ export class DocHandle<T extends Record<string, any>> {
       oldState,
       newState,
     })
+  }
+
+  #init(doc: LoroProxyDoc<AsLoro<T>>) {
+    if (this.#doc) {
+      throw new Error("DocHandle already has a document.")
+    }
+    this.#doc = doc
+    this.#doc.subscribeLocalUpdates(update => {
+      this._emitter.emit("sync-message", update)
+    })
+    this._setState("ready")
   }
 }

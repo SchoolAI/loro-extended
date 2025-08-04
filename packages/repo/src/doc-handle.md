@@ -19,35 +19,33 @@ To ensure predictable and robust behavior, the `DocHandle` is implemented as an 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle: created
+    [*] --> idle: created
 
-    Idle --> Loading: load(getDoc)
-    Loading --> Ready: getDoc() succeeds
-    Loading --> Unavailable: getDoc() fails
-
-    Idle --> Deleted: delete()
-    Loading --> Deleted: delete()
-    Ready --> Deleted: delete()
-
-    note right of Loading
-        The handle has been given an
-        async `getDoc()` function and is
-        awaiting its resolution.
-    end note
-
-    note right of Ready
-        The document is loaded into
-        memory and can be read from
-        and written to.
-    end note
+    idle --> loading: repo.find() [doc in storage]
+    loading --> ready: loaded from storage
+    loading --> unavailable: failed to load from storage
+    
+    idle --> searching: repo.find() [doc not in storage]
+    searching --> syncing: peer announces document
+    searching --> unavailable: discovery timeout
+    
+    syncing --> ready: sync message with data received
+    syncing --> searching: sync timeout / peer disconnects
+    
+    ready --> deleted: repo.delete()
+    searching --> deleted: repo.delete()
+    syncing --> deleted: repo.delete()
+    loading --> deleted: repo.delete()
 ```
 
 ### States
 
-- **`Idle`**: The initial state. The handle is instantiated but no data loading has been initiated. `load()` can be called.
-- **`Loading`**: The handle is actively awaiting the resolution of the `getDoc()` promise passed to `load()`. In this state, `doc()` and `change()` will throw, but `whenReady()` can be used to await the outcome.
-- **`Ready`**: The document was successfully loaded into memory and is available for mutation and reading.
-- **`Unavailable`**: The `getDoc()` promise was rejected, meaning the document could not be loaded.
+- **`Idle`**: The initial state. The handle exists, but we haven't tried to load it from storage or the network.
+- **`Loading`**: We are actively trying to load the document from storage.
+- **`Searching`**: The document wasn't found in storage, so we are now asking peers on the network if they have it. A discovery timer is running.
+- **`Syncing`**: A peer has told us they have the document, and we are now waiting for them to send the data. A sync timer is running.
+- **`Ready`**: The document is loaded in memory and available for use.
+- **`Unavailable`**: We couldn't find the document in storage or on the network within the allotted time.
 - **`Deleted`**: The document has been marked for deletion. This is a terminal state.
 
 ## 3. Core API
@@ -87,11 +85,17 @@ class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
 
 The responsibility for persistence is delegated to the creator of the `DocHandle` (typically a `Repo` instance). The `DocHandle` itself is agnostic about where the document comes from; it simply orchestrates the state transitions based on the outcome of the `getDoc` promise provided to its `load()` method.
 
-1.  **Initiate Load**: The owner of the handle calls `handle.load(getDoc)`, where `getDoc` is an async function that the owner is responsible for implementing. This transitions the handle's state from `Idle` to `Loading`, or from `Idle` to `Unavailable` if getDoc returns null.
-2.  **Await Document**: The handle `await`s the `getDoc()` promise.
-    -   **On Success**: If the promise resolves with a `LoroProxyDoc`, the handle transitions to the `Ready` state. It internally subscribes to the document to listen for local changes, which will be emitted as `sync-message` events.
-    -   **On Failure**: If the promise rejects, the handle transitions to the `Unavailable` state.
-3.  **Idempotency**: The `load()` method can only be called once when the handle is in the `Idle` state. Subsequent calls are ignored.
+1.  **Initiate Load**: The `Repo` calls `handle.load(getDoc)`, where `getDoc` is a function that attempts to load the document from the `StorageSubsystem`. This immediately transitions the handle from `idle` to `loading`.
+2.  **Storage Outcome**: The handle `await`s the `getDoc()` promise.
+    -   **On Success**: If `getDoc()` resolves with a `LoroProxyDoc`, the document was found in storage. The handle transitions to `ready`.
+    -   **On `null`**: If `getDoc()` resolves with `null`, the document is not in storage. The handle transitions to `searching`, signaling to the `Repo` that it should now query the network.
+    -   **On Failure**: If the promise rejects, the handle transitions to `unavailable`.
+3.  **Network Search**: While in the `searching` state, the `CollectionSynchronizer` (orchestrated by the `Repo`) broadcasts requests for the document and starts a discovery timer.
+    -   **Peer Found**: If a peer announces it has the document, the `CollectionSynchronizer` moves the handle to the `syncing` state and starts a new timer.
+    -   **Timeout**: If no peers respond before the discovery timer ends, the handle transitions to `unavailable`.
+4.  **Network Sync**: While in the `syncing` state, the handle waits for a `sync` message.
+    -   **Data Received**: When the `sync` message arrives, the handle applies it, initializes the `LoroDoc`, and transitions to `ready`.
+    -   **Timeout**: If the peer fails to send the data in time, the `CollectionSynchronizer` can transition the handle back to `searching` to find another peer.
 
 This design decouples the `DocHandle` from any specific storage or network implementation, making it a more general-purpose and reusable component. The `Repo` is now solely responsible for managing storage adapters and providing the correct `getDoc` logic.
 

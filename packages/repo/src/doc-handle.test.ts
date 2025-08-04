@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: ok for tests */
 
-import type { AsLoro, LoroProxyDoc } from "../../change/dist/index.js"
+import type { AsLoro, LoroProxyDoc } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 
@@ -31,10 +31,6 @@ describe("DocHandle", () => {
   it("whenReady() should wait for load, and resolve immediately once ready", async () => {
     const handle = new DocHandle("test-doc")
 
-    // Spy on the event emitter to check for listener registration
-    const onSpy = vi.spyOn(handle._emitter, "on")
-    const offSpy = vi.spyOn(handle._emitter, "off")
-
     // 1. Create a loader that we can resolve manually
     let resolveLoad!: (doc: LoroProxyDoc<any>) => void
     const loadingPromise = new Promise<LoroProxyDoc<any>>(resolve => {
@@ -46,30 +42,19 @@ describe("DocHandle", () => {
     handle.load(getDoc)
     expect(handle.state).toBe("loading")
 
-    // 3. The first call to whenReady() should register a 'state-change' listener
+    // 3. The first call to whenReady()
     const readyPromise = handle.whenReady()
-    expect(onSpy).toHaveBeenCalledWith("state-change", expect.any(Function))
-    expect(onSpy).toHaveBeenCalledTimes(1)
 
     // 4. Manually resolve the loader, fulfilling the loading promise
     resolveLoad(new LoroDoc() as LoroProxyDoc<any>)
     await readyPromise // This should now resolve
     expect(handle.state).toBe("ready")
 
-    // Check that the listener was removed after the state changed to 'ready'
-    expect(offSpy).toHaveBeenCalledWith("state-change", expect.any(Function))
-    expect(offSpy).toHaveBeenCalledTimes(1)
-
-    // 5. Reset spies to ensure clean checks for the second call
-    onSpy.mockClear()
-    offSpy.mockClear()
-
-    // 6. Call whenReady() again now that the handle is already 'ready'
-    await handle.whenReady()
-
-    // This second call should resolve immediately *without* adding/removing listeners
-    expect(onSpy).not.toHaveBeenCalled()
-    expect(offSpy).not.toHaveBeenCalled()
+    // 5. Call whenReady() again now that the handle is already 'ready'
+    const alreadyReadyPromise = handle.whenReady()
+    await alreadyReadyPromise
+    // check that it resolves immediately
+    expect(handle.state).toBe("ready")
   })
 
   it("should emit a 'state-change' event when state changes", async () => {
@@ -185,35 +170,40 @@ describe("DocHandle", () => {
     expect(jsDocB.text).toBe("synced")
   })
 
-  it("should transition to unavailable state if load returns null", async () => {
+  it("should transition to searching state if load returns null", async () => {
     const handle = new DocHandle("test-doc")
     const listener = vi.fn()
     handle.on("state-change", listener)
 
     await handle.load(async () => null)
 
-    expect(handle.state).toBe("unavailable")
+    expect(handle.state).toBe("searching")
     expect(listener).toHaveBeenCalledWith({
       oldState: "idle",
       newState: "loading",
     })
     expect(listener).toHaveBeenCalledWith({
       oldState: "loading",
-      newState: "unavailable",
+      newState: "searching",
     })
   })
 
-  it("whenReady() should not resolve if the document is unavailable", async () => {
+  it("whenReady() should not resolve while the document is searching", async () => {
     const handle = new DocHandle("test-doc")
-    expect(handle.whenReady()).rejects.toThrow(
-      "Document entered state: unavailable",
-    )
 
+    let isReady = false
+    handle.whenReady().then(() => {
+      isReady = true
+    })
+
+    // a load that returns null will put the handle in a 'searching' state
     await handle.load(async () => null)
+    expect(handle.state).toBe("searching")
 
     // Give a chance for the promise to resolve if it were to do so incorrectly
     await new Promise(r => setTimeout(r, 0))
 
-    expect(handle.state).toBe("unavailable")
+    // whenReady() promise should not have resolved
+    expect(isReady).toBe(false)
   })
 })

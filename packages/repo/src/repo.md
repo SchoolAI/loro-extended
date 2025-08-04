@@ -23,9 +23,12 @@ A `DocHandle` is a reference to a single document within the `Repo`. It is not t
 **Key Features:**
 
 - **State Machine**: A `DocHandle` progresses through a series of states:
-  - `idle`: The handle has been created, but the document has not been loaded from storage or the network.
-  - `loading`: The document is being actively fetched from storage or requested from peers.
-  - `ready`: The document is loaded, and its data is available for use (`handle.doc`).
+  - `idle`: The handle has been created, but we haven't tried to load it.
+  - `loading`: We are actively trying to load the document from storage.
+  - `searching`: The document wasn't found in storage, so we are asking peers on the network if they have it.
+  - `syncing`: A peer has told us they have the document, and we are waiting for them to send it.
+  - `ready`: The document is loaded and available.
+  - `unavailable`: We couldn't find the document in storage or on the network.
   - `deleted`: The document has been marked for deletion.
 - **Asynchronous Loading**: The `whenReady()` promise on the handle allows code to wait until the document is in the `ready` state before interacting with it.
 - **Event-Driven**: It emits `change` events whenever the underlying document is modified, either by the local user or through a sync message from a peer.
@@ -107,15 +110,17 @@ Here is the typical flow of data when a document is created and synchronized:
 
 3.  **Discovery and Request**:
 
-    - `repoB` sees the new `documentId`. It calls `repoB.find()` to get a `DocHandle`.
-    - This `DocHandle` starts in the `idle` state, as the document is not in `repoB`'s storage.
-    - The `CollectionSynchronizer` sees that the handle is `idle` and sends a `request-sync` message to `repoA`.
-    - The `DocHandle` in `repoB` transitions to `loading`.
+    - `repoB` sees the new `documentId`. It calls `repoB.find()` to get a `DocHandle`. The handle will not find the document in storage and will transition through the following states:
+        1. `idle` -> `loading`: `repoB.find()` is called.
+        2. `loading` -> `searching`: The `StorageSubsystem` returns `null`. The `Repo` sees this state change and tells the `CollectionSynchronizer` to `beginSync()`.
+    - The `CollectionSynchronizer` now starts a timer and waits for an `announce` message for the requested document.
 
 4.  **Full Sync**:
 
-    - `repoA` receives the `request-sync` and replies with a `sync` message containing the full document snapshot.
-    - `repoB` receives the `sync` message. Its `DocHandle` imports the snapshot, initializes its internal `LoroDoc`, subscribes to future changes, and transitions to `ready`.
+    - `repoA`'s periodic `announce` message is received by `repoB`.
+    - `repoB`'s `CollectionSynchronizer` sees the announcement for a document its handle is `searching` for. It transitions the handle to `syncing`, clears the discovery cromer, and starts a sync timer. It then sends a `request-sync` message to `repoA`.
+    - `repoA` receives the request and replies with a `sync` message a snapshot of the document.
+    - `repoB` receives the `sync` message. Its `CollectionSynchronizer` clears the sync timer, and the `DocHandle` imports the snapshot, initializes its `LoroDoc`, and transitions to `ready`.
     - The `whenReady()` promise on `repoB`'s handle resolves.
 
 5.  **Incremental Updates**:

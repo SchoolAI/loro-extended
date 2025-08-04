@@ -116,6 +116,11 @@ export class Repo extends Emittery {
       return this.#handleCache.get(documentId) as DocHandle<T>
     }
     const handle = new DocHandle<T>(documentId)
+    handle.on("state-change", ({ newState }) => {
+      if (newState === "searching") {
+        this.synchronizer.beginSync(handle)
+      }
+    })
     this.#handleCache.set(documentId, handle)
     return handle
   }
