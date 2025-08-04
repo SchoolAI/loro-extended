@@ -43,11 +43,18 @@ export interface SyncMessage extends MessageBase {
   data?: Uint8Array
 }
 
+/** A peer is requesting to delete a document. */
+export interface DeleteDocumentMessage extends MessageBase {
+  type: "delete-document"
+  documentId: DocumentId
+}
+
 export type RepoMessage =
   | AnnounceDocumentMessage
   | RequestSyncMessage
   | SyncMessage
   | DocumentUnavailableMessage
+  | DeleteDocumentMessage
 
 export interface NetworkAdapterEvents {
   /** A potential peer has been discovered. */

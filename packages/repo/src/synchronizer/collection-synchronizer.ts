@@ -3,6 +3,7 @@ import Emittery from "emittery"
 import type { DocHandle } from "../doc-handle.js"
 import type {
   AnnounceDocumentMessage,
+  DeleteDocumentMessage,
   RepoMessage,
   RequestSyncMessage,
   SyncMessage,
@@ -27,13 +28,31 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     this.#repo = repo
   }
 
-  addPeer(peerId: PeerId) {
+  async addPeer(peerId: PeerId) {
     this.#peers.add(peerId)
-    const documentIds = [
-      ...Array.from(this.#repo.handles.values())
-        .filter(handle => handle.state === "ready")
-        .map(handle => handle.documentId),
-    ]
+    const permissions = this.#repo.permissions
+
+    const handles = [
+      ...this.#repo.handles.values(),
+    ].filter(handle => handle.state === "ready")
+
+    if (handles.length === 0) {
+      return
+    }
+
+    let documentIds: DocumentId[]
+    if (permissions) {
+      const results = await Promise.all(
+        handles.map(handle =>
+          permissions.canShare(this.#repo.peerId, handle.documentId),
+        ),
+      )
+      documentIds = handles
+        .filter((_, i) => results[i])
+        .map(handle => handle.documentId)
+    } else {
+      documentIds = handles.map(handle => handle.documentId)
+    }
 
     if (documentIds.length > 0) {
       this.emit("message", {
@@ -50,36 +69,53 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
   }
 
   addDocument(handle: DocHandle<any>) {
+    const permissions = this.#repo.permissions
     // When the document is ready, announce it to all peers
-    handle.whenReady().then(({ status }) => {
+    handle.whenReady().then(async ({ status }) => {
       if (status === "ready") {
-        this.#peers.forEach(peerId => {
-          this.emit("message", {
-            type: "announce-document",
-            senderId: this.#repo.peerId,
-            targetId: peerId,
-            documentIds: [handle.documentId],
+        const canShare = permissions
+          ? await permissions.canShare(this.#repo.peerId, handle.documentId)
+          : true
+        if (canShare) {
+          this.#peers.forEach(peerId => {
+            this.emit("message", {
+              type: "announce-document",
+              senderId: this.#repo.peerId,
+              targetId: peerId,
+              documentIds: [handle.documentId],
+            })
           })
-        })
+        }
       }
     })
 
     // When the document changes locally, send a sync message to all peers
-    handle.on("sync-message", (data: Uint8Array) => {
-      this.#peers.forEach(peerId => {
-        this.emit("message", {
-          type: "sync",
-          senderId: this.#repo.peerId,
-          targetId: peerId,
-          documentId: handle.documentId,
-          data,
-        })
-      })
+    handle.on("sync-message", async (data: Uint8Array) => {
+      if (!permissions) {
+        this.#peers.forEach(peerId =>
+          this.#sendSyncMessage(peerId, handle.documentId, data),
+        )
+        return
+      }
+
+      for (const peerId of this.#peers) {
+        const canWrite = await permissions.canWrite(peerId, handle.documentId)
+        if (canWrite) {
+          this.#sendSyncMessage(peerId, handle.documentId, data)
+        }
+      }
     })
   }
 
   removeDocument(documentId: DocumentId) {
-    // TODO: suggest peers delete this document
+    this.#peers.forEach(peerId => {
+      this.emit("message", {
+        type: "delete-document",
+        senderId: this.#repo.peerId,
+        targetId: peerId,
+        documentId,
+      })
+    })
   }
 
   /**
@@ -107,6 +143,9 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
         break
       case "sync":
         this.#handleSync(message)
+        break
+      case "delete-document":
+        this.#handleDeleteDocument(message)
         break
     }
   }
@@ -164,10 +203,17 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     // The requesting peer will time out and re-request if necessary.
   }
 
-  async #handleSync({ documentId, data }: SyncMessage) {
+  async #handleSync({ senderId, documentId, data }: SyncMessage) {
     if (!data) return
 
     const handle = this.#repo.find<any>(documentId)
+    const permissions = this.#repo.permissions
+    if (permissions) {
+      const canWrite = await permissions.canWrite(senderId, documentId)
+      if (!canWrite) {
+        return
+      }
+    }
 
     // If we were waiting for this sync message, clear the timeout.
     if (handle.state === "syncing") {
@@ -178,5 +224,33 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     }
 
     handle.applySyncMessage(data)
+  }
+
+  async #handleDeleteDocument({
+    senderId,
+    documentId,
+  }: DeleteDocumentMessage) {
+    const permissions = this.#repo.permissions
+    if (permissions) {
+      const canDelete = await permissions.canDelete(senderId, documentId)
+      if (!canDelete) {
+        return
+      }
+    }
+    this.#repo.delete(documentId)
+  }
+
+  #sendSyncMessage(
+    targetId: PeerId,
+    documentId: DocumentId,
+    data: Uint8Array,
+  ) {
+    this.emit("message", {
+      type: "sync",
+      senderId: this.#repo.peerId,
+      targetId,
+      documentId,
+      data,
+    })
   }
 }

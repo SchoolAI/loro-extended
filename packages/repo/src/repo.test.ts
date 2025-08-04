@@ -124,3 +124,92 @@ describe("Repo", () => {
     expect(foundHandle.state).toBe("unavailable")
   })
 })
+
+describe("CollectionSynchronizer with permissions", () => {
+  let repo: Repo
+  let synchronizer: any // Access private methods for testing
+  let mockPermissions: any
+  let messageSpy: any
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockPermissions = {
+      canShare: vi.fn(() => true),
+      canWrite: vi.fn(() => true),
+      canDelete: vi.fn(() => true),
+    }
+
+    repo = new Repo({
+      permissions: mockPermissions,
+      peerId: "test-peer",
+    })
+
+    synchronizer = repo.synchronizer
+    messageSpy = vi.spyOn(synchronizer, "emit")
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("should not send an announce-document message if canShare is false", async () => {
+    mockPermissions.canShare.mockResolvedValue(false)
+    const handle = repo.create()
+    repo.handles.set(handle.documentId, handle)
+    handle._setState("ready")
+    await synchronizer.addPeer("peer-2")
+
+    expect(mockPermissions.canShare).toHaveBeenCalledWith(
+      "test-peer",
+      handle.documentId,
+    )
+    expect(messageSpy).not.toHaveBeenCalled()
+  })
+
+  it("should not send a sync message if canWrite is false", async () => {
+    mockPermissions.canWrite.mockResolvedValue(false)
+    const handle = repo.create()
+    await handle.whenReady() // Let the handle become ready naturally
+
+    // Add the peer after the handle is ready
+    await synchronizer.addPeer("peer-2")
+
+    // The 'sync-message' event on the handle is the correct way to get the sync data
+    handle.on("sync-message", () => {
+      // This part of the test is tricky; we need to verify a message *isn't* sent.
+      // The spy check below is the actual verification.
+    })
+
+    handle.change(d => {
+      d.text = "hello"
+    })
+
+    await vi.runAllTimersAsync() // Allow async operations to complete
+
+    expect(mockPermissions.canWrite).toHaveBeenCalledWith(
+      "peer-2",
+      handle.documentId,
+    )
+
+    // Check that no 'sync' message was emitted
+    const syncCalls = messageSpy.mock.calls.filter(
+      (call: any[]) => call[0] === "message" && call[1].type === "sync",
+    )
+    expect(syncCalls.length).toBe(0)
+  })
+
+  it("should not delete a document if canDelete returns false", async () => {
+    mockPermissions.canDelete.mockResolvedValue(false)
+    const deleteSpy = vi.spyOn(repo, "delete")
+    await synchronizer.receiveMessage({
+      type: "delete-document",
+      senderId: "peer-2",
+      documentId: "doc-to-delete",
+    })
+    expect(mockPermissions.canDelete).toHaveBeenCalledWith(
+      "peer-2",
+      "doc-to-delete",
+    )
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+})

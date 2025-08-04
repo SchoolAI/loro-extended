@@ -31,6 +31,10 @@ export class Repo extends Emittery {
   #permissionAdapter?: PermissionAdapter
   #handleCache = new Map<DocumentId, DocHandle<any>>()
 
+  get permissions(): PermissionAdapter | undefined {
+    return this.#permissionAdapter
+  }
+
   get handles(): Map<DocumentId, DocHandle<any>> {
     return this.#handleCache
   }
