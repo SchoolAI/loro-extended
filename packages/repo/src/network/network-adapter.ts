@@ -7,44 +7,40 @@ export interface PeerMetadata {
 }
 
 /** The base message interface. */
-export interface Message {
-  type: "announce-document" | "request-sync" | "sync" | "document-unavailable"
+export interface MessageBase {
   senderId: PeerId
   targetId: PeerId
-  documentId?: DocumentId
 }
 
 /** Broadcasts the documents a peer has available upon connection. */
-export interface AnnounceDocumentMessage extends Message {
+export interface AnnounceDocumentMessage extends MessageBase {
   type: "announce-document"
   documentIds: DocumentId[]
 }
 
+/** Informs a peer that a requested document is not available. */
+export interface DocumentUnavailableMessage extends MessageBase {
+  type: "document-unavailable"
+  documentId: DocumentId
+}
+
 /** Requests the latest version of a document from a peer. */
-export interface RequestSyncMessage extends Message {
+export interface RequestSyncMessage extends MessageBase {
   type: "request-sync"
   documentId: DocumentId
 }
 
 /**
- * The core message for document synchronization.
- * It contains the sender's version of the document.
- * The recipient uses this version to calculate the necessary updates.
- * This message may also contain binary update data.
+ * The core message for document synchronization. Contains Loro oplog and version info
+ * depending on the type of sync (snapshot, shallow-snapshot, update, update-in-range).
  */
-export interface SyncMessage extends Message {
+export interface SyncMessage extends MessageBase {
   type: "sync"
   documentId: DocumentId
   /** The sender's version vector for the document. Optional. */
   version?: Uint8Array
   /** Binary update data. Optional. */
   data?: Uint8Array
-}
-
-/** Informs a peer that a requested document is not available. */
-export interface DocumentUnavailableMessage extends Message {
-  type: "document-unavailable"
-  documentId: DocumentId
 }
 
 export type RepoMessage =

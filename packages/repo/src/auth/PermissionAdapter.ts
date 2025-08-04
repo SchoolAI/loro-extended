@@ -1,4 +1,4 @@
-import { DocumentId, PeerId } from "../types.js"
+import type { DocumentId, PeerId } from "../types.js"
 
 export interface PermissionAdapter {
   /**
