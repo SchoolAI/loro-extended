@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback } from "react";
+import { useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   type AsLoro,
   type DocHandle,
@@ -45,25 +45,44 @@ export type UseLoroDocReturn<T> = [
 export function useLoroDoc<T extends Record<string, any>>(
   handle: DocHandle<T>,
 ): UseLoroDocReturn<T> {
-  const subscribe = (onStoreChange: () => void) => {
-    // Subscribing to both 'change' and 'state-change' ensures the component
-    // re-renders whenever the document data or the handle's state changes.
+  const subscribe = useCallback((onStoreChange: () => void) => {
     handle.on("change", onStoreChange);
     handle.on("state-change", onStoreChange);
     return () => {
       handle.off("change", onStoreChange);
       handle.off("state-change", onStoreChange);
     };
-  };
+  }, [handle]);
+  
+  const getSnapshot = useMemo(() => {
+    let lastSnapshot: { version: string | null; state: HandleState } | null = null;
+    
+    return () => {
+      const currentState = handle.state;
+      let currentVersion: string | null = null;
+      if (currentState === "ready") {
+        const vv = handle.doc()?.oplogVersion();
+        currentVersion = vv ? JSON.stringify(Object.fromEntries(vv.toJSON())) : null;
+      }
+      
+      if (lastSnapshot && lastSnapshot.state === currentState && lastSnapshot.version === currentVersion) {
+         return lastSnapshot;
+      }
 
-  // getSnapshot returns the data needed for the component to render.
-  // We bundle the doc and state together so they are always consistent.
-  const getSnapshot = () => ({
-    doc: handle.state === "ready" ? handle.doc()?.toJSON() : undefined,
-    state: handle.state,
-  });
+      lastSnapshot = { version: currentVersion, state: currentState };
+      return lastSnapshot;
+    }
+  }, [handle]);
 
-  const { doc, state } = useSyncExternalStore(subscribe, getSnapshot);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+
+  const doc = useMemo(() => {
+    if (snapshot.state !== "ready" || snapshot.version === null) {
+      return undefined;
+    }
+    return handle.doc()?.toJSON();
+  }, [snapshot, handle]);
+
 
   const changeDoc = useCallback(
     (fn: ChangeFn<T>) => {
@@ -72,5 +91,5 @@ export function useLoroDoc<T extends Record<string, any>>(
     [handle],
   );
 
-  return [doc as T | undefined, changeDoc, state];
+  return [doc as T | undefined, changeDoc, snapshot.state];
 }

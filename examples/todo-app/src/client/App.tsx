@@ -16,20 +16,16 @@ interface TodoDoc {
 // A known, constant ID for our single todo list document
 const TODO_DOC_ID = "todos-example-document" as DocumentId;
 
-function App() {
-  // Memoize the repo instance so it's only created once per component lifecycle.
-  const repo = useMemo(() => {
-    const network = new SseClientNetworkAdapter("/loro");
-    const storage = new IndexedDBStorageAdapter();
-    return new Repo({ network: [network], storage });
-  }, []);
+// Create the Repo instance outside the component so it's a singleton.
+// This prevents it from being re-created on every render or HMR update.
+const network = new SseClientNetworkAdapter("/loro");
+const storage = new IndexedDBStorageAdapter();
+const repo = new Repo({ network: [network], storage });
 
+function App() {
   // Get a handle to the document. This will either find it in storage,
   // sync it from the network, or create it if it doesn't exist.
-  const handle = useMemo(
-    () => repo.find<TodoDoc>(TODO_DOC_ID),
-    [repo],
-  );
+  const handle = useMemo(() => repo.find<TodoDoc>(TODO_DOC_ID), []);
 
   // Use our custom hook to get a reactive state of the document
   const [doc, changeDoc, state] = useLoroDoc(handle);
