@@ -5,7 +5,7 @@ import {
   InProcessNetworkAdapter,
   InProcessNetworkBroker,
 } from "./in-process-network-adapter.js"
-import type { AnnounceMessage } from "./network-adapter.js"
+import type { AnnounceDocumentMessage } from "./network-adapter.js"
 
 describe("InProcessNetworkAdapter", () => {
   let broker: InProcessNetworkBroker
@@ -50,8 +50,8 @@ describe("InProcessNetworkAdapter", () => {
     const messageMock = vi.fn()
     adapter2.on("message", messageMock)
 
-    const message: AnnounceMessage = {
-      type: "announce",
+    const message: AnnounceDocumentMessage = {
+      type: "announce-document",
       senderId: peer1Id,
       targetId: peer2Id,
       documentIds: ["docA", "docB"],

@@ -8,15 +8,15 @@ export interface PeerMetadata {
 
 /** The base message interface. */
 export interface Message {
-  type: "announce" | "request-sync" | "sync" | "unavailable"
+  type: "announce-document" | "request-sync" | "sync" | "document-unavailable"
   senderId: PeerId
   targetId: PeerId
   documentId?: DocumentId
 }
 
 /** Broadcasts the documents a peer has available upon connection. */
-export interface AnnounceMessage extends Message {
-  type: "announce"
+export interface AnnounceDocumentMessage extends Message {
+  type: "announce-document"
   documentIds: DocumentId[]
 }
 
@@ -42,16 +42,16 @@ export interface SyncMessage extends Message {
 }
 
 /** Informs a peer that a requested document is not available. */
-export interface UnavailableMessage extends Message {
-  type: "unavailable"
+export interface DocumentUnavailableMessage extends Message {
+  type: "document-unavailable"
   documentId: DocumentId
 }
 
 export type RepoMessage =
-  | AnnounceMessage
+  | AnnounceDocumentMessage
   | RequestSyncMessage
   | SyncMessage
-  | UnavailableMessage
+  | DocumentUnavailableMessage
 
 export interface NetworkAdapterEvents {
   /** A potential peer has been discovered. */

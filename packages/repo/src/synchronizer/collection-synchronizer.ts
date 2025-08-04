@@ -2,7 +2,7 @@ import Emittery from "emittery"
 
 import type { DocHandle } from "../doc-handle.js"
 import type {
-  AnnounceMessage,
+  AnnounceDocumentMessage,
   RepoMessage,
   RequestSyncMessage,
   SyncMessage,
@@ -12,7 +12,7 @@ import type { DocumentId, PeerId } from "../types.js"
 
 // Constants for timeouts
 const DISCOVERY_TIMEOUT = 5000 // 5 seconds
-const SYNC_TIMEOUT = 5000 // 5 seconds
+const SYNC_TIMEOUT = 25000 // 25 seconds
 
 interface CollectionSynchronizerEvents {
   message: RepoMessage
@@ -37,7 +37,7 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
 
     if (documentIds.length > 0) {
       this.emit("message", {
-        type: "announce",
+        type: "announce-document",
         senderId: this.#repo.peerId,
         targetId: peerId,
         documentIds,
@@ -55,7 +55,7 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
       if (status === "ready") {
         this.#peers.forEach(peerId => {
           this.emit("message", {
-            type: "announce",
+            type: "announce-document",
             senderId: this.#repo.peerId,
             targetId: peerId,
             documentIds: [handle.documentId],
@@ -79,8 +79,7 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
   }
 
   removeDocument(documentId: DocumentId) {
-    // No-op. This method is kept for API compatibility but might be removed later.
-    // We no longer need to track requested documents here.
+    // TODO: suggest peers delete this document
   }
 
   /**
@@ -100,8 +99,8 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
 
   async receiveMessage(message: RepoMessage) {
     switch (message.type) {
-      case "announce":
-        this.#handleAnnounce(message)
+      case "announce-document":
+        this.#handleAnnounceDocument(message)
         break
       case "request-sync":
         this.#handleRequestSync(message)
@@ -112,7 +111,10 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     }
   }
 
-  async #handleAnnounce({ senderId, documentIds }: AnnounceMessage) {
+  async #handleAnnounceDocument({
+    senderId,
+    documentIds,
+  }: AnnounceDocumentMessage) {
     for (const documentId of documentIds) {
       const handle = this.#repo.find<any>(documentId)
 
