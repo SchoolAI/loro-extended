@@ -134,7 +134,7 @@ describe("CollectionSynchronizer with permissions", () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockPermissions = {
-      canShare: vi.fn(() => true),
+      canRevealDocumentId: vi.fn(() => true),
       canWrite: vi.fn(() => true),
       canDelete: vi.fn(() => true),
     }
@@ -152,14 +152,14 @@ describe("CollectionSynchronizer with permissions", () => {
     vi.useRealTimers()
   })
 
-  it("should not send an announce-document message if canShare is false", async () => {
-    mockPermissions.canShare.mockResolvedValue(false)
+  it("should not send an announce-document message if canRevealDocumentId is false", async () => {
+    mockPermissions.canRevealDocumentId.mockResolvedValue(false)
     const handle = repo.create()
     repo.handles.set(handle.documentId, handle)
     handle._setState("ready")
     await synchronizer.addPeer("peer-2")
 
-    expect(mockPermissions.canShare).toHaveBeenCalledWith(
+    expect(mockPermissions.canRevealDocumentId).toHaveBeenCalledWith(
       "test-peer",
       handle.documentId,
     )
@@ -211,5 +211,25 @@ describe("CollectionSynchronizer with permissions", () => {
       "doc-to-delete",
     )
     expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it("should not announce a new document when canRevealDocumentId is false", async () => {
+    mockPermissions.canRevealDocumentId.mockResolvedValue(false)
+    await synchronizer.addPeer("peer-2") // Peer is known beforehand
+    messageSpy.mockClear() // Clear spy from connection setup
+
+    const handle = repo.create()
+    await vi.runAllTimersAsync() // This makes the handle ready and triggers addDocument's .then()
+
+    expect(mockPermissions.canRevealDocumentId).toHaveBeenCalledWith(
+      "test-peer",
+      handle.documentId,
+    )
+    // Check that no 'announce-document' message was emitted
+    const announceCalls = messageSpy.mock.calls.filter(
+      (call: any[]) =>
+        call[0] === "message" && call[1].type === "announce-document",
+    )
+    expect(announceCalls.length).toBe(0)
   })
 })

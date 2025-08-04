@@ -44,7 +44,7 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     if (permissions) {
       const results = await Promise.all(
         handles.map(handle =>
-          permissions.canShare(this.#repo.peerId, handle.documentId),
+          permissions.canRevealDocumentId(this.#repo.peerId, handle.documentId),
         ),
       )
       documentIds = handles
@@ -73,10 +73,10 @@ export class CollectionSynchronizer extends Emittery<CollectionSynchronizerEvent
     // When the document is ready, announce it to all peers
     handle.whenReady().then(async ({ status }) => {
       if (status === "ready") {
-        const canShare = permissions
-          ? await permissions.canShare(this.#repo.peerId, handle.documentId)
+        const canRevealDocumentId = permissions
+          ? await permissions.canRevealDocumentId(this.#repo.peerId, handle.documentId)
           : true
-        if (canShare) {
+        if (canRevealDocumentId) {
           this.#peers.forEach(peerId => {
             this.emit("message", {
               type: "announce-document",

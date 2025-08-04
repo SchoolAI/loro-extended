@@ -2,12 +2,12 @@ import type { DocumentId, PeerId } from "../types.js"
 
 export interface PermissionAdapter {
   /**
-   * Determines if a peer is allowed to share a document with other peers.
+   * Determines if a peer is allowed to share a document ID with other peers.
    * @param peerId The ID of the peer creating the document.
    * @param documentId The ID of the document being shared.
    * @returns `true` if sharing is permitted, `false` otherwise.
    */
-  canShare(peerId: PeerId, documentId: DocumentId): Promise<boolean> | boolean
+  canRevealDocumentId(peerId: PeerId, documentId: DocumentId): Promise<boolean> | boolean
 
   /**
    * Determines if a peer's changes are allowed to be applied to a document.
