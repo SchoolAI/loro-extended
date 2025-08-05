@@ -1,0 +1,286 @@
+import { change, type AsLoro, type LoroProxyDoc } from "@loro-extended/change"
+import { LoroDoc } from "loro-crdt"
+import { describe, expect, it } from "vitest"
+import { init, update } from "./doc-handle-program.js"
+import type { DocumentId, RequestId } from "./types.js"
+
+type TestSchema = {
+  text: string
+}
+
+describe("DocHandle program", () => {
+  const docId = "test-doc" as DocumentId
+  const reqId = "request-1" as RequestId
+
+  it("init should start in idle", () => {
+    const [state, command] = init()
+    expect(state.state).toBe("idle")
+    expect(command).toBeUndefined()
+  })
+
+  describe("find flow", () => {
+    it("should transition from idle to storage-loading on find", () => {
+      const [initialState] = init<TestSchema>()
+      const [newState, command] = update(
+        { type: "msg-find", requestId: reqId },
+        initialState,
+        docId,
+      )
+
+      expect(newState).toEqual({
+        state: "storage-loading",
+        fallback: "network",
+        requestId: reqId,
+      })
+      expect(command).toEqual({
+        type: "cmd-load-from-storage",
+        documentId: docId,
+      })
+    })
+
+    it("should transition from storage-loading to ready on success", () => {
+      const doc = new LoroDoc()
+      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
+      const initialState = {
+        state: "storage-loading",
+        fallback: "network",
+        requestId: reqId,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-storage-load-success", doc: proxy },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("ready")
+      expect(command).toEqual({
+        type: "cmd-batch",
+        commands: [
+          { type: "cmd-subscribe-to-doc", doc: proxy },
+          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+        ],
+      })
+    })
+
+    it("should transition from storage-loading to network-loading on failure", () => {
+      const initialState = {
+        state: "storage-loading",
+        fallback: "network",
+        requestId: reqId,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-storage-load-failure" },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("network-loading")
+      expect((newState as any).requestId).toBe(reqId)
+      expect(command?.type).toBe("cmd-query-network")
+    })
+
+    it("should transition from network-loading to ready on success", () => {
+      const doc = new LoroDoc()
+      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
+      const initialState = {
+        state: "network-loading",
+        timeout: 5000,
+        createOnTimeout: false,
+        requestId: reqId,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-network-load-success", doc: proxy },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("ready")
+      expect(command).toEqual({
+        type: "cmd-batch",
+        commands: [
+          { type: "cmd-subscribe-to-doc", doc: proxy },
+          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+        ],
+      })
+    })
+
+    it("should transition from network-loading to unavailable on timeout", () => {
+      const initialState = {
+        state: "network-loading",
+        timeout: 5000,
+        createOnTimeout: false,
+        requestId: reqId,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-network-timeout" },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("unavailable")
+      expect(command?.type).toBeUndefined()
+    })
+  })
+
+  describe("findOrCreate flow", () => {
+    it("should transition from idle to storage-loading on findOrCreate", () => {
+      const [initialState] = init<TestSchema>()
+      const [newState, command] = update(
+        { type: "msg-find-or-create", timeout: 5000, requestId: reqId },
+        initialState,
+        docId,
+      )
+
+      expect(newState).toEqual({
+        state: "storage-loading",
+        fallback: "create",
+        requestId: reqId,
+      })
+      expect(command).toEqual({
+        type: "cmd-load-from-storage",
+        documentId: docId,
+      })
+    })
+
+    it("should issue a create_doc command if storage fails", () => {
+      const initialState = {
+        state: "storage-loading",
+        fallback: "create",
+        requestId: reqId,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-storage-load-failure" },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("creating")
+      expect((newState as any).requestId).toBe(reqId)
+      expect(command).toEqual({ type: "cmd-create-doc", documentId: docId })
+    })
+  })
+
+  describe("create flow", () => {
+    it("should transition to creating and issue a create_doc command", () => {
+      const [initialState] = init<TestSchema>()
+      const [newState, command] = update(
+        { type: "msg-create", requestId: reqId },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("creating")
+      expect((newState as any).requestId).toBe(reqId)
+      expect(command).toEqual({
+        type: "cmd-create-doc",
+        documentId: docId,
+        initialValue: undefined,
+      })
+    })
+
+    it("should handle an initial value function", () => {
+      const [initialState] = init<TestSchema>()
+      const initialValue = () => ({ text: "hello" })
+      const [newState, command] = update(
+        { type: "msg-create", initialValue, requestId: reqId },
+        initialState,
+        docId,
+      )
+      expect(newState.state).toBe("creating")
+      expect((newState as any).requestId).toBe(reqId)
+      expect(command).toEqual({
+        type: "cmd-create-doc",
+        documentId: docId,
+        initialValue,
+      })
+    })
+
+    it("should transition to ready after creation", () => {
+      const creatingState = { state: "creating", requestId: reqId } as const
+      const doc = new LoroDoc()
+      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
+      const [newState, command] = update(
+        { type: "msg-storage-load-success", doc: proxy }, // creation is modeled as a storage success
+        creatingState,
+        docId,
+      )
+
+      expect(newState.state).toBe("ready")
+      expect(command).toEqual({
+        type: "cmd-batch",
+        commands: [
+          { type: "cmd-subscribe-to-doc", doc: proxy },
+          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+        ],
+      })
+    })
+  })
+
+  describe("change flows", () => {
+    it("should issue an apply_local_change command when ready", () => {
+      const doc = new LoroDoc()
+      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
+      const initialState = { state: "ready", doc: proxy } as const
+      const mutator = (d: TestSchema) => {
+        d.text = "new"
+      }
+      const [newState, command] = update(
+        { type: "msg-local-change", mutator: mutator as any },
+        initialState,
+        docId,
+      )
+
+      expect(newState).toEqual(initialState)
+      expect(command).toEqual({
+        type: "cmd-apply-local-change",
+        doc: proxy,
+        mutator: mutator as any,
+      })
+    })
+
+    it("should issue an apply_remote_change command when ready", () => {
+      const doc = new LoroDoc()
+      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
+      const initialState = { state: "ready", doc: proxy } as const
+      const message = new Uint8Array([1, 2, 3])
+      const [newState, command] = update(
+        { type: "msg-remote-change", message },
+        initialState,
+        docId,
+      )
+
+      expect(newState).toEqual(initialState)
+      expect(command).toEqual({
+        type: "cmd-apply-remote-change",
+        doc: proxy,
+        message,
+      })
+    })
+  })
+
+  describe("delete flow", () => {
+    it("should transition to deleted from any state", () => {
+      const states: any[] = [
+        { state: "idle" },
+        { state: "storage-loading", fallback: "network" },
+        {
+          state: "network-loading",
+          timeout: 5000,
+          createOnTimeout: false,
+        },
+        { state: "ready", doc: {} },
+        { state: "unavailable" },
+      ]
+
+      for (const initialState of states) {
+        const [newState, command] = update(
+          { type: "msg-delete" },
+          initialState,
+          docId,
+        )
+        expect(newState.state).toBe("deleted")
+        expect(command).toBeUndefined()
+      }
+    })
+  })
+})

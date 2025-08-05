@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-
-import { Repo } from "./repo.js"
 import {
   InProcessNetworkAdapter,
   InProcessNetworkBroker,
 } from "./network/in-process-network-adapter.js"
+import { Repo } from "./repo.js"
 
-describe("End-to-end synchronization", () => {
+// Integration test suite for the Repo
+describe("Repo", () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
   })
 
   afterEach(() => {
@@ -17,224 +17,196 @@ describe("End-to-end synchronization", () => {
 
   it("should synchronize a document between two repos", async () => {
     const broker = new InProcessNetworkBroker()
-    const repo1 = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
-    const repo2 = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
+    const repo1 = new Repo({
+      peerId: "repo1",
+      network: [new InProcessNetworkAdapter(broker)],
+    })
+    const repo2 = new Repo({
+      peerId: "repo2",
+      network: [new InProcessNetworkAdapter(broker)],
+    })
 
-    const handle1 = repo1.create<{ text: string }>()
-    await vi.runAllTimersAsync()
+    // Repo 1 creates a document
+    const handle1 = await repo1.create<{ text: string }>()
     expect(handle1.state).toBe("ready")
 
+    // Mutate the document
     handle1.change(doc => {
       doc.text = "hello"
     })
-    expect(handle1.doc().toJSON()).toEqual({ root: { text: "hello" } })
+    expect(handle1.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
 
-    const handle2 = repo2.find<{ text:string }>(handle1.documentId)
-    await vi.runAllTimersAsync()
+    // Repo 2 finds the document
+    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
     expect(handle2.state).toBe("ready")
+    expect(handle2.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
 
-    expect(handle2.doc().toJSON()).toEqual({ root: { text: "hello" } })
-
+    // Mutate the document from repo 2
     handle2.change(doc => {
       doc.text += " world"
     })
-    expect(handle2.doc().toJSON()).toEqual({ root: { text: "hello world" } })
+    expect(handle2.doc().getMap("root").toJSON()).toEqual({
+      text: "hello world",
+    })
 
+    // Wait for the change to propagate back to repo 1
     await vi.runAllTimersAsync()
-    expect(handle1.doc().toJSON()).toEqual({ root: { text: "hello world" } })
+    expect(handle1.doc().getMap("root").toJSON()).toEqual({
+      text: "hello world",
+    })
   })
 
-  it("should not apply a change if the sender is not allowed to write", async () => {
+  it("should not apply a change if a peer is not allowed to write", async () => {
     const broker = new InProcessNetworkBroker()
     let repo1CanWrite = true
 
     const repo1 = new Repo({
+      peerId: "repo1",
       network: [new InProcessNetworkAdapter(broker)],
       permissions: {
-        canList: () => true,
         canWrite: () => repo1CanWrite,
-        canDelete: () => true,
       },
     })
-    const repo2 = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
+    const repo2 = new Repo({
+      peerId: "repo2",
+      network: [new InProcessNetworkAdapter(broker)],
+    })
 
-    const handle1 = repo1.create<{ text: string }>()
-    await vi.runAllTimersAsync()
-    const handle2 = repo2.find<{ text: string }>(handle1.documentId)
-    await vi.runAllTimersAsync()
+    const handle1 = await repo1.create<{ text: string }>()
+    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
 
+    // A change from a permitted peer should be applied
     handle2.change(doc => {
       doc.text = "hello"
     })
+
     await vi.runAllTimersAsync()
-    expect(handle1.doc().toJSON()).toEqual({ root: { text: "hello" } })
 
+    expect(handle1.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
+
+    // A change from a non-permitted peer should not be applied
     repo1CanWrite = false
-
     handle2.change(doc => {
       doc.text += " world"
     })
+
     await vi.runAllTimersAsync()
 
-    expect(handle1.doc().toJSON()).toEqual({ root: { text: "hello" } })
+    expect(handle1.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
   })
 
-  it("should not delete a document if the sender is not allowed to delete", async () => {
+  it("should not delete a document if a peer is not allowed to", async () => {
     const broker = new InProcessNetworkBroker()
     const repo1 = new Repo({
       network: [new InProcessNetworkAdapter(broker)],
-      permissions: {
-        canList: () => true,
-        canWrite: () => true,
-        canDelete: () => false,
-      },
+      permissions: { canDelete: () => false },
     })
     const repo2 = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-    const handle1 = repo1.create<{ text: string }>()
-    await vi.runAllTimersAsync()
-    const handle2 = repo2.find<{ text: string }>(handle1.documentId)
+    const handle1 = await repo1.create<{ text: string }>()
+    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
+    expect(handle2.state).toBe("ready")
+
+    await repo2.delete(handle1.documentId)
+
     await vi.runAllTimersAsync()
 
-    repo2.delete(handle1.documentId)
-    await vi.runAllTimersAsync()
-
+    // The document should still exist in repo1
     expect(repo1.handles.has(handle1.documentId)).toBe(true)
     expect(handle1.state).toBe("ready")
   })
-})
 
-describe("canList permission", () => {
-  let broker: InProcessNetworkBroker
-  let repoA: Repo
-  let repoB: Repo
+  describe("canList permission", () => {
+    let broker: InProcessNetworkBroker
+    let repoA: Repo
+    let repoB: Repo
 
-  beforeEach(() => {
-    vi.useFakeTimers()
-    broker = new InProcessNetworkBroker()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it("should reveal all documents when canList is always true", async () => {
-    repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
-      permissions: {
-        canList: () => true,
-        canWrite: () => true,
-        canDelete: () => true,
-      },
+    beforeEach(() => {
+      broker = new InProcessNetworkBroker()
     })
-    const handle1 = repoA.create()
-    const handle2 = repoA.create()
-    await vi.runAllTimersAsync()
-    await Promise.all([handle1.whenReady(), handle2.whenReady()])
 
-    // Repo B connects after Repo A has documents
-    repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
-    await vi.runAllTimersAsync()
+    it("should reveal all documents when canList is always true", async () => {
+      repoA = new Repo({
+        peerId: "repoA",
+        network: [new InProcessNetworkAdapter(broker)],
+        permissions: { canList: () => true },
+      })
+      const handle1 = await repoA.create()
+      const handle2 = await repoA.create()
 
-    // Repo B should have been told about both documents
-    const bHandle1 = repoB.find(handle1.documentId)
-    const bHandle2 = repoB.find(handle2.documentId)
-    await vi.runAllTimersAsync()
+      repoB = new Repo({
+        peerId: "repoB",
+        network: [new InProcessNetworkAdapter(broker)],
+      })
 
-    await Promise.all([bHandle1.whenReady(), bHandle2.whenReady()])
+      // Wait for the repos to connect and exchange messages
+      await vi.runAllTimersAsync()
 
-    // Run timers one last time to make sure handles have a chance to update their state
-    await vi.runAllTimersAsync()
+      expect(repoB.handles.has(handle1.documentId)).toBe(true)
+      expect(repoB.handles.has(handle2.documentId)).toBe(true)
 
-    expect(bHandle1.state).toBe("ready")
-    expect(bHandle2.state).toBe("ready")
-  })
+      const bHandle1 = await repoB.find(handle1.documentId)
+      const bHandle2 = await repoB.find(handle2.documentId)
 
-  it("should not announce documents when canList is false", async () => {
-    repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
-      permissions: { canList: () => false },
+      expect(bHandle1.state).toBe("ready")
+      expect(bHandle2.state).toBe("ready")
     })
-    repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-    repoA.create() // Create a document that will not be announced
-    await vi.runAllTimersAsync()
+    it("should not announce documents when canList is false", async () => {
+      repoA = new Repo({
+        network: [new InProcessNetworkAdapter(broker)],
+        permissions: { canList: () => false },
+      })
+      repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-    // B should not know about the doc, because it was not announced
-    expect(repoB.handles.size).toBe(0)
-  })
+      await repoA.create() // Create a document that will not be announced
+      await vi.runAllTimersAsync()
 
-  it("should sync a document on direct request even if not announced", async () => {
-    repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
-      permissions: { canList: () => false },
+      // B should not know about the doc, because it was not announced
+      expect(repoB.handles.size).toBe(0)
     })
-    repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-    const handleA = repoA.create<{ text: string }>()
-    await handleA.whenReady()
-    handleA.change(d => {
-      d.text = "hello"
+    it("should sync a document on direct request even if not announced", async () => {
+      repoA = new Repo({
+        network: [new InProcessNetworkAdapter(broker)],
+        permissions: { canList: () => false },
+      })
+      repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
+
+      const handleA = await repoA.create<{ text: string }>()
+      handleA.change(d => {
+        d.text = "hello"
+      })
+
+      // B explicitly requests the document. It should succeed.
+      const handleB = await repoB.find<{ text: string }>(handleA.documentId)
+
+      expect(handleB.state).toBe("ready")
+      expect(handleB.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
     })
-    await vi.runAllTimersAsync()
 
-    // B explicitly requests the document. It should succeed.
-    const handleB = repoB.find<{ text: string }>(handleA.documentId)
-    await handleB.whenReady()
-    await vi.runAllTimersAsync()
+    it("should selectively announce documents based on permissions", async () => {
+      repoA = new Repo({
+        peerId: "repoA",
+        network: [new InProcessNetworkAdapter(broker)],
+        permissions: {
+          canList: (_, documentId) => documentId.startsWith("allowed"),
+        },
+      })
+      repoB = new Repo({
+        peerId: "repoB",
+        network: [new InProcessNetworkAdapter(broker)],
+      })
 
-    expect(handleB.state).toBe("ready")
-    expect(handleB.doc().toJSON()).toEqual({ root: { text: "hello" } })
-  })
+      await repoA.create({ documentId: "allowed-doc-1" })
+      await repoA.create({ documentId: "denied-doc-1" })
+      await repoA.create({ documentId: "allowed-doc-2" })
+      await vi.runAllTimersAsync()
 
-  it("should selectively announce documents based on permissions", async () => {
-    repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
-      permissions: {
-        canList: (peerId, documentId) =>
-          documentId.startsWith("allowed"),
-      },
+      expect(repoB.handles.size).toBe(2)
+      expect(repoB.handles.has("allowed-doc-1")).toBe(true)
+      expect(repoB.handles.has("allowed-doc-2")).toBe(true)
+      expect(repoB.handles.has("denied-doc-1")).toBe(false)
     })
-    repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
-
-    repoA.create({ documentId: "allowed-doc-1" })
-    repoA.create({ documentId: "denied-doc-1" })
-    repoA.create({ documentId: "allowed-doc-2" })
-    await vi.runAllTimersAsync()
-
-    // B should only have been told about the allowed docs
-    expect(repoB.handles.size).toBe(2)
-    expect(repoB.handles.has("allowed-doc-1")).toBe(true)
-    expect(repoB.handles.has("allowed-doc-2")).toBe(true)
-    expect(repoB.handles.has("denied-doc-1")).toBe(false)
-  })
-
-  it("should sync a non-announced document on direct request", async () => {
-    repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
-      permissions: {
-        canList: (peerId, documentId) =>
-          documentId.startsWith("allowed"),
-      },
-    })
-    repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
-
-    const handleDenied = repoA.create<{ text: string }>({
-      documentId: "denied-doc",
-    })
-    await handleDenied.whenReady()
-    handleDenied.change(d => {
-      d.text = "denied"
-    })
-    await vi.runAllTimersAsync()
-
-    // B should not have been told about the denied doc
-    expect(repoB.handles.has(handleDenied.documentId)).toBe(false)
-
-    // Now, B explicitly requests the denied document. It should still succeed.
-    const bHandleDenied = repoB.find<{ text: string }>(handleDenied.documentId)
-    await bHandleDenied.whenReady()
-    expect(bHandleDenied.state).toBe("ready")
-    expect(bHandleDenied.doc().toJSON()).toEqual({ root: { text: "denied" } })
   })
 })

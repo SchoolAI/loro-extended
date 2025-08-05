@@ -8,13 +8,14 @@ The `@loro-extended/repo` library provides a framework for managing and synchron
 
 ### 1.1. The `Repo`
 
-The `Repo` class is the central coordinator of the entire system. It is the main entry point for all user interactions. Its primary responsibilities are:
+The `Repo` class is the central orchestrator of the entire system. It is the main entry point for all user interactions. Its primary responsibilities are:
 
 - **Document Management**: Creating new documents (`create()`) and finding existing ones (`find()`).
-- **Orchestration**: Managing the lifecycle and interaction of its underlying subsystems (Storage and Network).
+- **Service Orchestration**: Managing the lifecycle and wiring of its underlying subsystems (Storage, Network, and Synchronization).
+- **Dependency Injection**: Providing services to `DocHandle` instances and coordinating between subsystems.
 - **Identity**: Each `Repo` has a unique `peerId` to identify it within the network.
 
-A `Repo` instance acts as a container for a collection of documents, ensuring they are persistently stored and kept in sync with other peers.
+**Key Architectural Decision**: Unlike `DocHandle` and `Synchronizer` which use The Elm Architecture (TEA) for complex state management, the `Repo` class is intentionally kept as a simple orchestrator. It doesn't maintain complex state transitions of its own, but rather coordinates the state machines of its subsystems. This separation of concerns makes the system more maintainable and easier to understand.
 
 ### 1.2. The `DocHandle`
 
@@ -22,15 +23,17 @@ A `DocHandle` is a reference to a single document within the `Repo`. It is not t
 
 **Key Features:**
 
-- **State Machine**: A `DocHandle` progresses through a series of states:
+- **TEA-Based State Machine**: The `DocHandle` implements The Elm Architecture with a pure functional core (`doc-handle-program.ts`) and an impure runtime host (`doc-handle.ts`). It progresses through a series of states:
   - `idle`: The handle has been created, but we haven't tried to load it.
-  - `loading`: We are actively trying to load the document from storage.
-  - `searching`: The document wasn't found in storage, so we are asking peers on the network if they have it.
-  - `syncing`: A peer has told us they have the document, and we are waiting for them to send it.
+  - `storage-loading`: We are actively trying to load the document from storage.
+  - `network-loading`: The document wasn't found in storage, so we are querying the network.
+  - `creating`: We are creating a new document.
   - `ready`: The document is loaded and available.
   - `unavailable`: We couldn't find the document in storage or on the network.
   - `deleted`: The document has been marked for deletion.
-- **Asynchronous Loading**: The `whenReady()` promise on the handle allows code to wait until the document is in the `ready` state before interacting with it. It does not throw, but resolves to a status that is `ready`, `unavailable`, or `deleted`.
+  
+- **Promise-Based API**: All public methods (`find()`, `create()`, `findOrCreate()`) return Promises that resolve when the operation completes, providing a modern async/await interface.
+
 - **Event-Driven**: It emits `change` events whenever the underlying document is modified, either by the local user or through a sync message from a peer.
 
 ### 1.3. Adapters: Pluggable Backends
@@ -39,95 +42,152 @@ A core design principle is the use of adapters for abstracting away the concrete
 
 - **`StorageAdapter`**: Defines the interface for a key-value storage backend. Its responsibility is to save, load, and remove raw document data (`Uint8Array`). An `InMemoryStorageAdapter` is provided for testing and simple use cases.
 - **`NetworkAdapter`**: Defines the interface for a peer-to-peer communication channel. Its responsibility is to send and receive arbitrary messages between peers. An `InProcessNetworkAdapter` is provided, which allows multiple `Repo` instances within the same JavaScript process to communicate, facilitating robust testing.
-- **`PermissionAdapter`**: An optional interface for implementing access control. It provides a set of functions (`canRead`, `canWrite`, `canDelete`) that the `Repo` will call to authorize actions. If not provided, all actions are permitted.
+- **`PermissionAdapter`**: An optional interface for implementing access control. It provides a set of functions (`canList`, `canWrite`, `canDelete`) that are used by the `Synchronizer` to authorize actions. If a method is not provided, the action is permitted. See the "Access Control" section under `Synchronizer` for details.
 
 ## 2. System Architecture
 
-The `Repo` is composed of several internal subsystems that work together.
+The `Repo` orchestrates several subsystems, each with distinct responsibilities:
 
 ```
 ┌──────────────────┐
-│       Repo       │
-│    (Public API)  │
+│       Repo       │ ← Simple Orchestrator (No TEA)
+│  (Async Public   │
+│      API)        │
 └──────────────────┘
          │
-         │     ┌──────────────────┐      ┌─────────────────┐
-         ├───► │ StorageSubsystem ├────► │ StorageAdapter  │
-         │     └──────────────────┘      └─────────────────┘
-         │
-         │     ┌──────────────────┐      ┌────────────────────┐
-         └───► │ NetworkSubsystem ├────► │ NetworkAdapters... │
-               └──────────────────┘      └────────────────────┘
-                         │
-                         │
-               ┌─────────▼──────────┐
-               │ CollectionSync...  │
-               └────────────────────┘
+         ├─── Creates & Manages ───┐
+         │                          │
+         ▼                          ▼
+┌──────────────────┐      ┌──────────────────┐
+│    DocHandle     │      │ CollectionSync   │
+│   (TEA-based)    │      │   (TEA-based)    │
+└──────────────────┘      └──────────────────┘
+         │                          │
+         │     ┌──────────────────┐ │
+         ├───► │ StorageSubsystem │ │
+         │     └──────────────────┘ │
+         │                          │
+         │     ┌──────────────────┐ │
+         └───► │ NetworkSubsystem ├─┘
+               └──────────────────┘
 ```
 
-### 2.1. `StorageSubsystem`
+### 2.1. Architectural Trade-offs
+
+**TEA vs Simple Orchestration**: 
+- **Where TEA is Used**: `DocHandle` and `Synchronizer` use The Elm Architecture because they manage complex state transitions. Their state machines have multiple states, complex transition logic, and need to be highly testable.
+- **Where TEA is NOT Used**: The `Repo` class is a simple orchestrator. It was initially implemented with TEA but was refactored to a plain class because:
+  - It has minimal state (just a cache of handles)
+  - Its primary role is dependency injection and service wiring
+  - The TEA pattern added unnecessary complexity without providing value
+  - Direct async/await APIs are more ergonomic for users
+
+This hybrid approach gives us the best of both worlds: predictable state management where it matters, and simplicity where it doesn't.
+
+### 2.2. `StorageSubsystem`
 
 This subsystem manages all interactions with the `StorageAdapter`. It provides a simple, consistent API to the rest of the `Repo` for document persistence, abstracting away the specifics of the chosen backend.
 
-### 2.2. `NetworkSubsystem`
+### 2.3. `NetworkSubsystem`
 
 This subsystem manages the lifecycle of all `NetworkAdapter` instances. It is responsible for:
 
 - Connecting and disconnecting peers.
-- Broadcasting outgoing messages to all connected peers.
-- Routing incoming messages to the appropriate handler (e.g., the `CollectionSynchronizer`).
+- Sending outgoing messages to the specific peers designated by the `Synchronizer`.
+- Routing incoming messages to the appropriate handler (e.g., the `Synchronizer`).
 
-### 2.3. `CollectionSynchronizer`
+### 2.4. `Synchronizer`
 
-This is the heart of the synchronization logic. It sits on top of the `NetworkSubsystem` and implements the actual protocol for how documents are exchanged between peers.
+This is the heart of the synchronization logic. It implements a TEA-based state machine for managing document synchronization across peers.
 
-**Key Trade-off & Design Decision:**
+**Key Features:**
+- **Pure Functional Core**: The synchronization logic is implemented as a pure state machine in `synchronizer-program.ts`
+- **Retry Logic**: Implements exponential backoff for network requests
+- **Peer Discovery**: Maintains a directory of which peers have which documents
 
-Initially, the design was simpler: peers would broadcast any local changes, and other peers would apply them. **This was flawed.** If a peer came online and learned of a document it didn't have, it had no way to acquire it.
+**Protocol Design:**
 
-The architecture was refactored to an explicit **"Announce/Request/Sync"** protocol:
+The synchronizer implements an **"Announce/Request/Sync"** protocol:
 
-1.  **Announce Document**: A peer periodically broadcasts the existence of a new `documentId`s it has.
-2.  **Request Sync**: When a peer receives an "announce-document" for a document it doesn't have, it sends a direct `request-sync` message to the announcer.
-3.  **Sync**: The announcing peer responds with a `sync` message containing the full document snapshot. Any subsequent changes to the document are also sent as incremental `sync` messages.
-4. **Broadcast Request (Optional)**: If a peer calls `find()` on a document ID it does not have, and it has not yet received an `announce` message for it, it will broadcast a `request-sync` message to all connected peers. This ensures that a document can be found even if the `announce` message was missed or has not yet been sent.
+1. **Announce Document**: When a peer connects, it is sent a list of all documents this repo has (that the peer is allowed to see via `canList`). When a new document is added locally, it is announced to all connected peers (again, subject to `canList`).
+2. **Request Sync**: When a peer needs a document, it sends a `request-sync` message. If it knows which peer has the document (from an announcement), it sends the request directly. Otherwise, it sends the request to all connected peers.
+3. **Sync**: The peer with the document responds with a `sync` message containing the document's data.
 
-This design is more complex and requires more network chatter, but it is **fundamentally more robust**. It guarantees that any peer can eventually acquire any document it learns about, which is a critical requirement for a distributed system.
+This design is more complex than simple broadcast-on-change, but it's **fundamentally more robust**. It guarantees that any peer can eventually acquire any document it learns about.
+
+**Access Control:**
+
+The `Synchronizer` is responsible for enforcing access control rules via the `PermissionAdapter`.
+
+- **Outgoing (Discovery & Updates)**: When a new document is created or a new peer connects, the `canList(peerId, documentId)` function is called. If it returns `false`, the peer will not be told about the document. This is the **discovery** gate. Once a peer is aware of a document (i.e., they are in `docAvailability`), they will receive all subsequent `sync` messages for it.
+- **Incoming (Updates)**: When a `sync` message is received from a remote peer, the `canWrite(peerId, documentId)` function is called. If it returns `false`, the message is ignored, preventing unauthorized changes.
+
+This design is more complex than simple broadcast-on-change, but it's **fundamentally more robust**. It guarantees that any peer can eventually acquire any document it learns about.
 
 ## 3. Document Lifecycle & Data Flow
 
-Here is the typical flow of data when a document is created and synchronized:
+Here is the typical flow when working with documents:
 
-1.  **Creation**:
+### 3.1. Creating a Document
 
-    - `userA` calls `repoA.create()`.
-    - A new `DocHandle` is created with a new `LoroDoc`.
-    - The `DocHandle` is immediately `ready`.
-    - The `StorageSubsystem` saves the initial snapshot of the document to its `StorageAdapter`.
+```typescript
+// User calls create() - returns a Promise
+const handle = await repo.create<MyDoc>({ 
+  initialValue: () => ({ text: "Hello" }) 
+})
+// Handle is immediately ready
+```
 
-2.  **Synchronization begins**:
+1. `Repo` creates a new `DocHandle` with injected services
+2. `DocHandle` transitions through states: `idle` → `creating` → `ready`
+3. The Promise resolves with the ready handle
+4. Document is saved to storage and announced to peers
 
-    - `repoA`'s `CollectionSynchronizer` sends an `announce` message over the `NetworkSubsystem` containing the new `documentId`.
-    - `repoB`'s `NetworkSubsystem` receives the message and passes it to its `CollectionSynchronizer`.
+### 3.2. Finding a Document
 
-3.  **Discovery and Request**:
+```typescript
+// User calls find() - returns a Promise
+const handle = await repo.find<MyDoc>(documentId)
+// Handle is ready when document is found
+```
 
-    - `repoB` sees the new `documentId`. It calls `repoB.find()` to get a `DocHandle`. The handle will not find the document in storage and will transition through the following states:
-        1. `idle` -> `loading`: `repoB.find()` is called.
-        2. `loading` -> `searching`: The `StorageSubsystem` returns `null`. The `Repo` sees this state change and tells the `CollectionSynchronizer` to `beginSync()`.
-    - The `CollectionSynchronizer` now starts a timer and waits for an `announce` message for the requested document.
+1. `Repo` creates or retrieves a `DocHandle`
+2. `DocHandle` attempts to load from storage first
+3. If not in storage, queries the network via `Synchronizer`
+4. Promise resolves when document is found or rejects if unavailable
 
-4.  **Full Sync**:
+### 3.3. State Coordination
 
-    - `repoA`'s periodic `announce` message is received by `repoB`.
-    - `repoB`'s `CollectionSynchronizer` sees the announcement for a document its handle is `searching` for. It transitions the handle to `syncing`, clears the discovery cromer, and starts a sync timer. It then sends a `request-sync` message to `repoA`.
-    - `repoA` receives the request and replies with a `sync` message a snapshot of the document.
-    - `repoB` receives the `sync` message. Its `CollectionSynchronizer` clears the sync timer, and the `DocHandle` imports the snapshot, initializes its `LoroDoc`, and transitions to `ready`.
-    - The `whenReady()` promise on `repoB`'s handle resolves.
+The `Repo` coordinates between subsystems through event listeners:
 
-5.  **Incremental Updates**:
-    - `userA` modifies their document. The `DocHandle` in `repoA` detects the `change` and emits an incremental update.
-    - The `CollectionSynchronizer` wraps this in a `sync` message and broadcasts it.
-    - `repoB` receives the `sync` message and applies the incremental update to its copy of the document. The `change` event is fired on its `DocHandle`.
+```typescript
+// When a handle has a local change, we tell the synchronizer about it.
+handle.on("doc-handle-local-change", (message) => {
+  synchronizer.onLocalChange(documentId, message)
+})
 
-This architecture ensures that document state is managed consistently, whether loaded from local storage or initialized from a network peer, leading to a resilient and predictable system.
+// When a handle is ready, we tell the synchronizer to announce it.
+handle.on("doc-handle-state-transition", ({ newState }) => {
+  if (newState.state === "ready") {
+    synchronizer.addDocument(documentId)
+  }
+})
+```
+
+## 4. Testing Strategy
+
+The architecture supports comprehensive testing at multiple levels:
+
+1. **Unit Tests**: Pure state machines (`doc-handle-program.ts`, `synchronizer-program.ts`) are easily testable with simple input/output assertions.
+
+2. **Integration Tests**: The `InProcessNetworkAdapter` allows testing multi-peer scenarios within a single process.
+
+3. **Async Testing**: The Promise-based API makes async testing straightforward with async/await.
+
+## 5. Future Considerations
+
+- **Performance**: The current architecture could be optimized for large numbers of documents by implementing lazy loading strategies.
+- **Persistence**: The storage subsystem could be extended to support more sophisticated persistence strategies (e.g., incremental saves).
+- **Security**: The permission adapter system provides hooks for implementing fine-grained access control.
+
+This architecture ensures that document state is managed consistently, whether loaded from local storage or synchronized from network peers, leading to a resilient and predictable system.

@@ -1,137 +1,189 @@
-import { change, type AsLoro, type LoroProxyDoc } from "@loro-extended/change"
+import { type AsLoro, change, type LoroProxyDoc } from "@loro-extended/change"
 import Emittery from "emittery"
 import { LoroDoc } from "loro-crdt"
+import { v4 as uuid } from "uuid"
 
-import type { DocumentId } from "./types.js"
+import {
+  type Command,
+  type HandleState,
+  type Message,
+  init as programInit,
+  update as programUpdate,
+} from "./doc-handle-program.js"
+import type { DocContent, DocumentId, RequestId } from "./types.js"
 
-/** The possible states a DocHandle can be in. */
-export type HandleState =
-  /** The handle has been created but not yet loaded or requested. */
-  | "idle"
-  /** We are waiting for storage to finish loading. */
-  | "loading"
-  /** We are searching for the document on the network. */
-  | "searching"
-  /** A peer has announced they have the document, and we are waiting for them to send it. */
-  | "syncing"
-  /** The document is available and ready for interaction. */
-  | "ready"
-  /** The document was not found in storage or from any connected peers. */
-  | "unavailable"
-  /** The document has been marked as deleted. */
-  | "deleted"
+/** A dictionary of functions that the DocHandle can use to perform side effects. */
+export interface DocHandleServices<T extends DocContent> {
+  /** A function that returns a promise resolving to the Loro document from storage. */
+  loadFromStorage: (
+    documentId: DocumentId,
+  ) => Promise<LoroProxyDoc<AsLoro<T>> | null>
+  /** A function that returns a promise resolving to the Loro document from the network. */
+  queryNetwork: (
+    documentId: DocumentId,
+    timeout: number,
+  ) => Promise<LoroProxyDoc<AsLoro<T>> | null>
+}
 
-// Define the events that the DocHandle can emit, with their expected payload
-type DocHandleEvents<T extends Record<string, any>> = {
-  "state-change": { oldState: HandleState; newState: HandleState }
-  change: { doc: LoroProxyDoc<AsLoro<T>> }
-  "sync-message": Uint8Array
+// The events that the DocHandle can emit, with their expected payload.
+// Note that the state-change event now emits the full state objects.
+type DocHandleEvents<T extends DocContent> = {
+  "doc-handle-state-transition": { oldState: HandleState<T>; newState: HandleState<T> }
+  "doc-handle-change": { doc: LoroProxyDoc<AsLoro<T>> }
+  "doc-handle-local-change": Uint8Array
 }
 
 /**
- * Manages the lifecycle of a Loro document, providing a state machine,
- * a mutation API, and event handling for changes and synchronization.
+ * A handle to a Loro document that manages its lifecycle and state
+ * transitions according to The Elm Architecture (TEA).
+ *
+ * This class acts as the "runtime" for a pure state machine defined in
+ * `doc-handle-program.ts`. It dispatches messages to the program, receives
+ * new state and commands, and executes the commands as side effects.
  *
  * @typeParam T - The plain JavaScript object schema for the document.
  */
-export class DocHandle<T extends Record<string, any>> {
-  /** The unique identifier for the document. */
+export class DocHandle<T extends DocContent> {
   public readonly documentId: DocumentId
-  #state: HandleState = "idle"
-  #doc?: LoroProxyDoc<AsLoro<T>>
-
-  /**
-   * The ID of a timeout that is running to transition the handle to a new state.
-   * This is used by the CollectionSynchronizer to manage timers.
-   * @internal
-   */
-  public _stateTimeoutId?: NodeJS.Timeout
+  #state: HandleState<T>
+  #services: Partial<DocHandleServices<T>>
+  #pendingRequests = new Map<
+    RequestId,
+    {
+      resolve: (value: DocHandle<T>) => void
+      reject: (reason?: any) => void
+    }
+  >()
 
   /** @internal */
   _emitter = new Emittery<DocHandleEvents<T>>()
 
+  // Public event API
   public on = this._emitter.on.bind(this._emitter)
   public once = this._emitter.once.bind(this._emitter)
   public off = this._emitter.off.bind(this._emitter)
 
-  constructor(documentId: DocumentId) {
+  constructor(
+    documentId: DocumentId,
+    services: Partial<DocHandleServices<T>> = {},
+  ) {
     this.documentId = documentId
-    // DocHandles should be created by a Repo, which will call load().
-    // We do not call load() here automatically.
+    this.#services = services
+
+    const [initialState, initialCommand] = programInit<T>()
+    this.#state = initialState
+    if (initialCommand) {
+      this.#executeCommand(initialCommand)
+    }
   }
 
-  /** The current state of the handle. */
-  public get state(): HandleState {
+  /** The current state of the handle (e.g., "idle", "loading", "ready"). */
+  public get state(): HandleState<T>["state"] {
+    return this.#state.state
+  }
+
+  /** The full state object, for more detailed inspection. */
+  public get stateObject(): HandleState<T> {
     return this.#state
   }
 
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // PUBLIC API - Methods that dispatch messages to the state machine
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
   /**
-   * Returns a promise that resolves when the document is in a terminal state
-   * ('ready', 'unavailable', or 'deleted'). Unlike the old `whenReady`, this
-   * method does not throw an exception if the document becomes unavailable or is
-   * deleted.
-   *
-   * @returns A promise that resolves with the handle's terminal state.
+   * Finds a document, trying local storage first, then the network.
+   * Does not create the document if it's not found.
    */
-  public async whenReady(): Promise<{
-    status: "ready" | "unavailable" | "deleted"
-  }> {
-    for await (const state of this.stateStream()) {
-      if (state === "ready") return { status: "ready" }
-      if (state === "unavailable") return { status: "unavailable" }
-      if (state === "deleted") return { status: "deleted" }
-    }
-    // This line should be unreachable if the state machine is correct.
-    return { status: this.state as "ready" | "unavailable" | "deleted" }
+  public find(): Promise<DocHandle<T>> {
+    const requestId = uuid()
+    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
+      this.#pendingRequests.set(requestId, { resolve, reject })
+    })
+
+    this.#dispatch({ type: "msg-find", requestId })
+    return promise
   }
 
   /**
-   * Returns an async iterable that yields the handle's state as it changes.
-   * The first value yielded is always the current state.
+   * Finds a document, trying local storage and the network. If not found after
+   * a timeout, it creates the document.
+   * @param options Configuration for the findOrCreate operation.
+   */
+  public findOrCreate(
+    options: { timeout?: number } = {},
+  ): Promise<DocHandle<T>> {
+    const requestId = uuid()
+    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
+      this.#pendingRequests.set(requestId, { resolve, reject })
+    })
+
+    this.#dispatch({
+      type: "msg-find-or-create",
+      requestId,
+      timeout: options.timeout ?? 5000,
+    })
+
+    return promise
+  }
+
+  /**
+   * Creates a document immediately. If the document already exists, it will
+   * be merged with the existing document later.
+   * @param options Configuration for the create operation.
+   */
+  public create(): Promise<DocHandle<T>> {
+    const requestId = uuid()
+    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
+      this.#pendingRequests.set(requestId, { resolve, reject })
+    })
+
+    this.#dispatch({
+      type: "msg-create",
+      requestId,
+    })
+
+    return promise
+  }
+
+  /** Marks the document as deleted. */
+  public delete(): void {
+    this.#dispatch({ type: "msg-delete" })
+  }
+
+  /**
+   * The primary method for an application to mutate the document.
+   * @param mutator A function that receives a draft of the document to modify.
+   */
+  public change(mutator: (doc: AsLoro<T>) => void): DocHandle<T> {
+    if (this.state !== "ready") {
+      throw new Error(
+        `Cannot change a document that is not ready. Current state: '${this.state}'`,
+      )
+    }
+
+    this.#dispatch({ type: "msg-local-change", mutator })
+
+    // Useful for chaining after create or findOrCreate
+    return this
+  }
+
+  /**
+   * Applies a sync message from a remote peer to this document.
+   * This is intended for internal use by the network subsystem.
+   * @param message The binary sync message.
    * @internal
    */
-  async *stateStream(): AsyncIterable<HandleState> {
-    const events = this._emitter.events("state-change")
-    try {
-      yield this.state
-      for await (const { newState } of events) {
-        yield newState
-      }
-    } finally {
-      // This is crucial to ensure the event listener is removed when the
-      // consumer of the stream is finished.
-      events.return?.()
+  public applySyncMessage(message: Uint8Array): void {
+    if (this.state === "ready" && "doc" in this.#state) {
+      this.#dispatch({ type: "msg-remote-change", message })
+    } else {
+      // If we're not ready, we need to create a temporary doc to import into.
+      const doc = new LoroDoc()
+      doc.import(message)
+      const proxy = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
+      this.#dispatch({ type: "msg-remote-change", message, doc: proxy })
     }
-  }
-
-  /**
-   * Kicks off the loading process by calling the provided async function.
-   * The handle will transition to 'loading', then to 'ready' if the
-   * document is successfully loaded, or 'searching' if not found.
-   *
-   * @param getDoc A function that returns a promise resolving to the Loro document.
-   */
-  public async load(getDoc: () => Promise<LoroProxyDoc<AsLoro<T>> | null>) {
-    if (this.state !== "idle") {
-      return
-    }
-
-    this._setState("loading")
-
-    const doc = await getDoc()
-    if (this.#state !== "loading") {
-      // This could happen if the handle was deleted while loading
-      return
-    }
-
-    if (doc === null) {
-      // If the document is not in storage, we need to ask the network.
-      // The Repo will trigger this by listening for the state change.
-      this._setState("searching")
-      return
-    }
-
-    this.#init(doc)
   }
 
   /**
@@ -139,84 +191,158 @@ export class DocHandle<T extends Record<string, any>> {
    * @throws If the document is not in the 'ready' state.
    */
   public doc(): LoroProxyDoc<AsLoro<T>> {
-    if (this.state !== "ready" || !this.#doc) {
+    if (this.#state.state !== "ready") {
       throw new Error(`DocHandle is not ready. Current state: '${this.state}'`)
     }
-    return this.#doc
+    return this.#state.doc
   }
 
-  /** Marks the document as deleted. */
-  public delete() {
-    this._setState("deleted")
-    // In the future, this will trigger deletion from storage and notify peers.
-  }
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // INTERNAL RUNTIME - The "impure" part that executes effects
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   /**
-   * The primary method for mutating the document.
-   * @param mutator A function that receives a draft of the document to modify.
+   * The core of the runtime. It takes a message, passes it to the pure `update`
+   * function, gets the new state and command, updates its own state, and then
+   * executes the command.
    */
-  public change(mutator: (doc: AsLoro<T>) => void) {
-    if (this.state !== "ready") {
-      throw new Error(`Cannot change a document that is not ready.`)
-    }
-
-    const doc = this.doc()
-    // The type assertion is safe because the `change` function from `loro-change`
-    // provides the correctly typed proxy to the user's mutator.
-    change(doc, mutator as (d: any) => void)
-    this._emitter.emit("change", { doc })
-  }
-
-  /**
-   * Applies a sync message from a remote peer to this document.
-   * @param message The binary sync message.
-   */
-  public applySyncMessage(message: Uint8Array) {
-    if (this.state === "deleted") {
-      return // Don't apply changes to a deleted doc
-    }
-
-    // If we're idle, loading, or searching, this sync message is the doc's initial state
-    if (!this.#doc) {
-      const doc = new LoroDoc()
-      doc.import(message)
-      // The `change` function returns a proxy, which is what we need.
-      const proxy = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
-      this.#init(proxy)
-      return
-    }
-
-    // If we already have a doc, just import the new changes
-    const doc = this.doc()
-    doc.import(message)
-    this._emitter.emit("change", { doc })
-  }
-
-  /**
-   * Sets the handle's state and emits a 'state-change' event.
-   * @param newState The state to transition to.
-   */
-  _setState(newState: HandleState) {
-    if (this.#state === newState) {
-      return
-    }
+  #dispatch(message: Message<T>): void {
+    const [newState, command] = programUpdate(
+      message,
+      this.#state,
+      this.documentId,
+    )
 
     const oldState = this.#state
-    this.#state = newState
-    this._emitter.emit("state-change", {
-      oldState,
-      newState,
-    })
+    if (newState !== oldState) {
+      this.#state = newState
+      this._emitter.emit("doc-handle-state-transition", { oldState, newState })
+    }
+
+    if (command) {
+      this.#executeCommand(command)
+    }
   }
 
-  #init(doc: LoroProxyDoc<AsLoro<T>>) {
-    if (this.#doc) {
-      throw new Error("DocHandle already has a document.")
+  /**
+   * Executes the side effects described by commands from the `update` function.
+   * This is where all interaction with the outside world (storage, network, etc.) happens.
+   */
+  async #executeCommand(command: Command<T>): Promise<void> {
+    switch (command.type) {
+      case "cmd-load-from-storage": {
+        if (!this.#services.loadFromStorage) {
+          console.warn(
+            "No `loadFromStorage` service provided to DocHandle. Taking no action.",
+          )
+          this.#dispatch({ type: "msg-storage-load-failure" })
+          return
+        }
+        const doc = await this.#services.loadFromStorage(command.documentId)
+        if (doc) {
+          this.#dispatch({ type: "msg-storage-load-success", doc })
+        } else {
+          this.#dispatch({ type: "msg-storage-load-failure" })
+        }
+        break
+      }
+
+      case "cmd-query-network": {
+        if (!this.#services.queryNetwork) {
+          console.warn(
+            "No `queryNetwork` service provided. Simulating timeout.",
+          )
+          setTimeout(
+            () => this.#dispatch({ type: "msg-network-timeout" }),
+            command.timeout,
+          )
+          return
+        }
+        const doc = await this.#services.queryNetwork(
+          command.documentId,
+          command.timeout,
+        )
+        if (doc) {
+          this.#dispatch({ type: "msg-network-load-success", doc })
+        } else {
+          this.#dispatch({ type: "msg-network-timeout" })
+        }
+        break
+      }
+
+      case "cmd-create-doc": {
+        const proxy = change(new LoroDoc(), doc => {
+          const initialValue = command.initialValue?.()
+          Object.assign(doc as object, initialValue)
+        })
+
+        // Treat creation like a successful load to transition to ready state
+        this.#dispatch({ type: "msg-storage-load-success", doc: proxy })
+        break
+      }
+
+      case "cmd-apply-local-change": {
+        if (this.#state.state !== "ready") {
+          // This should not happen if the program logic is correct
+          console.warn("Cannot apply local change to a non-ready document.")
+          return
+        }
+        change(this.#state.doc, command.mutator as (d: any) => void)
+        break
+      }
+
+      case "cmd-apply-remote-change": {
+        if (this.#state.state !== "ready") {
+          // This should not happen if the program logic is correct
+          console.warn("Cannot apply remote change to a non-ready document.")
+          return
+        }
+        this.#state.doc.import(command.message)
+        break
+      }
+
+      case "cmd-subscribe-to-doc": {
+        // When any change happens (local or remote), notify listeners that the handle's doc has changed.
+        command.doc.subscribe(_event => {
+          this._emitter.emit("doc-handle-change", { doc: command.doc })
+        })
+
+        // When a local change happens, get the specific binary sync message and emit it.
+        command.doc.subscribeLocalUpdates(syncMessage => {
+          this._emitter.emit("doc-handle-local-change", syncMessage)
+        })
+        break
+      }
+
+      case "cmd-report-success": {
+        const request = this.#pendingRequests.get(command.requestId)
+        if (request) {
+          request.resolve(this)
+          this.#pendingRequests.delete(command.requestId)
+        }
+        break
+      }
+
+      case "cmd-report-failure": {
+        const request = this.#pendingRequests.get(command.requestId)
+        if (request) {
+          request.reject(command.error)
+          this.#pendingRequests.delete(command.requestId)
+        }
+        break
+      }
+
+      case "cmd-batch": {
+        for (const cmd of command.commands) {
+          this.#executeCommand(cmd)
+        }
+        break
+      }
+
+      default: {
+        const unhandled: never = command
+        throw new Error(`Unhandled command: ${JSON.stringify(unhandled)}`)
+      }
     }
-    this.#doc = doc
-    this.#doc.subscribeLocalUpdates(update => {
-      this._emitter.emit("sync-message", update)
-    })
-    this._setState("ready")
   }
 }

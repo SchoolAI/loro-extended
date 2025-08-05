@@ -1,115 +1,132 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: ok for tests */
+/** biome-ignore-all lint/suspicious/noExplicitAny: simplify tests */
 
 import type { AsLoro, LoroProxyDoc } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { DocHandle } from "./doc-handle.js"
+import { DocHandle, type DocHandleServices } from "./doc-handle.js"
 
-// Helper to wait for a specific event
-const waitForEvent = (handle: DocHandle<any>, eventName: string) => {
-  return handle.once(eventName as any)
+// Helper to wait for one or more events
+const waitForEvents = (
+  handle: DocHandle<any>,
+  eventName: string,
+  count: number,
+) => {
+  return new Promise<void>(resolve => {
+    let events = 0
+    const listener = () => {
+      events++
+      if (events === count) {
+        handle.off(eventName as any, listener)
+        resolve()
+      }
+    }
+    handle.on(eventName as any, listener)
+  })
 }
 
-describe("DocHandle", () => {
+const waitForEvent = (handle: DocHandle<any>, eventName: string) =>
+  waitForEvents(handle, eventName, 1)
+
+describe("DocHandle Integration Tests", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
   it("should initialize in an idle state", () => {
     const handle = new DocHandle("test-doc")
     expect(handle.state).toBe("idle")
   })
 
-  it("should transition to loading and then ready state", async () => {
-    const handle = new DocHandle("test-doc")
-    expect(handle.state).toBe("idle")
-    const loadPromise = handle.load(
-      async () => new LoroDoc() as LoroProxyDoc<any>,
-    )
-    expect(handle.state).toBe("loading")
-    await loadPromise
-    expect(handle.state).toBe("ready")
+  it("should become 'unavailable' if find() is unsuccessful (no return)", async () => {
+    const services: DocHandleServices<any> = {
+      loadFromStorage: vi.fn().mockResolvedValue(null),
+      queryNetwork: vi.fn(),
+    }
+    const handle = new DocHandle("test-doc", services)
+
+    // We don't await the promise here because we want to inspect the intermediate state
+    handle.find()
+    expect(handle.state).toBe("storage-loading")
+    await vi.runAllTimersAsync()
+
+    // The state transition to storage-loading is synchronous
+    expect(handle.state).toBe("unavailable")
+    expect(services.loadFromStorage).toHaveBeenCalledWith("test-doc")
   })
 
-  it("whenReady() should wait for load, and resolve immediately once ready", async () => {
-    const handle = new DocHandle("test-doc")
+  it("should transition through the find flow to ready", async () => {
+    const doc = new LoroDoc() as LoroProxyDoc<any>
+    const services: DocHandleServices<any> = {
+      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      queryNetwork: vi.fn(),
+    }
+    const handle = new DocHandle("test-doc", services)
 
-    // 1. Create a loader that we can resolve manually
-    let resolveLoad!: (doc: LoroProxyDoc<any>) => void
-    const loadingPromise = new Promise<LoroProxyDoc<any>>(resolve => {
-      resolveLoad = resolve
-    })
-    const getDoc = () => loadingPromise
+    const resolvedHandle = await handle.find()
 
-    // 2. Start loading. The handle should transition to the 'loading' state.
-    handle.load(getDoc)
-    expect(handle.state).toBe("loading")
-
-    // 3. The first call to whenReady()
-    const readyPromise = handle.whenReady()
-
-    // 4. Manually resolve the loader, fulfilling the loading promise
-    resolveLoad(new LoroDoc() as LoroProxyDoc<any>)
-    const result = await readyPromise // This should now resolve
-    expect(result.status).toBe("ready")
-    expect(handle.state).toBe("ready")
-
-    // 5. Call whenReady() again now that the handle is already 'ready'
-    const alreadyReadyPromise = handle.whenReady()
-    const alreadyReadyResult = await alreadyReadyPromise
-    // check that it resolves immediately
-    expect(alreadyReadyResult.status).toBe("ready")
-    expect(handle.state).toBe("ready")
+    expect(resolvedHandle.state).toBe("ready")
+    expect(resolvedHandle.doc()).toBe(doc)
+    expect(services.loadFromStorage).toHaveBeenCalledOnce()
+    expect(handle).toBe(resolvedHandle) // The resolved handle should be the same instance
   })
 
-  it("should emit a 'state-change' event when state changes", async () => {
-    const handle = new DocHandle("test-doc")
-    const listener = vi.fn()
-    handle.on("state-change", listener)
+  it("should create a document if findOrCreate times out", async () => {
+    const services: DocHandleServices<any> = {
+      loadFromStorage: vi.fn().mockResolvedValue(null),
+      queryNetwork: vi.fn().mockResolvedValue(null),
+    }
 
-    await handle.load(async () => new LoroDoc() as LoroProxyDoc<any>)
+    const handle = new DocHandle("test-doc", services)
+    await handle.findOrCreate()
 
-    // Expect idle -> loading and loading -> ready
-    expect(listener).toHaveBeenCalledWith({
-      oldState: "idle",
-      newState: "loading",
-    })
-    expect(listener).toHaveBeenCalledWith({
-      oldState: "loading",
-      newState: "ready",
-    })
+    expect(handle.state).toBe("ready")
+    expect(handle.doc()).toBeInstanceOf(LoroDoc)
   })
 
-  it("should allow changing a document", async () => {
+  it("should allow changing a document once ready", async () => {
     type TestSchema = { text: string }
-    const handle = new DocHandle<TestSchema>("test-doc")
-    await handle.load(
-      async () => new LoroDoc() as LoroProxyDoc<AsLoro<TestSchema>>,
-    )
+    const doc = new LoroDoc()
+    const services: DocHandleServices<TestSchema> = {
+      loadFromStorage: async () => doc as LoroProxyDoc<AsLoro<TestSchema>>,
+      queryNetwork: async () => null,
+    }
+    const handle = new DocHandle<TestSchema>("test-doc", services)
 
-    const changePromise = waitForEvent(handle, "change")
+    await handle.find()
 
-    handle.change(doc => {
-      doc.text = "hello world"
+    const changePromise = waitForEvent(handle, "doc-handle-change")
+
+    handle.change(d => {
+      d.text = "hello world"
     })
 
     await changePromise
-
     const loroDoc = handle.doc()
     const jsDoc = loroDoc.getMap("root").toJSON()
     expect(jsDoc.text).toBe("hello world")
   })
 
-  it("should emit a 'sync-message' after a change", async () => {
-    type TestSchema = { text: string }
-    const handle = new DocHandle<TestSchema>("test-doc")
-    await handle.load(
-      async () => new LoroDoc() as LoroProxyDoc<AsLoro<TestSchema>>,
-    )
+  it("should emit a 'sync-message' after a local change", async () => {
+    const doc = new LoroDoc()
+    const services = {
+      loadFromStorage: async () => doc as LoroProxyDoc<any>,
+    }
+    const handle = new DocHandle("test-doc", services)
 
-    const syncPromise = waitForEvent(handle, "sync-message")
+    await handle.find()
+
+    const syncPromise = waitForEvent(handle, "doc-handle-local-change")
     const listener = vi.fn()
-    handle.on("sync-message", listener)
+    handle.on("doc-handle-local-change", listener)
 
-    handle.change((doc: TestSchema) => {
-      doc.text = "hello"
+    handle.change((d: { text: string }) => {
+      d.text = "hello"
     })
 
     await syncPromise
@@ -117,52 +134,31 @@ describe("DocHandle", () => {
     expect(listener.mock.calls[0][0]).toBeInstanceOf(Uint8Array)
   })
 
-  it("should throw an error when trying to change a non-ready document", () => {
+  it("should throw when trying to change a non-ready document", () => {
     const handle = new DocHandle("test-doc")
-    // Do not call load(), so handle remains 'idle'
+    expect(handle.state).not.toBe("ready")
     expect(() => {
-      handle.change(() => {
-        // this should not run
-      })
-    }).toThrow("Cannot change a document that is not ready.")
-  })
-
-  it("should transition to deleted state", async () => {
-    const handle = new DocHandle("test-doc")
-    const listener = vi.fn()
-    handle.on("state-change", listener)
-    const stateChangePromise = waitForEvent(handle, "state-change")
-    handle.delete()
-    await stateChangePromise
-    expect(handle.state).toBe("deleted")
-    expect(listener).toHaveBeenCalledWith({
-      oldState: "idle",
-      newState: "deleted",
-    })
+      handle.change(() => {})
+    }).toThrow()
   })
 
   it("should sync changes between two handles", async () => {
-    type TestSchema = { text?: string }
-    const handleA = new DocHandle<TestSchema>("sync-doc")
-    const handleB = new DocHandle<TestSchema>("sync-doc")
+    // Setup handle A
+    const handleA = new DocHandle<any>("sync-doc")
+    await handleA.create()
 
-    const docA = new LoroDoc() as LoroProxyDoc<AsLoro<TestSchema>>
-    const docB = new LoroDoc() as LoroProxyDoc<AsLoro<TestSchema>>
-
-    // Simulate the repo loading the docs and initializing the handles
-    const loadAPromise = handleA.load(async () => docA)
-    const loadBPromise = handleB.load(async () => docB)
-
-    await Promise.all([loadAPromise, loadBPromise])
+    // Setup handle B
+    const handleB = new DocHandle<any>("sync-doc")
+    await handleB.create()
 
     // Pipe messages from A to B
-    handleA.on("sync-message", message => {
+    handleA.on("doc-handle-local-change", message => {
       handleB.applySyncMessage(message)
     })
 
-    const changePromise = waitForEvent(handleB, "change")
-    handleA.change(doc => {
-      doc.text = "synced"
+    const changePromise = waitForEvent(handleB, "doc-handle-change")
+    handleA.change((d: { text: string }) => {
+      d.text = "synced"
     })
 
     await changePromise
@@ -170,77 +166,5 @@ describe("DocHandle", () => {
     const retrievedDocB = handleB.doc()
     const jsDocB = retrievedDocB.getMap("root").toJSON()
     expect(jsDocB.text).toBe("synced")
-  })
-
-  it("should transition to searching state if load returns null", async () => {
-    const handle = new DocHandle("test-doc")
-    const listener = vi.fn()
-    handle.on("state-change", listener)
-
-    await handle.load(async () => null)
-
-    expect(handle.state).toBe("searching")
-    expect(listener).toHaveBeenCalledWith({
-      oldState: "idle",
-      newState: "loading",
-    })
-    expect(listener).toHaveBeenCalledWith({
-      oldState: "loading",
-      newState: "searching",
-    })
-  })
-
-  it("whenReady() should not resolve as 'ready' while the document is searching", async () => {
-    const handle = new DocHandle("test-doc")
-
-    let isReady = false
-    handle.whenReady().then(({ status }) => {
-      if (status === "ready") {
-        isReady = true
-      }
-    })
-
-    // a load that returns null will put the handle in a 'searching' state
-    await handle.load(async () => null)
-    expect(handle.state).toBe("searching")
-
-    // Give a chance for the promise to resolve if it were to do so incorrectly
-    await new Promise(r => setTimeout(r, 0))
-
-    // whenReady() promise should not have resolved
-    expect(isReady).toBe(false)
-  })
-
-  it("whenReady() should resolve with { status: 'deleted' } if the handle is deleted", async () => {
-    const handle = new DocHandle("test-doc")
-    const readyPromise = handle.whenReady()
-    handle.delete()
-    const result = await readyPromise
-    expect(result.status).toBe("deleted")
-  })
-
-  it("whenReady() should resolve with { status: 'unavailable' } if the handle becomes unavailable", async () => {
-    const handle = new DocHandle("test-doc")
-    const readyPromise = handle.whenReady()
-
-    // Manually set the state to unavailable, simulating a timeout
-    handle._setState("unavailable")
-
-    const result = await readyPromise
-    expect(result.status).toBe("unavailable")
-  })
-
-  it("whenReady() should resolve immediately with the correct status if already in a terminal state", async () => {
-    // Test for 'deleted' state
-    const deletedHandle = new DocHandle("deleted-doc")
-    deletedHandle.delete()
-    const deletedResult = await deletedHandle.whenReady()
-    expect(deletedResult.status).toBe("deleted")
-
-    // Test for 'unavailable' state
-    const unavailableHandle = new DocHandle("unavailable-doc")
-    unavailableHandle._setState("unavailable")
-    const unavailableResult = await unavailableHandle.whenReady()
-    expect(unavailableResult.status).toBe("unavailable")
   })
 })

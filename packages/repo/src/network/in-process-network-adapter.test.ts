@@ -5,7 +5,7 @@ import {
   InProcessNetworkAdapter,
   InProcessNetworkBroker,
 } from "./in-process-network-adapter.js"
-import type { AnnounceDocumentMessage } from "./network-adapter.js"
+import type { AnnounceDocumentMessage } from "./network-messages.js"
 
 describe("InProcessNetworkAdapter", () => {
   let broker: InProcessNetworkBroker
@@ -53,7 +53,7 @@ describe("InProcessNetworkAdapter", () => {
     const message: AnnounceDocumentMessage = {
       type: "announce-document",
       senderId: peer1Id,
-      targetId: peer2Id,
+      targetIds: [peer2Id],
       documentIds: ["docA", "docB"],
     }
     adapter1.send(message)

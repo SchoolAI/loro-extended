@@ -25,14 +25,17 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@loro-extended/change": "workspace:^",
     "emittery": "^1.0.1",
-    "@loro-extended/change": "workspace:^"
+    "raj-ts": "^0.0.2",
+    "uuid": "^9.0.1"
   },
   "peerDependencies": {
     "loro-crdt": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
+    "@types/uuid": "^9.0.8",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

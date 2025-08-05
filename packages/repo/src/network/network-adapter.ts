@@ -1,60 +1,11 @@
 import type Emittery from "emittery"
 import type { StorageId } from "../storage/storage-adapter.js"
-import type { DocumentId, PeerId } from "../types.js"
+import type { PeerId } from "../types.js"
+import type { RepoMessage } from "./network-messages.js"
 
 export interface PeerMetadata {
   storageId?: StorageId
 }
-
-/** The base message interface. */
-export interface MessageBase {
-  senderId: PeerId
-  targetId: PeerId
-}
-
-/** Broadcasts the documents a peer has available upon connection. */
-export interface AnnounceDocumentMessage extends MessageBase {
-  type: "announce-document"
-  documentIds: DocumentId[]
-}
-
-/** Informs a peer that a requested document is not available. */
-export interface DocumentUnavailableMessage extends MessageBase {
-  type: "document-unavailable"
-  documentId: DocumentId
-}
-
-/** Requests the latest version of a document from a peer. */
-export interface RequestSyncMessage extends MessageBase {
-  type: "request-sync"
-  documentId: DocumentId
-}
-
-/**
- * The core message for document synchronization. Contains Loro oplog and version info
- * depending on the type of sync (snapshot, shallow-snapshot, update, update-in-range).
- */
-export interface SyncMessage extends MessageBase {
-  type: "sync"
-  documentId: DocumentId
-  /** The sender's version vector for the document. Optional. */
-  version?: Uint8Array
-  /** Binary update data. Optional. */
-  data?: Uint8Array
-}
-
-/** A peer is requesting to delete a document. */
-export interface DeleteDocumentMessage extends MessageBase {
-  type: "delete-document"
-  documentId: DocumentId
-}
-
-export type RepoMessage =
-  | AnnounceDocumentMessage
-  | RequestSyncMessage
-  | SyncMessage
-  | DocumentUnavailableMessage
-  | DeleteDocumentMessage
 
 export interface NetworkAdapterEvents {
   /** A potential peer has been discovered. */

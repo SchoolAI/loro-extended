@@ -4,69 +4,93 @@ This document outlines the architecture for the `DocHandle`, a core component in
 
 ## 1. Core Purpose
 
-A `DocHandle` is a stateful wrapper around a single `LoroDoc` instance. It provides a higher-level, user-friendly API that abstracts the complexities of document loading, state management, and interaction with storage and network layers. It is inspired by the `DocHandle` in Automerge-Repo but tailored to Loro's specific capabilities.
+A `DocHandle` is a stateful wrapper around a single `LoroDoc` instance. It provides a higher-level, user-friendly API that abstracts the complexities of document loading, state management, and interaction with storage and network layers.
+
+At its core, the `DocHandle` implements **The Elm Architecture (TEA)**. It hosts a pure, synchronous state machine (defined in `doc-handle-program.ts`) and acts as the runtime for executing the side effects (like I/O) that the state machine describes.
 
 Key responsibilities include:
-- Managing the document's lifecycle (`loading`, `ready`, etc.).
-- Providing a simple `change()` API for mutations.
-- Emitting events when the document changes.
-- Abstracting the persistence strategy (snapshots and updates).
-- Generating and applying sync messages for peer-to-peer communication.
+- Managing the document's lifecycle (`idle`, `storage-loading`, `ready`, etc.) through a predictable state machine.
+- Providing a simple, intention-based API (`find`, `create`, `change`).
+- Executing side effects (Commands) like storage access and network queries in a controlled manner.
+- Emitting events when the document's state or content changes.
 
-## 2. State Machine
+## 2. Architecture: Host-as-Orchestrator
 
-To ensure predictable and robust behavior, the `DocHandle` is implemented as an explicit finite state machine.
+To bridge the gap between a typical asynchronous application and the synchronous state machine, the `DocHandle` uses the **Host-as-Orchestrator** pattern.
+
+When a public method like `handle.find()` is called, it returns a `Promise`. The `DocHandle` (the "host") generates a unique `RequestId` and stores the promise's resolver functions in a map. This `RequestId` is passed through the state machine. When the machine reaches a terminal state (`ready` or `unavailable`), it issues a `report_success` or `report_failure` command containing the original `RequestId`. The host then uses this ID to find and resolve the correct promise.
+
+This pattern keeps the state machine pure and testable while providing a modern, `async/await`-friendly public API. All state, including that of in-flight requests, is managed by the pure program, and the host is a "dumb" executor of commands.
+
+See `packages/docs/doc-handle-tea.md` for a more detailed technical breakdown and diagrams.
+
+## 3. State Machine
+
+The `DocHandle` is implemented as an explicit finite state machine.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> idle: created
+    direction LR
+    
+    [*] --> Idle
 
-    idle --> loading: repo.find() [doc in storage]
-    loading --> ready: loaded from storage
-    loading --> unavailable: failed to load from storage
+    Idle --> StorageLoading: find() / findOrCreate()
+    Idle --> Creating: create()
     
-    idle --> searching: repo.find() [doc not in storage]
-    searching --> syncing: peer announces document
-    searching --> unavailable: discovery timeout
+    StorageLoading --> Ready: found in storage
+    StorageLoading --> Creating: not found (findOrCreate)
+    StorageLoading --> NetworkLoading: not found (find)
     
-    syncing --> ready: sync message with data received
-    syncing --> searching: sync timeout / peer disconnects
+    NetworkLoading --> Ready: found on network
+    NetworkLoading --> Unavailable: timeout
     
-    ready --> deleted: repo.delete()
-    searching --> deleted: repo.delete()
-    syncing --> deleted: repo.delete()
-    loading --> deleted: repo.delete()
+    Creating --> Ready: created successfully
+    
+    Ready --> Deleted: delete()
+    Unavailable --> Idle: (re-request)
+
+    state "Async Public API" as api {
+      find
+      create
+      findOrCreate
+    }
 ```
 
 ### States
 
-- **`Idle`**: The initial state. The handle exists, but we haven't tried to load it from storage or the network.
-- **`Loading`**: We are actively trying to load the document from storage.
-- **`Searching`**: The document wasn't found in storage, so we are now asking peers on the network if they have it. A discovery timer is running.
-- **`Syncing`**: A peer has told us they have the document, and we are now waiting for them to send the data. A sync timer is running.
-- **`Ready`**: The document is loaded in memory and available for use.
-- **`Unavailable`**: We couldn't find the document in storage or on the network within the allotted time.
+- **`Idle`**: The initial state. The handle exists, but no document loading has been initiated.
+- **`StorageLoading`**: We are actively trying to load the document from the provided storage service in response to a `find` or `findOrCreate` call.
+- **`NetworkLoading`**: The document wasn't found in storage, so we are now asking peers on the network if they have it.
+- **`Creating`**: We are in the process of creating a new document from scratch.
+- **`Ready`**: The document is loaded in memory and available for use. This is a terminal state for successful load/create operations.
+- **`Unavailable`**: We couldn't find the document in storage or on the network within the allotted time. This is a terminal state for a `find` operation.
 - **`Deleted`**: The document has been marked for deletion. This is a terminal state.
 
-## 3. Core API
+## 4. Core API
 
-The `DocHandle<T>` will expose the following public API:
+The `DocHandle<T>` exposes a minimal `async` API for interacting with the document.
 
 ```typescript
-import { type AsLoro, type LoroProxyDoc } from "loro-change";
-
 class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
   public readonly documentId: DocumentId;
 
-  public get state(): HandleState;
+  // The string name of the current state (e.g., "idle").
+  public get state(): HandleState<T>["state"];
 
-  // Returns a promise that resolves when the handle is in a terminal state
-  // ('ready', 'unavailable', or 'deleted'). It does not throw.
-  public whenReady(): Promise<{ status: "ready" | "unavailable" | "deleted" }>;
+  // The full, rich state object.
+  public get stateObject(): HandleState<T>;
 
-  // Initiates loading by calling the provided async loader function.
-  // Only callable when in the 'idle' state.
-  public async load(getDoc: () => Promise<LoroProxyDoc<AsLoro<T>> | null>): Promise<void>;
+  // Asks the handle to find the doc in storage, then network.
+  // Returns a promise that resolves with the handle when ready, or rejects if unavailable.
+  public find(): Promise<DocHandle<T>>;
+
+  // Asks the handle to find the doc, creating it if not found after a timeout.
+  // Returns a promise that resolves with the handle when ready.
+  public findOrCreate(options?: { timeout?: number }): Promise<DocHandle<T>>;
+
+  // Asks the handle to create the doc immediately.
+  // Returns a promise that resolves with the handle when ready.
+  public create(options?: { initialValue?: () => T }): Promise<DocHandle<T>>;
 
   // Returns the underlying LoroProxyDoc. Throws if not 'ready'.
   public doc(): LoroProxyDoc<AsLoro<T>>;
@@ -74,36 +98,35 @@ class DocHandle<T> extends EventEmitter<DocHandleEvents<T>> {
   // The primary method for mutating the document. Throws if not 'ready'.
   public change(mutator: (doc: AsLoro<T>) => void): void;
 
-  // Applies a sync message from a remote peer.
-  public applySyncMessage(message: Uint8Array): void;
-
   // Marks the document for deletion.
   public delete(): void;
 }
 ```
 
-## 4. Loading Strategy
+## 5. Loading Strategy & Dependency Injection
 
-The responsibility for persistence is delegated to the creator of the `DocHandle` (typically a `Repo` instance). The `DocHandle` itself is agnostic about where the document comes from; it simply orchestrates the state transitions based on the outcome of the `getDoc` promise provided to its `load()` method.
+The responsibility for persistence and network communication is delegated to the creator of the `DocHandle` (typically a `Repo` instance) through **dependency injection**. The `DocHandle` constructor accepts a `services` object that provides the concrete implementations for side effects.
 
-1.  **Initiate Load**: The `Repo` calls `handle.load(getDoc)`, where `getDoc` is a function that attempts to load the document from the `StorageSubsystem`. This immediately transitions the handle from `idle` to `loading`.
-2.  **Storage Outcome**: The handle `await`s the `getDoc()` promise.
-    -   **On Success**: If `getDoc()` resolves with a `LoroProxyDoc`, the document was found in storage. The handle transitions to `ready`.
-    -   **On `null`**: If `getDoc()` resolves with `null`, the document is not in storage. The handle transitions to `searching`, signaling to the `Repo` that it should now query the network.
-    -   **On Failure**: If the promise rejects, the handle transitions to `unavailable`.
-3.  **Network Search**: While in the `searching` state, the `CollectionSynchronizer` (orchestrated by the `Repo`) broadcasts requests for the document and starts a discovery timer.
-    -   **Peer Found**: If a peer announces it has the document, the `CollectionSynchronizer` moves the handle to the `syncing` state and starts a new timer.
-    -   **Timeout**: If no peers respond before the discovery timer ends, the handle transitions to `unavailable`.
-4.  **Network Sync**: While in the `syncing` state, the handle waits for a `sync` message.
-    -   **Data Received**: When the `sync` message arrives, the handle applies it, initializes the `LoroDoc`, and transitions to `ready`.
-    -   **Timeout**: If the peer fails to send the data in time, the `CollectionSynchronizer` can transition the handle back to `searching` to find another peer.
+```typescript
+interface DocHandleServices<T> {
+  loadFromStorage: (id: DocumentId) => Promise<LoroProxyDoc<AsLoro<T>> | null>;
+  queryNetwork: (id: DocumentId, timeout: number) => Promise<LoroProxyDoc<AsLoro<T>> | null>;
+}
 
-This design decouples the `DocHandle` from any specific storage or network implementation, making it a more general-purpose and reusable component. The `Repo` is now solely responsible for managing storage adapters and providing the correct `getDoc` logic.
+const handle = new DocHandle(documentId, {
+  loadFromStorage: myStorage.load,
+  queryNetwork: myNetwork.query,
+});
 
-## 5. Event Emitter Interface
+const readyHandle = await handle.find();
+```
+
+This design decouples the `DocHandle`'s state management logic from any specific storage or network implementation, making it a highly reusable and testable component.
+
+## 6. Event Emitter Interface
 
 The `DocHandle` emits events to notify the application of important changes.
 
--   **`on('change', (payload: { doc: LoroProxyDoc<AsLoro<T>> }) => void)`**: Fired whenever the document's content changes, either from a local mutation via `handle.change()` or from a remote change via `handle.applySyncMessage()`. The payload contains the mutated document proxy.
--   **`on('sync-message', (message: Uint8Array) => void)`**: Fired when a local change via `handle.change()` produces a sync message that needs to be broadcast to other peers.
--   **`on('state-change', (payload: { oldState: HandleState; newState: HandleState }) => void)`**: Fired whenever the handle's internal state transitions (e.g., from `loading` to `ready`).
+- **`on('state-change', (payload: { oldState: HandleState<T>; newState: HandleState<T> }) => void)`**: Fired whenever the handle's internal state transitions.
+- **`on('change', (payload: { doc: LoroProxyDoc<AsLoro<T>> }) => void)`**: Fired whenever the document's content changes, either from a local `change()` or a remote sync message.
+- **`on('sync-message', (message: Uint8Array) => void)`**: Fired when a local `change()` produces a sync message that needs to be broadcast to other peers.

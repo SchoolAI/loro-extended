@@ -1,7 +1,7 @@
-import Emittery from "emittery"
-import { LoroDoc } from "loro-crdt"
-
-import type { PermissionAdapter } from "./auth/PermissionAdapter.js"
+import {
+  createPermissions,
+  type PermissionAdapter,
+} from "./auth/permission-adapter.js"
 import { DocHandle } from "./doc-handle.js"
 import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
 import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
@@ -9,46 +9,74 @@ import { NetworkSubsystem } from "./network/network-subsystem.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
 import { StorageSubsystem } from "./storage/storage-subsystem.js"
-import { CollectionSynchronizer } from "./synchronizer/collection-synchronizer.js"
+import {
+  Synchronizer,
+  type SynchronizerServices,
+} from "./synchronizer.js"
 import type { DocumentId, PeerId } from "./types.js"
 
 export interface RepoConfig {
   storage?: StorageAdapter
   network?: NetworkAdapter[]
   peerId?: PeerId
-  permissions?: PermissionAdapter
+  permissions?: Partial<PermissionAdapter>
 }
 
 function randomPeerId(): PeerId {
   return `peer-${Math.random().toString(36).slice(2)}`
 }
 
-export class Repo extends Emittery {
-  peerId: PeerId
-  networkSubsystem: NetworkSubsystem
-  storageSubsystem: StorageSubsystem
-  synchronizer: CollectionSynchronizer
-  #permissionAdapter: PermissionAdapter
-  #handleCache = new Map<DocumentId, DocHandle<any>>()
+/**
+ * The Repo class is the central orchestrator for the Loro state synchronization system.
+ * It manages the lifecycle of documents, coordinates subsystems, and provides the main
+ * public API for document operations.
+ *
+ * Unlike DocHandle and Synchronizer which use TEA for complex state management,
+ * Repo is a simple orchestrator that wires together the various subsystems.
+ */
+export class Repo {
+  readonly peerId: PeerId
+
+  // Subsystems
+  private readonly networkSubsystem: NetworkSubsystem
+  private readonly storageSubsystem: StorageSubsystem
+  private readonly synchronizer: Synchronizer
+
+  // Services
+  private readonly permissionAdapter: PermissionAdapter
+
+  // Handle management
+  private readonly handleCache = new Map<DocumentId, DocHandle<any>>()
 
   get permissions(): PermissionAdapter {
-    return this.#permissionAdapter
+    return this.permissionAdapter
   }
 
   get handles(): Map<DocumentId, DocHandle<any>> {
-    return this.#handleCache
+    return this.handleCache
   }
 
-  constructor({ storage, network, peerId, permissions }: RepoConfig = {}) {
-    super()
+  constructor({ storage, network, peerId, permissions }: RepoConfig) {
     this.peerId = peerId ?? randomPeerId()
-    this.#permissionAdapter = permissions ?? {}
+    this.permissionAdapter = createPermissions(permissions)
+
+    // Create services object for the synchronizer
+    const services: SynchronizerServices = {
+      sendMessage: message => this.networkSubsystem.send(message),
+      getDoc: documentId => this.getOrCreateHandle(documentId),
+      permissions: this.permissionAdapter,
+      onDocAvailable: documentId => {
+        if (!this.handleCache.has(documentId)) {
+          this.getOrCreateHandle(documentId)
+        }
+      },
+    }
 
     // Instantiate subsystems
     this.storageSubsystem = new StorageSubsystem(
       storage ?? new InMemoryStorageAdapter(),
     )
-    this.synchronizer = new CollectionSynchronizer(this)
+    this.synchronizer = new Synchronizer(services)
 
     const peerMetadata: PeerMetadata = {} // In the future, this could contain the storageId
     this.networkSubsystem = new NetworkSubsystem(
@@ -57,60 +85,80 @@ export class Repo extends Emittery {
       peerMetadata,
     )
 
-    // Wire up subsystems
+    // Wire up subsystems - Network events to Synchronizer
     this.networkSubsystem.on("peer", ({ peerId }) =>
       this.synchronizer.addPeer(peerId),
     )
     this.networkSubsystem.on("peer-disconnected", ({ peerId }) =>
       this.synchronizer.removePeer(peerId),
     )
-    this.networkSubsystem.on("message", message =>
-      this.synchronizer.receiveMessage(message),
-    )
-
-    this.synchronizer.on("message", message => {
-      // Add the senderId before sending the message over the network
-      message.senderId = this.peerId
-      this.networkSubsystem.send(message)
+    this.networkSubsystem.on("message", async message => {
+      this.synchronizer.handleRepoMessage(message)
     })
   }
 
   //
-  // PUBLIC API
+  // PUBLIC API - Now returns Promises
   //
 
-  create<T extends Record<string, any>>(
+  /**
+   * Creates a new document with an optional documentId.
+   * @param options Configuration options for document creation
+   * @returns A promise that resolves to the DocHandle when the document is ready
+   */
+  async create<T extends Record<string, any> = Record<string, any>>(
     options: { documentId?: DocumentId } = {},
-  ): DocHandle<T> {
+  ): Promise<DocHandle<T>> {
     const documentId = options.documentId ?? crypto.randomUUID()
-    if (this.#handleCache.has(documentId)) {
+
+    if (this.handleCache.has(documentId)) {
       throw new Error(`A document with id ${documentId} already exists.`)
     }
-    const handle = this.#getHandle<T>(documentId)
-    // A new document is ready immediately with an empty LoroDoc.
-    handle.load(() => Promise.resolve(new LoroDoc()))
-    this.synchronizer.addDocument(handle)
-    return handle
+
+    const handle = this.getOrCreateHandle<T>(documentId)
+    return await handle.create()
   }
 
-  find<T extends Record<string, any>>(documentId: DocumentId): DocHandle<T> {
-    const handle = this.#getHandle<T>(documentId)
-    if (handle.state === "idle") {
-      // The synchronizer needs to know about the document in order to sync it.
-      this.synchronizer.addDocument(handle)
-      // loadDoc will either return a LoroDoc or null. The handle will transition
-      // to "searching" if it's not found in storage.
-      handle.load(() => this.storageSubsystem.loadDoc(documentId))
-    }
-    return handle
+  /**
+   * Finds an existing document by its ID.
+   * @param documentId The ID of the document to find
+   * @returns A promise that resolves to the DocHandle when found, or rejects if unavailable
+   */
+  async find<T extends Record<string, any> = Record<string, any>>(
+    documentId: DocumentId,
+  ): Promise<DocHandle<T>> {
+    const handle = this.getOrCreateHandle<T>(documentId)
+    return await handle.find()
   }
 
-  delete(documentId: DocumentId) {
-    const handle = this.#handleCache.get(documentId)
+  /**
+   * Finds a document or creates it if not found.
+   * @param documentId The ID of the document to find or create
+   * @param options Configuration options
+   * @returns A promise that resolves to the DocHandle when ready
+   */
+  async findOrCreate<T extends Record<string, any> = Record<string, any>>(
+    documentId: DocumentId,
+    options: {
+      timeout?: number
+      initialValue?: () => T
+    } = {},
+  ): Promise<DocHandle<T>> {
+    const handle = this.getOrCreateHandle<T>(documentId)
+    return await handle.findOrCreate(options)
+  }
+
+  /**
+   * Deletes a document from the repo.
+   * @param documentId The ID of the document to delete
+   */
+  async delete(documentId: DocumentId): Promise<void> {
+    const handle = this.handleCache.get(documentId)
+
     if (handle) {
       handle.delete()
-      this.#handleCache.delete(documentId)
-      this.storageSubsystem.removeDoc(documentId)
+      this.handleCache.delete(documentId)
+      await this.storageSubsystem.removeDoc(documentId)
       this.synchronizer.removeDocument(documentId)
     }
   }
@@ -119,19 +167,40 @@ export class Repo extends Emittery {
   // PRIVATE METHODS
   //
 
-  #getHandle<T extends Record<string, any>>(
+  /**
+   * Gets an existing handle or creates a new one for the given document ID.
+   * This method ensures proper service injection and event wiring for each handle.
+   */
+  private getOrCreateHandle<T extends Record<string, any>>(
     documentId: DocumentId,
   ): DocHandle<T> {
-    if (this.#handleCache.has(documentId)) {
-      return this.#handleCache.get(documentId) as DocHandle<T>
+    if (this.handleCache.has(documentId)) {
+      return this.handleCache.get(documentId) as DocHandle<T>
     }
-    const handle = new DocHandle<T>(documentId)
-    handle.on("state-change", ({ newState }) => {
-      if (newState === "searching") {
-        this.synchronizer.beginSync(handle)
+
+    // Create a new handle with injected services
+    const handle = new DocHandle<T>(documentId, {
+      loadFromStorage: async (id: DocumentId) => {
+        const data = await this.storageSubsystem.loadDoc(id)
+        return data || null
+      },
+      queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
+    })
+
+    // Listen for state changes to coordinate with synchronizer
+    handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
+      // When a handle finds a document, announce it to peers.
+      if (newState.state === "ready" && oldState.state !== "ready") {
+        this.synchronizer.addDocument(documentId)
       }
     })
-    this.#handleCache.set(documentId, handle)
+
+    // Listen for sync messages from the handle to broadcast to peers
+    handle.on("doc-handle-local-change", message => {
+      this.synchronizer.onLocalChange(documentId, message)
+    })
+
+    this.handleCache.set(documentId, handle)
     return handle
   }
 }

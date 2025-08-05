@@ -36,7 +36,7 @@ type MyDoc = {
 const handle = new DocHandle<MyDoc>("my-document-id");
 
 // Listen for state changes
-handle.on("state-change", ({ newState }) => {
+handle.on("doc-handle-state-transition", ({ newState }) => {
   console.log(`Handle state is now: ${newState}`);
 });
 
@@ -50,7 +50,7 @@ await handle.load(async () => {
 await handle.whenReady();
 
 // Listen for changes
-handle.on("change", ({ doc }) => {
+handle.on("doc-handle-change", ({ doc }) => {
   console.log("Document changed:", doc.toJSON().root);
 });
 

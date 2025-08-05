@@ -5,8 +5,8 @@ import type {
   NetworkAdapter,
   NetworkAdapterEvents,
   PeerMetadata,
-  RepoMessage,
 } from "./network-adapter.js"
+import type { RepoMessage } from "./network-messages.js"
 
 /**
  * A "network" adapter that allows for direct, in-process communication
@@ -32,8 +32,10 @@ export class InProcessNetworkAdapter
   }
 
   send(message: RepoMessage): void {
-    const { targetId } = message
-    this.#broker.sendMessage(targetId, message)
+    const { targetIds } = message
+    for (const targetId of targetIds) {
+      this.#broker.sendMessage(targetId, message)
+    }
   }
 
   disconnect(): void {
@@ -68,11 +70,20 @@ export class InProcessNetworkBroker {
   }
 
   sendMessage(targetId: PeerId, message: RepoMessage) {
-    const peer = this.#peers.get(targetId)
-    if (peer) {
-      // The `message` event is emitted on the target adapter, which is then
-      // picked up by the NetworkSubsystem and passed to the Repo.
-      peer.adapter.emit("message", message)
+    if (targetId === "broadcast") {
+      // Send to all peers except the sender
+      for (const [peerId, peer] of this.#peers.entries()) {
+        if (peerId !== message.senderId) {
+          peer.adapter.emit("message", message)
+        }
+      }
+    } else {
+      const peer = this.#peers.get(targetId)
+      if (peer) {
+        // The `message` event is emitted on the target adapter, which is then
+        // picked up by the NetworkSubsystem and passed to the Repo.
+        peer.adapter.emit("message", message)
+      }
     }
   }
 

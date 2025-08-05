@@ -46,11 +46,11 @@ export function useLoroDoc<T extends Record<string, any>>(
   handle: DocHandle<T>,
 ): UseLoroDocReturn<T> {
   const subscribe = useCallback((onStoreChange: () => void) => {
-    handle.on("change", onStoreChange);
-    handle.on("state-change", onStoreChange);
+    handle.on("doc-handle-change", onStoreChange);
+    handle.on("doc-handle-state-transition", onStoreChange);
     return () => {
-      handle.off("change", onStoreChange);
-      handle.off("state-change", onStoreChange);
+      handle.off("doc-handle-change", onStoreChange);
+      handle.off("doc-handle-state-transition", onStoreChange);
     };
   }, [handle]);
   

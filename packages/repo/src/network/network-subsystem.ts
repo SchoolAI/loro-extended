@@ -1,11 +1,8 @@
 import Emittery from "emittery"
 
 import type { PeerId } from "../types.js"
-import type {
-  NetworkAdapter,
-  PeerMetadata,
-  RepoMessage,
-} from "./network-adapter.js"
+import type { NetworkAdapter, PeerMetadata } from "./network-adapter.js"
+import type { RepoMessage, UnsentRepoMessage } from "./network-messages.js"
 
 interface NetworkSubsystemEvents {
   peer: { peerId: PeerId; metadata: PeerMetadata }
@@ -46,7 +43,12 @@ export class NetworkSubsystem extends Emittery<NetworkSubsystemEvents> {
     adapter.connect(this.#peerId, this.#peerMetadata)
   }
 
-  send(message: RepoMessage) {
-    this.#adapters.forEach(adapter => adapter.send(message))
+  send(message: UnsentRepoMessage) {
+    this.#adapters.forEach(adapter =>
+      adapter.send({
+        ...message,
+        senderId: this.#peerId,
+      }),
+    )
   }
 }
