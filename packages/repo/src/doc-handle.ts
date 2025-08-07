@@ -28,7 +28,10 @@ export interface DocHandleServices<T extends DocContent> {
 // The events that the DocHandle can emit, with their expected payload.
 // Note that the state-change event now emits the full state objects.
 type DocHandleEvents<T extends DocContent> = {
-  "doc-handle-state-transition": { oldState: HandleState<T>; newState: HandleState<T> }
+  "doc-handle-state-transition": {
+    oldState: HandleState<T>
+    newState: HandleState<T>
+  }
   "doc-handle-change": { doc: LoroProxyDoc<AsLoro<T>> }
   "doc-handle-local-change": Uint8Array
 }

@@ -1,12 +1,17 @@
-import { useSyncExternalStore, useCallback, useMemo } from "react";
+import type { AsLoro, DocHandle, DocumentId } from "@loro-extended/repo"
 import {
-  type AsLoro,
-  type DocHandle,
-  type HandleState,
-} from "@loro-extended/repo";
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react"
+import { useRepo } from "../contexts/RepoContext"
+
+export type LoroDocState = "loading" | "ready" | "unavailable"
 
 /** A function that mutates a Loro document. */
-export type ChangeFn<T> = (doc: AsLoro<T>) => void;
+export type ChangeFn<T> = (doc: AsLoro<T>) => void
 
 /** The return type of the `useLoroDoc` hook. */
 export type UseLoroDocReturn<T> = [
@@ -15,8 +20,8 @@ export type UseLoroDocReturn<T> = [
   /** A function to change the document. */
   changeFn: (fn: ChangeFn<T>) => void,
   /** The current state of the DocHandle. */
-  state: HandleState,
-];
+  state: LoroDocState,
+]
 
 /**
  * A hook that provides a reactive interface to a Loro document handle.
@@ -43,53 +48,76 @@ export type UseLoroDocReturn<T> = [
  * ```
  */
 export function useLoroDoc<T extends Record<string, any>>(
-  handle: DocHandle<T>,
+  documentId: DocumentId,
 ): UseLoroDocReturn<T> {
-  const subscribe = useCallback((onStoreChange: () => void) => {
-    handle.on("doc-handle-change", onStoreChange);
-    handle.on("doc-handle-state-transition", onStoreChange);
-    return () => {
-      handle.off("doc-handle-change", onStoreChange);
-      handle.off("doc-handle-state-transition", onStoreChange);
-    };
-  }, [handle]);
-  
+  const repo = useRepo()
+  const [handle, setHandle] = useState<DocHandle<T> | null>(null)
+  useEffect(() => {
+    repo.findOrCreate<T>(documentId).then(setHandle)
+  }, [repo, documentId])
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      if (!handle) return () => {}
+      handle.on("doc-handle-change", onStoreChange)
+      handle.on("doc-handle-state-transition", onStoreChange)
+      return () => {
+        handle.off("doc-handle-change", onStoreChange)
+        handle.off("doc-handle-state-transition", onStoreChange)
+      }
+    },
+    [handle],
+  )
+
   const getSnapshot = useMemo(() => {
-    let lastSnapshot: { version: string | null; state: HandleState } | null = null;
-    
+    let lastSnapshot: { version: string | null; state: LoroDocState } | null =
+      null
+
     return () => {
-      const currentState = handle.state;
-      let currentVersion: string | null = null;
-      if (currentState === "ready") {
-        const vv = handle.doc()?.oplogVersion();
-        currentVersion = vv ? JSON.stringify(Object.fromEntries(vv.toJSON())) : null;
+      const currentState = handle?.state ?? "loading"
+      const simpleState: LoroDocState =
+        currentState === "ready" ? "ready" : "loading"
+      if (!currentState) {
+        return { version: null, state: "loading" as const }
       }
-      
-      if (lastSnapshot && lastSnapshot.state === currentState && lastSnapshot.version === currentVersion) {
-         return lastSnapshot;
+      let currentVersion: string | null = null
+      if (simpleState === "ready" && handle) {
+        const vv = handle.doc()?.oplogVersion()
+        if (vv) {
+          currentVersion = JSON.stringify(Object.fromEntries(vv.toJSON()))
+        }
       }
 
-      lastSnapshot = { version: currentVersion, state: currentState };
-      return lastSnapshot;
+      if (
+        lastSnapshot &&
+        lastSnapshot.state === simpleState &&
+        lastSnapshot.version === currentVersion
+      ) {
+        return lastSnapshot
+      }
+
+      lastSnapshot = { version: currentVersion, state: simpleState }
+      return lastSnapshot
     }
-  }, [handle]);
+  }, [handle])
 
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
   const doc = useMemo(() => {
     if (snapshot.state !== "ready" || snapshot.version === null) {
-      return undefined;
+      return undefined
     }
-    return handle.doc()?.toJSON();
-  }, [snapshot, handle]);
-
+    if (!handle) return undefined
+    return handle.doc()?.toJSON()
+  }, [snapshot, handle])
 
   const changeDoc = useCallback(
     (fn: ChangeFn<T>) => {
-      handle.change(fn);
+      if (!handle) return
+      handle.change(fn)
     },
     [handle],
-  );
+  )
 
-  return [doc as T | undefined, changeDoc, snapshot.state];
+  return [doc as T | undefined, changeDoc, snapshot.state]
 }
