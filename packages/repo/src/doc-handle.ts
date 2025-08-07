@@ -1,4 +1,3 @@
-import { type AsLoro, change, type LoroProxyDoc } from "@loro-extended/change"
 import Emittery from "emittery"
 import { LoroDoc } from "loro-crdt"
 import { v4 as uuid } from "uuid"
@@ -10,19 +9,22 @@ import {
   init as programInit,
   update as programUpdate,
 } from "./doc-handle-program.js"
-import type { DocContent, DocumentId, RequestId } from "./types.js"
+import type {
+  DocContent,
+  DocumentId,
+  LoroDocMutator,
+  RequestId,
+} from "./types.js"
 
 /** A dictionary of functions that the DocHandle can use to perform side effects. */
 export interface DocHandleServices<T extends DocContent> {
   /** A function that returns a promise resolving to the Loro document from storage. */
-  loadFromStorage: (
-    documentId: DocumentId,
-  ) => Promise<LoroProxyDoc<AsLoro<T>> | null>
+  loadFromStorage: (documentId: DocumentId) => Promise<LoroDoc<T> | null>
   /** A function that returns a promise resolving to the Loro document from the network. */
   queryNetwork: (
     documentId: DocumentId,
     timeout: number,
-  ) => Promise<LoroProxyDoc<AsLoro<T>> | null>
+  ) => Promise<LoroDoc<T> | null>
 }
 
 // The events that the DocHandle can emit, with their expected payload.
@@ -32,7 +34,7 @@ type DocHandleEvents<T extends DocContent> = {
     oldState: HandleState<T>
     newState: HandleState<T>
   }
-  "doc-handle-change": { doc: LoroProxyDoc<AsLoro<T>> }
+  "doc-handle-change": { doc: LoroDoc<T> }
   "doc-handle-local-change": Uint8Array
 }
 
@@ -158,7 +160,7 @@ export class DocHandle<T extends DocContent> {
    * The primary method for an application to mutate the document.
    * @param mutator A function that receives a draft of the document to modify.
    */
-  public change(mutator: (doc: AsLoro<T>) => void): DocHandle<T> {
+  public change(mutator: LoroDocMutator<T>): DocHandle<T> {
     if (this.state !== "ready") {
       throw new Error(
         `Cannot change a document that is not ready. Current state: '${this.state}'`,
@@ -182,10 +184,9 @@ export class DocHandle<T extends DocContent> {
       this.#dispatch({ type: "msg-remote-change", message })
     } else {
       // If we're not ready, we need to create a temporary doc to import into.
-      const doc = new LoroDoc()
+      const doc = new LoroDoc<T>()
       doc.import(message)
-      const proxy = change(doc, () => {}) as LoroProxyDoc<AsLoro<T>>
-      this.#dispatch({ type: "msg-remote-change", message, doc: proxy })
+      this.#dispatch({ type: "msg-remote-change", message, doc })
     }
   }
 
@@ -193,7 +194,7 @@ export class DocHandle<T extends DocContent> {
    * Returns the underlying LoroDoc's content.
    * @throws If the document is not in the 'ready' state.
    */
-  public doc(): LoroProxyDoc<AsLoro<T>> {
+  public doc(): LoroDoc<T> {
     if (this.#state.state !== "ready") {
       throw new Error(`DocHandle is not ready. Current state: '${this.state}'`)
     }
@@ -274,23 +275,15 @@ export class DocHandle<T extends DocContent> {
       }
 
       case "cmd-create-doc": {
-        const proxy = change(new LoroDoc(), doc => {
-          const initialValue = command.initialValue?.()
-          Object.assign(doc as object, initialValue)
-        })
+        const doc = new LoroDoc<T>()
+
+        command.initialize?.(doc)
 
         // Treat creation like a successful load to transition to ready state
-        this.#dispatch({ type: "msg-storage-load-success", doc: proxy })
-        break
-      }
-
-      case "cmd-apply-local-change": {
-        if (this.#state.state !== "ready") {
-          // This should not happen if the program logic is correct
-          console.warn("Cannot apply local change to a non-ready document.")
-          return
-        }
-        change(this.#state.doc, command.mutator as (d: any) => void)
+        this.#dispatch({
+          type: "msg-storage-load-success",
+          doc,
+        })
         break
       }
 

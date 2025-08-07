@@ -27,23 +27,25 @@ describe("Repo", () => {
     })
 
     // Repo 1 creates a document
-    const handle1 = await repo1.create<{ text: string }>()
+    const handle1 = await repo1.create()
     expect(handle1.state).toBe("ready")
 
     // Mutate the document
     handle1.change(doc => {
-      doc.text = "hello"
+      doc.getMap("root").set("text", "hello")
     })
     expect(handle1.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
 
     // Repo 2 finds the document
-    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
+    const handle2 = await repo2.find(handle1.documentId)
     expect(handle2.state).toBe("ready")
     expect(handle2.doc().getMap("root").toJSON()).toEqual({ text: "hello" })
 
     // Mutate the document from repo 2
     handle2.change(doc => {
-      doc.text += " world"
+      const root = doc.getMap("root")
+      root.get("text")
+      root.set("text", `${root.get("text")} world`)
     })
     expect(handle2.doc().getMap("root").toJSON()).toEqual({
       text: "hello world",
@@ -72,12 +74,12 @@ describe("Repo", () => {
       network: [new InProcessNetworkAdapter(broker)],
     })
 
-    const handle1 = await repo1.create<{ text: string }>()
-    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
+    const handle1 = await repo1.create()
+    const handle2 = await repo2.find(handle1.documentId)
 
     // A change from a permitted peer should be applied
     handle2.change(doc => {
-      doc.text = "hello"
+      doc.getMap("root").set("text", "hello")
     })
 
     await vi.runAllTimersAsync()
@@ -87,7 +89,8 @@ describe("Repo", () => {
     // A change from a non-permitted peer should not be applied
     repo1CanWrite = false
     handle2.change(doc => {
-      doc.text += " world"
+      const root = doc.getMap("root")
+      root.set("text", `${root.get("text")} world`)
     })
 
     await vi.runAllTimersAsync()
@@ -103,8 +106,8 @@ describe("Repo", () => {
     })
     const repo2 = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-    const handle1 = await repo1.create<{ text: string }>()
-    const handle2 = await repo2.find<{ text: string }>(handle1.documentId)
+    const handle1 = await repo1.create()
+    const handle2 = await repo2.find(handle1.documentId)
     expect(handle2.state).toBe("ready")
 
     await repo2.delete(handle1.documentId)
@@ -173,13 +176,13 @@ describe("Repo", () => {
       })
       repoB = new Repo({ network: [new InProcessNetworkAdapter(broker)] })
 
-      const handleA = await repoA.create<{ text: string }>()
-      handleA.change(d => {
-        d.text = "hello"
+      const handleA = await repoA.create()
+      handleA.change(doc => {
+        doc.getMap("root").set("text", "hello")
       })
 
       // B explicitly requests the document. It should succeed.
-      const handleB = await repoB.find<{ text: string }>(handleA.documentId)
+      const handleB = await repoB.find(handleA.documentId)
 
       expect(handleB.state).toBe("ready")
       expect(handleB.doc().getMap("root").toJSON()).toEqual({ text: "hello" })

@@ -1,6 +1,6 @@
 import { LoroDoc } from "loro-crdt"
 
-import type { DocumentId } from "../types.js"
+import type { DocContent, DocumentId } from "../types.js"
 import type { StorageAdapter } from "./storage-adapter.js"
 
 export class StorageSubsystem {
@@ -10,12 +10,14 @@ export class StorageSubsystem {
     this.#storageAdapter = storageAdapter
   }
 
-  async loadDoc(documentId: DocumentId): Promise<LoroDoc | null> {
+  async loadDoc<T extends DocContent>(
+    documentId: DocumentId,
+  ): Promise<LoroDoc | null> {
     const data = await this.#storageAdapter.load([documentId])
     if (!data) {
       return null
     }
-    return LoroDoc.fromSnapshot(data)
+    return LoroDoc.fromSnapshot(data) as LoroDoc<T>
   }
 
   async saveDoc(documentId: DocumentId, doc: LoroDoc): Promise<void> {

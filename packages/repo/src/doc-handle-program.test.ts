@@ -1,11 +1,13 @@
-import { change, type AsLoro, type LoroProxyDoc } from "@loro-extended/change"
-import { LoroDoc } from "loro-crdt"
+import { change, type AsLoro } from "@loro-extended/change"
+import { LoroDoc, type LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { init, update } from "./doc-handle-program.js"
 import type { DocumentId, RequestId } from "./types.js"
 
 type TestSchema = {
-  text: string
+  root: LoroMap<{
+    text: string
+  }>
 }
 
 describe("DocHandle program", () => {
@@ -40,14 +42,13 @@ describe("DocHandle program", () => {
 
     it("should transition from storage-loading to ready on success", () => {
       const doc = new LoroDoc()
-      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
       const initialState = {
         state: "storage-loading",
         fallback: "network",
         requestId: reqId,
       } as const
       const [newState, command] = update(
-        { type: "msg-storage-load-success", doc: proxy },
+        { type: "msg-storage-load-success", doc },
         initialState,
         docId,
       )
@@ -56,8 +57,8 @@ describe("DocHandle program", () => {
       expect(command).toEqual({
         type: "cmd-batch",
         commands: [
-          { type: "cmd-subscribe-to-doc", doc: proxy },
-          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+          { type: "cmd-subscribe-to-doc", doc },
+          { type: "cmd-report-success", requestId: reqId, payload: doc },
         ],
       })
     })
@@ -81,7 +82,6 @@ describe("DocHandle program", () => {
 
     it("should transition from network-loading to ready on success", () => {
       const doc = new LoroDoc()
-      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
       const initialState = {
         state: "network-loading",
         timeout: 5000,
@@ -89,7 +89,7 @@ describe("DocHandle program", () => {
         requestId: reqId,
       } as const
       const [newState, command] = update(
-        { type: "msg-network-load-success", doc: proxy },
+        { type: "msg-network-load-success", doc },
         initialState,
         docId,
       )
@@ -98,8 +98,8 @@ describe("DocHandle program", () => {
       expect(command).toEqual({
         type: "cmd-batch",
         commands: [
-          { type: "cmd-subscribe-to-doc", doc: proxy },
-          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+          { type: "cmd-subscribe-to-doc", doc },
+          { type: "cmd-report-success", requestId: reqId, payload: doc },
         ],
       })
     })
@@ -180,9 +180,11 @@ describe("DocHandle program", () => {
 
     it("should handle an initial value function", () => {
       const [initialState] = init<TestSchema>()
-      const initialValue = () => ({ text: "hello" })
+      const initialize = (doc: LoroDoc) => {
+        doc.getMap("root").set("text", "hello")
+      }
       const [newState, command] = update(
-        { type: "msg-create", initialValue, requestId: reqId },
+        { type: "msg-create", initialize, requestId: reqId },
         initialState,
         docId,
       )
@@ -191,16 +193,15 @@ describe("DocHandle program", () => {
       expect(command).toEqual({
         type: "cmd-create-doc",
         documentId: docId,
-        initialValue,
+        initialize,
       })
     })
 
     it("should transition to ready after creation", () => {
       const creatingState = { state: "creating", requestId: reqId } as const
       const doc = new LoroDoc()
-      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
       const [newState, command] = update(
-        { type: "msg-storage-load-success", doc: proxy }, // creation is modeled as a storage success
+        { type: "msg-storage-load-success", doc }, // creation is modeled as a storage success
         creatingState,
         docId,
       )
@@ -209,39 +210,17 @@ describe("DocHandle program", () => {
       expect(command).toEqual({
         type: "cmd-batch",
         commands: [
-          { type: "cmd-subscribe-to-doc", doc: proxy },
-          { type: "cmd-report-success", requestId: reqId, payload: proxy },
+          { type: "cmd-subscribe-to-doc", doc },
+          { type: "cmd-report-success", requestId: reqId, payload: doc },
         ],
       })
     })
   })
 
   describe("change flows", () => {
-    it("should issue an apply_local_change command when ready", () => {
+    it("should issue an apply-remote-change command when ready", () => {
       const doc = new LoroDoc()
-      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
-      const initialState = { state: "ready", doc: proxy } as const
-      const mutator = (d: TestSchema) => {
-        d.text = "new"
-      }
-      const [newState, command] = update(
-        { type: "msg-local-change", mutator: mutator as any },
-        initialState,
-        docId,
-      )
-
-      expect(newState).toEqual(initialState)
-      expect(command).toEqual({
-        type: "cmd-apply-local-change",
-        doc: proxy,
-        mutator: mutator as any,
-      })
-    })
-
-    it("should issue an apply_remote_change command when ready", () => {
-      const doc = new LoroDoc()
-      const proxy = change(doc, () => ({})) as LoroProxyDoc<AsLoro<TestSchema>>
-      const initialState = { state: "ready", doc: proxy } as const
+      const initialState = { state: "ready", doc } as const
       const message = new Uint8Array([1, 2, 3])
       const [newState, command] = update(
         { type: "msg-remote-change", message },
@@ -252,7 +231,7 @@ describe("DocHandle program", () => {
       expect(newState).toEqual(initialState)
       expect(command).toEqual({
         type: "cmd-apply-remote-change",
-        doc: proxy,
+        doc,
         message,
       })
     })

@@ -10,7 +10,7 @@ describe("from", () => {
       age: 30,
     }
     const doc = from(initialState)
-    expect(doc.toJSON().root).toEqual(initialState)
+    expect(doc.toJSON()).toEqual(initialState)
   })
 
   it("should handle nested objects", () => {
@@ -23,7 +23,7 @@ describe("from", () => {
       },
     }
     const doc = from(initialState)
-    expect(doc.toJSON().root).toEqual(initialState)
+    expect(doc.toJSON()).toEqual(initialState)
   })
 
   it("should handle arrays", () => {
@@ -31,7 +31,7 @@ describe("from", () => {
       tasks: ["buy milk", "walk the dog"],
     }
     const doc = from(initialState)
-    expect(doc.toJSON().root).toEqual(initialState)
+    expect(doc.toJSON()).toEqual(initialState)
   })
 
   it("should handle arrays of objects", () => {
@@ -42,12 +42,12 @@ describe("from", () => {
       ],
     }
     const doc = from(initialState)
-    expect(doc.toJSON().root).toEqual(initialState)
+    expect(doc.toJSON()).toEqual(initialState)
   })
 
   it("should handle an empty object", () => {
     const doc = from({})
-    expect(doc.toJSON().root).toEqual({})
+    expect(doc.toJSON()).toEqual({})
   })
 
   it("should handle complex nested structures", () => {
@@ -56,7 +56,7 @@ describe("from", () => {
       f: [2, [3, 4]],
     }
     const doc = from(initialState)
-    expect(doc.toJSON().root).toEqual(initialState)
+    expect(doc.toJSON()).toEqual(initialState)
   })
 })
 
@@ -66,7 +66,7 @@ describe("change", () => {
     change(doc, d => {
       d.counter = 1
     })
-    expect(doc.toJSON().root).toEqual({ counter: 1 })
+    expect(doc.toJSON()).toEqual({ counter: 1 })
   })
 
   it("should add new properties", () => {
@@ -77,7 +77,7 @@ describe("change", () => {
     change(doc, d => {
       d.age = 30
     })
-    expect(doc.toJSON().root).toEqual({ name: "Alice", age: 30 })
+    expect(doc.toJSON()).toEqual({ name: "Alice", age: 30 })
   })
 
   it("should modify nested objects", () => {
@@ -85,7 +85,7 @@ describe("change", () => {
     change(doc, (d: { user: { name: string } }) => {
       d.user.name = "Charlie"
     })
-    expect(doc.toJSON().root).toEqual({ user: { name: "Charlie" } })
+    expect(doc.toJSON()).toEqual({ user: { name: "Charlie" } })
   })
 
   it("should add properties to nested objects", () => {
@@ -95,7 +95,7 @@ describe("change", () => {
     change(doc, d => {
       d.user.email = "david@example.com"
     })
-    expect(doc.toJSON().root).toEqual({
+    expect(doc.toJSON()).toEqual({
       user: { name: "David", email: "david@example.com" },
     })
   })
@@ -105,7 +105,7 @@ describe("change", () => {
     change(doc, (d: { tasks: string[] }) => {
       d.tasks[0] = "task 1 modified"
     })
-    expect(doc.toJSON().root).toEqual({ tasks: ["task 1 modified"] })
+    expect(doc.toJSON()).toEqual({ tasks: ["task 1 modified"] })
   })
 
   it("should push items to arrays", () => {
@@ -113,7 +113,7 @@ describe("change", () => {
     change(doc, (d: { tasks: string[] }) => {
       d.tasks.push("task 2")
     })
-    expect(doc.toJSON().root).toEqual({ tasks: ["task 1", "task 2"] })
+    expect(doc.toJSON()).toEqual({ tasks: ["task 1", "task 2"] })
   })
 
   it("should push items to arrays of objects", () => {
@@ -121,7 +121,7 @@ describe("change", () => {
     change(doc, (d: { tasks: { description: string; done: boolean }[] }) => {
       d.tasks.push({ description: "feed dog", done: false })
     })
-    expect(doc.toJSON().root).toEqual({
+    expect(doc.toJSON()).toEqual({
       tasks: [
         { description: "feed cat", done: true },
         { description: "feed dog", done: false },
@@ -137,7 +137,7 @@ describe("change", () => {
     change(doc, d => {
       d.age = null
     })
-    expect(doc.toJSON().root).toEqual({ name: "Eve", age: null })
+    expect(doc.toJSON()).toEqual({ name: "Eve", age: null })
   })
 
   it("should handle multiple changes in one block", () => {
@@ -151,7 +151,7 @@ describe("change", () => {
       d.c = 30
       d.b = null
     })
-    expect(doc.toJSON().root).toEqual({ a: 10, c: 30, b: null })
+    expect(doc.toJSON()).toEqual({ a: 10, c: 30, b: null })
   })
 
   it("should handle splice to replace a range of values in a list", () => {
@@ -159,7 +159,7 @@ describe("change", () => {
     change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 2, 5, 6, 7)
     })
-    expect(doc.toJSON().root).toEqual({ list: [1, 5, 6, 7, 4] })
+    expect(doc.toJSON()).toEqual({ list: [1, 5, 6, 7, 4] })
   })
 
   it("should handle splice to insert into a list", () => {
@@ -167,7 +167,7 @@ describe("change", () => {
     change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 0, 4, 5)
     })
-    expect(doc.toJSON().root).toEqual({ list: [1, 4, 5, 2, 3] })
+    expect(doc.toJSON()).toEqual({ list: [1, 4, 5, 2, 3] })
   })
 
   it("should handle splice to delete a range in a list", () => {
@@ -175,7 +175,7 @@ describe("change", () => {
     change(doc, (d: { list: number[] }) => {
       d.list.splice(1, 3)
     })
-    expect(doc.toJSON().root).toEqual({ list: [1, 5] })
+    expect(doc.toJSON()).toEqual({ list: [1, 5] })
   })
 
   it("should handle pop from a list", () => {
@@ -184,7 +184,7 @@ describe("change", () => {
       const popped = (d.list as (number | undefined)[]).pop()
       expect(popped).toBe(3)
     })
-    expect(doc.toJSON().root).toEqual({ list: [1, 2] })
+    expect(doc.toJSON()).toEqual({ list: [1, 2] })
   })
 
   it("should handle shift from a list", () => {
@@ -193,7 +193,7 @@ describe("change", () => {
       const shifted = (d.list as (number | undefined)[]).shift()
       expect(shifted).toBe(1)
     })
-    expect(doc.toJSON().root).toEqual({ list: [2, 3] })
+    expect(doc.toJSON()).toEqual({ list: [2, 3] })
   })
 
   it("should handle unshift to a list", () => {
@@ -201,7 +201,7 @@ describe("change", () => {
     change(doc, (d: { list: number[] }) => {
       d.list.unshift(0)
     })
-    expect(doc.toJSON().root).toEqual({ list: [0, 1, 2, 3] })
+    expect(doc.toJSON()).toEqual({ list: [0, 1, 2, 3] })
   })
 
   it("should assign null to object properties", () => {
@@ -210,7 +210,7 @@ describe("change", () => {
       d.a = null
       d.b = null
     })
-    expect(doc.toJSON().root).toEqual({ a: null, b: null })
+    expect(doc.toJSON()).toEqual({ a: null, b: null })
   })
 
   it("should handle complex nested creations and modifications", () => {
@@ -225,7 +225,7 @@ describe("change", () => {
       d.data.users[0].posts.push({ title: "First Post" })
       d.data.config = { version: 1 }
     })
-    expect(doc.toJSON().root).toEqual({
+    expect(doc.toJSON()).toEqual({
       data: {
         users: [{ name: "Alice", posts: [{ title: "First Post" }] }],
         config: { version: 1 },
@@ -239,7 +239,7 @@ describe("change", () => {
       d.list = [4, 5, 6]
     })
 
-    expect(doc.toJSON().root).toEqual({ list: [4, 5, 6] })
+    expect(doc.toJSON()).toEqual({ list: [4, 5, 6] })
   })
 })
 

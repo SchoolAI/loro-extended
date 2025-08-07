@@ -1,11 +1,112 @@
 import {
   type Container,
+  type ExportMode,
   LoroCounter,
   LoroDoc,
   LoroList,
   LoroMap,
   LoroText,
 } from "loro-crdt"
+
+// #################
+// ### ExtendedLoroDoc
+// #################
+
+/**
+ * ExtendedLoroDoc wraps a LoroDoc to provide a cleaner API that hides the internal "root" map.
+ * It provides convenient methods for casual users while exposing the underlying LoroDoc for advanced use cases.
+ */
+export class ExtendedLoroDoc<T = any> {
+  private _doc: LoroDoc
+  private _rootMap: LoroMap
+  private _dataProxy?: T
+
+  constructor(doc?: LoroDoc) {
+    this._doc = doc || new LoroDoc()
+    this._rootMap = this._doc.getMap("root")
+  }
+
+  /**
+   * Returns the data as clean JSON without the "root" wrapper.
+   */
+  toJSON(): T {
+    const json = this._doc.toJSON()
+    return (json.root as T) || ({} as T)
+  }
+
+  /**
+   * Provides direct access to the underlying LoroDoc for advanced operations.
+   */
+  get doc(): LoroDoc {
+    return this._doc
+  }
+
+  /**
+   * Provides proxied access to the data for reading and writing.
+   * The proxy is cached for performance.
+   */
+  get data(): T {
+    if (!this._dataProxy) {
+      this._dataProxy = createProxy(this._rootMap) as T
+    }
+    return this._dataProxy
+  }
+
+  /**
+   * Commits any pending changes to the document.
+   */
+  commit(): void {
+    this._doc.commit()
+  }
+
+  /**
+   * Exports the document as a binary snapshot.
+   */
+  export(mode: ExportMode = { mode: "snapshot" }): Uint8Array {
+    return this._doc.export(mode)
+  }
+
+  /**
+   * Imports a binary snapshot into the document.
+   */
+  import(data: Uint8Array): void {
+    this._doc.import(data)
+    // Clear the cached proxy since the data has changed
+    this._dataProxy = undefined
+  }
+
+  /**
+   * Gets the root map container (for compatibility with existing tests).
+   */
+  getMap(name: string): LoroMap {
+    return this._doc.getMap(name)
+  }
+
+  /**
+   * Creates an ExtendedLoroDoc from an exported binary snapshot.
+   */
+  static import<T>(data: Uint8Array): ExtendedLoroDoc<T> {
+    const doc = new LoroDoc()
+    doc.import(data)
+    return new ExtendedLoroDoc<T>(doc)
+  }
+
+  /**
+   * Wraps an existing LoroDoc in an ExtendedLoroDoc.
+   * Useful for interoperability with code that provides a LoroDoc.
+   */
+  static wrap<T>(doc: LoroDoc): ExtendedLoroDoc<T> {
+    return new ExtendedLoroDoc<T>(doc)
+  }
+
+  /**
+   * Unwraps an ExtendedLoroDoc to get the underlying LoroDoc.
+   * Useful for interoperability with code that expects a LoroDoc.
+   */
+  static unwrap<T>(extendedDoc: ExtendedLoroDoc<T>): LoroDoc {
+    return extendedDoc.doc
+  }
+}
 
 // #################
 // ### Loro Object
@@ -38,23 +139,7 @@ export type AsLoro<T> = T extends LoroTextWrapper
         ? { [K in keyof T]: AsLoro<T[K]> }
         : T
 
-/**
- * A LoroDoc that is "branded" with a type representing the shape of its proxy.
- * This allows for better type inference in the `change` function.
- */
-export type LoroProxyDoc<T> = LoroDoc & {
-  /**
-   * @hidden
-   * A phantom property to hold the type for inference.
-   */
-  readonly __proxy_type?: T
-}
-
-/**
- * @hidden
- * A helper type to infer the proxy shape from a LoroProxyDoc.
- */
-type InferProxyType<D> = D extends LoroProxyDoc<infer P> ? P : object
+// Removed LoroProxyDoc - replaced by ExtendedLoroDoc
 
 /**
  * @hidden
@@ -99,35 +184,35 @@ const proxyCache = new WeakMap<LoroMap | LoroList, object>()
 // #################
 
 /**
- * Creates a new Loro document from a plain JavaScript object.
+ * Creates a new ExtendedLoroDoc from a plain JavaScript object.
  *
  * This function recursively converts the initial state into Loro's
  * CRDT containers (LoroMap for objects, LoroList for arrays).
  *
  * @example
  * ```ts
- * import { from, change, toJS } from './loro';
+ * import { from, change } from './loro';
  *
  * const doc = from({
  *   name: 'Alice',
  *   tasks: [{ description: 'Buy milk', done: false }]
  * });
  *
- * const modifiedDoc = change(doc, d => {
+ * change(doc, d => {
  *   d.tasks[0].done = true;
  * });
  *
- * console.log(toJS(modifiedDoc));
+ * console.log(doc.toJSON());
  * // { name: 'Alice', tasks: [{ description: 'Buy milk', done: true }] }
  * ```
  *
  * @param initialState The initial state to populate the document with.
- * @returns A new Loro document.
+ * @returns A new ExtendedLoroDoc.
  */
 export function from<T extends Record<string, unknown>>(
   initialState: T & NoOptional<T>,
-): LoroProxyDoc<AsLoro<T>> {
-  const doc = new LoroDoc()
+): ExtendedLoroDoc<AsLoro<T>> {
+  const doc = new ExtendedLoroDoc<AsLoro<T>>()
   // Use the change function to set the initial state transactionally.
   change(doc, d => {
     if (!d || typeof d !== "object") {
@@ -136,7 +221,7 @@ export function from<T extends Record<string, unknown>>(
 
     Object.assign(d, initialState)
   })
-  return doc as LoroProxyDoc<AsLoro<T>>
+  return doc
 }
 
 // #################
@@ -149,23 +234,23 @@ export function from<T extends Record<string, unknown>>(
 type ChangeFn<T> = (doc: T) => void
 
 /**
- * Modifies a Loro document within a transactional change block.
+ * Modifies an ExtendedLoroDoc within a transactional change block.
  *
  * The provided callback receives a proxy of the document's root.
  * Any mutations made to this proxy are translated into Loro CRDT operations.
  *
- * @param doc The Loro document to modify.
+ * @param doc The ExtendedLoroDoc to modify.
  * @param callback A function that mutates the document proxy.
- * @returns The same Loro document instance.
+ * @returns The same ExtendedLoroDoc instance.
  */
-export function change<D extends LoroDoc>(
-  doc: D,
-  callback: ChangeFn<InferProxyType<D>>,
-): D {
+export function change<T>(
+  doc: ExtendedLoroDoc<T>,
+  callback: ChangeFn<T>,
+): ExtendedLoroDoc<T> {
   // The root container is always a map.
   const rootContainer = doc.getMap("root")
   const proxy = createProxy(rootContainer)
-  callback(proxy as InferProxyType<D>)
+  callback(proxy as T)
   doc.commit()
   return doc
 }

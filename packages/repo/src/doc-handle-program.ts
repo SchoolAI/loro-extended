@@ -1,6 +1,11 @@
-import type { AsLoro, LoroProxyDoc } from "@loro-extended/change"
+import type { LoroDoc } from "loro-crdt"
 import type { Program, Effect as RajEffect } from "raj-ts"
-import type { DocContent, DocumentId, RequestId } from "./types.js"
+import type {
+  DocContent,
+  DocumentId,
+  LoroDocMutator,
+  RequestId,
+} from "./types.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  STATE
@@ -33,7 +38,7 @@ export type NetworkLoadingState = {
 
 export type ReadyState<T extends DocContent> = {
   state: "ready"
-  doc: LoroProxyDoc<AsLoro<T>>
+  doc: LoroDoc<T>
 }
 
 export type UnavailableState = {
@@ -77,13 +82,13 @@ export type FindOrCreateMessage = {
 export type CreateMessage<T extends DocContent> = {
   type: "msg-create"
   requestId: RequestId
-  initialValue?: () => T
+  initialize?: LoroDocMutator<T>
 }
 
 /** A message indicating the document was successfully loaded from storage. */
 export type StorageLoadSuccessMessage<T extends DocContent> = {
   type: "msg-storage-load-success"
-  doc: LoroProxyDoc<AsLoro<T>>
+  doc: LoroDoc<T>
 }
 
 /** A message indicating the document could not be found in storage. */
@@ -94,7 +99,7 @@ export type StorageLoadFailureMessage = {
 /** A message indicating the document was successfully loaded from the network. */
 export type NetworkLoadSuccessMessage<T extends DocContent> = {
   type: "msg-network-load-success"
-  doc: LoroProxyDoc<AsLoro<T>>
+  doc: LoroDoc<T>
 }
 
 /** A message indicating the network search timed out. */
@@ -105,7 +110,7 @@ export type NetworkTimeoutMessage = {
 /** A message to apply a local mutation to the document. */
 export type LocalChangeMessage<T extends DocContent> = {
   type: "msg-local-change"
-  mutator: (doc: AsLoro<T>) => void
+  mutator: LoroDocMutator<T>
 }
 
 /** A message to apply a remote sync message to the document. */
@@ -113,7 +118,7 @@ export type RemoteChangeMessage<T extends DocContent> = {
   type: "msg-remote-change"
   message: Uint8Array
   // The doc is needed to create a proxy if the handle is currently idle
-  doc?: LoroProxyDoc<AsLoro<T>>
+  doc?: LoroDoc<T>
 }
 
 /** A message to mark the document as deleted. */
@@ -151,30 +156,24 @@ export type QueryNetworkCommand = {
 export type CreateDocCommand<T extends DocContent> = {
   type: "cmd-create-doc"
   documentId: DocumentId
-  initialValue?: () => T
-}
-
-export type ApplyLocalChangeCommand<T extends DocContent> = {
-  type: "cmd-apply-local-change"
-  doc: LoroProxyDoc<AsLoro<T>>
-  mutator: (doc: AsLoro<T>) => void
+  initialize?: LoroDocMutator<T>
 }
 
 export type ApplyRemoteChangeCommand<T extends DocContent> = {
   type: "cmd-apply-remote-change"
-  doc: LoroProxyDoc<AsLoro<T>>
+  doc: LoroDoc<T>
   message: Uint8Array
 }
 
 export type SubscribeToDocCommand<T extends DocContent> = {
   type: "cmd-subscribe-to-doc"
-  doc: LoroProxyDoc<AsLoro<T>>
+  doc: LoroDoc<T>
 }
 
 export type ReportSuccessCommand<T extends DocContent> = {
   type: "cmd-report-success"
   requestId: RequestId
-  payload: LoroProxyDoc<AsLoro<T>>
+  payload: LoroDoc<T>
 }
 
 export type ReportFailureCommand = {
@@ -192,7 +191,6 @@ export type Command<T extends DocContent> =
   | LoadFromStorageCommand
   | QueryNetworkCommand
   | CreateDocCommand<T>
-  | ApplyLocalChangeCommand<T>
   | ApplyRemoteChangeCommand<T>
   | SubscribeToDocCommand<T>
   | ReportSuccessCommand<T>
@@ -256,7 +254,7 @@ export function update<T extends DocContent>(
             {
               type: "cmd-create-doc",
               documentId,
-              initialValue: msg.initialValue,
+              initialize: msg.initialize,
             },
           ]
         case "msg-remote-change":
@@ -393,14 +391,13 @@ export function update<T extends DocContent>(
             },
           ]
         case "msg-local-change":
-          return [
-            state,
-            {
-              type: "cmd-apply-local-change",
-              doc: state.doc,
-              mutator: msg.mutator,
-            },
-          ]
+          // Apply the mutation directly to the document
+          // The mutator receives the LoroDoc as per the type definition
+          msg.mutator(state.doc)
+          // Commit the changes to trigger subscriptions
+          state.doc.commit()
+          // The doc subscriptions set up via cmd-subscribe-to-doc will handle emitting events
+          return [state]
         case "msg-remote-change":
           return [
             state,

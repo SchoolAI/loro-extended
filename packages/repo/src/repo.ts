@@ -1,3 +1,4 @@
+import type { LoroDoc } from "loro-crdt"
 import {
   createPermissions,
   type PermissionAdapter,
@@ -9,11 +10,8 @@ import { NetworkSubsystem } from "./network/network-subsystem.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
 import { StorageSubsystem } from "./storage/storage-subsystem.js"
-import {
-  Synchronizer,
-  type SynchronizerServices,
-} from "./synchronizer.js"
-import type { DocumentId, PeerId } from "./types.js"
+import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
+import type { DocContent, DocumentId, PeerId } from "./types.js"
 
 export interface RepoConfig {
   storage?: StorageAdapter
@@ -46,13 +44,13 @@ export class Repo {
   private readonly permissionAdapter: PermissionAdapter
 
   // Handle management
-  private readonly handleCache = new Map<DocumentId, DocHandle<any>>()
+  private readonly handleCache = new Map<DocumentId, DocHandle<DocContent>>()
 
   get permissions(): PermissionAdapter {
     return this.permissionAdapter
   }
 
-  get handles(): Map<DocumentId, DocHandle<any>> {
+  get handles(): Map<DocumentId, DocHandle<DocContent>> {
     return this.handleCache
   }
 
@@ -106,7 +104,7 @@ export class Repo {
    * @param options Configuration options for document creation
    * @returns A promise that resolves to the DocHandle when the document is ready
    */
-  async create<T extends Record<string, any> = Record<string, any>>(
+  async create<T extends DocContent>(
     options: { documentId?: DocumentId } = {},
   ): Promise<DocHandle<T>> {
     const documentId = options.documentId ?? crypto.randomUUID()
@@ -124,7 +122,7 @@ export class Repo {
    * @param documentId The ID of the document to find
    * @returns A promise that resolves to the DocHandle when found, or rejects if unavailable
    */
-  async find<T extends Record<string, any> = Record<string, any>>(
+  async find<T extends DocContent>(
     documentId: DocumentId,
   ): Promise<DocHandle<T>> {
     const handle = this.getOrCreateHandle<T>(documentId)
@@ -171,18 +169,21 @@ export class Repo {
    * Gets an existing handle or creates a new one for the given document ID.
    * This method ensures proper service injection and event wiring for each handle.
    */
-  private getOrCreateHandle<T extends Record<string, any>>(
+  private getOrCreateHandle<T extends DocContent>(
     documentId: DocumentId,
   ): DocHandle<T> {
-    if (this.handleCache.has(documentId)) {
-      return this.handleCache.get(documentId) as DocHandle<T>
+    // We need to cast through unknown because TypeScript can't guarantee the cached handle
+    // has the exact same type T, even though we know it's the same document
+    const cached = this.handleCache.get(documentId)
+    if (cached) {
+      return cached as unknown as DocHandle<T>
     }
 
     // Create a new handle with injected services
     const handle = new DocHandle<T>(documentId, {
       loadFromStorage: async (id: DocumentId) => {
         const data = await this.storageSubsystem.loadDoc(id)
-        return data || null
+        return data as LoroDoc<T> | null
       },
       queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
     })
@@ -200,7 +201,7 @@ export class Repo {
       this.synchronizer.onLocalChange(documentId, message)
     })
 
-    this.handleCache.set(documentId, handle)
+    this.handleCache.set(documentId, handle as unknown as DocHandle<DocContent>)
     return handle
   }
 }

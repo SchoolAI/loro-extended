@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DocHandle } from "./doc-handle.js"
-import { Repo } from "./repo.js"
-import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import {
   InProcessNetworkAdapter,
   InProcessNetworkBroker,
 } from "./network/in-process-network-adapter.js"
+import { Repo } from "./repo.js"
+import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 
 describe("Repo", () => {
-  type DocSchema = { text: string }
+  // DocSchema should match the DocContent constraint (Record<string, Container>)
+  // For now, we'll use 'any' since we're not assuming a specific structure
   let repo: Repo
   let storage: InMemoryStorageAdapter
 
@@ -40,15 +41,17 @@ describe("Repo", () => {
   })
 
   it("should create a document with initial value", async () => {
-    const handle = (await repo.create<DocSchema>()).change(doc => {
-      doc.text = "initial"
+    const handle = (await repo.create()).change(doc => {
+      const root = doc.getMap("root")
+      root.set("text", "initial")
     })
 
     expect(handle.state).toBe("ready")
 
     // The document should have the initial value
     const doc = handle.doc()
-    expect(doc.toJSON()).toMatchObject({ root: { text: "initial" } })
+    const root = doc.getMap("root")
+    expect(root.get("text")).toBe("initial")
   })
 
   it("should throw error when creating a document with existing ID", async () => {
@@ -98,9 +101,10 @@ describe("Repo", () => {
       network: [new InProcessNetworkAdapter(broker)],
       peerId: "repoA",
     })
-    const handleA = await repoA.create<DocSchema>()
+    const handleA = await repoA.create()
     handleA.change(doc => {
-      doc.text = "hello"
+      const root = doc.getMap("root")
+      root.set("text", "hello")
     })
     expect(handleA.state).toBe("ready")
 
@@ -110,9 +114,11 @@ describe("Repo", () => {
     })
 
     // This should work with the network sync
-    const handleB = await repoB.find<DocSchema>(handleA.documentId)
+    const handleB = await repoB.find(handleA.documentId)
     expect(handleB.state).toBe("ready")
-    expect(handleB.doc().toJSON()).toMatchObject({ root: { text: "hello" } })
+    const docB = handleB.doc()
+    const rootB = docB.getMap("root")
+    expect(rootB.get("text")).toBe("hello")
   })
 
   // it("should delete a document", async () => {
@@ -134,15 +140,18 @@ describe("Repo", () => {
 
   it("should handle findOrCreate with timeout option", async () => {
     const handle = (
-      await repo.findOrCreate<DocSchema>("test-doc", {
+      await repo.findOrCreate("test-doc", {
         timeout: 1000,
       })
     ).change(doc => {
-      doc.text = "created"
+      const root = doc.getMap("root")
+      root.set("text", "created")
     })
 
     expect(handle.state).toBe("ready")
-    expect(handle.doc().toJSON()).toMatchObject({ root: { text: "created" } })
+    const doc = handle.doc()
+    const root = doc.getMap("root")
+    expect(root.get("text")).toBe("created")
   })
 
   // it("should sync changes between repos", async () => {
@@ -158,17 +167,19 @@ describe("Repo", () => {
   //   })
 
   //   // Create document in repoA
-  //   const handleA = await repoA.create<DocSchema>()
+  //   const handleA = await repoA.create()
   //   handleA.change(doc => {
-  //     doc.text = "initial"
+  //     const root = doc.getMap("root")
+  //     root.set("text", "initial")
   //   })
 
   //   // Find document in repoB
-  //   const handleB = await repoB.find<DocSchema>(handleA.documentId)
+  //   const handleB = await repoB.find(handleA.documentId)
 
   //   // Make a change in repoB
   //   handleB.change(doc => {
-  //     doc.text = "updated from B"
+  //     const root = doc.getMap("root")
+  //     root.set("text", "updated from B")
   //   })
 
   //   // Use a small delay to allow sync to propagate

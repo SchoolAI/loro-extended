@@ -1,7 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: simplify tests */
 
-import type { AsLoro, LoroProxyDoc } from "@loro-extended/change"
-import { LoroDoc } from "loro-crdt"
+import { LoroDoc, type LoroMap } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { DocHandle, type DocHandleServices } from "./doc-handle.js"
@@ -61,7 +60,7 @@ describe("DocHandle Integration Tests", () => {
   })
 
   it("should transition through the find flow to ready", async () => {
-    const doc = new LoroDoc() as LoroProxyDoc<any>
+    const doc = new LoroDoc()
     const services: DocHandleServices<any> = {
       loadFromStorage: vi.fn().mockResolvedValue(doc),
       queryNetwork: vi.fn(),
@@ -90,10 +89,10 @@ describe("DocHandle Integration Tests", () => {
   })
 
   it("should allow changing a document once ready", async () => {
-    type TestSchema = { text: string }
-    const doc = new LoroDoc()
+    type TestSchema = { root: LoroMap<{ text: string }> }
+    const doc = new LoroDoc<TestSchema>()
     const services: DocHandleServices<TestSchema> = {
-      loadFromStorage: async () => doc as LoroProxyDoc<AsLoro<TestSchema>>,
+      loadFromStorage: async () => doc,
       queryNetwork: async () => null,
     }
     const handle = new DocHandle<TestSchema>("test-doc", services)
@@ -102,8 +101,9 @@ describe("DocHandle Integration Tests", () => {
 
     const changePromise = waitForEvent(handle, "doc-handle-change")
 
-    handle.change(d => {
-      d.text = "hello world"
+    handle.change(doc => {
+      const root = doc.getMap("root")
+      root.set("text", "hello world")
     })
 
     await changePromise
@@ -115,7 +115,7 @@ describe("DocHandle Integration Tests", () => {
   it("should emit a 'sync-message' after a local change", async () => {
     const doc = new LoroDoc()
     const services = {
-      loadFromStorage: async () => doc as LoroProxyDoc<any>,
+      loadFromStorage: async () => doc,
     }
     const handle = new DocHandle("test-doc", services)
 
@@ -125,8 +125,9 @@ describe("DocHandle Integration Tests", () => {
     const listener = vi.fn()
     handle.on("doc-handle-local-change", listener)
 
-    handle.change((d: { text: string }) => {
-      d.text = "hello"
+    handle.change(doc => {
+      const root = doc.getMap("root")
+      root.set("text", "hello")
     })
 
     await syncPromise
@@ -157,8 +158,9 @@ describe("DocHandle Integration Tests", () => {
     })
 
     const changePromise = waitForEvent(handleB, "doc-handle-change")
-    handleA.change((d: { text: string }) => {
-      d.text = "synced"
+    handleA.change(doc => {
+      const root = doc.getMap("root")
+      root.set("text", "synced")
     })
 
     await changePromise
