@@ -24,5 +24,11 @@ These packages provide production-ready solutions to these common needs.
 -   **`packages/repo`**: A peer-to-peer document syncing repository, with plugable storage and network adapters.
     -   [View Package README](./packages/repo/README.md)
 
+-   **`packages/network-sse`**: Server-Sent Events network adapter for real-time synchronization between clients and servers.
+    -   [View Package README](./packages/network-sse/README.md)
+
+-   **`packages/react`**: React hooks and utilities for using Loro in React applications. (TODO)
+    -   [View Package README](./packages/react/README.md)
+
 -   **`examples/todo-app`**: An example implementation of a React + Vite + ExpressJS app using `@loro-extended/change` and `@loro-extended/repo`.
     -   [View Package README](./examples/todo-app/README.md)
