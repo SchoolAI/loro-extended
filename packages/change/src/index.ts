@@ -376,19 +376,33 @@ function toLoroValue(value: unknown): unknown {
 const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   get(target, prop, receiver) {
     if (target instanceof LoroMap) {
-      const value = target.get(String(prop))
-      if (value instanceof LoroText || value instanceof LoroCounter) {
-        return value
+      // Guard against null/undefined property access
+      if (prop == null || prop === undefined) {
+        return undefined
       }
-      if (value instanceof LoroMap || value instanceof LoroList) {
-        return createProxy(value)
+
+      // Check if it's a method on the LoroMap itself
+      const targetProp = (target as any)[prop]
+      if (typeof targetProp === "function") {
+        return targetProp.bind(target)
       }
-      // Bind methods like 'set', 'get', 'delete' to the target
-      if (typeof value === "function") {
-        return value.bind(target)
-      }
-      if (value !== undefined) {
-        return value
+
+      // Try to get the value from the map
+      try {
+        const value = target.get(String(prop))
+        if (value instanceof LoroText || value instanceof LoroCounter) {
+          return value
+        }
+        if (value instanceof LoroMap || value instanceof LoroList) {
+          return createProxy(value)
+        }
+        if (value !== undefined) {
+          return value
+        }
+      } catch (_error) {
+        // If there's an error accessing the property (e.g., WASM error), return undefined
+        // console.warn(`Error accessing property "${String(prop)}" on LoroMap:`, error)
+        return undefined
       }
     }
 
@@ -481,6 +495,201 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
         }
       }
 
+      // Implement common array methods
+      if (prop === "find") {
+        return (
+          predicate: (value: any, index: number, array: any[]) => boolean,
+          thisArg?: any,
+        ) => {
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            if (predicate.call(thisArg, proxiedValue, i, receiver)) {
+              return proxiedValue
+            }
+          }
+          return undefined
+        }
+      }
+
+      if (prop === "findIndex") {
+        return (
+          predicate: (value: any, index: number, array: any[]) => boolean,
+          thisArg?: any,
+        ) => {
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            if (predicate.call(thisArg, proxiedValue, i, receiver)) {
+              return i
+            }
+          }
+          return -1
+        }
+      }
+
+      if (prop === "map") {
+        return (
+          callback: (value: any, index: number, array: any[]) => any,
+          thisArg?: any,
+        ) => {
+          const result = []
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            result.push(callback.call(thisArg, proxiedValue, i, receiver))
+          }
+          return result
+        }
+      }
+
+      if (prop === "filter") {
+        return (
+          predicate: (value: any, index: number, array: any[]) => boolean,
+          thisArg?: any,
+        ) => {
+          const result = []
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            if (predicate.call(thisArg, proxiedValue, i, receiver)) {
+              result.push(proxiedValue)
+            }
+          }
+          return result
+        }
+      }
+
+      if (prop === "forEach") {
+        return (
+          callback: (value: any, index: number, array: any[]) => void,
+          thisArg?: any,
+        ) => {
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            callback.call(thisArg, proxiedValue, i, receiver)
+          }
+        }
+      }
+
+      if (prop === "some") {
+        return (
+          predicate: (value: any, index: number, array: any[]) => boolean,
+          thisArg?: any,
+        ) => {
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            if (predicate.call(thisArg, proxiedValue, i, receiver)) {
+              return true
+            }
+          }
+          return false
+        }
+      }
+
+      if (prop === "every") {
+        return (
+          predicate: (value: any, index: number, array: any[]) => boolean,
+          thisArg?: any,
+        ) => {
+          for (let i = 0; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            if (!predicate.call(thisArg, proxiedValue, i, receiver)) {
+              return false
+            }
+          }
+          return true
+        }
+      }
+
+      if (prop === "includes") {
+        return (searchElement: any, fromIndex?: number) => {
+          const start = fromIndex ?? 0
+          for (let i = start; i < target.length; i++) {
+            const value = target.get(i)
+            if (value === searchElement) {
+              return true
+            }
+          }
+          return false
+        }
+      }
+
+      if (prop === "indexOf") {
+        return (searchElement: any, fromIndex?: number) => {
+          const start = fromIndex ?? 0
+          for (let i = start; i < target.length; i++) {
+            const value = target.get(i)
+            if (value === searchElement) {
+              return i
+            }
+          }
+          return -1
+        }
+      }
+
+      if (prop === "reduce") {
+        return (
+          callback: (
+            accumulator: any,
+            value: any,
+            index: number,
+            array: any[],
+          ) => any,
+          initialValue?: any,
+        ) => {
+          let accumulator = initialValue
+          let startIndex = 0
+
+          if (initialValue === undefined) {
+            if (target.length === 0) {
+              throw new TypeError("Reduce of empty array with no initial value")
+            }
+            const firstValue = target.get(0)
+            accumulator =
+              firstValue instanceof LoroMap || firstValue instanceof LoroList
+                ? createProxy(firstValue)
+                : firstValue
+            startIndex = 1
+          }
+
+          for (let i = startIndex; i < target.length; i++) {
+            const value = target.get(i)
+            const proxiedValue =
+              value instanceof LoroMap || value instanceof LoroList
+                ? createProxy(value)
+                : value
+            accumulator = callback(accumulator, proxiedValue, i, receiver)
+          }
+
+          return accumulator
+        }
+      }
+
       const index = Number(prop)
       if (!Number.isNaN(index)) {
         const value = target.get(index)
@@ -496,11 +705,21 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   set(target, prop, value: unknown) {
     if (target instanceof LoroMap) {
-      const current = target.get(String(prop))
-      if (current instanceof LoroText && typeof value === "string") {
-        current.delete(0, current.length)
-        current.insert(0, value)
-        return true
+      // Guard against null/undefined property names
+      if (prop == null || prop === undefined) {
+        // console.warn("Cannot set property with null or undefined key")
+        return false
+      }
+
+      try {
+        const current = target.get(String(prop))
+        if (current instanceof LoroText && typeof value === "string") {
+          current.delete(0, current.length)
+          current.insert(0, value)
+          return true
+        }
+      } catch (error) {
+        // If we can't get the current value, just proceed with setting
       }
 
       const loroValue = toLoroValue(value)
@@ -557,7 +776,17 @@ const proxyHandlers: ProxyHandler<LoroMap | LoroList> = {
   },
   has(target, prop) {
     if (target instanceof LoroMap) {
-      return target.get(String(prop)) !== undefined
+      // Guard against null/undefined property names
+      if (prop == null || prop === undefined) {
+        return false
+      }
+
+      try {
+        return target.get(String(prop)) !== undefined
+      } catch (error) {
+        // If there's an error checking the property, return false
+        return false
+      }
     }
 
     if (target instanceof LoroList) {

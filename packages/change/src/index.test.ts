@@ -326,3 +326,250 @@ describe("LoroCounter handling", () => {
     expect((counters.get(1) as LoroCounter).value).toBe(1)
   })
 })
+
+describe("Array methods on LoroList proxy", () => {
+  it("should support find method", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: false },
+        { id: "2", text: "Walk dog", done: true },
+        { id: "3", text: "Write code", done: false },
+      ],
+    })
+
+    // Test outside of change function to check if proxy works correctly
+    const todos = doc.data.todos
+    const foundTodo = todos.find((t: any) => t.id === "2")
+
+    expect(foundTodo).toBeDefined()
+    expect(foundTodo?.id).toBe("2")
+    expect(foundTodo?.text).toBe("Walk dog")
+    expect(foundTodo?.done).toBe(true)
+  })
+
+  it("should support findIndex method", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: false },
+        { id: "2", text: "Walk dog", done: true },
+        { id: "3", text: "Write code", done: false },
+      ],
+    })
+
+    const todos = doc.data.todos
+    const index = todos.findIndex((t: any) => t.id === "2")
+
+    expect(index).toBe(1)
+  })
+
+  it("should support map method", () => {
+    const doc = from({ numbers: [1, 2, 3, 4, 5] })
+
+    const numbers = doc.data.numbers
+    const doubled = numbers.map((n: number) => n * 2)
+
+    expect(doubled).toEqual([2, 4, 6, 8, 10])
+  })
+
+  it("should support filter method", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: false },
+        { id: "2", text: "Walk dog", done: true },
+        { id: "3", text: "Write code", done: false },
+      ],
+    })
+
+    const todos = doc.data.todos
+    const incompleteTodos = todos.filter((t: any) => !t.done)
+
+    expect(incompleteTodos).toHaveLength(2)
+    expect(incompleteTodos[0].id).toBe("1")
+    expect(incompleteTodos[1].id).toBe("3")
+  })
+
+  it("should support forEach method", () => {
+    const doc = from({ numbers: [1, 2, 3] })
+
+    const collected: number[] = []
+    const numbers = doc.data.numbers
+    numbers.forEach((n: number) => collected.push(n * 2))
+
+    expect(collected).toEqual([2, 4, 6])
+  })
+
+  it("should support some method", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: false },
+        { id: "2", text: "Walk dog", done: true },
+        { id: "3", text: "Write code", done: false },
+      ],
+    })
+
+    const todos = doc.data.todos
+    const hasCompleted = todos.some((t: any) => t.done)
+    const hasIncomplete = todos.some((t: any) => !t.done)
+
+    expect(hasCompleted).toBe(true)
+    expect(hasIncomplete).toBe(true)
+  })
+
+  it("should support every method", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: true },
+        { id: "2", text: "Walk dog", done: true },
+      ],
+    })
+
+    const todos = doc.data.todos
+    const allDone = todos.every((t: any) => t.done)
+
+    expect(allDone).toBe(true)
+
+    // Add an incomplete todo and test again
+    change(doc, d => {
+      d.todos.push({ id: "3", text: "Write code", done: false })
+    })
+
+    const allDoneAfter = doc.data.todos.every((t: any) => t.done)
+    expect(allDoneAfter).toBe(false)
+  })
+
+  it("should support includes method", () => {
+    const doc = from({ tags: ["javascript", "typescript", "react"] })
+
+    const tags = doc.data.tags
+    const hasJS = tags.includes("javascript")
+    const hasPython = tags.includes("python")
+
+    expect(hasJS).toBe(true)
+    expect(hasPython).toBe(false)
+  })
+
+  it("should support indexOf method", () => {
+    const doc = from({ tags: ["javascript", "typescript", "react"] })
+
+    const tags = doc.data.tags
+    const tsIndex = tags.indexOf("typescript")
+    const pythonIndex = tags.indexOf("python")
+
+    expect(tsIndex).toBe(1)
+    expect(pythonIndex).toBe(-1)
+  })
+
+  it("should support reduce method", () => {
+    const doc = from({ numbers: [1, 2, 3, 4, 5] })
+
+    const numbers = doc.data.numbers
+    const sum = numbers.reduce((acc: number, n: number) => acc + n, 0)
+    const product = numbers.reduce((acc: number, n: number) => acc * n, 1)
+
+    expect(sum).toBe(15)
+    expect(product).toBe(120)
+  })
+
+  it("should support reduce without initial value", () => {
+    const doc = from({ numbers: [1, 2, 3, 4] })
+
+    const numbers = doc.data.numbers
+    const sum = numbers.reduce((acc: number, n: number) => acc + n)
+
+    expect(sum).toBe(10)
+  })
+
+  it("should work with nested objects in array methods", () => {
+    const doc = from({
+      users: [
+        { name: "Alice", posts: [{ title: "Post 1" }, { title: "Post 2" }] },
+        { name: "Bob", posts: [{ title: "Post 3" }] },
+      ],
+    })
+
+    const users = doc.data.users
+    const allPosts = users.reduce((acc: any[], user: any) => {
+      return acc.concat(
+        user.posts.map((p: any) => ({ title: p.title, author: user.name })),
+      )
+    }, [] as any[])
+
+    expect(allPosts).toEqual([
+      { title: "Post 1", author: "Alice" },
+      { title: "Post 2", author: "Alice" },
+      { title: "Post 3", author: "Bob" },
+    ])
+  })
+
+  it("should allow modifying objects found with find", () => {
+    const doc = from({
+      todos: [
+        { id: "1", text: "Buy milk", done: false },
+        { id: "2", text: "Walk dog", done: false },
+      ],
+    })
+
+    change(doc, d => {
+      const todo = d.todos.find(t => t.id === "1")
+      if (todo) {
+        todo.done = true
+      }
+    })
+
+    expect(doc.toJSON()).toEqual({
+      todos: [
+        { id: "1", text: "Buy milk", done: true },
+        { id: "2", text: "Walk dog", done: false },
+      ],
+    })
+  })
+
+  it("should handle null/undefined property access gracefully", () => {
+    const doc = from({
+      data: { name: "test" },
+    })
+
+    // Test accessing undefined/null properties doesn't crash
+    expect(() => {
+      const data = doc.data.data
+      // Try to access properties that might be null/undefined
+      const undefinedProp = (data as any)[undefined as any]
+      const nullProp = (data as any)[null as any]
+      expect(undefinedProp).toBeUndefined()
+      expect(nullProp).toBeUndefined()
+    }).not.toThrow()
+  })
+
+  it("should handle find with properties that might not exist", () => {
+    const doc = from<{
+      items: Array<{ id?: string | null; name?: string | null }>
+    }>({
+      items: [
+        { id: "1", name: "Item 1" },
+        { id: null, name: "Item 2" }, // id is null
+        { id: "3", name: null }, // name is null
+      ],
+    })
+
+    const itemWithId2 = doc.data.items.find((item: any) => item.id === "2")
+    expect(itemWithId2).toBeUndefined()
+
+    const itemWithName2 = doc.data.items.find(
+      (item: any) => item.name === "Item 2",
+    )
+    expect(itemWithName2).toBeDefined()
+    expect(itemWithName2?.name).toBe("Item 2")
+
+    // Should not throw when accessing missing properties
+    const allHaveIds = doc.data.items.every(
+      (item: any) => item.id !== null && item.id !== undefined,
+    )
+    expect(allHaveIds).toBe(false)
+
+    // Test that we can safely check for properties that don't exist
+    const hasDescription = doc.data.items.some(
+      (item: any) => item.description !== undefined,
+    )
+    expect(hasDescription).toBe(false)
+  })
+})
