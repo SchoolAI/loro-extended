@@ -57,7 +57,12 @@ export type Message =
   | { type: "msg-peer-removed"; peerId: PeerId }
   | { type: "msg-document-added"; documentId: DocumentId }
   | { type: "msg-document-removed"; documentId: DocumentId }
-  | { type: "msg-sync-started"; documentId: DocumentId; requestId?: RequestId; timeout?: number }
+  | {
+      type: "msg-sync-started"
+      documentId: DocumentId
+      requestId?: RequestId
+      timeout?: number
+    }
   | { type: "msg-local-change"; documentId: DocumentId; data: Uint8Array }
 
   // Events from the Network
@@ -143,10 +148,12 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
       // Track that this peer is now aware of our documents
       for (const docId of docIds) {
-        if (!newModel.peersAwareOfDoc.has(docId)) {
-          newModel.peersAwareOfDoc.set(docId, new Set())
+        let peerSet = newModel.peersAwareOfDoc.get(docId)
+        if (!peerSet) {
+          peerSet = new Set()
+          newModel.peersAwareOfDoc.set(docId, peerSet)
         }
-        newModel.peersAwareOfDoc.get(docId)!.add(msg.peerId)
+        peerSet.add(msg.peerId)
       }
 
       // Announce our existing documents to the new peer
@@ -364,7 +371,9 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       if (hopCount === 0) {
         const awarePeers = model.peersAwareOfDoc.get(documentId)
         if (awarePeers && awarePeers.size > 0) {
-          const forwardTargets = [...awarePeers].filter(peerId => peerId !== from)
+          const forwardTargets = [...awarePeers].filter(
+            peerId => peerId !== from,
+          )
           if (forwardTargets.length > 0) {
             commands.push({
               type: "cmd-send-message",
@@ -394,10 +403,8 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       }
 
       const command: Command =
-        commands.length === 1
-          ? commands[0]
-          : { type: "cmd-batch", commands }
-      
+        commands.length === 1 ? commands[0] : { type: "cmd-batch", commands }
+
       return [model, command]
     }
 
@@ -499,7 +506,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       const newSyncStates = new Map(model.syncStates)
       newSyncStates.delete(documentId)
       const newModel = { ...model, syncStates: newSyncStates }
-      
+
       const command: Command = {
         type: "cmd-batch",
         commands: [

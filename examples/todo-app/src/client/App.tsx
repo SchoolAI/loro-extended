@@ -4,7 +4,6 @@ import { TodoInput } from "./components/TodoInput"
 import { TodoList } from "./components/TodoList"
 import { useLoroDoc } from "./hooks/useLoroDoc"
 import "../App.css"
-import { useEffect } from "react"
 
 // Define the schema for our document
 interface TodoDoc {
