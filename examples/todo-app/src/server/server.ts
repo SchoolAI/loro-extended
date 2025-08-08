@@ -16,7 +16,7 @@ const storageAdapter = new LevelStorageAdapter("loro-todo-app.db")
 // 2. Create the Repo, passing the adapters in the config.
 // The repo is not directly used, but its constructor sets up the listeners
 // between the network and storage adapters.
-const repo = new Repo({
+new Repo({
   storage: storageAdapter,
   network: [sseAdapter],
 })
