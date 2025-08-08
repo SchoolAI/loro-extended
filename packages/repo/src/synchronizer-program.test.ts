@@ -1,12 +1,14 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: tests */
+
 import { describe, expect, it } from "vitest"
 
 import { createPermissions } from "./auth/permission-adapter.js"
 import {
-  init as programInit,
-  update,
   type Command,
   type Message,
   type Model,
+  init as programInit,
+  update,
 } from "./synchronizer-program.js"
 
 describe("Synchronizer program", () => {

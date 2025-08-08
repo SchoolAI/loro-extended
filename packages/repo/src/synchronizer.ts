@@ -1,13 +1,11 @@
-import type { AsLoro, LoroProxyDoc } from "@loro-extended/change"
-import { v4 as uuid } from "uuid"
-
+import type { LoroDoc } from "loro-crdt"
 import type { PermissionAdapter } from "src/auth/permission-adapter.js"
+import { v4 as uuid } from "uuid"
 import type { DocHandle } from "./doc-handle.js"
 import type {
   RepoMessage,
   UnsentRepoMessage,
 } from "./network/network-messages.js"
-import type { DocumentId, PeerId, RequestId } from "./types.js"
 import {
   type Command,
   type Message,
@@ -15,9 +13,11 @@ import {
   init as programInit,
   update as programUpdate,
 } from "./synchronizer-program.js"
+import type { DocContent, DocumentId, PeerId, RequestId } from "./types.js"
 
 export interface SynchronizerServices {
   sendMessage: (message: UnsentRepoMessage) => void
+  // biome-ignore lint/suspicious/noExplicitAny: many docs possible
   getDoc: (documentId: DocumentId) => DocHandle<any>
   permissions: PermissionAdapter
   onDocAvailable: (documentId: DocumentId) => void
@@ -30,8 +30,8 @@ export class Synchronizer {
   #pendingRequests = new Map<
     RequestId,
     {
-      resolve: (value: LoroProxyDoc<any> | null) => void
-      reject: (reason?: any) => void
+      resolve: (value: LoroDoc<DocContent> | null) => void
+      reject: (reason?: Error) => void
     }
   >()
 
@@ -109,19 +109,17 @@ export class Synchronizer {
       }
     }
   }
-  public queryNetwork<T extends Record<string, any>>(
+  public queryNetwork<T extends DocContent>(
     documentId: DocumentId,
     _timeout = 5000,
-  ): Promise<LoroProxyDoc<AsLoro<T>> | null> {
+  ): Promise<LoroDoc<T> | null> {
     const requestId = uuid()
-    const promise = new Promise<LoroProxyDoc<AsLoro<T>> | null>(
-      (resolve, reject) => {
-        this.#pendingRequests.set(requestId, {
-          resolve: resolve as (value: LoroProxyDoc<any> | null) => void,
-          reject,
-        })
-      },
-    )
+    const promise = new Promise<LoroDoc<T> | null>((resolve, reject) => {
+      this.#pendingRequests.set(requestId, {
+        resolve: resolve as (value: LoroDoc<DocContent> | null) => void,
+        reject,
+      })
+    })
 
     this.#dispatch({ type: "msg-sync-started", documentId, requestId })
     return promise
@@ -210,8 +208,10 @@ export class Synchronizer {
     }
   }
   #clearTimeout(documentId: DocumentId) {
-    if (this.#timeouts.has(documentId)) {
-      clearTimeout(this.#timeouts.get(documentId)!)
+    const timeout = this.#timeouts.get(documentId)
+
+    if (timeout) {
+      clearTimeout(timeout)
       this.#timeouts.delete(documentId)
     }
   }

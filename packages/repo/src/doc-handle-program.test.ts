@@ -1,4 +1,5 @@
-import { change, type AsLoro } from "@loro-extended/change"
+/** biome-ignore-all lint/suspicious/noExplicitAny: tests */
+
 import { LoroDoc, type LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { init, update } from "./doc-handle-program.js"

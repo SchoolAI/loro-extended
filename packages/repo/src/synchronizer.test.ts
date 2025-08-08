@@ -1,10 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+/** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
-import { createPermissions } from "src/auth/permission-adapter.js"
-import {
-  Synchronizer,
-  type SynchronizerServices,
-} from "./synchronizer.js"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createPermissions } from "./auth/permission-adapter.js"
+import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
@@ -17,6 +15,7 @@ describe("Synchronizer (Host)", () => {
       sendMessage: vi.fn(),
       getDoc: vi.fn(),
       permissions: createPermissions(),
+      onDocAvailable: vi.fn(),
     }
     synchronizer = new Synchronizer(mockServices)
   })

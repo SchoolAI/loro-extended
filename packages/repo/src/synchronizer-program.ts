@@ -424,7 +424,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
       }
 
       // We're going to retry, so update the state and set a new timeout.
-      const backoff_duration = BASE_TIMEOUT * Math.pow(2, newRetryCount)
+      const backoff_duration = BASE_TIMEOUT * 2 ** newRetryCount
 
       // If we were syncing with a specific peer, go back to searching everyone.
       newSyncStates.set(documentId, {

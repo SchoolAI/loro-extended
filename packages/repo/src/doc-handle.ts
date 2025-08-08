@@ -56,7 +56,7 @@ export class DocHandle<T extends DocContent> {
     RequestId,
     {
       resolve: (value: DocHandle<T>) => void
-      reject: (reason?: any) => void
+      reject: (reason?: Error) => void
     }
   >()
 

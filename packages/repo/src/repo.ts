@@ -135,7 +135,7 @@ export class Repo {
    * @param options Configuration options
    * @returns A promise that resolves to the DocHandle when ready
    */
-  async findOrCreate<T extends Record<string, any> = Record<string, any>>(
+  async findOrCreate<T extends DocContent>(
     documentId: DocumentId,
     options: {
       timeout?: number

@@ -1,5 +1,5 @@
 import type { LoroDoc } from "loro-crdt"
-import type { Program, Effect as RajEffect } from "raj-ts"
+import type { Effect as RajEffect } from "raj-ts"
 import type {
   DocContent,
   DocumentId,
@@ -203,12 +203,6 @@ export type Effect<T extends DocContent> = RajEffect<Message<T>>
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  PROGRAM
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-type DocHandleProgram<T extends DocContent> = Program<
-  Message<T>,
-  HandleState<T>,
-  Command<T>
->
 
 export const init = <T extends DocContent>(): [HandleState<T>, Command<T>?] => [
   {
