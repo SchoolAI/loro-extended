@@ -90,7 +90,12 @@ describe("Repo", () => {
   })
 
   it("should create a document if findOrCreate is called for a non-existent doc", async () => {
-    const handle = await repo.findOrCreate("non-existent-doc")
+    const findOrCreatePromise = repo.findOrCreate("non-existent-doc")
+
+    // Advance timers to trigger the network timeout
+    await vi.runAllTimersAsync()
+
+    const handle = await findOrCreatePromise
     expect(handle.state).toBe("ready")
   })
 
@@ -139,11 +144,14 @@ describe("Repo", () => {
   // })
 
   it("should handle findOrCreate with timeout option", async () => {
-    const handle = (
-      await repo.findOrCreate("test-doc", {
-        timeout: 1000,
-      })
-    ).change(doc => {
+    const findOrCreatePromise = repo.findOrCreate("test-doc", {
+      timeout: 1000,
+    })
+
+    // Advance timers to trigger the network timeout
+    await vi.runAllTimersAsync()
+
+    const handle = (await findOrCreatePromise).change(doc => {
       const root = doc.getMap("root")
       root.set("text", "created")
     })
