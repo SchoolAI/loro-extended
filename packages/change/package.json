@@ -25,11 +25,11 @@
     "test": "vitest"
   },
   "dependencies": {
-    "loro-crdt": "catalog:"
+    "loro-crdt": "^1.5.9"
   },
   "devDependencies": {
-    "tsup": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

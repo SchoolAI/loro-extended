@@ -4,21 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-catalogs:
-  default:
-    loro-crdt:
-      specifier: ^1.5.9
-      version: 1.5.9
-    tsup:
-      specifier: ^8.5.0
-      version: 8.5.0
-    typescript:
-      specifier: ^5.9.2
-      version: 5.9.2
-    vitest:
-      specifier: ^3.2.4
-      version: 3.2.4
-
 importers:
 
   .:
@@ -29,6 +14,9 @@ importers:
 
   examples/todo-app:
     dependencies:
+      '@loro-extended/network-sse':
+        specifier: workspace:*
+        version: link:../../packages/network-sse
       '@loro-extended/repo':
         specifier: workspace:*
         version: link:../../packages/repo
@@ -112,29 +100,85 @@ importers:
   packages/change:
     dependencies:
       loro-crdt:
-        specifier: 'catalog:'
+        specifier: ^1.5.9
         version: 1.5.9
     devDependencies:
       tsup:
-        specifier: 'catalog:'
+        specifier: ^8.5.0
         version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
       typescript:
-        specifier: 'catalog:'
+        specifier: ^5.9.2
         version: 5.9.2
       vitest:
-        specifier: 'catalog:'
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.9)(tsx@4.20.3)
+
+  packages/network-sse:
+    dependencies:
+      '@loro-extended/change':
+        specifier: workspace:*
+        version: link:../change
+      '@loro-extended/repo':
+        specifier: workspace:*
+        version: link:../repo
+      emittery:
+        specifier: ^1.2.0
+        version: 1.2.0
+      express:
+        specifier: ^4.21.2
+        version: 4.21.2
+      loro-crdt:
+        specifier: ^1.5.9
+        version: 1.5.9
+      reconnecting-eventsource:
+        specifier: ^1.6.4
+        version: 1.6.4
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.23
+        version: 4.17.23
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.9)(tsx@4.20.3)
+
+  packages/react:
+    dependencies:
+      '@loro-extended/change':
+        specifier: file:///Users/duane/schoolai/loro-extended/packages/change
+        version: link:../change
+      '@loro-extended/repo':
+        specifier: file:///Users/duane/schoolai/loro-extended/packages/repo
+        version: link:../repo
+      loro-crdt:
+        specifier: ^1.5.9
+        version: 1.5.9
+    devDependencies:
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(tsx@4.20.3)
 
   packages/repo:
     dependencies:
       '@loro-extended/change':
-        specifier: workspace:^
+        specifier: file:///Users/duane/schoolai/loro-extended/packages/change
         version: link:../change
       emittery:
         specifier: ^1.0.1
         version: 1.2.0
       loro-crdt:
-        specifier: 'catalog:'
+        specifier: ^1.5.9
         version: 1.5.9
       raj-ts:
         specifier: ^0.0.2
@@ -150,13 +194,13 @@ importers:
         specifier: ^9.0.8
         version: 9.0.8
       tsup:
-        specifier: 'catalog:'
+        specifier: ^8.5.0
         version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
       typescript:
-        specifier: 'catalog:'
+        specifier: ^5.9.2
         version: 5.9.2
       vitest:
-        specifier: 'catalog:'
+        specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(tsx@4.20.3)
 
 packages:
@@ -1805,6 +1849,10 @@ packages:
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
+
+  reconnecting-eventsource@1.6.4:
+    resolution: {integrity: sha512-0L3IS3wxcNFApTPPHkcbY8Aya7XZIpYDzhxa8j6QSufVkUN018XJKfh2ZaThLBGP/iN5UTz2yweMhkqr0PKa7A==}
+    engines: {node: '>=12.0.0'}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -3797,6 +3845,8 @@ snapshots:
   react@19.1.1: {}
 
   readdirp@4.1.2: {}
+
+  reconnecting-eventsource@1.6.4: {}
 
   require-directory@2.1.1: {}
 
