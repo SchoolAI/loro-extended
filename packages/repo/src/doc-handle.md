@@ -9,6 +9,7 @@ A `DocHandle` is a stateful wrapper around a single `LoroDoc` instance. It provi
 At its core, the `DocHandle` implements **The Elm Architecture (TEA)**. It hosts a pure, synchronous state machine (defined in `doc-handle-program.ts`) and acts as the runtime for executing the side effects (like I/O) that the state machine describes.
 
 Key responsibilities include:
+
 - Managing the document's lifecycle (`idle`, `storage-loading`, `ready`, etc.) through a predictable state machine.
 - Providing a simple, intention-based API (`find`, `create`, `change`).
 - Executing side effects (Commands) like storage access and network queries in a controlled manner.
@@ -30,29 +31,46 @@ The `DocHandle` is implemented as an explicit finite state machine.
 
 ```mermaid
 stateDiagram-v2
-    direction LR
-    
-    [*] --> Idle
+    [*] --> create
+    [*] --> find
+    [*] --> findOrCreate
 
-    Idle --> StorageLoading: find() / findOrCreate()
-    Idle --> Creating: create()
-    
-    StorageLoading --> Ready: found in storage
-    StorageLoading --> NetworkLoading: not found (both find and findOrCreate)
-    
-    NetworkLoading --> Ready: found on network
-    NetworkLoading --> Unavailable: timeout (find)
-    NetworkLoading --> Creating: timeout (findOrCreate)
-    
-    Creating --> Ready: created successfully
-    
-    Ready --> Deleted: delete()
-    Unavailable --> Idle: (re-request)
+    state create {
+        state "Idle" as Idle_c
+        state "Ready" as Ready_c
+        Idle_c --> Ready_c : create
+    }
 
-    state "Async Public API" as api {
-      find
-      create
-      findOrCreate
+    state find {
+        state "Idle" as Idle_f
+        state "Ready" as Ready_f
+        state "StorageLoading<div style='color:gray; font-weight: 300; margin-top: 5px'>(fallback:network)</div>" as Storage_f
+        state "NetworkLoading<div style='color:gray; font-weight: 300; margin-top: 5px'>(timeout:500ms)</div>" as Network_f
+        state "Unavailable" as Unavailable_f
+        state "Deleted" as Deleted_f
+        Idle_f --> Storage_f
+        Storage_f --> Ready_f : found
+        Storage_f --> Network_f : not found
+        Storage_f --> Deleted_f : deleted
+        Network_f --> Ready_f : found
+        Network_f --> Unavailable_f : timeout
+        Network_f --> Deleted_f : deleted
+        Unavailable_f --> Ready_f : found (bg)
+    }
+
+    state findOrCreate {
+        state "Idle" as Idle_foc
+        state "Ready" as Ready_foc
+        state "StorageLoading<div style='color:gray; font-weight: 300; margin-top: 5px'>(fallback:network)</div>" as Storage_foc
+        state "NetworkLoading<div style='color:gray; font-weight: 300; margin-top: 5px'>(timeout:500ms)</div>" as Network_foc
+        state "Deleted" as Deleted_foc
+        Idle_foc --> Storage_foc
+        Storage_foc --> Ready_foc : found
+        Storage_foc --> Network_foc : not found
+        Storage_foc --> Deleted_foc : deleted
+        Network_foc --> Ready_foc : found
+        Network_foc --> Ready_foc : timeout<div>(create)</div>
+        Network_foc --> Deleted_foc : deleted
     }
 ```
 
@@ -78,6 +96,7 @@ The `StorageLoading` state now tracks the original operation (`find` vs `findOrC
 #### Timeout Handling
 
 The `findOrCreate` operation passes its timeout to the network layer, ensuring that:
+
 - The user doesn't wait longer than expected
 - The synchronizer respects user-specified timeouts
 - No exponential backoff delays the creation of new documents
@@ -126,7 +145,10 @@ The responsibility for persistence and network communication is delegated to the
 ```typescript
 interface DocHandleServices<T> {
   loadFromStorage: (id: DocumentId) => Promise<LoroProxyDoc<AsLoro<T>> | null>;
-  queryNetwork: (id: DocumentId, timeout: number) => Promise<LoroProxyDoc<AsLoro<T>> | null>;
+  queryNetwork: (
+    id: DocumentId,
+    timeout: number
+  ) => Promise<LoroProxyDoc<AsLoro<T>> | null>;
 }
 
 const handle = new DocHandle(documentId, {
