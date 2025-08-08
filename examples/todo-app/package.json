@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:*",
+    "@loro-extended/network-sse": "workspace:*",
     "classic-level": "^1.2.0",
     "cors": "^2.8.5",
     "emittery": "^1.0.1",

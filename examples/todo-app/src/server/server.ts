@@ -1,9 +1,8 @@
+import { SseServerNetworkAdapter } from "@loro-extended/network-sse/server"
+import { Repo } from "@loro-extended/repo"
 import cors from "cors"
 import express from "express"
-
-import { Repo } from "@loro-extended/repo"
 import { LevelStorageAdapter } from "./LevelStorageAdapter.js"
-import { SseServerNetworkAdapter } from "./SseServerNetworkAdapter.js"
 
 const app = express()
 app.use(cors())

@@ -1,9 +1,9 @@
 import type { DocumentId } from "@loro-extended/repo"
+import { useEffect } from "react"
 import type { Todo } from "../shared/types"
 import { TodoInput } from "./components/TodoInput"
 import { TodoList } from "./components/TodoList"
 import { useLoroDoc } from "./hooks/useLoroDoc"
-import "../App.css"
 
 // Define the schema for our document
 interface TodoDoc {
@@ -16,6 +16,10 @@ const TODO_DOC_ID: DocumentId = "todos-example-document"
 function App() {
   // Use our custom hook to get a reactive state of the document
   const [doc, changeDoc, state] = useLoroDoc<TodoDoc>(TODO_DOC_ID)
+
+  useEffect(() => {
+    console.log("doc state", doc)
+  }, [doc])
 
   const addTodo = (text: string) => {
     changeDoc(d => {
