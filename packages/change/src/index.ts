@@ -84,6 +84,8 @@ export class ExtendedLoroDoc<T = any> {
 
   /**
    * Creates an ExtendedLoroDoc from an exported binary snapshot.
+   *
+   * biome-ignore lint/suspicious/useAdjacentOverloadSignatures: not an import
    */
   static import<T>(data: Uint8Array): ExtendedLoroDoc<T> {
     const doc = new LoroDoc()

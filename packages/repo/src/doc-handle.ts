@@ -233,6 +233,8 @@ export class DocHandle<T extends DocContent> {
    * This is where all interaction with the outside world (storage, network, etc.) happens.
    */
   async #executeCommand(command: Command<T>): Promise<void> {
+    console.log("DocHandle Command", command)
+
     switch (command.type) {
       case "cmd-load-from-storage": {
         if (!this.#services.loadFromStorage) {

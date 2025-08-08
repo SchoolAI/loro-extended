@@ -114,15 +114,19 @@ export function init(permissions: PermissionAdapter): [Model, Command?] {
   ]
 }
 
-export function update(message: Message, model: Model): [Model, Command?] {
-  switch (message.type) {
+export function update(msg: Message, model: Model): [Model, Command?] {
+  console.log("Synchronizer Message", msg, model)
+
+  switch (msg.type) {
     case "msg-peer-added": {
-      const newModel = { ...model }
-      newModel.peers.add(message.peerId)
+      const newModel = {
+        ...model,
+        peers: new Set([...model.peers, msg.peerId]),
+      }
 
       const docIds = [...newModel.localDocs].filter(docId => {
         const canList = newModel.permissions.canList
-        if (canList && !canList(message.peerId, docId)) {
+        if (canList && !canList(msg.peerId, docId)) {
           return false
         }
         return true
@@ -133,20 +137,21 @@ export function update(message: Message, model: Model): [Model, Command?] {
         message: {
           type: "announce-document",
           documentIds: docIds,
-          targetIds: [message.peerId],
+          targetIds: [msg.peerId],
         },
       }
 
+      console.log("msg-peer-added model", newModel)
       return [newModel, command]
     }
 
     case "msg-peer-removed": {
       const newModel = { ...model }
-      newModel.peers.delete(message.peerId)
+      newModel.peers.delete(msg.peerId)
 
       // Remove the peer from all availability records
       for (const peers of newModel.docAvailability.values()) {
-        peers.delete(message.peerId)
+        peers.delete(msg.peerId)
       }
 
       return [newModel]
@@ -154,12 +159,12 @@ export function update(message: Message, model: Model): [Model, Command?] {
 
     case "msg-document-added": {
       const newModel = { ...model }
-      newModel.localDocs.add(message.documentId)
+      newModel.localDocs.add(msg.documentId)
 
       const announceTargetIds = []
       for (const peerId of model.peers) {
         const canList = model.permissions.canList
-        if (canList && !canList(peerId, message.documentId)) {
+        if (canList && !canList(peerId, msg.documentId)) {
           continue
         }
         announceTargetIds.push(peerId)
@@ -170,7 +175,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
         type: "cmd-send-message",
         message: {
           type: "announce-document",
-          documentIds: [message.documentId],
+          documentIds: [msg.documentId],
           targetIds: announceTargetIds,
         },
       }
@@ -180,15 +185,15 @@ export function update(message: Message, model: Model): [Model, Command?] {
 
     case "msg-document-removed": {
       const newModel = { ...model }
-      newModel.localDocs.delete(message.documentId)
-      newModel.docAvailability.delete(message.documentId)
+      newModel.localDocs.delete(msg.documentId)
+      newModel.docAvailability.delete(msg.documentId)
 
       // Inform peers that the document is deleted
       const command: Command = {
         type: "cmd-send-message",
         message: {
           type: "delete-document",
-          documentId: message.documentId,
+          documentId: msg.documentId,
           targetIds: [...model.peers],
         },
       }
@@ -197,7 +202,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-received-doc-announced": {
-      const { from: fromPeerId, documentIds } = message
+      const { from: fromPeerId, documentIds } = msg
       const newModel = { ...model }
       const commands: Command[] = []
       const newlyDiscoveredDocs: DocumentId[] = []
@@ -269,7 +274,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-received-doc-request": {
-      const { from, documentId } = message
+      const { from, documentId } = msg
       if (model.localDocs.has(documentId)) {
         const command: Command = {
           type: "cmd-load-and-send-sync",
@@ -282,7 +287,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-received-sync": {
-      const { from, documentId, data } = message
+      const { from, documentId, data } = msg
       const syncState = model.syncStates.get(documentId)
 
       if (!model.permissions.canWrite(from, documentId)) {
@@ -313,7 +318,8 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-local-change": {
-      const { documentId, data } = message
+      const { documentId, data } = msg
+
       const peers = model.docAvailability.get(documentId)
       if (!peers) return [model]
 
@@ -332,7 +338,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-sync-started": {
-      const { documentId, requestId } = message
+      const { documentId, requestId } = msg
       const knownPeers = model.docAvailability.get(documentId)
 
       // If we already have the doc or are already syncing it, do nothing.
@@ -398,7 +404,7 @@ export function update(message: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-sync-timeout-fired": {
-      const { documentId } = message
+      const { documentId } = msg
       const syncState = model.syncStates.get(documentId)
       if (!syncState) return [model]
 

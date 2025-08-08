@@ -215,6 +215,8 @@ export function update<T extends DocContent>(
   state: HandleState<T>,
   documentId: DocumentId,
 ): [HandleState<T>, Command<T>?] {
+  console.log("DocHandle Message", msg)
+
   // All states can be deleted
   if (msg.type === "msg-delete") {
     // TODO: Should this report failure on any pending requests?

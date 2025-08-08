@@ -1,4 +1,10 @@
-import type { AsLoro, DocHandle, DocumentId } from "@loro-extended/repo"
+import {
+  type AsLoro,
+  type DocHandle,
+  type DocumentId,
+  ExtendedLoroDoc,
+  change,
+} from "@loro-extended/repo"
 import {
   useCallback,
   useEffect,
@@ -107,14 +113,28 @@ export function useLoroDoc<T extends Record<string, any>>(
     if (snapshot.state !== "ready" || snapshot.version === null) {
       return undefined
     }
-    if (!handle) return undefined
-    return handle.doc()?.toJSON()
+
+    const loroDoc = handle?.doc()
+
+    if (!loroDoc) return undefined
+
+    // Wrap and return the plain JSON representation
+    const extendedDoc = ExtendedLoroDoc.wrap<T>(loroDoc)
+    return extendedDoc.toJSON()
   }, [snapshot, handle])
 
   const changeDoc = useCallback(
     (fn: ChangeFn<T>) => {
-      if (!handle) return
-      handle.change(fn)
+      if (!handle) {
+        console.warn("doc handle not available for change")
+        return
+      }
+      handle.change(loroDoc => {
+        // Use the change function from @loro-extended/repo to handle the conversion
+        const extendedDoc = ExtendedLoroDoc.wrap<AsLoro<T>>(loroDoc)
+        change(extendedDoc, fn)
+        console.log("CHANGE!!")
+      })
     },
     [handle],
   )

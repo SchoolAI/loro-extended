@@ -54,6 +54,14 @@ export class Repo {
     return this.handleCache
   }
 
+  get network(): NetworkSubsystem {
+    return this.networkSubsystem
+  }
+
+  get storage(): StorageSubsystem {
+    return this.storageSubsystem
+  }
+
   constructor({ storage, network, peerId, permissions }: RepoConfig) {
     this.peerId = peerId ?? randomPeerId()
     this.permissionAdapter = createPermissions(permissions)
@@ -198,6 +206,7 @@ export class Repo {
 
     // Listen for sync messages from the handle to broadcast to peers
     handle.on("doc-handle-local-change", message => {
+      console.log("doc-handle-local-change emitted", documentId)
       this.synchronizer.onLocalChange(documentId, message)
     })
 
