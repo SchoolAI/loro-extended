@@ -133,7 +133,6 @@ export function useLoroDoc<T extends Record<string, any>>(
         // Use the change function from @loro-extended/repo to handle the conversion
         const extendedDoc = ExtendedLoroDoc.wrap<AsLoro<T>>(loroDoc)
         change(extendedDoc, fn)
-        console.log("CHANGE!!")
       })
     },
     [handle],

@@ -42,7 +42,9 @@ export class SseServerNetworkAdapter
       const clientRes = this.#clients.get(targetId)
       if (clientRes) {
         console.log("[SYNC/SEND]", targetId)
-        clientRes.write(`data: ${JSON.stringify(message)}\n\n`)
+        // Convert Uint8Array to base64 for JSON serialization
+        const serializedMessage = this.#serializeMessage(message)
+        clientRes.write(`data: ${JSON.stringify(serializedMessage)}\n\n`)
       } else {
         // It's possible for the network subsystem to try sending to a peer that
         // just disconnected, so a warning is appropriate.
@@ -63,7 +65,8 @@ export class SseServerNetworkAdapter
 
     // Endpoint for clients to send messages TO the server.
     router.post("/sync", (req, res) => {
-      const message = req.body as RepoMessage
+      const serializedMessage = req.body
+      const message = this.#deserializeMessage(serializedMessage) as RepoMessage
 
       console.log("[SYNC/RECEIVE]", message)
 
@@ -116,5 +119,44 @@ export class SseServerNetworkAdapter
       // Emit a "peer-disconnected" event
       this.emit("peer-disconnected", { peerId })
     })
+  }
+
+  #serializeMessage(message: any): any {
+    if (message && typeof message === 'object') {
+      if (message instanceof Uint8Array) {
+        // Convert Uint8Array to base64
+        return {
+          __type: 'Uint8Array',
+          data: Buffer.from(message).toString('base64')
+        }
+      } else if (Array.isArray(message)) {
+        return message.map(item => this.#serializeMessage(item))
+      } else {
+        const result: any = {}
+        for (const key in message) {
+          result[key] = this.#serializeMessage(message[key])
+        }
+        return result
+      }
+    }
+    return message
+  }
+
+  #deserializeMessage(message: any): any {
+    if (message && typeof message === 'object') {
+      if (message.__type === 'Uint8Array' && message.data) {
+        // Convert base64 back to Uint8Array
+        return new Uint8Array(Buffer.from(message.data, 'base64'))
+      } else if (Array.isArray(message)) {
+        return message.map(item => this.#deserializeMessage(item))
+      } else {
+        const result: any = {}
+        for (const key in message) {
+          result[key] = this.#deserializeMessage(message[key])
+        }
+        return result
+      }
+    }
+    return message
   }
 }
