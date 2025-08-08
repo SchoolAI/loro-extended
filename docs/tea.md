@@ -1079,7 +1079,7 @@ Inspired by the prior refactor of the `DocHandle`, we separated the `Synchronize
 1.  **`synchronizer-program.ts` (The Pure Core):** This file exports a pure `update` function: `(message, state) => [newState, command]`. It is completely deterministic and has no knowledge of the outside world (networks, timers, etc.). Its only job is to calculate the next state based on the current state and a `Message`.
 
 2.  **`synchronizer.ts` (The Impure Host):** This class is the runtime engine. It instantiates the `raj-ts` runtime with the pure program. Its responsibilities are:
-    *   **Driving the State:** Exposing a public API (`addPeer`, `beginSync`) that translates method calls into `Message`s dispatched to the pure program.
+    *   **Driving the State:** Exposing a public API (`addPeer`) that translates method calls into `Message`s dispatched to the pure program.
     *   **Executing Side Effects:** Receiving `Command` data objects from the pure program and executing them. This is where all interaction with the outside world happens (e.g., sending network messages, setting timeouts).
     *   **Translating External Events:** Taking incoming `RepoMessage`s from the network and translating them into `Message`s for the pure program, thus "closing the loop."
 

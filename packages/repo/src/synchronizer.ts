@@ -67,14 +67,6 @@ export class Synchronizer {
     this.#dispatch({ type: "msg-document-removed", documentId })
   }
 
-  /**
-   * @deprecated This method is intended for internal use by the Repo and
-   * may be removed in a future version.
-   */
-  public beginSync(documentId: DocumentId) {
-    this.#dispatch({ type: "msg-sync-started", documentId })
-  }
-
   public onLocalChange(documentId: DocumentId, data: Uint8Array) {
     this.#dispatch({ type: "msg-local-change", documentId, data })
   }
@@ -207,6 +199,7 @@ export class Synchronizer {
       }
     }
   }
+
   #clearTimeout(documentId: DocumentId) {
     const timeout = this.#timeouts.get(documentId)
 
@@ -215,6 +208,7 @@ export class Synchronizer {
       this.#timeouts.delete(documentId)
     }
   }
+
   public _clearAllTimeouts() {
     for (const timeoutId of this.#timeouts.values()) {
       clearTimeout(timeoutId)

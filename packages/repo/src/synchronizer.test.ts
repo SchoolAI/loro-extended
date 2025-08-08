@@ -35,17 +35,6 @@ describe("Synchronizer (Host)", () => {
     })
   })
 
-  // it("should send a request-sync message when beginSync is called", async () => {
-  //   synchronizer.beginSync("doc-1")
-  //   await tick()
-
-  //   expect(mockServices.sendMessage).toHaveBeenCalledWith({
-  //     type: "request-sync",
-  //     targetIds: [],
-  //     documentId: "doc-1",
-  //   })
-  // })
-
   it("should execute a load-and-send-sync command", async () => {
     const mockHandle = {
       state: "ready",

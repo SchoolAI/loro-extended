@@ -28,7 +28,6 @@ The `Synchronizer` is a servant to the `Repo` and operates on its behalf.
     - `synchronizer.addPeer(peerId)`: When the `NetworkSubsystem` connects to a new peer.
     - `synchronizer.removePeer(peerId)`: When a peer disconnects.
     - `synchronizer.addDocument(documentId)`: When the `Repo` creates or finds a handle for a new document.
-    - `synchronizer.beginSync(documentId)`: This is the critical link. When a `DocHandle` transitions to the `searching` state, the `Repo` tells the `Synchronizer` to actively find that document on the network.
 - **Events from `Synchronizer` to `Repo`**: The `Synchronizer` emits generic messages that the `Repo` is responsible for sending over the network via the `NetworkSubsystem`. It also delivers sync data back to the appropriate `DocHandle`.
 
 The `Synchronizer` and `DocHandle` are decoupled; they do not interact directly. The `Repo` acts as the intermediary, translating a state change in a `DocHandle` (e.g., "I need this document") into an action for the `Synchronizer` (e.g., "Find this document").
@@ -38,7 +37,7 @@ The `Synchronizer` and `DocHandle` are decoupled; they do not interact directly.
 To ensure robustness in a distributed environment, the `Synchronizer` uses an explicit three-phase protocol:
 
 1.  **Announce**: When a peer comes online or acquires a new document, it broadcasts an `announce-document` message to its peers. This message contains a list of `documentId`s it has available. This serves as a form of service discovery.
-2.  **Request**: When a synchronizer needs a document (triggered by `beginSync`), it first checks its internal directory to see if a peer has announced it.
+2.  **Request**: When a synchronizer needs a document, it first checks its internal directory to see if a peer has announced it.
     - If a peer is known, it sends a direct `request-sync` message to that peer.
     - If no peer is known, it broadcasts the `request-sync` message to all peers.
 3.  **Sync**: A peer that receives a `request-sync` for a document it has will respond with a `sync` message containing the full document data. The requesting synchronizer then delivers this data to the waiting `DocHandle` to be processed.
