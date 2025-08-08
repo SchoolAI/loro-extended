@@ -1,11 +1,11 @@
 import type { LoroDoc } from "loro-crdt"
-import type { PermissionAdapter } from "src/auth/permission-adapter.js"
 import { v4 as uuid } from "uuid"
 import type { DocHandle } from "./doc-handle.js"
 import type {
   RepoMessage,
   UnsentRepoMessage,
 } from "./network/network-messages.js"
+import type { PermissionAdapter } from "./permission-adapter.js"
 import {
   type Command,
   type Message,

@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createPermissions } from "./auth/permission-adapter.js"
+import { createPermissions } from "./permission-adapter.js"
 import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))

@@ -1,12 +1,12 @@
 import type { LoroDoc } from "loro-crdt"
-import {
-  createPermissions,
-  type PermissionAdapter,
-} from "./auth/permission-adapter.js"
 import { DocHandle } from "./doc-handle.js"
 import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
 import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
 import { NetworkSubsystem } from "./network/network-subsystem.js"
+import {
+  createPermissions,
+  type PermissionAdapter,
+} from "./permission-adapter.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
 import { StorageSubsystem } from "./storage/storage-subsystem.js"

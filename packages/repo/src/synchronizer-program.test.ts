@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { createPermissions } from "./auth/permission-adapter.js"
+import { createPermissions } from "./permission-adapter.js"
 import {
   type Command,
   type Message,

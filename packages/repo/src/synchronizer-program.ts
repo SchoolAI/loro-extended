@@ -1,5 +1,5 @@
-import type { PermissionAdapter } from "./auth/permission-adapter.js"
 import type { UnsentRepoMessage } from "./network/network-messages.js"
+import type { PermissionAdapter } from "./permission-adapter.js"
 import type { DocumentId, PeerId, RequestId } from "./types.js"
 
 // STATE
