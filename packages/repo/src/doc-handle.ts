@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid"
 
 import {
   type Command,
+  FIND_OR_CREATE_DEFAULT_TIMEOUT,
   type HandleState,
   type Message,
   init as programInit,
@@ -126,7 +127,7 @@ export class DocHandle<T extends DocContent> {
     this.#dispatch({
       type: "msg-find-or-create",
       requestId,
-      timeout: options.timeout ?? 5000,
+      timeout: options.timeout ?? FIND_OR_CREATE_DEFAULT_TIMEOUT,
     })
 
     return promise

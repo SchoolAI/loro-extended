@@ -127,7 +127,7 @@ describe("DocHandle program", () => {
     it("should transition from idle to storage-loading on findOrCreate", () => {
       const [initialState] = init<TestSchema>()
       const [newState, command] = update(
-        { type: "msg-find-or-create", timeout: 5000, requestId: reqId },
+        { type: "msg-find-or-create", timeout: 1000, requestId: reqId },
         initialState,
         docId,
       )
@@ -136,7 +136,7 @@ describe("DocHandle program", () => {
         state: "storage-loading",
         operation: "find-or-create",
         requestId: reqId,
-        timeout: 5000,
+        timeout: 1000,
       })
       expect(command).toEqual({
         type: "cmd-load-from-storage",

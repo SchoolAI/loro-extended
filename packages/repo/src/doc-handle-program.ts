@@ -7,6 +7,8 @@ import type {
   RequestId,
 } from "./types.js"
 
+export const FIND_OR_CREATE_DEFAULT_TIMEOUT = 1000
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  STATE
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -299,7 +301,7 @@ export function update<T extends DocContent>(
             ]
           } else {
             // For find-or-create: try network, create if not found
-            const timeout = state.timeout || 5000
+            const timeout = state.timeout || FIND_OR_CREATE_DEFAULT_TIMEOUT
             return [
               {
                 state: "network-loading",
