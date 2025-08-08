@@ -23,7 +23,7 @@ new Repo({
 // 3. Mount the adapter's routes onto our Express app under the "/loro" prefix.
 app.use("/loro", sseAdapter.getExpressRouter())
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 5170
 app.listen(PORT, () => {
   console.log(
     `Loro-Extended Todo App Server listening on http://localhost:${PORT}`,

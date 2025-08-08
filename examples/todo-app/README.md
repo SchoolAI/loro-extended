@@ -53,7 +53,7 @@ pnpm dev
 This starts:
 
 - React app on http://localhost:5173
-- Express sync server on http://localhost:3001
+- Express sync server on http://localhost:5170
 
 Open multiple browser windows to see real-time collaboration in action!
 
