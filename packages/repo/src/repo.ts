@@ -206,7 +206,6 @@ export class Repo {
 
     // Listen for sync messages from the handle to broadcast to peers
     handle.on("doc-handle-local-change", message => {
-      console.log("doc-handle-local-change emitted", documentId)
       this.synchronizer.onLocalChange(documentId, message)
     })
 

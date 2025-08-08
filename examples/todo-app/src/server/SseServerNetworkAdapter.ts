@@ -41,7 +41,6 @@ export class SseServerNetworkAdapter
     for (const targetId of message.targetIds) {
       const clientRes = this.#clients.get(targetId)
       if (clientRes) {
-        console.log("[SYNC/SEND]", targetId)
         // Convert Uint8Array to base64 for JSON serialization
         const serializedMessage = this.#serializeMessage(message)
         clientRes.write(`data: ${JSON.stringify(serializedMessage)}\n\n`)
@@ -67,8 +66,6 @@ export class SseServerNetworkAdapter
     router.post("/sync", (req, res) => {
       const serializedMessage = req.body
       const message = this.#deserializeMessage(serializedMessage) as RepoMessage
-
-      console.log("[SYNC/RECEIVE]", message)
 
       // Emit a "message" event, which the NetworkSubsystem is listening for.
       // This is how incoming messages get into the Repo.
@@ -104,9 +101,7 @@ export class SseServerNetworkAdapter
     this.#clients.set(peerId, res)
 
     console.log(
-      "[PEER CANDIDATE]",
-      peerId,
-      `Total clients: ${this.#clients.size}`,
+      `[SSE-ADAPTER] New Peer: ${peerId}. Total clients: ${this.#clients.size}`,
     )
 
     // Emit a "peer-candidate" event to inform the Repo a new peer is available.
@@ -122,12 +117,12 @@ export class SseServerNetworkAdapter
   }
 
   #serializeMessage(message: any): any {
-    if (message && typeof message === 'object') {
+    if (message && typeof message === "object") {
       if (message instanceof Uint8Array) {
         // Convert Uint8Array to base64
         return {
-          __type: 'Uint8Array',
-          data: Buffer.from(message).toString('base64')
+          __type: "Uint8Array",
+          data: Buffer.from(message).toString("base64"),
         }
       } else if (Array.isArray(message)) {
         return message.map(item => this.#serializeMessage(item))
@@ -143,10 +138,10 @@ export class SseServerNetworkAdapter
   }
 
   #deserializeMessage(message: any): any {
-    if (message && typeof message === 'object') {
-      if (message.__type === 'Uint8Array' && message.data) {
+    if (message && typeof message === "object") {
+      if (message.__type === "Uint8Array" && message.data) {
         // Convert base64 back to Uint8Array
-        return new Uint8Array(Buffer.from(message.data, 'base64'))
+        return new Uint8Array(Buffer.from(message.data, "base64"))
       } else if (Array.isArray(message)) {
         return message.map(item => this.#deserializeMessage(item))
       } else {

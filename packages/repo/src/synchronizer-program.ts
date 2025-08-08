@@ -125,8 +125,6 @@ export function init(permissions: PermissionAdapter): [Model, Command?] {
 }
 
 export function update(msg: Message, model: Model): [Model, Command?] {
-  console.log("Synchronizer Message", msg, model)
-
   switch (msg.type) {
     case "msg-peer-added": {
       const newModel = {

@@ -32,10 +32,6 @@ function App() {
     })
   }
 
-  useEffect(() => {
-    console.log(doc)
-  }, [doc])
-
   const toggleTodo = (id: string) => {
     changeDoc(d => {
       const todo = d.todos.find(t => t.id === id)

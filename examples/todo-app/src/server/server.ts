@@ -21,12 +21,6 @@ const repo = new Repo({
   network: [sseAdapter],
 })
 
-repo.network.on("message", event => {
-  if (event.type === "sync") {
-    console.log("sync", event.documentId, event.data)
-  }
-})
-
 // 3. Mount the adapter's routes onto our Express app under the "/loro" prefix.
 app.use("/loro", sseAdapter.getExpressRouter())
 

@@ -132,8 +132,6 @@ export class Synchronizer {
   }
 
   #executeCommand(command: Command) {
-    console.log("Synchronizer Command", command)
-
     switch (command.type) {
       case "cmd-notify-docs-available":
         for (const documentId of command.documentIds) {
