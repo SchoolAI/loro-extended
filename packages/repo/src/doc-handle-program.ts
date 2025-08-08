@@ -18,8 +18,10 @@ export type IdleState = {
 export type StorageLoadingState = {
   state: "storage-loading"
   requestId: RequestId
-  /** What to do if storage loading fails */
-  fallback: "network" | "create"
+  /** The original operation that triggered this load */
+  operation: "find" | "find-or-create"
+  /** For find-or-create, the timeout to use for network query */
+  timeout?: number
 }
 
 export type CreatingState = {
@@ -230,7 +232,7 @@ export function update<T extends DocContent>(
           return [
             {
               state: "storage-loading",
-              fallback: "network",
+              operation: "find",
               requestId: msg.requestId,
             },
             { type: "cmd-load-from-storage", documentId },
@@ -239,8 +241,9 @@ export function update<T extends DocContent>(
           return [
             {
               state: "storage-loading",
-              fallback: "create",
+              operation: "find-or-create",
               requestId: msg.requestId,
+              timeout: msg.timeout,
             },
             { type: "cmd-load-from-storage", documentId },
           ]
@@ -284,21 +287,29 @@ export function update<T extends DocContent>(
           return [{ state: "ready", doc: msg.doc }, command]
         }
         case "msg-storage-load-failure":
-          if (state.fallback === "network") {
+          // Determine next step based on the original operation
+          if (state.operation === "find") {
+            // For find: try network, but don't create if not found
             return [
               {
                 state: "network-loading",
                 requestId: state.requestId,
-                timeout: 5000, // TODO: Make configurable
+                timeout: 5000,
                 createOnTimeout: false,
               },
               { type: "cmd-query-network", documentId, timeout: 5000 },
             ]
           } else {
-            // Fallback is "create"
+            // For find-or-create: try network, create if not found
+            const timeout = state.timeout || 5000
             return [
-              { state: "creating", requestId: state.requestId },
-              { type: "cmd-create-doc", documentId },
+              {
+                state: "network-loading",
+                requestId: state.requestId,
+                timeout: timeout,
+                createOnTimeout: true,
+              },
+              { type: "cmd-query-network", documentId, timeout: timeout },
             ]
           }
         default:

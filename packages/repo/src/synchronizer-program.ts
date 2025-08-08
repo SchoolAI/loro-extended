@@ -9,8 +9,17 @@ export interface Model {
   /** The set of peers we are currently connected to. */
   peers: Set<PeerId>
 
-  /** A map of which documents are available from which peers. */
-  docAvailability: Map<DocumentId, Set<PeerId>>
+  /**
+   * Peers that HAVE each document (they announced it to us).
+   * Used when we need to fetch/sync a document from the network.
+   */
+  peersWithDoc: Map<DocumentId, Set<PeerId>>
+
+  /**
+   * Peers that KNOW ABOUT each document (we announced to them or they requested it).
+   * Used when broadcasting local changes to interested peers.
+   */
+  peersAwareOfDoc: Map<DocumentId, Set<PeerId>>
 
   /** A map of which documents we have locally. */
   localDocs: Set<DocumentId>
@@ -27,16 +36,16 @@ export type SyncState =
   /** We've broadcasted a request and are waiting for any peer to announce the doc. */
   | {
       state: "searching"
-      /** The number of times we have retried the search. */
-      retryCount: number
+      /** User-specified timeout (if any) - no retries if this is set */
+      userTimeout?: number
       requestId?: RequestId
     }
   /** We've identified a peer with the doc and are waiting for them to send it. */
   | {
       state: "syncing"
       peerId: PeerId
-      /** The number of times we have retried this specific peer. */
-      retryCount: number
+      /** User-specified timeout (if any) - no retries if this is set */
+      userTimeout?: number
       requestId?: RequestId
     }
 
@@ -48,7 +57,7 @@ export type Message =
   | { type: "msg-peer-removed"; peerId: PeerId }
   | { type: "msg-document-added"; documentId: DocumentId }
   | { type: "msg-document-removed"; documentId: DocumentId }
-  | { type: "msg-sync-started"; documentId: DocumentId; requestId?: RequestId }
+  | { type: "msg-sync-started"; documentId: DocumentId; requestId?: RequestId; timeout?: number }
   | { type: "msg-local-change"; documentId: DocumentId; data: Uint8Array }
 
   // Events from the Network
@@ -95,8 +104,7 @@ export type Command =
 // PROGRAM DEFINITION
 
 // CONSTANTS
-const MAX_RETRIES = 3
-const BASE_TIMEOUT = 5000 // 5 seconds
+const DEFAULT_SYNC_TIMEOUT = 5000 // 5 seconds for peer-to-peer sync
 
 export type Program = {
   update(message: Message, model: Model): [Model, Command?]
@@ -106,7 +114,8 @@ export function init(permissions: PermissionAdapter): [Model, Command?] {
   return [
     {
       peers: new Set(),
-      docAvailability: new Map(),
+      peersWithDoc: new Map(),
+      peersAwareOfDoc: new Map(),
       localDocs: new Set(),
       syncStates: new Map(),
       permissions,
@@ -122,6 +131,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       const newModel = {
         ...model,
         peers: new Set([...model.peers, msg.peerId]),
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
       }
 
       const docIds = [...newModel.localDocs].filter(docId => {
@@ -131,6 +141,15 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         }
         return true
       })
+
+      // Track that this peer is now aware of our documents
+      for (const docId of docIds) {
+        if (!newModel.peersAwareOfDoc.has(docId)) {
+          newModel.peersAwareOfDoc.set(docId, new Set())
+        }
+        newModel.peersAwareOfDoc.get(docId)!.add(msg.peerId)
+      }
+
       // Announce our existing documents to the new peer
       const command: Command = {
         type: "cmd-send-message",
@@ -146,11 +165,18 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-peer-removed": {
-      const newModel = { ...model }
+      const newModel = {
+        ...model,
+        peersWithDoc: new Map(model.peersWithDoc),
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
+      }
       newModel.peers.delete(msg.peerId)
 
-      // Remove the peer from all availability records
-      for (const peers of newModel.docAvailability.values()) {
+      // Remove the peer from both tracking maps
+      for (const peers of newModel.peersWithDoc.values()) {
+        peers.delete(msg.peerId)
+      }
+      for (const peers of newModel.peersAwareOfDoc.values()) {
         peers.delete(msg.peerId)
       }
 
@@ -158,7 +184,10 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-document-added": {
-      const newModel = { ...model }
+      const newModel = {
+        ...model,
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
+      }
       newModel.localDocs.add(msg.documentId)
 
       const announceTargetIds = []
@@ -168,6 +197,11 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           continue
         }
         announceTargetIds.push(peerId)
+      }
+
+      // Track which peers are now aware of this document
+      if (announceTargetIds.length > 0) {
+        newModel.peersAwareOfDoc.set(msg.documentId, new Set(announceTargetIds))
       }
 
       // Announce the new document to peers that are permitted to know
@@ -184,9 +218,14 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-document-removed": {
-      const newModel = { ...model }
+      const newModel = {
+        ...model,
+        peersWithDoc: new Map(model.peersWithDoc),
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
+      }
       newModel.localDocs.delete(msg.documentId)
-      newModel.docAvailability.delete(msg.documentId)
+      newModel.peersWithDoc.delete(msg.documentId)
+      newModel.peersAwareOfDoc.delete(msg.documentId)
 
       // Inform peers that the document is deleted
       const command: Command = {
@@ -203,7 +242,11 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
     case "msg-received-doc-announced": {
       const { from: fromPeerId, documentIds } = msg
-      const newModel = { ...model }
+      const newModel = {
+        ...model,
+        peersWithDoc: new Map(model.peersWithDoc),
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
+      }
       const commands: Command[] = []
       const newlyDiscoveredDocs: DocumentId[] = []
 
@@ -212,15 +255,17 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           newModel.localDocs.has(documentId) ||
           newModel.syncStates.has(documentId)
 
-        // Record that this peer has this document
-        if (!newModel.docAvailability.has(documentId)) {
-          newModel.docAvailability.set(documentId, new Set())
+        // Record that this peer HAS this document
+        if (!newModel.peersWithDoc.has(documentId)) {
+          newModel.peersWithDoc.set(documentId, new Set())
         }
-        const availableDoc = newModel.docAvailability.get(documentId)
-        if (!availableDoc) {
-          throw new Error("Impossible state: docAvailability not set")
+        newModel.peersWithDoc.get(documentId)!.add(fromPeerId)
+
+        // Also record that this peer KNOWS ABOUT this document
+        if (!newModel.peersAwareOfDoc.has(documentId)) {
+          newModel.peersAwareOfDoc.set(documentId, new Set())
         }
-        availableDoc.add(fromPeerId)
+        newModel.peersAwareOfDoc.get(documentId)!.add(fromPeerId)
 
         // If we are not already tracking this document, we need to
         if (!isAlreadyKnown) {
@@ -233,7 +278,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           newModel.syncStates.set(documentId, {
             state: "syncing",
             peerId: fromPeerId,
-            retryCount: 0,
+            userTimeout: syncState.userTimeout,
             requestId: syncState.requestId,
           })
 
@@ -246,11 +291,11 @@ export function update(msg: Message, model: Model): [Model, Command?] {
               targetIds: [fromPeerId],
             },
           })
-          // TODO: Use a real timeout value
+          // Use user timeout if specified, otherwise default
           commands.push({
             type: "cmd-set-timeout",
             documentId,
-            duration: 25000,
+            duration: syncState.userTimeout || DEFAULT_SYNC_TIMEOUT,
           })
         }
       }
@@ -276,12 +321,22 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     case "msg-received-doc-request": {
       const { from, documentId } = msg
       if (model.localDocs.has(documentId)) {
+        // Track that this peer is now aware of this document
+        const newModel = {
+          ...model,
+          peersAwareOfDoc: new Map(model.peersAwareOfDoc),
+        }
+        if (!newModel.peersAwareOfDoc.has(documentId)) {
+          newModel.peersAwareOfDoc.set(documentId, new Set())
+        }
+        newModel.peersAwareOfDoc.get(documentId)!.add(from)
+
         const command: Command = {
           type: "cmd-load-and-send-sync",
           documentId,
           to: from,
         }
-        return [model, command]
+        return [newModel, command]
       }
       return [model]
     }
@@ -320,10 +375,9 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     case "msg-local-change": {
       const { documentId, data } = msg
 
-      const peers = model.docAvailability.get(documentId)
-      if (!peers) return [model]
-
-      if (peers.size === 0) return [model]
+      // Use peersAwareOfDoc to determine who should receive updates
+      const peers = model.peersAwareOfDoc.get(documentId)
+      if (!peers || peers.size === 0) return [model]
 
       const command: Command = {
         type: "cmd-send-message",
@@ -338,8 +392,9 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-sync-started": {
-      const { documentId, requestId } = msg
-      const knownPeers = model.docAvailability.get(documentId)
+      const { documentId, requestId, timeout } = msg
+      // Use peersWithDoc to find who has the document
+      const knownPeers = model.peersWithDoc.get(documentId)
 
       // If we already have the doc or are already syncing it, do nothing.
       if (model.localDocs.has(documentId) || model.syncStates.has(documentId)) {
@@ -354,6 +409,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
       const newModel = { ...model }
       const commands: Command[] = []
+      const timeoutDuration = timeout || DEFAULT_SYNC_TIMEOUT
 
       if (knownPeers && knownPeers.size > 0) {
         // We know who has the doc, request it from one of them.
@@ -361,7 +417,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         newModel.syncStates.set(documentId, {
           state: "syncing",
           peerId,
-          retryCount: 0,
+          userTimeout: timeout,
           requestId,
         })
         commands.push({
@@ -375,13 +431,13 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         commands.push({
           type: "cmd-set-timeout",
           documentId,
-          duration: BASE_TIMEOUT,
+          duration: timeoutDuration,
         })
       } else {
         // We don't know who has the doc, ask everyone.
         newModel.syncStates.set(documentId, {
           state: "searching",
-          retryCount: 0,
+          userTimeout: timeout,
           requestId,
         })
         commands.push({
@@ -395,7 +451,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         commands.push({
           type: "cmd-set-timeout",
           documentId,
-          duration: BASE_TIMEOUT,
+          duration: timeoutDuration,
         })
       }
 
@@ -408,50 +464,21 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       const syncState = model.syncStates.get(documentId)
       if (!syncState) return [model]
 
+      // If this was a user-specified timeout (from findOrCreate), fail immediately
+      // Otherwise, this is a regular sync that can be retried when peers connect
       const newSyncStates = new Map(model.syncStates)
-      const newRetryCount = syncState.retryCount + 1
-
-      if (newRetryCount > MAX_RETRIES) {
-        // We've retried enough, give up.
-        newSyncStates.delete(documentId)
-        const newModel = { ...model, syncStates: newSyncStates }
-        const command: Command = {
-          type: "cmd-batch",
-          commands: [
-            { type: "cmd-clear-timeout", documentId },
-            {
-              type: "cmd-sync-failed",
-              documentId,
-              requestId: syncState.requestId,
-            },
-          ],
-        }
-        return [newModel, command]
-      }
-
-      // We're going to retry, so update the state and set a new timeout.
-      const backoff_duration = BASE_TIMEOUT * 2 ** newRetryCount
-
-      // If we were syncing with a specific peer, go back to searching everyone.
-      newSyncStates.set(documentId, {
-        state: "searching",
-        retryCount: newRetryCount,
-        requestId: syncState.requestId,
-      })
+      newSyncStates.delete(documentId)
       const newModel = { ...model, syncStates: newSyncStates }
-
+      
       const command: Command = {
         type: "cmd-batch",
         commands: [
+          { type: "cmd-clear-timeout", documentId },
           {
-            type: "cmd-send-message",
-            message: {
-              type: "request-sync",
-              documentId,
-              targetIds: [...model.peers],
-            },
+            type: "cmd-sync-failed",
+            documentId,
+            requestId: syncState.requestId,
           },
-          { type: "cmd-set-timeout", documentId, duration: backoff_duration },
         ],
       }
       return [newModel, command]

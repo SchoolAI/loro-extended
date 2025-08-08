@@ -38,11 +38,11 @@ stateDiagram-v2
     Idle --> Creating: create()
     
     StorageLoading --> Ready: found in storage
-    StorageLoading --> Creating: not found (findOrCreate)
-    StorageLoading --> NetworkLoading: not found (find)
+    StorageLoading --> NetworkLoading: not found (both find and findOrCreate)
     
     NetworkLoading --> Ready: found on network
-    NetworkLoading --> Unavailable: timeout
+    NetworkLoading --> Unavailable: timeout (find)
+    NetworkLoading --> Creating: timeout (findOrCreate)
     
     Creating --> Ready: created successfully
     
@@ -59,12 +59,28 @@ stateDiagram-v2
 ### States
 
 - **`Idle`**: The initial state. The handle exists, but no document loading has been initiated.
-- **`StorageLoading`**: We are actively trying to load the document from the provided storage service in response to a `find` or `findOrCreate` call.
-- **`NetworkLoading`**: The document wasn't found in storage, so we are now asking peers on the network if they have it.
+- **`StorageLoading`**: We are actively trying to load the document from the provided storage service in response to a `find` or `findOrCreate` call. The state tracks the original operation to determine the next step if storage fails.
+- **`NetworkLoading`**: The document wasn't found in storage, so we are now asking peers on the network if they have it. For `findOrCreate`, this state includes a `createOnTimeout` flag to create the document if the network query times out.
 - **`Creating`**: We are in the process of creating a new document from scratch.
 - **`Ready`**: The document is loaded in memory and available for use. This is a terminal state for successful load/create operations.
 - **`Unavailable`**: We couldn't find the document in storage or on the network within the allotted time. This is a terminal state for a `find` operation.
 - **`Deleted`**: The document has been marked for deletion. This is a terminal state.
+
+### Key Architectural Decisions
+
+#### Operation-Based State Transitions
+
+The `StorageLoading` state now tracks the original operation (`find` vs `findOrCreate`) rather than using a generic "fallback" field. This makes the intent clearer and the state transitions more predictable:
+
+- `operation: "find"` → on storage failure, query network with no creation fallback
+- `operation: "find-or-create"` → on storage failure, query network with creation fallback
+
+#### Timeout Handling
+
+The `findOrCreate` operation passes its timeout to the network layer, ensuring that:
+- The user doesn't wait longer than expected
+- The synchronizer respects user-specified timeouts
+- No exponential backoff delays the creation of new documents
 
 ## 4. Core API
 

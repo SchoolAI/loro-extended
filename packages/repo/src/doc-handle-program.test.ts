@@ -32,7 +32,7 @@ describe("DocHandle program", () => {
 
       expect(newState).toEqual({
         state: "storage-loading",
-        fallback: "network",
+        operation: "find",
         requestId: reqId,
       })
       expect(command).toEqual({
@@ -45,7 +45,7 @@ describe("DocHandle program", () => {
       const doc = new LoroDoc()
       const initialState = {
         state: "storage-loading",
-        fallback: "network",
+        operation: "find",
         requestId: reqId,
       } as const
       const [newState, command] = update(
@@ -67,7 +67,7 @@ describe("DocHandle program", () => {
     it("should transition from storage-loading to network-loading on failure", () => {
       const initialState = {
         state: "storage-loading",
-        fallback: "network",
+        operation: "find",
         requestId: reqId,
       } as const
       const [newState, command] = update(
@@ -134,8 +134,9 @@ describe("DocHandle program", () => {
 
       expect(newState).toEqual({
         state: "storage-loading",
-        fallback: "create",
+        operation: "find-or-create",
         requestId: reqId,
+        timeout: 5000,
       })
       expect(command).toEqual({
         type: "cmd-load-from-storage",
@@ -143,14 +144,38 @@ describe("DocHandle program", () => {
       })
     })
 
-    it("should issue a create_doc command if storage fails", () => {
+    it("should transition to network-loading if storage fails", () => {
       const initialState = {
         state: "storage-loading",
-        fallback: "create",
+        operation: "find-or-create",
         requestId: reqId,
+        timeout: 5000,
       } as const
       const [newState, command] = update(
         { type: "msg-storage-load-failure" },
+        initialState,
+        docId,
+      )
+
+      expect(newState.state).toBe("network-loading")
+      expect((newState as any).requestId).toBe(reqId)
+      expect((newState as any).createOnTimeout).toBe(true)
+      expect(command).toEqual({
+        type: "cmd-query-network",
+        documentId: docId,
+        timeout: 5000
+      })
+    })
+
+    it("should create document if network times out in findOrCreate", () => {
+      const initialState = {
+        state: "network-loading",
+        requestId: reqId,
+        timeout: 5000,
+        createOnTimeout: true,
+      } as const
+      const [newState, command] = update(
+        { type: "msg-network-timeout" },
         initialState,
         docId,
       )
@@ -242,7 +267,7 @@ describe("DocHandle program", () => {
     it("should transition to deleted from any state", () => {
       const states: any[] = [
         { state: "idle" },
-        { state: "storage-loading", fallback: "network" },
+        { state: "storage-loading", operation: "find" },
         {
           state: "network-loading",
           timeout: 5000,

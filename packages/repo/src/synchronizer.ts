@@ -103,7 +103,7 @@ export class Synchronizer {
   }
   public queryNetwork<T extends DocContent>(
     documentId: DocumentId,
-    _timeout = 5000,
+    timeout = 5000,
   ): Promise<LoroDoc<T> | null> {
     const requestId = uuid()
     const promise = new Promise<LoroDoc<T> | null>((resolve, reject) => {
@@ -113,7 +113,7 @@ export class Synchronizer {
       })
     })
 
-    this.#dispatch({ type: "msg-sync-started", documentId, requestId })
+    this.#dispatch({ type: "msg-sync-started", documentId, requestId, timeout })
     return promise
   }
 
