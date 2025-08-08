@@ -34,6 +34,13 @@ export interface UnsentSyncMessage extends UnsentMessageBase {
   version?: Uint8Array
   /** Binary update data. Optional. */
   data?: Uint8Array
+  /**
+   * Hop count to prevent infinite forwarding cascades.
+   * 0 = original message, 1 = forwarded once, etc.
+   * Messages with hopCount >= 1 should not be forwarded again.
+   * Required to prevent cascade bugs.
+   */
+  hopCount: number
 }
 
 /** A peer is requesting to delete a document. */

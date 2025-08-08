@@ -72,6 +72,7 @@ export type Message =
       from: PeerId
       documentId: DocumentId
       data: Uint8Array
+      hopCount: number
     }
 
   // Internal Events
@@ -342,33 +343,63 @@ export function update(msg: Message, model: Model): [Model, Command?] {
     }
 
     case "msg-received-sync": {
-      const { from, documentId, data } = msg
+      const { from, documentId, data, hopCount } = msg
       const syncState = model.syncStates.get(documentId)
 
       if (!model.permissions.canWrite(from, documentId)) {
         return [model]
       }
 
+      const commands: Command[] = []
+
       // We received a sync message. If we were waiting for it, this resolves the find() promise.
       // If we weren't, it's just a regular sync message. In either case, we want to apply it.
-      const command: Command = {
+      commands.push({
         type: "cmd-sync-succeeded",
         documentId,
         data,
         requestId: syncState?.requestId,
+      })
+
+      // Forward the sync to other aware peers only if this hasn't been forwarded yet
+      // (hopCount = 0 means this is the original message)
+      if (hopCount === 0) {
+        const awarePeers = model.peersAwareOfDoc.get(documentId)
+        if (awarePeers && awarePeers.size > 0) {
+          const forwardTargets = [...awarePeers].filter(peerId => peerId !== from)
+          if (forwardTargets.length > 0) {
+            commands.push({
+              type: "cmd-send-message",
+              message: {
+                type: "sync",
+                targetIds: forwardTargets,
+                documentId,
+                data,
+                hopCount: 1, // Increment hop count when forwarding
+              },
+            })
+          }
+        }
       }
+      // If hopCount >= 1, we don't forward to prevent cascades
 
       // If we were syncing, we can stop now.
       if (syncState) {
         const newModel = { ...model }
         newModel.syncStates.delete(documentId)
+        commands.unshift({ type: "cmd-clear-timeout", documentId })
         const batchCommand: Command = {
           type: "cmd-batch",
-          commands: [{ type: "cmd-clear-timeout", documentId }, command],
+          commands,
         }
         return [newModel, batchCommand]
       }
 
+      const command: Command =
+        commands.length === 1
+          ? commands[0]
+          : { type: "cmd-batch", commands }
+      
       return [model, command]
     }
 
@@ -386,6 +417,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           targetIds: [...peers],
           documentId,
           data,
+          hopCount: 0, // Original message for local changes
         },
       }
       return [model, command]

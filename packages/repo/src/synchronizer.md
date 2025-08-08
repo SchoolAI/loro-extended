@@ -44,7 +44,41 @@ To ensure robustness in a distributed environment, the `Synchronizer` uses an ex
 
 This protocol is more verbose than a simple broadcast-on-change model, but it is fundamentally more resilient. It solves the "late-joiner" problem, ensuring that any peer can eventually acquire any document it needs, regardless of when it came online.
 
-## 5. Document Awareness Tracking: The Two-Map Design
+## 5. Cascade Prevention with Hop Count
+
+### 5.1. The Cascade Problem
+
+In hub-and-spoke topologies where a server acts as both a peer and a relay, sync messages can create infinite loops or "sync storms" when the server forwards received sync messages to other aware peers. For example:
+
+1. Browser A sends a change to both Server and Browser B
+2. Server receives it and forwards to Browser B (who already has it)
+3. Without deduplication, Browser B might forward back, creating a cascade
+
+### 5.2. The Hop Count Solution
+
+To prevent cascades while maintaining topology flexibility, sync messages include a mandatory `hopCount` field:
+
+- **`hopCount: 0`**: Original message from the peer that made the change
+- **`hopCount: 1`**: Message that has been forwarded once by an intermediary
+- **`hopCount >= 1`**: Should NOT be forwarded again
+
+This simple mechanism ensures:
+- **Single-hop forwarding**: Messages are forwarded at most once
+- **No infinite loops**: Forwarded messages (hopCount=1) are never re-forwarded
+- **Topology agnostic**: Works correctly in mesh, hub-and-spoke, or hybrid topologies
+- **Type safety**: Required field prevents bugs from missing hop counts
+
+### 5.3. Implementation Details
+
+When a peer:
+- **Makes a local change**: Sends with `hopCount: 0`
+- **Responds to a sync request**: Sends with `hopCount: 0`
+- **Receives a sync with `hopCount: 0`**: May forward with `hopCount: 1`
+- **Receives a sync with `hopCount >= 1`**: Only applies locally, never forwards
+
+This approach leverages Loro's internal operation deduplication while preventing network-level message storms.
+
+## 6. Document Awareness Tracking: The Two-Map Design
 
 The synchronizer maintains two distinct maps to track document relationships with peers:
 
@@ -84,7 +118,7 @@ This two-map design eliminates semantic ambiguity and ensures:
 - Permission boundaries are respected (via `canList` checks before adding to `peersAwareOfDoc`)
 - The system correctly tracks bidirectional document awareness
 
-## 6. Timeout Strategy: Event-Driven vs Polling
+## 7. Timeout Strategy: Event-Driven vs Polling
 
 ### 6.1. Evolution from Exponential Backoff
 
@@ -108,7 +142,7 @@ This approach provides:
 - **Simpler code**: No retry logic or backoff calculations
 - **Natural resilience**: The event-driven protocol handles recovery
 
-## 7. State Management & The Elm Architecture (TEA)
+## 8. State Management & The Elm Architecture (TEA)
 
 Like the `DocHandle`, the `Synchronizer` is built using a pure-functional core based on The Elm Architecture.
 

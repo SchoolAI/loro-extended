@@ -63,6 +63,7 @@ describe("Synchronizer (Host)", () => {
       targetIds: ["peer-2"],
       documentId: "doc-1",
       data: new Uint8Array([1, 2, 3]),
+      hopCount: 0, // Original message from this peer
     })
   })
 
@@ -83,6 +84,7 @@ describe("Synchronizer (Host)", () => {
       targetIds: ["test-peer"],
       documentId: "doc-1",
       data: new Uint8Array([4, 5, 6]),
+      hopCount: 0, // Original message from peer-2
     })
     await tick()
 

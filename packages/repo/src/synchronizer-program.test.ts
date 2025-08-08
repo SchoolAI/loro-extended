@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest"
 
 import { createPermissions } from "./permission-adapter.js"
 import {
-  type Command,
   type Message,
   type Model,
   init as programInit,
@@ -177,6 +176,7 @@ describe("Synchronizer program", () => {
       from: "peer-1",
       documentId: "doc-1",
       data: new Uint8Array([1, 2, 3]),
+      hopCount: 0, // Original message
     }
     const [newModel, command] = update(message, modelWithSyncState)
 
@@ -294,6 +294,7 @@ describe("Synchronizer program", () => {
       from: "peer-1",
       documentId: "doc-1",
       data: new Uint8Array([1, 2, 3]),
+      hopCount: 0, // Original message
     }
 
     const [newModel, command] = update(message, modelWithSyncState)
@@ -451,6 +452,276 @@ describe("Synchronizer program", () => {
       
       const sendCommand = (command as any).commands.find((c: any) => c.type === "cmd-send-message")
       expect(sendCommand.message.targetIds).toEqual(["peer-1"])
+    })
+  })
+
+  describe("Sync message forwarding with hop count", () => {
+    it("should forward received sync messages to other aware peers with hop count", () => {
+      const [initialModel] = programInit(createPermissions())
+      const model: Model = {
+        ...initialModel,
+        peers: new Set(["peer-1", "peer-2", "peer-3"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["peer-1", "peer-2", "peer-3"])],
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      const syncData = new Uint8Array([1, 2, 3])
+      const message: Message = {
+        type: "msg-received-sync",
+        from: "peer-1",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 0, // Original message
+      }
+
+      const [, command] = update(message, model)
+
+      // Should have a batch command with sync-succeeded and forward message
+      expect(command?.type).toBe("cmd-batch")
+      const batchCommand = command as any
+      expect(batchCommand.commands).toHaveLength(2)
+      
+      // First command should be sync-succeeded
+      expect(batchCommand.commands[0]).toEqual({
+        type: "cmd-sync-succeeded",
+        documentId: "doc-1",
+        data: syncData,
+        requestId: undefined,
+      })
+      
+      // Second command should forward to other peers with incremented hop count
+      expect(batchCommand.commands[1]).toEqual({
+        type: "cmd-send-message",
+        message: {
+          type: "sync",
+          targetIds: ["peer-2", "peer-3"],
+          documentId: "doc-1",
+          data: syncData,
+          hopCount: 1, // Incremented from 0
+        },
+      })
+    })
+
+    it("should NOT forward messages that have already been forwarded (hopCount >= 1)", () => {
+      const [initialModel] = programInit(createPermissions())
+      const model: Model = {
+        ...initialModel,
+        peers: new Set(["peer-1", "peer-2", "peer-3"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["peer-1", "peer-2", "peer-3"])],
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      const syncData = new Uint8Array([1, 2, 3])
+      const message: Message = {
+        type: "msg-received-sync",
+        from: "peer-1",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 1, // Already forwarded once
+      }
+
+      const [, command] = update(message, model)
+
+      // Should only apply the sync, not forward it
+      expect(command?.type).toBe("cmd-sync-succeeded")
+      expect((command as any).documentId).toBe("doc-1")
+      expect((command as any).data).toEqual(syncData)
+    })
+
+    it("should treat missing hopCount as 0 (original message)", () => {
+      const [initialModel] = programInit(createPermissions())
+      const model: Model = {
+        ...initialModel,
+        peers: new Set(["peer-1", "peer-2"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["peer-1", "peer-2"])],
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      const syncData = new Uint8Array([1, 2, 3])
+      const message: Message = {
+        type: "msg-received-sync",
+        from: "peer-1",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 0, // Testing default behavior for original messages
+      }
+
+      const [, command] = update(message, model)
+
+      // Should forward with hopCount: 1
+      expect(command?.type).toBe("cmd-batch")
+      const batchCommand = command as any
+      expect(batchCommand.commands[1]).toEqual({
+        type: "cmd-send-message",
+        message: {
+          type: "sync",
+          targetIds: ["peer-2"],
+          documentId: "doc-1",
+          data: syncData,
+          hopCount: 1,
+        },
+      })
+    })
+
+    it("should not forward if no other peers are aware", () => {
+      const [initialModel] = programInit(createPermissions())
+      const model: Model = {
+        ...initialModel,
+        peers: new Set(["peer-1"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["peer-1"])], // Only the sender is aware
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      const syncData = new Uint8Array([1, 2, 3])
+      const message: Message = {
+        type: "msg-received-sync",
+        from: "peer-1",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 0,
+      }
+
+      const [, command] = update(message, model)
+
+      // Should only have sync-succeeded, no forwarding
+      expect(command?.type).toBe("cmd-sync-succeeded")
+      expect((command as any).documentId).toBe("doc-1")
+    })
+  })
+
+  describe("Cascade prevention scenarios", () => {
+    it("should prevent cascade in hub-and-spoke topology", () => {
+      // Scenario: Server receives sync from Browser A and forwards to Browser B
+      // Browser B should NOT forward it back
+      const [initialModel] = programInit(createPermissions())
+      
+      // Browser B's state
+      const browserBModel: Model = {
+        ...initialModel,
+        peers: new Set(["server", "browser-a"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["server", "browser-a"])],
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      // Message from server (already forwarded once)
+      const syncData = new Uint8Array([1, 2, 3])
+      const messageFromServer: Message = {
+        type: "msg-received-sync",
+        from: "server",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 1, // Server incremented this when forwarding
+      }
+
+      const [, command] = update(messageFromServer, browserBModel)
+
+      // Browser B should only apply, not forward
+      expect(command?.type).toBe("cmd-sync-succeeded")
+      // No batch command with forwarding
+      expect(command?.type).not.toBe("cmd-batch")
+    })
+
+    it("should allow single-hop forwarding in hub topology", () => {
+      // Server receives original message and forwards once
+      const [initialModel] = programInit(createPermissions())
+      
+      // Server's state
+      const serverModel: Model = {
+        ...initialModel,
+        peers: new Set(["browser-a", "browser-b", "browser-c"]),
+        peersAwareOfDoc: new Map([
+          ["doc-1", new Set(["browser-a", "browser-b", "browser-c"])],
+        ]),
+        localDocs: new Set(["doc-1"]),
+      }
+
+      // Original message from browser-a
+      const syncData = new Uint8Array([1, 2, 3])
+      const originalMessage: Message = {
+        type: "msg-received-sync",
+        from: "browser-a",
+        documentId: "doc-1",
+        data: syncData,
+        hopCount: 0, // Original message
+      }
+
+      const [, command] = update(originalMessage, serverModel)
+
+      // Server should forward to other browsers
+      expect(command?.type).toBe("cmd-batch")
+      const batchCommand = command as any
+      
+      // Check forwarding command
+      const forwardCommand = batchCommand.commands.find((c: any) =>
+        c.type === "cmd-send-message"
+      )
+      expect(forwardCommand).toBeDefined()
+      expect(forwardCommand.message.hopCount).toBe(1)
+      expect(forwardCommand.message.targetIds).toEqual(["browser-b", "browser-c"])
+    })
+  
+    describe("Integration with Synchronizer class", () => {
+      it("should properly pass hopCount from network message to internal message", () => {
+        // This test would have caught the bug where synchronizer.ts wasn't passing hopCount
+        const [initialModel] = programInit(createPermissions())
+        const model: Model = {
+          ...initialModel,
+          peers: new Set(["peer-1", "peer-2"]),
+          peersAwareOfDoc: new Map([
+            ["doc-1", new Set(["peer-1", "peer-2"])],
+          ]),
+          localDocs: new Set(["doc-1"]),
+        }
+  
+        // Simulate a network message with hopCount
+        const networkMessage: Message = {
+          type: "msg-received-sync",
+          from: "peer-1",
+          documentId: "doc-1",
+          data: new Uint8Array([1, 2, 3]),
+          hopCount: 1, // This should prevent forwarding
+        }
+  
+        const [, command] = update(networkMessage, model)
+  
+        // With hopCount=1, should NOT forward
+        expect(command?.type).toBe("cmd-sync-succeeded")
+        expect(command?.type).not.toBe("cmd-batch")
+      })
+  
+      it("should include hopCount in outgoing sync messages for local changes", () => {
+        const [initialModel] = programInit(createPermissions())
+        const model: Model = {
+          ...initialModel,
+          peers: new Set(["peer-1"]),
+          peersAwareOfDoc: new Map([
+            ["doc-1", new Set(["peer-1"])],
+          ]),
+          localDocs: new Set(["doc-1"]),
+        }
+  
+        const message: Message = {
+          type: "msg-local-change",
+          documentId: "doc-1",
+          data: new Uint8Array([1, 2, 3]),
+        }
+  
+        const [, command] = update(message, model)
+  
+        expect(command?.type).toBe("cmd-send-message")
+        const sendCommand = command as any
+        expect(sendCommand.message.hopCount).toBe(0) // Should be 0 for original messages
+      })
     })
   })
 })

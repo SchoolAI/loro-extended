@@ -96,6 +96,7 @@ export class Synchronizer {
           from: message.senderId,
           documentId: message.documentId,
           data: message.data,
+          hopCount: message.hopCount,
         })
         break
       }
@@ -151,6 +152,7 @@ export class Synchronizer {
             targetIds: [command.to],
             documentId: command.documentId,
             data: handle.doc().exportSnapshot(),
+            hopCount: 0, // Original message from this peer
           })
         }
         break
