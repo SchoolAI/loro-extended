@@ -1,4 +1,4 @@
-import type { LoroDoc } from "loro-crdt"
+import { LoroDoc } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
 import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
 import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
@@ -9,7 +9,6 @@ import {
 } from "./permission-adapter.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
-import { StorageSubsystem } from "./storage/storage-subsystem.js"
 import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
@@ -37,11 +36,11 @@ export class Repo {
 
   // Subsystems
   private readonly networkSubsystem: NetworkSubsystem
-  private readonly storageSubsystem: StorageSubsystem
   private readonly synchronizer: Synchronizer
 
   // Services
   private readonly permissionAdapter: PermissionAdapter
+  private readonly storageAdapter: StorageAdapter
 
   // Handle management
   private readonly handleCache = new Map<DocumentId, DocHandle<DocContent>>()
@@ -58,13 +57,10 @@ export class Repo {
     return this.networkSubsystem
   }
 
-  get storage(): StorageSubsystem {
-    return this.storageSubsystem
-  }
-
   constructor({ storage, network, peerId, permissions }: RepoConfig) {
     this.peerId = peerId ?? randomPeerId()
     this.permissionAdapter = createPermissions(permissions)
+    this.storageAdapter = storage ?? new InMemoryStorageAdapter()
 
     // Create services object for the synchronizer
     const services: SynchronizerServices = {
@@ -78,10 +74,7 @@ export class Repo {
       },
     }
 
-    // Instantiate subsystems
-    this.storageSubsystem = new StorageSubsystem(
-      storage ?? new InMemoryStorageAdapter(),
-    )
+    // Instantiate synchronizer
     this.synchronizer = new Synchronizer(services)
 
     const peerMetadata: PeerMetadata = {} // In the future, this could contain the storageId
@@ -164,7 +157,7 @@ export class Repo {
     if (handle) {
       handle.delete()
       this.handleCache.delete(documentId)
-      await this.storageSubsystem.removeDoc(documentId)
+      await this.storageAdapter.remove([documentId])
       this.synchronizer.removeDocument(documentId)
     }
   }
@@ -180,8 +173,6 @@ export class Repo {
   private getOrCreateHandle<T extends DocContent>(
     documentId: DocumentId,
   ): DocHandle<T> {
-    // We need to cast through unknown because TypeScript can't guarantee the cached handle
-    // has the exact same type T, even though we know it's the same document
     const cached = this.handleCache.get(documentId)
     if (cached) {
       return cached as unknown as DocHandle<T>
@@ -190,23 +181,42 @@ export class Repo {
     // Create a new handle with injected services
     const handle = new DocHandle<T>(documentId, {
       loadFromStorage: async (id: DocumentId) => {
-        const data = await this.storageSubsystem.loadDoc(id)
-        return data as LoroDoc<T> | null
+        const data = await this.storageAdapter.load([id])
+        if (!data) return null
+        return LoroDoc.fromSnapshot(data) as LoroDoc<T>
       },
       queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
     })
 
     // Listen for state changes to coordinate with synchronizer
     handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
-      // When a handle finds a document, announce it to peers.
       if (newState.state === "ready" && oldState.state !== "ready") {
         this.synchronizer.addDocument(documentId)
+        
+        // Notify storage - adapter decides if save needed
+        const doc = handle.doc()
+        if (doc) {
+          const data = doc.exportSnapshot()
+          this.storageAdapter.save([documentId], data).catch(error => {
+            console.error(`[Repo] Failed to save document ${documentId}:`, error)
+          })
+        }
       }
     })
 
     // Listen for sync messages from the handle to broadcast to peers
     handle.on("doc-handle-local-change", message => {
       this.synchronizer.onLocalChange(documentId, message)
+      
+      // Save on local changes - adapter handles deduplication
+      const doc = handle.doc()
+      if (doc) {
+        // Adapter can choose to store either snapshot or raw sync message
+        const data = doc.exportSnapshot()
+        this.storageAdapter.save([documentId], data).catch(error => {
+          console.error(`[Repo] Failed to save document ${documentId}:`, error)
+        })
+      }
     })
 
     this.handleCache.set(documentId, handle as unknown as DocHandle<DocContent>)
