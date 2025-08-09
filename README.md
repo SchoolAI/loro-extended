@@ -16,6 +16,32 @@ While Loro provides powerful low-level CRDT operations, building collaborative a
 
 These packages provide production-ready solutions to these common needs.
 
+## 🚀 Quick Start: Building a Collaborative React App
+
+Want to build a real-time collaborative app? With the @loro-extended/react package, it's as simple as:
+
+```tsx
+import { useLoroDoc } from '@loro-extended/react'
+
+const [doc, changeDoc, state] = useLoroDoc<TodoDoc>("document-id")
+
+// Make changes with natural JavaScript syntax
+changeDoc(d => {
+  d.todos.push({ id: "1", text: "Build something amazing", done: false })
+})
+
+// Your UI automatically updates when any user makes changes!
+// <>{doc.map(...)}</>
+```
+
+The `useLoroDoc` hook handles everything:
+- ✅ **Automatic synchronization** across all connected users
+- ✅ **Offline support** with automatic reconnection and merge
+- ✅ **Type-safe** mutations with TypeScript
+- ✅ **React-optimized** re-renders only when data changes
+
+This single hook connects all the pieces: `@loro-extended/change` for natural mutations, `@loro-extended/repo` for document management, and network adapters for real-time sync. Check out the [@loro-extended/react package](./packages/react/README.md) to see how easy collaborative apps can be!
+
 ## Packages
 
 -   **`packages/change`**: A utility that provides a simple, Immer-style `change()` method for mutating Loro documents.
@@ -27,7 +53,7 @@ These packages provide production-ready solutions to these common needs.
 -   **`packages/network-sse`**: Server-Sent Events network adapter for real-time synchronization between clients and servers.
     -   [View Package README](./packages/network-sse/README.md)
 
--   **`packages/react`**: React hooks and utilities for using Loro in React applications. (TODO)
+-   **`packages/react`**: React hooks and utilities for using Loro in React applications.
     -   [View Package README](./packages/react/README.md)
 
 -   **`examples/todo-app`**: An example implementation of a React + Vite + ExpressJS app using `@loro-extended/change` and `@loro-extended/repo`.
