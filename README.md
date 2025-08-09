@@ -34,7 +34,7 @@ changeDoc(d => {
 // <>{doc.map(...)}</>
 ```
 
-The `useLoroDoc` hook handles everything:
+The `useLoroDoc` hook (and accompanying RepoProvider) handles everything:
 - ✅ **Automatic synchronization** across all connected users
 - ✅ **Offline support** with automatic reconnection and merge
 - ✅ **Type-safe** mutations with TypeScript
