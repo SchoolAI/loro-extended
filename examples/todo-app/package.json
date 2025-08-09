@@ -4,11 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "build": "pnpm build:client && pnpm build:server",
+    "build:client": "vite build",
+    "build:server": "tsc --project tsconfig.node.json",
     "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx --watch src/server/server.ts",
-    "build": "tsc --project tsconfig.node.json && vite build",
-    "serve": "node --watch dist/server/server.js",
+    "serve:client": "vite preview",
+    "serve:server": "node dist/src/server/server.js",
     "test": "vitest"
   },
   "dependencies": {

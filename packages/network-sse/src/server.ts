@@ -33,7 +33,7 @@ export class SseServerNetworkAdapter
     })
     this.#clients.clear()
     this.peerId = undefined
-    console.log("SSE-ADAPTER: Disconnected and all clients removed.")
+    console.log("[SSE-ADAPTER]: Disconnected and all clients removed.")
   }
 
   /** The NetworkSubsystem will call this method to send a message to a peer. */
@@ -48,7 +48,7 @@ export class SseServerNetworkAdapter
         // It's possible for the network subsystem to try sending to a peer that
         // just disconnected, so a warning is appropriate.
         console.warn(
-          `SSE-ADAPTER: Tried to send message to disconnected peer ${targetId}`,
+          `[SSE-ADAPTER]: Tried to send message to disconnected peer ${targetId}`,
         )
       }
     }
@@ -109,7 +109,7 @@ export class SseServerNetworkAdapter
 
     // Handle client disconnect
     req.on("close", () => {
-      console.log(`SSE-ADAPTER: Peer ${peerId} disconnected.`)
+      console.log(`[SSE-ADAPTER]: Peer ${peerId} disconnected.`)
       this.#clients.delete(peerId)
       // Emit a "peer-disconnected" event
       this.emit("peer-disconnected", { peerId })
