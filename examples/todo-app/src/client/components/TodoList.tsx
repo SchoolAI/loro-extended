@@ -1,11 +1,11 @@
-import React from "react";
-import type { Todo } from "../../shared/types";
-import { TodoItem } from "./TodoItem";
+import type React from "react"
+import type { Todo } from "../../shared/types"
+import { TodoItem } from "./TodoItem"
 
 interface TodoListProps {
-  todos: Todo[];
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  todos: Todo[]
+  onToggle: (id: string) => void
+  onDelete: (id: string) => void
 }
 
 export const TodoList: React.FC<TodoListProps> = ({
@@ -24,5 +24,5 @@ export const TodoList: React.FC<TodoListProps> = ({
         />
       ))}
     </ul>
-  );
-};
+  )
+}

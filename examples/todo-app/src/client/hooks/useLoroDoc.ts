@@ -1,9 +1,9 @@
 import {
   type AsLoro,
+  change,
   type DocHandle,
   type DocumentId,
   ExtendedLoroDoc,
-  change,
 } from "@loro-extended/repo"
 import {
   useCallback,

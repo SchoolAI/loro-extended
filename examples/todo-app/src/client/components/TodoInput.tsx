@@ -1,19 +1,19 @@
-import React, { useState } from "react";
+import { type default as React, useState } from "react"
 
 interface TodoInputProps {
-  onAdd: (text: string) => void;
+  onAdd: (text: string) => void
 }
 
 export const TodoInput: React.FC<TodoInputProps> = ({ onAdd }) => {
-  const [text, setText] = useState("");
+  const [text, setText] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (text.trim()) {
-      onAdd(text.trim());
-      setText("");
+      onAdd(text.trim())
+      setText("")
     }
-  };
+  }
 
   return (
     <form onSubmit={handleSubmit} className="todo-input-form">
@@ -25,5 +25,5 @@ export const TodoInput: React.FC<TodoInputProps> = ({ onAdd }) => {
       />
       <button type="submit">Add</button>
     </form>
-  );
-};
+  )
+}

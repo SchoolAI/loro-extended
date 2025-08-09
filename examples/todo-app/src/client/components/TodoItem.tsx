@@ -1,10 +1,10 @@
-import React from "react";
-import type { Todo } from "../../shared/types";
+import type React from "react"
+import type { Todo } from "../../shared/types"
 
 interface TodoItemProps {
-  todo: Todo;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  todo: Todo
+  onToggle: (id: string) => void
+  onDelete: (id: string) => void
 }
 
 export const TodoItem: React.FC<TodoItemProps> = ({
@@ -28,5 +28,5 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         &times;
       </button>
     </li>
-  );
-};
+  )
+}
