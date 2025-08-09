@@ -1,12 +1,25 @@
+import { SseClientNetworkAdapter } from "@loro-extended/network-sse/client"
+import { RepoProvider } from "@loro-extended/react"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import "./index.css"
 import App from "./client/App.tsx"
-import { RepoProvider } from "./client/contexts/RepoContext.tsx"
+import { IndexedDBStorageAdapter } from "./client/IndexedDBStorageAdapter"
+import "./index.css"
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root")
+if (!root) {
+  throw new Error("Not found: DOM 'root' element")
+}
+
+// Create the Repo config so it's a singleton.
+const config = {
+  network: [new SseClientNetworkAdapter("/loro")],
+  storage: new IndexedDBStorageAdapter(),
+}
+
+createRoot(root).render(
   <StrictMode>
-    <RepoProvider>
+    <RepoProvider config={config}>
       <App />
     </RepoProvider>
   </StrictMode>,

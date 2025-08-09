@@ -1,9 +1,9 @@
+import { useLoroDoc } from "@loro-extended/react"
 import type { DocumentId } from "@loro-extended/repo"
 import { useEffect } from "react"
 import type { Todo } from "../shared/types"
 import { TodoInput } from "./components/TodoInput"
 import { TodoList } from "./components/TodoList"
-import { useLoroDoc } from "./hooks/useLoroDoc"
 
 // Define the schema for our document
 interface TodoDoc {
