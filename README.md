@@ -14,7 +14,7 @@ While Loro provides powerful low-level CRDT operations, building collaborative a
 - **Document Management**: Syncing CRDTs across peers requires handling network protocols, storage, and peer discovery.
 - **Framework Integration**: React and other frameworks need reactive bindings to automatically update UI when documents change.
 
-These packages provide production-ready solutions to these common needs.
+These packages will soon provide production-ready solutions to these common needs.
 
 ## 🚀 Quick Start: Building a Collaborative React App
 
