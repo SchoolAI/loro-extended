@@ -1,5 +1,5 @@
 import Emittery from "emittery"
-import { LoroDoc } from "loro-crdt"
+import { LoroDoc, type LoroEventBatch } from "loro-crdt"
 import { v4 as uuid } from "uuid"
 
 import {
@@ -35,7 +35,10 @@ type DocHandleEvents<T extends DocContent> = {
     oldState: HandleState<T>
     newState: HandleState<T>
   }
-  "doc-handle-change": { doc: LoroDoc<T> }
+  "doc-handle-change": {
+    doc: LoroDoc<T>
+    event: LoroEventBatch  // Now includes the full event with frontiers
+  }
   "doc-handle-local-change": Uint8Array
 }
 
@@ -299,12 +302,15 @@ export class DocHandle<T extends DocContent> {
       }
 
       case "cmd-subscribe-to-doc": {
-        // When any change happens (local or remote), notify listeners that the handle's doc has changed.
-        command.doc.subscribe(_event => {
-          this._emitter.emit("doc-handle-change", { doc: command.doc })
+        // When any change happens (local or remote), notify listeners with full event details
+        command.doc.subscribe(event => {
+          this._emitter.emit("doc-handle-change", {
+            doc: command.doc,
+            event  // Include the full LoroEventBatch with frontiers
+          })
         })
 
-        // When a local change happens, get the specific binary sync message and emit it.
+        // Keep local updates subscription for network synchronization
         command.doc.subscribeLocalUpdates(syncMessage => {
           this._emitter.emit("doc-handle-local-change", syncMessage)
         })

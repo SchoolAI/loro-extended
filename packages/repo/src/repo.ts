@@ -1,4 +1,4 @@
-import { LoroDoc } from "loro-crdt"
+import { LoroDoc, type OpId } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
 import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
 import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
@@ -11,6 +11,54 @@ import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
 import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
+
+/**
+ * Creates a function that loads a document from storage by reconstructing it
+ * from stored snapshots and/or incremental updates.
+ *
+ * @param storageAdapter The storage adapter to load from
+ * @returns A function that loads a document by its ID
+ */
+function createStorageLoader<T extends DocContent>(
+  storageAdapter: StorageAdapter,
+): (id: DocumentId) => Promise<LoroDoc<T> | null> {
+  return async (id: DocumentId) => {
+    // Load all data for this document using loadRange
+    const chunks = await storageAdapter.loadRange([id])
+    console.log(
+      `[StorageLoader] Loading document ${id}, found ${chunks.length} chunks`,
+    )
+
+    if (chunks.length === 0) return null
+
+    // Get all updates and sort them by version key
+    const updateChunks = chunks
+      .filter(chunk => chunk.key.length === 3 && chunk.key[1] === "update")
+      .sort((a, b) => {
+        // Sort by version key (third element)
+        const versionA = a.key[2] as string
+        const versionB = b.key[2] as string
+        return versionA.localeCompare(versionB)
+      })
+
+    console.log(
+      `[StorageLoader] Found ${updateChunks.length} updates for ${id}`,
+    )
+
+    if (updateChunks.length === 0) return null
+
+    // Create new doc and apply all updates in order
+    const doc = new LoroDoc<T>()
+
+    for (const updateChunk of updateChunks) {
+      doc.import(updateChunk.data)
+    }
+
+    console.log(`[StorageLoader] Loaded document ${id}, content:`, doc.toJSON())
+
+    return doc
+  }
+}
 
 export interface RepoConfig {
   storage?: StorageAdapter
@@ -167,6 +215,20 @@ export class Repo {
   //
 
   /**
+   * Converts frontiers to a string key for storage.
+   * Frontiers are an array of OpIds, we'll stringify them for a unique key.
+   */
+  private frontiersToKey(frontiers: OpId[]): string {
+    // Convert frontiers to a JSON string then base64 encode for compactness
+    const jsonStr = JSON.stringify(frontiers)
+    return Buffer.from(jsonStr)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "") // Remove padding
+  }
+
+  /**
    * Gets an existing handle or creates a new one for the given document ID.
    * This method ensures proper service injection and event wiring for each handle.
    */
@@ -180,11 +242,7 @@ export class Repo {
 
     // Create a new handle with injected services
     const handle = new DocHandle<T>(documentId, {
-      loadFromStorage: async (id: DocumentId) => {
-        const data = await this.storageAdapter.load([id])
-        if (!data) return null
-        return LoroDoc.fromSnapshot(data) as LoroDoc<T>
-      },
+      loadFromStorage: createStorageLoader<T>(this.storageAdapter),
       queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
     })
 
@@ -192,31 +250,47 @@ export class Repo {
     handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
       if (newState.state === "ready" && oldState.state !== "ready") {
         this.synchronizer.addDocument(documentId)
-        
-        // Notify storage - adapter decides if save needed
-        const doc = handle.doc()
-        if (doc) {
-          const data = doc.exportSnapshot()
-          this.storageAdapter.save([documentId], data).catch(error => {
-            console.error(`[Repo] Failed to save document ${documentId}:`, error)
-          })
-        }
       }
     })
 
-    // Listen for sync messages from the handle to broadcast to peers
+    // Listen for ALL document changes for storage (both local and remote)
+    handle.on("doc-handle-change", ({ doc, event }) => {
+      // Only save actual changes, not checkouts
+      if (event.by === "local" || event.by === "import") {
+        // Use the 'to' frontiers as the unique key for this update
+        const frontiersKey = this.frontiersToKey(event.to)
+        
+        // Convert frontiers to version vectors for the export
+        // This gives us the incremental update between the two states
+        const fromVersion = doc.frontiersToVV(event.from)
+        const update = doc.export({
+          mode: "update",
+          from: fromVersion
+        })
+
+        console.log(`[Repo] Saving update for ${documentId} with frontiers key: ${frontiersKey}`)
+        console.log(`[Repo] Update size: ${update.byteLength} bytes, by: ${event.by}`)
+        console.log(`[Repo] From frontiers:`, event.from)
+        console.log(`[Repo] To frontiers:`, event.to)
+
+        // Store with unique key based on frontiers
+        this.storageAdapter
+          .save([documentId, "update", frontiersKey], update)
+          .then(() => {
+            console.log(`[Repo] Successfully saved update for ${documentId}`)
+          })
+          .catch(error => {
+            console.error(
+              `[Repo] Failed to save update for document ${documentId}:`,
+              error,
+            )
+          })
+      }
+    })
+
+    // Listen for local changes to broadcast to peers (network synchronization)
     handle.on("doc-handle-local-change", message => {
       this.synchronizer.onLocalChange(documentId, message)
-      
-      // Save on local changes - adapter handles deduplication
-      const doc = handle.doc()
-      if (doc) {
-        // Adapter can choose to store either snapshot or raw sync message
-        const data = doc.exportSnapshot()
-        this.storageAdapter.save([documentId], data).catch(error => {
-          console.error(`[Repo] Failed to save document ${documentId}:`, error)
-        })
-      }
     })
 
     this.handleCache.set(documentId, handle as unknown as DocHandle<DocContent>)

@@ -166,7 +166,6 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         },
       }
 
-      console.log("msg-peer-added model", newModel)
       return [newModel, command]
     }
 

@@ -212,4 +212,252 @@ describe("Repo", () => {
       expect(repoB.handles.has("denied-doc-1")).toBe(false)
     })
   })
+
+  describe("storage persistence", () => {
+    it("should persist and load documents across repo instances", async () => {
+      const { InMemoryStorageAdapter } = await import(
+        "./storage/in-memory-storage-adapter.js"
+      )
+      const storage = new InMemoryStorageAdapter()
+
+      // Create first repo instance and create a document
+      const repo1 = new Repo({
+        peerId: "repo1",
+        storage,
+      })
+
+      const documentId = "persistent-doc"
+      const handle1 = await repo1.create({ documentId })
+
+      // Add some content
+      handle1.change(doc => {
+        const root = doc.getMap("root")
+        root.set("title", "My Document")
+        root.set("content", "This should persist")
+        root.set("count", 42)
+      })
+
+      // Get the snapshot for comparison
+      const snapshot1 = handle1.doc().export({ mode: "snapshot" })
+
+      // Wait for storage operations to complete
+      await vi.runAllTimersAsync()
+
+      // Create a second repo instance with the same storage
+      const repo2 = new Repo({
+        peerId: "repo2",
+        storage,
+      })
+
+      // Try to find the document - it should load from storage
+      const handle2 = await repo2.find(documentId)
+
+      // Verify the document was loaded correctly
+      expect(handle2.state).toBe("ready")
+      const doc2 = handle2.doc()
+      const root2 = doc2.getMap("root")
+      expect(root2.get("title")).toBe("My Document")
+      expect(root2.get("content")).toBe("This should persist")
+      expect(root2.get("count")).toBe(42)
+
+      // The snapshots should be equivalent
+      const snapshot2 = doc2.export({ mode: "snapshot" })
+      expect(snapshot2).toEqual(snapshot1)
+    })
+
+    it("should handle incremental updates across sessions", async () => {
+      const { InMemoryStorageAdapter } = await import(
+        "./storage/in-memory-storage-adapter.js"
+      )
+
+      const storage = new InMemoryStorageAdapter()
+
+      // First session: create document with initial content
+      const repo1 = new Repo({
+        peerId: "repo1",
+        storage,
+      })
+
+      const documentId = "incremental-doc"
+      const handle1 = await repo1.create({ documentId })
+
+      handle1.change(doc => {
+        const root = doc.getMap("root")
+        root.set("items", ["item1", "item2"])
+      })
+
+      // Wait for storage save to complete
+      await vi.runAllTimersAsync()
+
+      // Second session: load document from storage
+      const repo2 = new Repo({
+        peerId: "repo2",
+        storage,
+      })
+
+      const handle2 = await repo2.find(documentId)
+      expect(handle2.state).toBe("ready")
+
+      // Verify initial content loaded from storage
+      let root2 = handle2.doc().getMap("root")
+      expect(root2.get("items")).toEqual(["item1", "item2"])
+
+      // Make additional changes
+      handle2.change(doc => {
+        const root = doc.getMap("root")
+        const items = root.get("items") as string[]
+        root.set("items", [...items, "item3"])
+      })
+
+      await vi.runAllTimersAsync()
+
+      // Third session: verify all changes are persisted in storage
+      const repo3 = new Repo({
+        peerId: "repo3",
+        storage,
+      })
+
+      const handle3 = await repo3.find(documentId)
+      expect(handle3.state).toBe("ready")
+
+      const root3 = handle3.doc().getMap("root")
+      expect(root3.get("items")).toEqual(["item1", "item2", "item3"])
+    })
+
+    it("should reconstruct document from updates alone (no snapshot)", async () => {
+      // This test verifies that the storage system works correctly
+      // The full reconstruction from updates-only is tested in other tests
+
+      const { InMemoryStorageAdapter } = await import(
+        "./storage/in-memory-storage-adapter.js"
+      )
+
+      const storage = new InMemoryStorageAdapter()
+
+      // Create document with changes
+      const repo1 = new Repo({
+        peerId: "repo1",
+        storage,
+      })
+
+      const documentId = "updates-only-doc"
+      const handle1 = await repo1.create({ documentId })
+
+      handle1.change(doc => {
+        const root = doc.getMap("root")
+        root.set("step", 1)
+        root.set("data", "hello")
+      })
+
+      handle1.change(doc => {
+        const root = doc.getMap("root")
+        root.set("step", 2)
+        root.set("data", "hello world")
+      })
+
+      // Wait for saves
+      await vi.runAllTimersAsync()
+
+      // Create new repo and load the document
+      const repo2 = new Repo({
+        peerId: "repo2",
+        storage,
+      })
+
+      // Use findOrCreate with timeout 0 to immediately check storage
+      const handle2 = await repo2.findOrCreate(documentId, { timeout: 0 })
+
+      // The document should be ready and have the expected content
+      expect(handle2.state).toBe("ready")
+      const root2 = handle2.doc().getMap("root")
+      expect(root2.get("step")).toBe(2)
+      expect(root2.get("data")).toBe("hello world")
+    })
+
+    it("should save and load documents with complex nested structures", async () => {
+      const { InMemoryStorageAdapter } = await import(
+        "./storage/in-memory-storage-adapter.js"
+      )
+      const storage = new InMemoryStorageAdapter()
+
+      const repo1 = new Repo({
+        peerId: "repo1",
+        storage,
+      })
+
+      const documentId = "complex-doc"
+      const handle1 = await repo1.create({ documentId })
+
+      // Create a complex nested structure
+      handle1.change(doc => {
+        const root = doc.getMap("root")
+
+        // Add nested maps
+        const user = doc.getMap("user")
+        user.set("name", "Alice")
+        user.set("age", 30)
+
+        const preferences = doc.getMap("preferences")
+        preferences.set("theme", "dark")
+        preferences.set("notifications", true)
+        user.setContainer("preferences", preferences)
+
+        root.setContainer("user", user)
+
+        // Add lists
+        const todos = doc.getList("todos")
+        todos.push("Task 1")
+        todos.push("Task 2")
+        todos.push("Task 3")
+        root.setContainer("todos", todos)
+
+        // Add nested list of maps
+        const comments = doc.getList("comments")
+        const comment1 = doc.getMap("comment1")
+        comment1.set("author", "Bob")
+        comment1.set("text", "Great work!")
+        comments.pushContainer(comment1)
+
+        const comment2 = doc.getMap("comment2")
+        comment2.set("author", "Charlie")
+        comment2.set("text", "Thanks!")
+        comments.pushContainer(comment2)
+
+        root.setContainer("comments", comments)
+      })
+
+      await vi.runAllTimersAsync()
+
+      // Load in new repo instance
+      const repo2 = new Repo({
+        peerId: "repo2",
+        storage,
+      })
+
+      const handle2 = await repo2.find(documentId)
+      expect(handle2.state).toBe("ready")
+
+      // Verify complex structure is preserved
+      const doc2 = handle2.doc()
+      const root2 = doc2.getMap("root")
+
+      const user2 = root2.get("user") as any
+      expect(user2.get("name")).toBe("Alice")
+      expect(user2.get("age")).toBe(30)
+
+      const preferences2 = user2.get("preferences") as any
+      expect(preferences2.get("theme")).toBe("dark")
+      expect(preferences2.get("notifications")).toBe(true)
+
+      const todos2 = root2.get("todos") as any
+      expect(todos2.toArray()).toEqual(["Task 1", "Task 2", "Task 3"])
+
+      const comments2 = root2.get("comments") as any
+      const commentsArray = comments2.toArray()
+      expect(commentsArray[0].get("author")).toBe("Bob")
+      expect(commentsArray[0].get("text")).toBe("Great work!")
+      expect(commentsArray[1].get("author")).toBe("Charlie")
+      expect(commentsArray[1].get("text")).toBe("Thanks!")
+    })
+  })
 })
