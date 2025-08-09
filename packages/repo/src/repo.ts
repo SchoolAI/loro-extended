@@ -1,4 +1,4 @@
-import { LoroDoc, type OpId } from "loro-crdt"
+import { LoroDoc, type OpId, type LoroEventBatch } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
 import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
 import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
@@ -25,9 +25,6 @@ function createStorageLoader<T extends DocContent>(
   return async (id: DocumentId) => {
     // Load all data for this document using loadRange
     const chunks = await storageAdapter.loadRange([id])
-    console.log(
-      `[StorageLoader] Loading document ${id}, found ${chunks.length} chunks`,
-    )
 
     if (chunks.length === 0) return null
 
@@ -41,10 +38,6 @@ function createStorageLoader<T extends DocContent>(
         return versionA.localeCompare(versionB)
       })
 
-    console.log(
-      `[StorageLoader] Found ${updateChunks.length} updates for ${id}`,
-    )
-
     if (updateChunks.length === 0) return null
 
     // Create new doc and apply all updates in order
@@ -53,8 +46,6 @@ function createStorageLoader<T extends DocContent>(
     for (const updateChunk of updateChunks) {
       doc.import(updateChunk.data)
     }
-
-    console.log(`[StorageLoader] Loaded document ${id}, content:`, doc.toJSON())
 
     return doc
   }
@@ -229,6 +220,48 @@ export class Repo {
   }
 
   /**
+   * Creates a saveToStorage service function for a specific document.
+   * This encapsulates the storage logic that was previously in event listeners.
+   */
+  private createSaveToStorage<T extends DocContent>(
+    documentId: DocumentId,
+  ): (
+    documentId: DocumentId,
+    doc: LoroDoc<T>,
+    event: LoroEventBatch,
+  ) => Promise<void> {
+    return async (_, doc, event) => {
+      // Only save actual changes, not checkouts
+      if (event.by === "local" || event.by === "import") {
+        // Use the 'to' frontiers as the unique key for this update
+        const frontiersKey = this.frontiersToKey(event.to)
+
+        // Convert frontiers to version vectors for the export
+        // This gives us the incremental update between the two states
+        const fromVersion = doc.frontiersToVV(event.from)
+        const update = doc.export({
+          mode: "update",
+          from: fromVersion,
+        })
+
+        try {
+          // Store with unique key based on frontiers
+          await this.storageAdapter.save(
+            [documentId, "update", frontiersKey],
+            update,
+          )
+        } catch (error) {
+          console.error(
+            `[Repo] Failed to save update for document ${documentId}:`,
+            error,
+          )
+          throw error // Re-throw to let DocHandle handle it
+        }
+      }
+    }
+  }
+
+  /**
    * Gets an existing handle or creates a new one for the given document ID.
    * This method ensures proper service injection and event wiring for each handle.
    */
@@ -240,9 +273,10 @@ export class Repo {
       return cached as unknown as DocHandle<T>
     }
 
-    // Create a new handle with injected services
+    // Create a new handle with injected services including saveToStorage
     const handle = new DocHandle<T>(documentId, {
       loadFromStorage: createStorageLoader<T>(this.storageAdapter),
+      saveToStorage: this.createSaveToStorage<T>(documentId),
       queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
     })
 
@@ -253,40 +287,7 @@ export class Repo {
       }
     })
 
-    // Listen for ALL document changes for storage (both local and remote)
-    handle.on("doc-handle-change", ({ doc, event }) => {
-      // Only save actual changes, not checkouts
-      if (event.by === "local" || event.by === "import") {
-        // Use the 'to' frontiers as the unique key for this update
-        const frontiersKey = this.frontiersToKey(event.to)
-        
-        // Convert frontiers to version vectors for the export
-        // This gives us the incremental update between the two states
-        const fromVersion = doc.frontiersToVV(event.from)
-        const update = doc.export({
-          mode: "update",
-          from: fromVersion
-        })
-
-        console.log(`[Repo] Saving update for ${documentId} with frontiers key: ${frontiersKey}`)
-        console.log(`[Repo] Update size: ${update.byteLength} bytes, by: ${event.by}`)
-        console.log(`[Repo] From frontiers:`, event.from)
-        console.log(`[Repo] To frontiers:`, event.to)
-
-        // Store with unique key based on frontiers
-        this.storageAdapter
-          .save([documentId, "update", frontiersKey], update)
-          .then(() => {
-            console.log(`[Repo] Successfully saved update for ${documentId}`)
-          })
-          .catch(error => {
-            console.error(
-              `[Repo] Failed to save update for document ${documentId}:`,
-              error,
-            )
-          })
-      }
-    })
+    // Note: Storage is now handled by the saveToStorage service, not event listeners
 
     // Listen for local changes to broadcast to peers (network synchronization)
     handle.on("doc-handle-local-change", message => {

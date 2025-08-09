@@ -21,6 +21,12 @@ import type {
 export interface DocHandleServices<T extends DocContent> {
   /** A function that returns a promise resolving to the Loro document from storage. */
   loadFromStorage: (documentId: DocumentId) => Promise<LoroDoc<T> | null>
+  /** A function that saves the document to storage after changes. */
+  saveToStorage?: (
+    documentId: DocumentId,
+    doc: LoroDoc<T>,
+    event: LoroEventBatch,
+  ) => Promise<void>
   /** A function that returns a promise resolving to the Loro document from the network. */
   queryNetwork: (
     documentId: DocumentId,
@@ -37,7 +43,7 @@ type DocHandleEvents<T extends DocContent> = {
   }
   "doc-handle-change": {
     doc: LoroDoc<T>
-    event: LoroEventBatch  // Now includes the full event with frontiers
+    event: LoroEventBatch // Now includes the full event with frontiers
   }
   "doc-handle-local-change": Uint8Array
 }
@@ -306,8 +312,29 @@ export class DocHandle<T extends DocContent> {
         command.doc.subscribe(event => {
           this._emitter.emit("doc-handle-change", {
             doc: command.doc,
-            event  // Include the full LoroEventBatch with frontiers
+            event, // Include the full LoroEventBatch with frontiers
           })
+
+          // Also trigger storage save if service is available
+          if (
+            this.#services.saveToStorage &&
+            (event.by === "local" || event.by === "import")
+          ) {
+            const savePromise = this.#services.saveToStorage(
+              this.documentId,
+              command.doc,
+              event,
+            )
+            // Only attach catch handler if saveToStorage returns a promise
+            if (savePromise && typeof savePromise.catch === "function") {
+              savePromise.catch(error => {
+                console.error(
+                  `Failed to save document ${this.documentId} to storage:`,
+                  error,
+                )
+              })
+            }
+          }
         })
 
         // Keep local updates subscription for network synchronization
@@ -331,6 +358,28 @@ export class DocHandle<T extends DocContent> {
         if (request) {
           request.reject(command.error)
           this.#pendingRequests.delete(command.requestId)
+        }
+        break
+      }
+
+      case "cmd-save-to-storage": {
+        // This command is now handled directly in cmd-subscribe-to-doc
+        // Keeping this case for backward compatibility if needed
+        if (!this.#services.saveToStorage) {
+          console.debug("No saveToStorage service provided, skipping save")
+          return
+        }
+        try {
+          await this.#services.saveToStorage(
+            command.documentId,
+            command.doc,
+            command.event,
+          )
+        } catch (error) {
+          console.error(
+            `Failed to save document ${command.documentId} to storage:`,
+            error,
+          )
         }
         break
       }

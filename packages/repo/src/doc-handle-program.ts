@@ -1,4 +1,4 @@
-import type { LoroDoc } from "loro-crdt"
+import type { LoroDoc, LoroEventBatch } from "loro-crdt"
 import type { Effect as RajEffect } from "raj-ts"
 import type {
   DocContent,
@@ -174,6 +174,13 @@ export type SubscribeToDocCommand<T extends DocContent> = {
   doc: LoroDoc<T>
 }
 
+export type SaveToStorageCommand<T extends DocContent> = {
+  type: "cmd-save-to-storage"
+  documentId: DocumentId
+  doc: LoroDoc<T>
+  event: LoroEventBatch
+}
+
 export type ReportSuccessCommand<T extends DocContent> = {
   type: "cmd-report-success"
   requestId: RequestId
@@ -197,6 +204,7 @@ export type Command<T extends DocContent> =
   | CreateDocCommand<T>
   | ApplyRemoteChangeCommand<T>
   | SubscribeToDocCommand<T>
+  | SaveToStorageCommand<T>
   | ReportSuccessCommand<T>
   | ReportFailureCommand
   | BatchCommand<T>
