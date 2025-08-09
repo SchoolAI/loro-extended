@@ -28,8 +28,8 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@loro-extended/change": "workspace:*",
-    "@loro-extended/repo": "workspace:*",
+    "@loro-extended/change": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
     "emittery": "^1.2.0",
     "express": "^4.21.2",
     "loro-crdt": "^1.5.9",

@@ -15,10 +15,13 @@ importers:
   examples/todo-app:
     dependencies:
       '@loro-extended/network-sse':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/network-sse
+      '@loro-extended/react':
+        specifier: workspace:^
+        version: link:../../packages/react
       '@loro-extended/repo':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/repo
       classic-level:
         specifier: ^1.2.0
@@ -116,10 +119,10 @@ importers:
   packages/network-sse:
     dependencies:
       '@loro-extended/change':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../change
       '@loro-extended/repo':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../repo
       emittery:
         specifier: ^1.2.0
@@ -150,15 +153,21 @@ importers:
   packages/react:
     dependencies:
       '@loro-extended/change':
-        specifier: file:///Users/duane/schoolai/loro-extended/packages/change
+        specifier: workspace:^
         version: link:../change
       '@loro-extended/repo':
-        specifier: file:///Users/duane/schoolai/loro-extended/packages/repo
+        specifier: workspace:^
         version: link:../repo
       loro-crdt:
         specifier: ^1.5.9
         version: 1.5.9
+      react:
+        specifier: '>=18'
+        version: 19.1.1
     devDependencies:
+      '@types/react':
+        specifier: 19.1.1
+        version: 19.1.1
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
@@ -172,7 +181,7 @@ importers:
   packages/repo:
     dependencies:
       '@loro-extended/change':
-        specifier: file:///Users/duane/schoolai/loro-extended/packages/change
+        specifier: workspace:^
         version: link:../change
       emittery:
         specifier: ^1.0.1
@@ -863,6 +872,9 @@ packages:
     resolution: {integrity: sha512-i5ZzwYpqjmrKenzkoLM2Ibzt6mAsM7pxB6BCIouEVVmgiqaMj1TjaK7hnA36hbW5aZv20kx7Lw6hWzPWg0Rurw==}
     peerDependencies:
       '@types/react': ^19.0.0
+
+  '@types/react@19.1.1':
+    resolution: {integrity: sha512-ePapxDL7qrgqSF67s0h9m412d9DbXyC1n59O2st+9rjuuamWsZuD2w55rqY12CbzsZ7uVXb5Nw0gEp9Z8MMutQ==}
 
   '@types/react@19.1.9':
     resolution: {integrity: sha512-WmdoynAX8Stew/36uTSVMcLJJ1KRh6L3IZRx1PZ7qJtBqT3dYTgyDTx8H1qoRghErydW7xw9mSJ3wS//tCRpFA==}
@@ -2836,6 +2848,10 @@ snapshots:
   '@types/react-dom@19.1.7(@types/react@19.1.9)':
     dependencies:
       '@types/react': 19.1.9
+
+  '@types/react@19.1.1':
+    dependencies:
+      csstype: 3.1.3
 
   '@types/react@19.1.9':
     dependencies:
