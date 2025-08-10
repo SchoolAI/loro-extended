@@ -21,8 +21,7 @@
     "./src/*": "./src/*"
   },
   "scripts": {
-    "build": "tsup",
-    "test": "vitest"
+    "build": "tsup"
   },
   "dependencies": {
     "@loro-extended/change": "workspace:^",
