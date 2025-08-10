@@ -23,28 +23,28 @@ graph TB
         QN[queryNetwork service]
         CE[Change Events]
     end
-    
+
     subgraph Repo
         R[Repo]
         EL[Event Listener]
         SA[Storage Adapter]
         CSL[createStorageLoader]
     end
-    
+
     subgraph Flow
         UC[User Change] --> DH
         DH --> CE
         CE -.->|doc-handle-change event| EL
         EL --> |frontiersToKey| SA
         SA --> |save| Storage[(Storage)]
-        
+
         LR[Load Request] --> DH
         DH --> LS
         LS --> CSL
         CSL --> SA
         SA --> |loadRange| Storage
     end
-    
+
     style CE fill:#ffcccc
     style EL fill:#ffcccc
 ```
@@ -66,28 +66,28 @@ graph TB
         SS[saveToStorage service]
         QN[queryNetwork service]
     end
-    
+
     subgraph Repo
         R[Repo]
         SA[Storage Adapter]
         CSL[createStorageLoader]
         CSS[createSaveToStorage]
     end
-    
+
     subgraph Flow
         UC[User Change] --> DH
         DH --> |explicit call| SS
         SS --> CSS
         CSS --> |frontiersToKey| SA
         SA --> |save| Storage[(Storage)]
-        
+
         LR[Load Request] --> DH
         DH --> LS
         LS --> CSL
         CSL --> SA
         SA --> |loadRange| Storage
     end
-    
+
     style SS fill:#ccffcc
     style CSS fill:#ccffcc
 ```
@@ -106,20 +106,20 @@ graph TB
 ```typescript
 export interface DocHandleServices<T extends DocContent> {
   /** Load document from storage */
-  loadFromStorage: (documentId: DocumentId) => Promise<LoroDoc<T> | null>
-  
+  loadFromStorage: (documentId: DocumentId) => Promise<LoroDoc<T> | null>;
+
   /** Save document to storage (NEW) */
   saveToStorage?: (
     documentId: DocumentId,
     doc: LoroDoc<T>,
     event: LoroEventBatch
-  ) => Promise<void>
-  
+  ) => Promise<void>;
+
   /** Query document from network */
   queryNetwork: (
     documentId: DocumentId,
     timeout: number
-  ) => Promise<LoroDoc<T> | null>
+  ) => Promise<LoroDoc<T> | null>;
 }
 ```
 
@@ -129,20 +129,30 @@ The DocHandle now explicitly calls saveToStorage when changes occur:
 
 ```typescript
 // In cmd-subscribe-to-doc command handler
-command.doc.subscribe(event => {
+command.doc.subscribe((event) => {
   // Emit event for compatibility
-  this._emitter.emit("doc-handle-change", { doc: command.doc, event })
-  
+  this._emitter.emit("doc-handle-change", { doc: command.doc, event });
+
   // Explicitly save to storage if service is available
-  if (this.#services.saveToStorage && (event.by === "local" || event.by === "import")) {
-    const savePromise = this.#services.saveToStorage(this.documentId, command.doc, event)
-    if (savePromise && typeof savePromise.catch === 'function') {
-      savePromise.catch(error => {
-        console.error(`Failed to save document ${this.documentId} to storage:`, error)
-      })
+  if (
+    this.#services.saveToStorage &&
+    (event.by === "local" || event.by === "import")
+  ) {
+    const savePromise = this.#services.saveToStorage(
+      this.documentId,
+      command.doc,
+      event
+    );
+    if (savePromise && typeof savePromise.catch === "function") {
+      savePromise.catch((error) => {
+        console.error(
+          `Failed to save document ${this.documentId} to storage:`,
+          error
+        );
+      });
     }
   }
-})
+});
 ```
 
 ### 3. Repo Provides Storage Services
@@ -158,7 +168,7 @@ private createSaveToStorage<T extends DocContent>(
       const frontiersKey = this.frontiersToKey(event.to)
       const fromVersion = doc.frontiersToVV(event.from)
       const update = doc.export({ mode: "update", from: fromVersion })
-      
+
       await this.storageAdapter.save(
         [documentId, "update", frontiersKey],
         update
@@ -191,39 +201,41 @@ New tests verify the service-driven storage:
 
 ```typescript
 it("should call saveToStorage service when local changes occur", async () => {
-  const saveToStorage = vi.fn().mockResolvedValue(undefined)
+  const saveToStorage = vi.fn().mockResolvedValue(undefined);
   const services: DocHandleServices<DocContent> = {
     loadFromStorage: vi.fn().mockResolvedValue(doc),
-    saveToStorage,  // Mock service
+    saveToStorage, // Mock service
     queryNetwork: vi.fn(),
-  }
-  
-  const handle = new DocHandle("test-doc", services)
-  await handle.find()
-  
-  handle.change(doc => {
-    doc.getMap("root").set("text", "hello")
-  })
-  
-  await new Promise(resolve => setTimeout(resolve, 10))
-  
+  };
+
+  const handle = new DocHandle("test-doc", services);
+  await handle.find();
+
+  handle.change((doc) => {
+    doc.getMap("root").set("text", "hello");
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
   expect(saveToStorage).toHaveBeenCalledWith(
     "test-doc",
     expect.any(LoroDoc),
     expect.objectContaining({ by: "local" })
-  )
-})
+  );
+});
 ```
 
 ## Results
 
 ### Before
+
 - ❌ Implicit storage through event listeners
 - ❌ Asymmetric interface (load but no save)
 - ❌ Hard to test storage in isolation
 - ❌ Silent failures if event listener breaks
 
 ### After
+
 - ✅ Explicit storage through service injection
 - ✅ Symmetric interface (both load and save)
 - ✅ Easy to test with mocked services
