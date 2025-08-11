@@ -21,7 +21,7 @@ export type StorageLoadingState = {
   state: "storage-loading"
   requestId: RequestId
   /** The original operation that triggered this load */
-  operation: "find" | "find-or-create"
+  operation: "find" | "find-in-storage" | "find-or-create"
   /** For find-or-create, the timeout to use for network query */
   timeout?: number
 }
@@ -69,6 +69,12 @@ export type HandleState<T extends DocContent> =
 /** Ask the system to find a document, starting with storage and then the network. */
 export type FindMessage = {
   type: "msg-find"
+  requestId: RequestId
+}
+
+/** Ask the system to find a document in storage only, without checking the network. */
+export type FindInStorageMessage = {
+  type: "msg-find-in-storage"
   requestId: RequestId
 }
 
@@ -132,6 +138,7 @@ export type DeleteMessage = {
 
 export type Message<T extends DocContent> =
   | FindMessage
+  | FindInStorageMessage
   | FindOrCreateMessage
   | CreateMessage<T>
   | StorageLoadSuccessMessage<T>
@@ -245,6 +252,15 @@ export function update<T extends DocContent>(
             },
             { type: "cmd-load-from-storage", documentId },
           ]
+        case "msg-find-in-storage":
+          return [
+            {
+              state: "storage-loading",
+              operation: "find",
+              requestId: msg.requestId,
+            },
+            { type: "cmd-load-from-storage", documentId },
+          ]
         case "msg-find-or-create":
           return [
             {
@@ -307,7 +323,7 @@ export function update<T extends DocContent>(
               },
               { type: "cmd-query-network", documentId, timeout: 5000 },
             ]
-          } else {
+          } else if (state.operation === "find-or-create") {
             // For find-or-create: try network, create if not found
             const timeout = state.timeout || FIND_OR_CREATE_DEFAULT_TIMEOUT
             return [
@@ -319,6 +335,9 @@ export function update<T extends DocContent>(
               },
               { type: "cmd-query-network", documentId, timeout: timeout },
             ]
+          } else {
+            // For find-in-storage: go directly to unavailable (don't try network)
+            return [{ state: "unavailable" }]
           }
         default:
           return [state]

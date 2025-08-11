@@ -91,6 +91,11 @@ export type Command =
 
   // Storage
   | { type: "cmd-load-and-send-sync"; documentId: DocumentId; to: PeerId }
+  | {
+      type: "cmd-check-storage-and-respond"
+      documentId: DocumentId
+      to: PeerId
+    }
 
   // Timers
   | { type: "cmd-set-timeout"; documentId: DocumentId; duration: number }
@@ -111,6 +116,26 @@ export type Command =
 
 // CONSTANTS
 const DEFAULT_SYNC_TIMEOUT = 5000 // 5 seconds for peer-to-peer sync
+
+// HELPER FUNCTIONS
+
+/**
+ * Helper function to find or create a Set in a Map and add an item to it.
+ * This handles the common pattern of checking if a Set exists in a Map,
+ * creating it if it doesn't, and then adding an item to the Set.
+ */
+function findOrCreateSetInMap<K, V>(
+  map: Map<K, Set<V>>,
+  key: K,
+  item: V
+): void {
+  let set = map.get(key)
+  if (!set) {
+    set = new Set()
+    map.set(key, set)
+  }
+  set.add(item)
+}
 
 export type Program = {
   update(message: Message, model: Model): [Model, Command?]
@@ -148,12 +173,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
       // Track that this peer is now aware of our documents
       for (const docId of docIds) {
-        let peerSet = newModel.peersAwareOfDoc.get(docId)
-        if (!peerSet) {
-          peerSet = new Set()
-          newModel.peersAwareOfDoc.set(docId, peerSet)
-        }
-        peerSet.add(msg.peerId)
+        findOrCreateSetInMap(newModel.peersAwareOfDoc, docId, msg.peerId)
       }
 
       // Announce our existing documents to the new peer
@@ -261,16 +281,10 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           newModel.syncStates.has(documentId)
 
         // Record that this peer HAS this document
-        if (!newModel.peersWithDoc.has(documentId)) {
-          newModel.peersWithDoc.set(documentId, new Set())
-        }
-        newModel.peersWithDoc.get(documentId)!.add(fromPeerId)
+        findOrCreateSetInMap(newModel.peersWithDoc, documentId, fromPeerId)
 
         // Also record that this peer KNOWS ABOUT this document
-        if (!newModel.peersAwareOfDoc.has(documentId)) {
-          newModel.peersAwareOfDoc.set(documentId, new Set())
-        }
-        newModel.peersAwareOfDoc.get(documentId)!.add(fromPeerId)
+        findOrCreateSetInMap(newModel.peersAwareOfDoc, documentId, fromPeerId)
 
         // If we are not already tracking this document, we need to
         if (!isAlreadyKnown) {
@@ -325,25 +339,22 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
     case "msg-received-doc-request": {
       const { from, documentId } = msg
-      if (model.localDocs.has(documentId)) {
-        // Track that this peer is now aware of this document
-        const newModel = {
-          ...model,
-          peersAwareOfDoc: new Map(model.peersAwareOfDoc),
-        }
-        if (!newModel.peersAwareOfDoc.has(documentId)) {
-          newModel.peersAwareOfDoc.set(documentId, new Set())
-        }
-        newModel.peersAwareOfDoc.get(documentId)!.add(from)
 
-        const command: Command = {
-          type: "cmd-load-and-send-sync",
-          documentId,
-          to: from,
-        }
-        return [newModel, command]
+      // Track that this peer is now aware of this document
+      const newModel = {
+        ...model,
+        peersAwareOfDoc: new Map(model.peersAwareOfDoc),
       }
-      return [model]
+
+      findOrCreateSetInMap(newModel.peersAwareOfDoc, documentId, from)
+
+      // Always check storage (even if not in localDocs) by delegating to the host
+      const command: Command = {
+        type: "cmd-check-storage-and-respond",
+        documentId,
+        to: from,
+      }
+      return [newModel, command]
     }
 
     case "msg-received-sync": {

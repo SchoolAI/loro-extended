@@ -161,6 +161,20 @@ export class DocHandle<T extends DocContent> {
     return promise
   }
 
+  /**
+   * Finds a document in storage only, without checking the network.
+   * Returns immediately if the document is not found in storage.
+   */
+  public findInStorageOnly(): Promise<DocHandle<T>> {
+    const requestId = uuid()
+    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
+      this.#pendingRequests.set(requestId, { resolve, reject })
+    })
+
+    this.#dispatch({ type: "msg-find-in-storage", requestId })
+    return promise
+  }
+
   /** Marks the document as deleted. */
   public delete(): void {
     this.#dispatch({ type: "msg-delete" })

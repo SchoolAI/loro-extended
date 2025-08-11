@@ -155,6 +155,42 @@ export class Synchronizer {
         }
         break
       }
+      case "cmd-check-storage-and-respond": {
+        // First check if we already have the document in memory
+        const handle = this.#services.getDoc(command.documentId)
+        
+        if (handle.state === "ready") {
+          // Document is already loaded in memory, send it directly
+          this.#services.sendMessage({
+            type: "sync",
+            targetIds: [command.to],
+            documentId: command.documentId,
+            data: handle.doc().exportSnapshot(),
+            hopCount: 0, // Original message from this peer
+          })
+        } else {
+          // Document is not in memory, try to load it from storage only
+          // Use findInStorageOnly which checks storage but doesn't wait for network
+          handle.findInStorageOnly().then(() => {
+            // After findInStorageOnly completes, check if the document is now ready
+            if (handle.state === "ready") {
+              this.#services.sendMessage({
+                type: "sync",
+                targetIds: [command.to],
+                documentId: command.documentId,
+                data: handle.doc().exportSnapshot(),
+                hopCount: 0, // Original message from this peer
+              })
+            }
+            // If the document couldn't be loaded from storage, findInStorageOnly will reject
+            // and we won't send a response, maintaining the same behavior as before
+          }).catch(() => {
+            // If findInStorageOnly() rejects, the document doesn't exist in storage
+            // We don't send a response, maintaining the same behavior as before
+          })
+        }
+        break
+      }
       case "cmd-set-timeout": {
         this.#clearTimeout(command.documentId)
         const timeoutId = setTimeout(() => {

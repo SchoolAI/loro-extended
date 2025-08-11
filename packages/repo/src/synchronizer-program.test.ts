@@ -156,7 +156,7 @@ describe("Synchronizer program", () => {
     const [, command] = update(message, modelWithDoc)
 
     expect(command).toEqual({
-      type: "cmd-load-and-send-sync",
+      type: "cmd-check-storage-and-respond",
       documentId: "doc-1",
       to: "peer-1",
     })
