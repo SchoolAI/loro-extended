@@ -363,7 +363,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit(createPermissions())
 
       // Step 1: Start with a peer
-      let model: Model = {
+      const model: Model = {
         ...initialModel,
         peers: new Set(["peer-1"]),
       }
