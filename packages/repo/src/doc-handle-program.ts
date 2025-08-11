@@ -1,11 +1,7 @@
 import type { LoroDoc, LoroEventBatch } from "loro-crdt"
 import type { Effect as RajEffect } from "raj-ts"
-import type {
-  DocContent,
-  DocumentId,
-  LoroDocMutator,
-  RequestId,
-} from "./types.js"
+import type { RequestId } from "./request-tracker.js"
+import type { DocContent, DocumentId, LoroDocMutator } from "./types.js"
 
 export const FIND_OR_CREATE_DEFAULT_TIMEOUT = 1000
 

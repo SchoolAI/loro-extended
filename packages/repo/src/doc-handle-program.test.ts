@@ -3,7 +3,8 @@
 import { LoroDoc, type LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { init, update } from "./doc-handle-program.js"
-import type { DocumentId, RequestId } from "./types.js"
+import type { RequestId } from "./request-tracker.js"
+import type { DocumentId } from "./types.js"
 
 type TestSchema = {
   root: LoroMap<{
@@ -13,7 +14,7 @@ type TestSchema = {
 
 describe("DocHandle program", () => {
   const docId = "test-doc" as DocumentId
-  const reqId = "request-1" as RequestId
+  const reqId: RequestId = 0
 
   it("init should start in idle", () => {
     const [state, command] = init()
@@ -163,7 +164,7 @@ describe("DocHandle program", () => {
       expect(command).toEqual({
         type: "cmd-query-network",
         documentId: docId,
-        timeout: 5000
+        timeout: 5000,
       })
     })
 

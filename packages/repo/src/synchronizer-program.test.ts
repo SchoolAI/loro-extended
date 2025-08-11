@@ -166,9 +166,7 @@ describe("Synchronizer program", () => {
     const [initialModel] = programInit(createPermissions())
     const modelWithSyncState: Model = {
       ...initialModel,
-      syncStates: new Map([
-        ["doc-1", { state: "syncing", peerId: "peer-1" }],
-      ]),
+      syncStates: new Map([["doc-1", { state: "syncing", peerId: "peer-1" }]]),
     }
 
     const message: Message = {
@@ -206,7 +204,7 @@ describe("Synchronizer program", () => {
       { type: "msg-sync-timeout-fired", documentId: "doc-1" },
       model,
     )
-    
+
     expect(newModel.syncStates.has("doc-1")).toBe(false)
     expect(command).toEqual({
       type: "cmd-batch",
@@ -228,7 +226,9 @@ describe("Synchronizer program", () => {
     const [initialModel] = programInit(createPermissions())
     const model: Model = {
       ...initialModel,
-      syncStates: new Map([["doc-1", { state: "searching", userTimeout: 3000, requestId: "req-1" }]]),
+      syncStates: new Map([
+        ["doc-1", { state: "searching", userTimeout: 3000, requestId: 0 }],
+      ]),
     }
 
     // Timeout with user-specified timeout should fail immediately
@@ -236,7 +236,7 @@ describe("Synchronizer program", () => {
       { type: "msg-sync-timeout-fired", documentId: "doc-1" },
       model,
     )
-    
+
     expect(newModel.syncStates.has("doc-1")).toBe(false)
     expect(command).toEqual({
       type: "cmd-batch",
@@ -247,7 +247,7 @@ describe("Synchronizer program", () => {
         },
         {
           documentId: "doc-1",
-          requestId: "req-1",
+          requestId: 0,
           type: "cmd-sync-failed",
         },
       ],
@@ -348,7 +348,10 @@ describe("Synchronizer program", () => {
         peers: new Set(["peer-1", "peer-2"]),
       }
 
-      const message: Message = { type: "msg-document-added", documentId: "doc-1" }
+      const message: Message = {
+        type: "msg-document-added",
+        documentId: "doc-1",
+      }
       const [newModel] = update(message, modelWithPeers)
 
       // All peers should be aware of the new document
@@ -358,7 +361,7 @@ describe("Synchronizer program", () => {
 
     it("should send local changes to aware peers after document creation", () => {
       const [initialModel] = programInit(createPermissions())
-      
+
       // Step 1: Start with a peer
       let model: Model = {
         ...initialModel,
@@ -366,11 +369,16 @@ describe("Synchronizer program", () => {
       }
 
       // Step 2: Add a document locally
-      const addDocMessage: Message = { type: "msg-document-added", documentId: "doc-1" }
+      const addDocMessage: Message = {
+        type: "msg-document-added",
+        documentId: "doc-1",
+      }
       const [modelAfterAdd] = update(addDocMessage, model)
-      
+
       // Verify peer is aware
-      expect(modelAfterAdd.peersAwareOfDoc.get("doc-1")?.has("peer-1")).toBe(true)
+      expect(modelAfterAdd.peersAwareOfDoc.get("doc-1")?.has("peer-1")).toBe(
+        true,
+      )
 
       // Step 3: Make a local change
       const changeMessage: Message = {
@@ -407,7 +415,7 @@ describe("Synchronizer program", () => {
 
     it("should distinguish between peersWithDoc and peersAwareOfDoc", () => {
       const [initialModel] = programInit(createPermissions())
-      
+
       // Peer announces they have doc-1
       const announceMessage: Message = {
         type: "msg-received-doc-announced",
@@ -417,20 +425,29 @@ describe("Synchronizer program", () => {
       const [modelAfterAnnounce] = update(announceMessage, initialModel)
 
       // Peer-1 should be in both maps for doc-1
-      expect(modelAfterAnnounce.peersWithDoc.get("doc-1")?.has("peer-1")).toBe(true)
-      expect(modelAfterAnnounce.peersAwareOfDoc.get("doc-1")?.has("peer-1")).toBe(true)
+      expect(modelAfterAnnounce.peersWithDoc.get("doc-1")?.has("peer-1")).toBe(
+        true,
+      )
+      expect(
+        modelAfterAnnounce.peersAwareOfDoc.get("doc-1")?.has("peer-1"),
+      ).toBe(true)
 
       // Now we add doc-2 locally and announce to peer-1
       const modelWithPeer: Model = {
         ...modelAfterAnnounce,
         peers: new Set(["peer-1"]),
       }
-      const addDocMessage: Message = { type: "msg-document-added", documentId: "doc-2" }
+      const addDocMessage: Message = {
+        type: "msg-document-added",
+        documentId: "doc-2",
+      }
       const [modelAfterAdd] = update(addDocMessage, modelWithPeer)
 
       // Peer-1 should only be in peersAwareOfDoc for doc-2 (not peersWithDoc)
       expect(modelAfterAdd.peersWithDoc.get("doc-2")?.has("peer-1")).toBeFalsy()
-      expect(modelAfterAdd.peersAwareOfDoc.get("doc-2")?.has("peer-1")).toBe(true)
+      expect(modelAfterAdd.peersAwareOfDoc.get("doc-2")?.has("peer-1")).toBe(
+        true,
+      )
     })
 
     it("should use peersWithDoc when searching for a document", () => {
@@ -449,8 +466,10 @@ describe("Synchronizer program", () => {
       const syncState = newModel.syncStates.get("doc-1")
       expect(syncState?.state).toBe("syncing")
       expect((syncState as any).peerId).toBe("peer-1")
-      
-      const sendCommand = (command as any).commands.find((c: any) => c.type === "cmd-send-message")
+
+      const sendCommand = (command as any).commands.find(
+        (c: any) => c.type === "cmd-send-message",
+      )
       expect(sendCommand.message.targetIds).toEqual(["peer-1"])
     })
   })
@@ -482,7 +501,7 @@ describe("Synchronizer program", () => {
       expect(command?.type).toBe("cmd-batch")
       const batchCommand = command as any
       expect(batchCommand.commands).toHaveLength(2)
-      
+
       // First command should be sync-succeeded
       expect(batchCommand.commands[0]).toEqual({
         type: "cmd-sync-succeeded",
@@ -490,7 +509,7 @@ describe("Synchronizer program", () => {
         data: syncData,
         requestId: undefined,
       })
-      
+
       // Second command should forward to other peers with incremented hop count
       expect(batchCommand.commands[1]).toEqual({
         type: "cmd-send-message",
@@ -537,9 +556,7 @@ describe("Synchronizer program", () => {
       const model: Model = {
         ...initialModel,
         peers: new Set(["peer-1", "peer-2"]),
-        peersAwareOfDoc: new Map([
-          ["doc-1", new Set(["peer-1", "peer-2"])],
-        ]),
+        peersAwareOfDoc: new Map([["doc-1", new Set(["peer-1", "peer-2"])]]),
         localDocs: new Set(["doc-1"]),
       }
 
@@ -602,14 +619,12 @@ describe("Synchronizer program", () => {
       // Scenario: Server receives sync from Browser A and forwards to Browser B
       // Browser B should NOT forward it back
       const [initialModel] = programInit(createPermissions())
-      
+
       // Browser B's state
       const browserBModel: Model = {
         ...initialModel,
         peers: new Set(["server", "browser-a"]),
-        peersAwareOfDoc: new Map([
-          ["doc-1", new Set(["server", "browser-a"])],
-        ]),
+        peersAwareOfDoc: new Map([["doc-1", new Set(["server", "browser-a"])]]),
         localDocs: new Set(["doc-1"]),
       }
 
@@ -634,7 +649,7 @@ describe("Synchronizer program", () => {
     it("should allow single-hop forwarding in hub topology", () => {
       // Server receives original message and forwards once
       const [initialModel] = programInit(createPermissions())
-      
+
       // Server's state
       const serverModel: Model = {
         ...initialModel,
@@ -660,16 +675,19 @@ describe("Synchronizer program", () => {
       // Server should forward to other browsers
       expect(command?.type).toBe("cmd-batch")
       const batchCommand = command as any
-      
+
       // Check forwarding command
-      const forwardCommand = batchCommand.commands.find((c: any) =>
-        c.type === "cmd-send-message"
+      const forwardCommand = batchCommand.commands.find(
+        (c: any) => c.type === "cmd-send-message",
       )
       expect(forwardCommand).toBeDefined()
       expect(forwardCommand.message.hopCount).toBe(1)
-      expect(forwardCommand.message.targetIds).toEqual(["browser-b", "browser-c"])
+      expect(forwardCommand.message.targetIds).toEqual([
+        "browser-b",
+        "browser-c",
+      ])
     })
-  
+
     describe("Integration with Synchronizer class", () => {
       it("should properly pass hopCount from network message to internal message", () => {
         // This test would have caught the bug where synchronizer.ts wasn't passing hopCount
@@ -677,12 +695,10 @@ describe("Synchronizer program", () => {
         const model: Model = {
           ...initialModel,
           peers: new Set(["peer-1", "peer-2"]),
-          peersAwareOfDoc: new Map([
-            ["doc-1", new Set(["peer-1", "peer-2"])],
-          ]),
+          peersAwareOfDoc: new Map([["doc-1", new Set(["peer-1", "peer-2"])]]),
           localDocs: new Set(["doc-1"]),
         }
-  
+
         // Simulate a network message with hopCount
         const networkMessage: Message = {
           type: "msg-received-sync",
@@ -691,33 +707,31 @@ describe("Synchronizer program", () => {
           data: new Uint8Array([1, 2, 3]),
           hopCount: 1, // This should prevent forwarding
         }
-  
+
         const [, command] = update(networkMessage, model)
-  
+
         // With hopCount=1, should NOT forward
         expect(command?.type).toBe("cmd-sync-succeeded")
         expect(command?.type).not.toBe("cmd-batch")
       })
-  
+
       it("should include hopCount in outgoing sync messages for local changes", () => {
         const [initialModel] = programInit(createPermissions())
         const model: Model = {
           ...initialModel,
           peers: new Set(["peer-1"]),
-          peersAwareOfDoc: new Map([
-            ["doc-1", new Set(["peer-1"])],
-          ]),
+          peersAwareOfDoc: new Map([["doc-1", new Set(["peer-1"])]]),
           localDocs: new Set(["doc-1"]),
         }
-  
+
         const message: Message = {
           type: "msg-local-change",
           documentId: "doc-1",
           data: new Uint8Array([1, 2, 3]),
         }
-  
+
         const [, command] = update(message, model)
-  
+
         expect(command?.type).toBe("cmd-send-message")
         const sendCommand = command as any
         expect(sendCommand.message.hopCount).toBe(0) // Should be 0 for original messages

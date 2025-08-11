@@ -1,6 +1,7 @@
 import type { UnsentRepoMessage } from "./network/network-messages.js"
 import type { PermissionAdapter } from "./permission-adapter.js"
-import type { DocumentId, PeerId, RequestId } from "./types.js"
+import type { RequestId } from "./request-tracker.js"
+import type { DocumentId, PeerId } from "./types.js"
 
 // STATE
 
@@ -127,7 +128,7 @@ const DEFAULT_SYNC_TIMEOUT = 5000 // 5 seconds for peer-to-peer sync
 function findOrCreateSetInMap<K, V>(
   map: Map<K, Set<V>>,
   key: K,
-  item: V
+  item: V,
 ): void {
   let set = map.get(key)
   if (!set) {

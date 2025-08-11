@@ -1,6 +1,5 @@
 import Emittery from "emittery"
 import { LoroDoc, type LoroEventBatch } from "loro-crdt"
-import { v4 as uuid } from "uuid"
 
 import {
   type Command,
@@ -10,12 +9,8 @@ import {
   init as programInit,
   update as programUpdate,
 } from "./doc-handle-program.js"
-import type {
-  DocContent,
-  DocumentId,
-  LoroDocMutator,
-  RequestId,
-} from "./types.js"
+import { RequestTracker } from "./request-tracker.js"
+import type { DocContent, DocumentId, LoroDocMutator } from "./types.js"
 
 /** A dictionary of functions that the DocHandle can use to perform side effects. */
 export interface DocHandleServices<T extends DocContent> {
@@ -62,13 +57,7 @@ export class DocHandle<T extends DocContent> {
   public readonly documentId: DocumentId
   #state: HandleState<T>
   #services: Partial<DocHandleServices<T>>
-  #pendingRequests = new Map<
-    RequestId,
-    {
-      resolve: (value: DocHandle<T>) => void
-      reject: (reason?: Error) => void
-    }
-  >()
+  #requestTracker = new RequestTracker<DocHandle<T>>()
 
   /** @internal */
   _emitter = new Emittery<DocHandleEvents<T>>()
@@ -111,11 +100,7 @@ export class DocHandle<T extends DocContent> {
    * Does not create the document if it's not found.
    */
   public find(): Promise<DocHandle<T>> {
-    const requestId = uuid()
-    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
-      this.#pendingRequests.set(requestId, { resolve, reject })
-    })
-
+    const [requestId, promise] = this.#requestTracker.createRequest()
     this.#dispatch({ type: "msg-find", requestId })
     return promise
   }
@@ -128,11 +113,7 @@ export class DocHandle<T extends DocContent> {
   public findOrCreate(
     options: { timeout?: number } = {},
   ): Promise<DocHandle<T>> {
-    const requestId = uuid()
-    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
-      this.#pendingRequests.set(requestId, { resolve, reject })
-    })
-
+    const [requestId, promise] = this.#requestTracker.createRequest()
     this.#dispatch({
       type: "msg-find-or-create",
       requestId,
@@ -148,11 +129,7 @@ export class DocHandle<T extends DocContent> {
    * @param options Configuration for the create operation.
    */
   public create(): Promise<DocHandle<T>> {
-    const requestId = uuid()
-    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
-      this.#pendingRequests.set(requestId, { resolve, reject })
-    })
-
+    const [requestId, promise] = this.#requestTracker.createRequest()
     this.#dispatch({
       type: "msg-create",
       requestId,
@@ -166,11 +143,7 @@ export class DocHandle<T extends DocContent> {
    * Returns immediately if the document is not found in storage.
    */
   public findInStorageOnly(): Promise<DocHandle<T>> {
-    const requestId = uuid()
-    const promise = new Promise<DocHandle<T>>((resolve, reject) => {
-      this.#pendingRequests.set(requestId, { resolve, reject })
-    })
-
+    const [requestId, promise] = this.#requestTracker.createRequest()
     this.#dispatch({ type: "msg-find-in-storage", requestId })
     return promise
   }
@@ -359,20 +332,12 @@ export class DocHandle<T extends DocContent> {
       }
 
       case "cmd-report-success": {
-        const request = this.#pendingRequests.get(command.requestId)
-        if (request) {
-          request.resolve(this)
-          this.#pendingRequests.delete(command.requestId)
-        }
+        this.#requestTracker.resolve(command.requestId, this)
         break
       }
 
       case "cmd-report-failure": {
-        const request = this.#pendingRequests.get(command.requestId)
-        if (request) {
-          request.reject(command.error)
-          this.#pendingRequests.delete(command.requestId)
-        }
+        this.#requestTracker.reject(command.requestId, command.error)
         break
       }
 
