@@ -7,9 +7,7 @@ import wasm from "vite-plugin-wasm"
 export default defineConfig({
   clearScreen: false,
   server: {
-    proxy: {
-      "/loro": "http://localhost:5170",
-    },
+    proxy: { "/loro": "http://localhost:5170" },
   },
   plugins: [react(), wasm(), topLevelAwait()],
   optimizeDeps: {

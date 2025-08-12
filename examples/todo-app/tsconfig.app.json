@@ -26,5 +26,5 @@
     /* Preferences */
     "preserveWatchOutput": true
   },
-  "include": ["src"]
+  "include": ["src", "tests/e2e"]
 }
