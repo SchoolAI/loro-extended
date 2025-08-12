@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
 import type { DocumentId } from "@loro-extended/repo"
+import { useEffect, useState } from "react"
 
 /**
  * A hook that manages document ID from URL hash with a fallback default.
