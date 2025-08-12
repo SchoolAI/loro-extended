@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test"
 import {
-  clearClientStorage,
   createTodo,
+  generateTestDocumentId,
   waitForRepoState,
 } from "./fixtures/test-helpers"
 
@@ -10,12 +10,8 @@ test.describe("Storage Persistence", () => {
   // We'll test persistence without manually starting/stopping the server
 
   test("should persist client state in IndexedDB", async ({ page }) => {
-    await page.goto("/")
-    await waitForRepoState(page, "ready")
-
-    // Clear any existing data first
-    await clearClientStorage(page)
-    await page.reload()
+    const testDocId = generateTestDocumentId()
+    await page.goto(`/#${testDocId}`)
     await waitForRepoState(page, "ready")
 
     // Create a todo
@@ -32,9 +28,12 @@ test.describe("Storage Persistence", () => {
   })
 
   test("should sync persisted data between clients", async ({ browser }) => {
+    // Use the same document ID for both clients to test sync
+    const testDocId = generateTestDocumentId()
+    
     // First client creates a todo
     const page1 = await browser.newPage()
-    await page1.goto("/")
+    await page1.goto(`/#${testDocId}`)
     await waitForRepoState(page1, "ready")
 
     // Create a unique todo
@@ -46,7 +45,7 @@ test.describe("Storage Persistence", () => {
 
     // Second client should see the todo (loaded from server)
     const page2 = await browser.newPage()
-    await page2.goto("/")
+    await page2.goto(`/#${testDocId}`)
     await waitForRepoState(page2, "ready")
 
     // Should see the todo created by first client

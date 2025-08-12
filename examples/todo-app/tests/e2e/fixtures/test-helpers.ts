@@ -1,4 +1,9 @@
+import { v4 as uuidv4 } from "uuid"
 import type { Page } from "@playwright/test"
+
+export function generateTestDocumentId(): string {
+  return `test-${uuidv4()}`
+}
 
 export async function clearClientStorage(page: Page): Promise<void> {
   await page.evaluate(() => {

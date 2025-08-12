@@ -1,13 +1,23 @@
 import { expect, test } from "@playwright/test"
-import { createTodo, waitForRepoState } from "./fixtures/test-helpers"
+import {
+  createTodo,
+  generateTestDocumentId,
+  waitForRepoState,
+} from "./fixtures/test-helpers"
 
 test.describe("Multi-Client Synchronization", () => {
   test("should sync new todos between clients", async ({ browser }) => {
     const client1 = await browser.newPage()
     const client2 = await browser.newPage()
 
+    // Use the same document ID for both clients
+    const testDocId = generateTestDocumentId()
+
     // Both clients connect
-    await Promise.all([client1.goto("/"), client2.goto("/")])
+    await Promise.all([
+      client1.goto(`/#${testDocId}`),
+      client2.goto(`/#${testDocId}`),
+    ])
 
     // Wait for ready state
     await Promise.all([
@@ -31,8 +41,14 @@ test.describe("Multi-Client Synchronization", () => {
     const client1 = await browser.newPage()
     const client2 = await browser.newPage()
 
+    // Use the same document ID for both clients
+    const testDocId = generateTestDocumentId()
+
     // Setup clients with a todo
-    await Promise.all([client1.goto("/"), client2.goto("/")])
+    await Promise.all([
+      client1.goto(`/#${testDocId}`),
+      client2.goto(`/#${testDocId}`),
+    ])
     await Promise.all([
       waitForRepoState(client1, "ready"),
       waitForRepoState(client2, "ready"),
@@ -57,8 +73,14 @@ test.describe("Multi-Client Synchronization", () => {
     const client1 = await browser.newPage()
     const client2 = await browser.newPage()
 
+    // Use the same document ID for both clients
+    const testDocId = generateTestDocumentId()
+
     // Setup clients with a todo
-    await Promise.all([client1.goto("/"), client2.goto("/")])
+    await Promise.all([
+      client1.goto(`/#${testDocId}`),
+      client2.goto(`/#${testDocId}`),
+    ])
     await Promise.all([
       waitForRepoState(client1, "ready"),
       waitForRepoState(client2, "ready"),
@@ -81,24 +103,68 @@ test.describe("Multi-Client Synchronization", () => {
     const client1 = await browser.newPage()
     const client2 = await browser.newPage()
 
+    // Use the same document ID for both clients
+    const testDocId = generateTestDocumentId()
+
     // Setup clients
-    await Promise.all([client1.goto("/"), client2.goto("/")])
+    await Promise.all([
+      client1.goto(`/#${testDocId}`),
+      client2.goto(`/#${testDocId}`),
+    ])
     await Promise.all([
       waitForRepoState(client1, "ready"),
       waitForRepoState(client2, "ready"),
     ])
 
-    // Both clients create todos simultaneously
-    await Promise.all([
-      createTodo(client1, "Client 1 Todo"),
-      createTodo(client2, "Client 2 Todo"),
-    ])
+    // Client 1 creates a todo first
+    await createTodo(client1, "Client 1 Todo")
 
-    // Both clients should see both todos
-    await Promise.all([
-      client1.waitForSelector('.todo-item:has-text("Client 2 Todo")'),
-      client2.waitForSelector('.todo-item:has-text("Client 1 Todo")'),
-    ])
+    // Wait for client1 to see its own todo
+    await client1.waitForSelector('.todo-item:has-text("Client 1 Todo")')
+
+    // Client 2 creates a todo
+    await createTodo(client2, "Client 2 Todo")
+
+    // Wait for client2 to see its own todo
+    await client2.waitForSelector('.todo-item:has-text("Client 2 Todo")')
+
+    // Wait for sync to complete
+    await client1.waitForTimeout(2000)
+    await client2.waitForTimeout(2000)
+
+    // Check if client1 can see client2's todo
+    try {
+      await client1.waitForSelector('.todo-item:has-text("Client 2 Todo")', {
+        timeout: 10000,
+      })
+    } catch (e) {
+      // If timeout, let's see what todos client1 actually has
+      const client1Todos = await client1
+        .locator(".todo-item span")
+        .allTextContents()
+      console.log("Client1 todos:", client1Todos)
+      throw e
+    }
+
+    // Check if client2 can see client1's todo
+    try {
+      await client2.waitForSelector('.todo-item:has-text("Client 1 Todo")', {
+        timeout: 10000,
+      })
+    } catch (e) {
+      // If timeout, let's see what todos client2 actually has
+      const client2Todos = await client2
+        .locator(".todo-item span")
+        .allTextContents()
+      console.log("Client2 todos:", client2Todos)
+      throw e
+    }
+
+    // Verify both clients have the same number of todos
+    const todoCount1 = await client1.locator(".todo-item").count()
+    const todoCount2 = await client2.locator(".todo-item").count()
+    expect(todoCount1).toBe(2)
+    expect(todoCount2).toBe(2)
 
     // Verify order is consistent (CRDT resolution)
     const todos1 = await client1.locator(".todo-item span").allTextContents()

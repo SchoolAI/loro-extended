@@ -1,17 +1,14 @@
 import { expect, test } from "@playwright/test"
 import {
-  clearClientStorage,
   createTodo,
+  generateTestDocumentId,
   waitForRepoState,
 } from "./fixtures/test-helpers"
 
 test.describe("Basic Todo Functionality", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/")
-    await waitForRepoState(page, "ready")
-    // Clear any existing todos
-    await clearClientStorage(page)
-    await page.reload()
+    const testDocId = generateTestDocumentId()
+    await page.goto(`/#${testDocId}`)
     await waitForRepoState(page, "ready")
   })
 
