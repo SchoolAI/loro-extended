@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Todo } from "../../shared/types"
-import { TodoItem } from "./TodoItem"
+import { TodoItem } from "./todo-item"
 
 interface TodoListProps {
   todos: Todo[]

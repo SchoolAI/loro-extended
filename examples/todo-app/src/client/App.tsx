@@ -1,9 +1,10 @@
 import { useLoroDoc } from "@loro-extended/react"
 import type { DocumentId } from "@loro-extended/repo"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import type { Todo } from "../shared/types"
-import { TodoInput } from "./components/TodoInput"
-import { TodoList } from "./components/TodoList"
+import { TodoInput } from "./components/todo-input"
+import { TodoList } from "./components/todo-list"
+import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
 interface TodoDoc {
@@ -15,23 +16,7 @@ const DEFAULT_TODO_DOC_ID: DocumentId = "todos-example-document"
 
 function App() {
   // Get document ID from URL hash if present, otherwise use default
-  const [docId, setDocId] = useState<DocumentId>(() => {
-    const hash = window.location.hash.slice(1) // Remove the '#' character
-    return hash || DEFAULT_TODO_DOC_ID
-  })
-
-  // Listen for hash changes
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.slice(1) // Remove the '#' character
-      setDocId(hash || DEFAULT_TODO_DOC_ID)
-    }
-
-    window.addEventListener("hashchange", handleHashChange)
-    return () => {
-      window.removeEventListener("hashchange", handleHashChange)
-    }
-  }, [])
+  const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
   // Use our custom hook to get a reactive state of the document
   const [doc, changeDoc, state] = useLoroDoc<TodoDoc>(docId)

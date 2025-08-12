@@ -2,8 +2,8 @@ import { SseClientNetworkAdapter } from "@loro-extended/network-sse/client"
 import { RepoProvider } from "@loro-extended/react"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import App from "./client/App.tsx"
-import { IndexedDBStorageAdapter } from "./client/IndexedDBStorageAdapter"
+import App from "./client/app.tsx"
+import { IndexedDBStorageAdapter } from "./client/indexd-db-storage-adapter.ts"
 import "./index.css"
 
 const root = document.getElementById("root")
