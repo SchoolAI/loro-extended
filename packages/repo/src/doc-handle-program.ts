@@ -386,9 +386,10 @@ export function update<T extends DocContent>(
             return [{ state: "unavailable" }]
           }
         case "msg-remote-change": {
-          // This is the key fix: if we get the document from a peer while we're
-          // waiting for the network, we can move to the ready state.
           if (!msg.doc) return [state]
+
+          // If we get the document from a peer while we're waiting for the network,
+          // we can move to the ready state.
           const command: Command<T> = {
             type: "cmd-batch",
             commands: [
@@ -410,6 +411,7 @@ export function update<T extends DocContent>(
       switch (msg.type) {
         // If we get a request for a doc that's already ready, just report success immediately.
         case "msg-find":
+        case "msg-find-in-storage":
         case "msg-find-or-create":
         case "msg-create":
           return [
@@ -422,7 +424,6 @@ export function update<T extends DocContent>(
           ]
         case "msg-local-change":
           // Apply the mutation directly to the document
-          // The mutator receives the LoroDoc as per the type definition
           msg.mutator(state.doc)
           // Commit the changes to trigger subscriptions
           state.doc.commit()
