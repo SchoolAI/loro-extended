@@ -1,43 +1,36 @@
-import type {
-  NetworkAdapter,
-  NetworkAdapterEvents,
-  PeerId,
-  PeerMetadata,
-  RepoMessage,
-} from "@loro-extended/repo"
-import Emittery from "emittery"
+import { NetworkAdapter, type NetMsg, type PeerId } from "@loro-extended/repo"
 import type { Request, Response, Router } from "express"
 import express from "express"
 
-export class SseServerNetworkAdapter
-  extends Emittery<NetworkAdapterEvents>
-  implements NetworkAdapter
-{
-  peerId?: PeerId
+export class SseServerNetworkAdapter extends NetworkAdapter {
   #clients = new Map<PeerId, Response>()
+  #heartbeats = new Map<PeerId, NodeJS.Timeout>()
+  #heartbeatInterval = 30000 // 30 seconds
 
   //
   // NetworkAdapter implementation
   //
 
-  connect(peerId: PeerId, _metadata: PeerMetadata): void {
-    this.peerId = peerId
-    // In this adapter, connection is managed by the Express app listening,
-    // so this is largely a no-op, but we store the peerId.
+  async start() {
+    console.info("[SSE-ADAPTER] Started")
   }
 
-  disconnect(): void {
+  async stop(): Promise<void> {
     // Close all active client connections
     this.#clients.forEach(res => {
       res.end()
     })
+    // Clear all heartbeats
+    this.#heartbeats.forEach(timeout => {
+      clearTimeout(timeout)
+    })
+    this.#heartbeats.clear()
     this.#clients.clear()
-    this.peerId = undefined
-    console.log("[SSE-ADAPTER]: Disconnected and all clients removed.")
+    console.log("[SSE-ADAPTER] Disconnected and all clients removed")
   }
 
   /** The NetworkSubsystem will call this method to send a message to a peer. */
-  public send(message: RepoMessage): void {
+  async send(message: NetMsg): Promise<void> {
     for (const targetId of message.targetIds) {
       const clientRes = this.#clients.get(targetId)
       if (clientRes) {
@@ -48,7 +41,7 @@ export class SseServerNetworkAdapter
         // It's possible for the network subsystem to try sending to a peer that
         // just disconnected, so a warning is appropriate.
         console.warn(
-          `[SSE-ADAPTER]: Tried to send message to disconnected peer ${targetId}`,
+          `[SSE-ADAPTER] Tried to send message to disconnected peer ${targetId}`,
         )
       }
     }
@@ -65,11 +58,10 @@ export class SseServerNetworkAdapter
     // Endpoint for clients to send messages TO the server.
     router.post("/sync", (req, res) => {
       const serializedMessage = req.body
-      const message = this.#deserializeMessage(serializedMessage) as RepoMessage
+      const message = this.#deserializeMessage(serializedMessage) as NetMsg
 
-      // Emit a "message" event, which the NetworkSubsystem is listening for.
-      // This is how incoming messages get into the Repo.
-      this.emit("message", message)
+      // Forward the message to the repo
+      this.messageReceived(message)
 
       res.status(200).send({ ok: true })
     })
@@ -101,19 +93,58 @@ export class SseServerNetworkAdapter
     this.#clients.set(peerId, res)
 
     console.log(
-      `[SSE-ADAPTER] New Peer: ${peerId}. Total clients: ${this.#clients.size}`,
+      `[SSE-ADAPTER] Connect peer: ${peerId}. Total peers: ${this.#clients.size}`,
     )
 
-    // Emit a "peer-candidate" event to inform the Repo a new peer is available.
-    this.emit("peer-candidate", { peerId, metadata: {} })
+    // Tell the Repo about the new peer
+    this.peerAvailable(peerId, {})
+
+    // Setup heartbeat to detect stale connections
+    this.#setupHeartbeat(peerId, res)
 
     // Handle client disconnect
     req.on("close", () => {
-      console.log(`[SSE-ADAPTER]: Peer ${peerId} disconnected.`)
-      this.#clients.delete(peerId)
+      this.#cleanupConnection(peerId)
+      console.log(
+        `[SSE-ADAPTER] Disconnect peer ${peerId}. Total peers: ${this.#clients.size}`,
+      )
       // Emit a "peer-disconnected" event
-      this.emit("peer-disconnected", { peerId })
+      this.peerDisconnected(peerId)
     })
+  }
+
+  #setupHeartbeat(peerId: PeerId, res: Response) {
+    // Clear any existing heartbeat for this peer
+    const existingHeartbeat = this.#heartbeats.get(peerId)
+    if (existingHeartbeat) {
+      clearTimeout(existingHeartbeat)
+    }
+
+    // Setup new heartbeat
+    const heartbeat = setInterval(() => {
+      try {
+        // Send a heartbeat comment (SSE comments are ignored by clients)
+        res.write(": heartbeat\n\n")
+      } catch (_) {
+        // If we can't write to the response, the connection is dead
+        this.#cleanupConnection(peerId)
+        this.peerDisconnected(peerId)
+      }
+    }, this.#heartbeatInterval)
+
+    this.#heartbeats.set(peerId, heartbeat)
+  }
+
+  #cleanupConnection(peerId: PeerId) {
+    // Clear heartbeat
+    const heartbeat = this.#heartbeats.get(peerId)
+    if (heartbeat) {
+      clearTimeout(heartbeat)
+      this.#heartbeats.delete(peerId)
+    }
+
+    // Remove client
+    this.#clients.delete(peerId)
   }
 
   #serializeMessage(message: any): any {

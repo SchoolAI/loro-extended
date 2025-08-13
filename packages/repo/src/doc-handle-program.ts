@@ -58,6 +58,9 @@ export type HandleState<T extends DocContent> =
   | UnavailableState
   | DeletedState
 
+// biome-ignore lint/suspicious/noExplicitAny: just need state
+export type DocHandleState = HandleState<any>["state"]
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  MESSAGE
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -252,7 +255,7 @@ export function update<T extends DocContent>(
           return [
             {
               state: "storage-loading",
-              operation: "find",
+              operation: "find-in-storage",
               requestId: msg.requestId,
             },
             { type: "cmd-load-from-storage", documentId },

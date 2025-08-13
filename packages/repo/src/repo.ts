@@ -1,7 +1,10 @@
-import { LoroDoc, type OpId, type LoroEventBatch } from "loro-crdt"
+import { LoroDoc, type LoroEventBatch, type OpId } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
-import { InProcessNetworkAdapter } from "./network/in-process-network-adapter.js"
-import type { NetworkAdapter, PeerMetadata } from "./network/network-adapter.js"
+import {
+  InProcessBridge,
+  InProcessNetworkAdapter,
+} from "./network/in-process-network-adapter.js"
+import type { NetworkAdapter } from "./network/network-adapter.js"
 import { NetworkSubsystem } from "./network/network-subsystem.js"
 import {
   createPermissions,
@@ -53,7 +56,7 @@ function createStorageLoader<T extends DocContent>(
 
 export interface RepoConfig {
   storage?: StorageAdapter
-  network?: NetworkAdapter[]
+  network?: NetworkAdapter | NetworkAdapter[]
   peerId?: PeerId
   permissions?: Partial<PermissionAdapter>
 }
@@ -61,6 +64,8 @@ export interface RepoConfig {
 function randomPeerId(): PeerId {
   return `peer-${Math.random().toString(36).slice(2)}`
 }
+
+const defaultBridge = new InProcessBridge()
 
 /**
  * The Repo class is the central orchestrator for the Loro state synchronization system.
@@ -92,47 +97,74 @@ export class Repo {
     return this.handleCache
   }
 
-  get network(): NetworkSubsystem {
+  get networks(): NetworkSubsystem {
     return this.networkSubsystem
   }
 
-  constructor({ storage, network, peerId, permissions }: RepoConfig) {
-    this.peerId = peerId ?? randomPeerId()
-    this.permissionAdapter = createPermissions(permissions)
+  constructor({
+    peerId = randomPeerId(),
+    storage,
+    network,
+    permissions,
+  }: RepoConfig) {
+    this.peerId = peerId
     this.storageAdapter = storage ?? new InMemoryStorageAdapter()
+
+    // Create the permissions manager
+    this.permissionAdapter = createPermissions(permissions)
 
     // Create services object for the synchronizer
     const services: SynchronizerServices = {
-      sendMessage: message => this.networkSubsystem.send(message),
+      // functions
+      send: message => this.networkSubsystem.send(message),
       getDoc: documentId => this.getOrCreateHandle(documentId),
+
+      // services
       permissions: this.permissionAdapter,
-      onDocAvailable: documentId => {
-        if (!this.handleCache.has(documentId)) {
-          this.getOrCreateHandle(documentId)
-        }
-      },
     }
 
     // Instantiate synchronizer
     this.synchronizer = new Synchronizer(services)
 
-    const peerMetadata: PeerMetadata = {} // In the future, this could contain the storageId
-    this.networkSubsystem = new NetworkSubsystem(
-      network ?? [new InProcessNetworkAdapter()],
-      this.peerId,
-      peerMetadata,
-    )
+    this.networkSubsystem = this.#initializeNetworkSubsystem(network)
+  }
+
+  #initializeNetworkSubsystem(
+    network: RepoConfig["network"],
+  ): NetworkSubsystem {
+    // Instantiate network subsystem
+    const adapters: NetworkAdapter[] = []
+    if (network && !Array.isArray(network)) {
+      adapters.push(network)
+    } else if (network && Array.isArray(network)) {
+      adapters.push(...network)
+    } else {
+      adapters.push(new InProcessNetworkAdapter(defaultBridge))
+    }
+
+    const networkSubsystem = new NetworkSubsystem({
+      peerId: this.peerId,
+      adapters,
+      services: {
+        isPeerConnected: (peerId: PeerId) =>
+          this.synchronizer.isPeerConnected(peerId),
+      },
+    })
 
     // Wire up subsystems - Network events to Synchronizer
-    this.networkSubsystem.on("peer", ({ peerId }) =>
-      this.synchronizer.addPeer(peerId),
-    )
-    this.networkSubsystem.on("peer-disconnected", ({ peerId }) =>
+    networkSubsystem.on("peer-available", ({ peerId }) => {
+      this.synchronizer.addPeer(peerId)
+    })
+    networkSubsystem.on("peer-disconnected", ({ peerId }) =>
       this.synchronizer.removePeer(peerId),
     )
-    this.networkSubsystem.on("message", async message => {
+    networkSubsystem.on("message-received", async ({ message }) => {
       this.synchronizer.handleRepoMessage(message)
     })
+
+    networkSubsystem.startAdapters()
+
+    return networkSubsystem
   }
 
   //
@@ -201,6 +233,38 @@ export class Repo {
     }
   }
 
+  /**
+   * Disconnects all network adapters and cleans up resources.
+   * This should be called when the Repo is no longer needed.
+   */
+  disconnect(): void {
+    // Disconnect all network adapters
+    this.networkSubsystem.stopAll()
+
+    // Clear synchronizer model
+    this.synchronizer.reset()
+
+    // Clear all document handles
+    this.handleCache.forEach(h => h.delete())
+    this.handleCache.clear()
+  }
+
+  /**
+   * Starts the network subsystem.
+   * This should be called when the Repo is ready to participate in the network.
+   */
+  startNetwork(): void {
+    this.networkSubsystem.startAdapters()
+  }
+
+  /**
+   * Stops the network subsystem.
+   * This should be called when the Repo needs to temporarily disconnect from the network.
+   */
+  stopNetwork(): void {
+    this.networkSubsystem.stopAll()
+  }
+
   //
   // PRIVATE METHODS
   //
@@ -212,11 +276,9 @@ export class Repo {
   private frontiersToKey(frontiers: OpId[]): string {
     // Convert frontiers to a JSON string then base64 encode for compactness
     const jsonStr = JSON.stringify(frontiers)
-    return Buffer.from(jsonStr)
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "") // Remove padding
+    // Use browser-compatible base64 encoding instead of Node.js Buffer
+    const base64 = btoa(jsonStr)
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "") // Remove padding
   }
 
   /**

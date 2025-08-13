@@ -1,5 +1,4 @@
 export type StorageKey = string[]
-export type StorageId = string
 
 export type Chunk = {
   key: StorageKey

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  InProcessBridge,
   InProcessNetworkAdapter,
-  InProcessNetworkBroker,
 } from "./network/in-process-network-adapter.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
@@ -23,14 +23,15 @@ describe("Storage-Network Synchronization", () => {
     // 4. Client requests the document from the new server
     // 5. Server should check storage and respond with the document
 
-    const broker = new InProcessNetworkBroker()
+    const bridge = new InProcessBridge()
 
     // Step 1: Create server repo with storage and create a document
-    const serverStorage1 = new InMemoryStorageAdapter()
+    const serverStorage = new InMemoryStorageAdapter()
+    const server1Adapter = new InProcessNetworkAdapter(bridge)
     const server1 = new Repo({
       peerId: "server1",
-      network: [new InProcessNetworkAdapter(broker)],
-      storage: serverStorage1,
+      network: [server1Adapter],
+      storage: serverStorage,
     })
 
     const documentId = "test-doc-1"
@@ -48,28 +49,19 @@ describe("Storage-Network Synchronization", () => {
     await vi.runAllTimersAsync()
 
     // Verify the document was saved to storage
-    const savedData = await serverStorage1.loadRange([documentId])
+    const savedData = await serverStorage.loadRange([documentId])
     expect(savedData.length).toBeGreaterThan(0)
 
-    // Step 2: Simulate server shutdown by removing it from the broker
+    // Step 2: Simulate server shutdown by stopping the network
     // This simulates the server going offline
-    broker.removePeer("server1")
-
-    // Step 3: Create new server instance with its own storage
-    // We manually copy the data to simulate persistent storage (like a filesystem)
-    const serverStorage2 = new InMemoryStorageAdapter()
-
-    // Copy the saved data from the old storage to the new storage
-    // This simulates reading from the same persistent storage (filesystem/database)
-    for (const { key, data } of savedData) {
-      await serverStorage2.save(key, data)
-    }
+    server1.stopNetwork()
 
     // Create the new server instance
+    const server2Adapter = new InProcessNetworkAdapter(bridge)
     const server2 = new Repo({
       peerId: "server2",
-      network: [new InProcessNetworkAdapter(broker)],
-      storage: serverStorage2,
+      network: [server2Adapter],
+      storage: serverStorage,
     })
 
     // At this point, server2 has the document in its storage
@@ -77,24 +69,28 @@ describe("Storage-Network Synchronization", () => {
     expect(server2.handles.has(documentId)).toBe(false)
 
     // Step 4: Create client repo that will request the document
+    const clientAdapter = new InProcessNetworkAdapter(bridge)
     const client = new Repo({
       peerId: "client",
-      network: [new InProcessNetworkAdapter(broker)],
+      network: [clientAdapter],
       // Client has no storage, must get document from network
     })
+
+    // The network adapters are already started by the Repo constructor
+    // No need to start them manually
 
     // Wait for network connections to establish
     await vi.runAllTimersAsync()
 
     // Step 5: Client requests the document from the network
     // EXPECTED: server2 should check its storage and respond with the document
-    // ACTUAL: This will timeout/fail because server2 only checks memory, not storage
+    // CURRENT STATUS: This currently times out and fails
 
     try {
       const clientHandle = await client.find(documentId)
 
       // If we get here, the test passes (after implementing the fix)
-      expect(clientHandle.state).toBe("ready")
+      expect(clientHandle.fullState).toBe("ready")
       const docClient = clientHandle.doc()
       const rootClient = docClient.getMap("root")
       expect(rootClient.get("title")).toBe("Important Document")
@@ -105,7 +101,7 @@ describe("Storage-Network Synchronization", () => {
       // (it should have loaded it from storage when client requested it)
       const server2Handle = server2.handles.get(documentId)
       expect(server2Handle).toBeDefined()
-      expect(server2Handle?.state).toBe("ready")
+      expect(server2Handle?.fullState).toBe("ready")
     } catch (error) {
       // This is what currently happens - the find times out
       // because server2 doesn't check its storage

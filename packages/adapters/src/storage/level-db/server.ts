@@ -3,7 +3,7 @@ import { ClassicLevel } from "classic-level"
 
 const KEY_SEP = "::"
 
-export class LevelStorageAdapter implements StorageAdapter {
+export class LevelDBStorageAdapter implements StorageAdapter {
   #db: ClassicLevel<string, Uint8Array>
 
   constructor(dbPath: string) {

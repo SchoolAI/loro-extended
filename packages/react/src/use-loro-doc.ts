@@ -2,31 +2,36 @@ import {
   type AsLoro,
   change,
   type DocHandle,
+  type DocHandleSimplifiedState,
   type DocumentId,
   ExtendedLoroDoc,
 } from "@loro-extended/repo"
+import type { LoroMap } from "loro-crdt"
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react"
 import { useRepo } from "./repo-context.js"
 
-export type LoroDocState = "loading" | "ready" | "unavailable"
+export type DocWrapper = {
+  doc: LoroMap<Record<string, unknown>>
+}
 
 /** A function that mutates a Loro document. */
 export type ChangeFn<T> = (doc: AsLoro<T>) => void
 
 /** The return type of the `useLoroDoc` hook. */
-export type UseLoroDocReturn<T> = [
+export type UseLoroDocReturn<T extends object> = [
   /** The current state of the document, or undefined if not ready. */
   doc: T | undefined,
   /** A function to change the document. */
   changeFn: (fn: ChangeFn<T>) => void,
-  /** The current state of the DocHandle. */
-  state: LoroDocState,
+  /** The DocHandle instance that provides access to the underlying LoroDoc and state. */
+  handle: DocHandle<DocWrapper> | null,
 ]
 
 /**
@@ -53,13 +58,13 @@ export type UseLoroDocReturn<T> = [
  * )
  * ```
  */
-export function useLoroDoc<T extends Record<string, any>>(
+export function useLoroDoc<T extends object>(
   documentId: DocumentId,
 ): UseLoroDocReturn<T> {
   const repo = useRepo()
-  const [handle, setHandle] = useState<DocHandle<T> | null>(null)
+  const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
   useEffect(() => {
-    repo.findOrCreate<T>(documentId).then(setHandle)
+    repo.findOrCreate<DocWrapper>(documentId).then(setHandle)
   }, [repo, documentId])
 
   const subscribe = useCallback(
@@ -75,42 +80,36 @@ export function useLoroDoc<T extends Record<string, any>>(
     [handle],
   )
 
-  const getSnapshot = useMemo(() => {
-    let lastSnapshot: { version: string | null; state: LoroDocState } | null =
-      null
+  // Use refs to maintain stable state
+  const snapshotRef = useRef<{
+    version: number
+    state: DocHandleSimplifiedState
+  }>({
+    version: -1,
+    state: "loading",
+  })
 
-    return () => {
-      const currentState = handle?.state ?? "loading"
-      const simpleState: LoroDocState =
-        currentState === "ready" ? "ready" : "loading"
-      if (!currentState) {
-        return { version: null, state: "loading" as const }
-      }
-      let currentVersion: string | null = null
-      if (simpleState === "ready" && handle) {
-        const vv = handle.doc()?.oplogVersion()
-        if (vv) {
-          currentVersion = JSON.stringify(Object.fromEntries(vv.toJSON()))
-        }
-      }
+  const getSnapshot = useCallback(() => {
+    if (handle) {
+      const state = handle.state
+      const version = handle.doc()?.opCount() ?? -1
 
+      // Only update the ref if something actually changed
       if (
-        lastSnapshot &&
-        lastSnapshot.state === simpleState &&
-        lastSnapshot.version === currentVersion
+        snapshotRef.current.state !== state ||
+        snapshotRef.current.version !== version
       ) {
-        return lastSnapshot
+        snapshotRef.current = { version, state }
       }
-
-      lastSnapshot = { version: currentVersion, state: simpleState }
-      return lastSnapshot
     }
+
+    return snapshotRef.current
   }, [handle])
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
   const doc = useMemo(() => {
-    if (snapshot.state !== "ready" || snapshot.version === null) {
+    if (snapshot.state !== "ready" || snapshot.version === -1) {
       return undefined
     }
 
@@ -138,5 +137,5 @@ export function useLoroDoc<T extends Record<string, any>>(
     [handle],
   )
 
-  return [doc as T | undefined, changeDoc, snapshot.state]
+  return [doc as T | undefined, changeDoc, handle]
 }

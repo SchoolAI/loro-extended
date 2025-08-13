@@ -1,22 +1,19 @@
-import type {
+import {
+  type NetMsg,
   NetworkAdapter,
-  PeerId,
-  PeerMetadata,
-  RepoMessage,
+  type PeerId,
+  type PeerMetadata,
 } from "@loro-extended/repo"
-import Emittery from "emittery"
 import ReconnectingEventSource from "reconnecting-eventsource"
 
-type AdapterEvents = {
-  message: RepoMessage
-  "peer-candidate": { peerId: PeerId; metadata: PeerMetadata }
-  "peer-disconnected": { peerId: PeerId }
-}
+/*
 
-export class SseClientNetworkAdapter
-  extends Emittery<AdapterEvents>
-  implements NetworkAdapter
-{
+In the case of a server:
+
+
+*/
+
+export class SseClientNetworkAdapter extends NetworkAdapter {
   peerId?: PeerId
   #serverUrl: string
   #eventSource?: ReconnectingEventSource
@@ -26,51 +23,45 @@ export class SseClientNetworkAdapter
     this.#serverUrl = serverUrl
   }
 
-  connect(peerId: PeerId, _metadata: PeerMetadata): void {
+  async start(peerId: PeerId, _metadata: PeerMetadata): Promise<void> {
     this.peerId = peerId
     const url = `${this.#serverUrl}/events?peerId=${peerId}`
     this.#eventSource = new ReconnectingEventSource(url)
 
     this.#eventSource.onmessage = event => {
       const serializedMessage = JSON.parse(event.data)
-      const message = this.#deserializeMessage(serializedMessage) as RepoMessage
-      this.emit("message", message)
+      const message = this.#deserializeMessage(serializedMessage) as NetMsg
+      this.messageReceived(message)
     }
 
     this.#eventSource.onerror = err => {
-      console.error("EventSource failed:", err)
-      // The server will emit a "peer-disconnected" event on its end,
-      // but we can also signal it here.
-      this.emit("peer-disconnected", { peerId: "server" })
+      console.warn("disconnected", err)
+      this.peerDisconnected("server")
     }
 
     // When we connect, we can treat the server as a peer.
-    this.emit("peer-candidate", { peerId: "server", metadata: {} })
+    this.peerAvailable("server", {})
   }
 
-  disconnect(): void {
+  async stop(): Promise<void> {
     this.#eventSource?.close()
-    this.emit("peer-disconnected", { peerId: "server" })
+    this.peerDisconnected("server")
     this.peerId = undefined
   }
 
-  async send(message: RepoMessage): Promise<void> {
-    try {
-      // Convert Uint8Array to base64 for JSON serialization
-      const serializedMessage = this.#serializeMessage(message)
-      const response = await fetch(`${this.#serverUrl}/sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(serializedMessage),
-      })
+  async send(message: NetMsg): Promise<void> {
+    // Convert Uint8Array to base64 for JSON serialization
+    const serializedMessage = this.#serializeMessage(message)
+    const response = await fetch(`${this.#serverUrl}/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(serializedMessage),
+    })
 
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`)
-      }
-    } catch (error) {
-      console.error("Failed to send message:", error)
+    if (!response.ok) {
+      throw new Error(`Failed to send message: ${response.statusText}`)
     }
   }
 

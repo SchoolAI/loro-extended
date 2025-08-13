@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DocHandle } from "./doc-handle.js"
 import {
+  InProcessBridge,
   InProcessNetworkAdapter,
-  InProcessNetworkBroker,
 } from "./network/in-process-network-adapter.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
@@ -30,23 +30,23 @@ describe("Repo", () => {
   it("should create a new document and return a handle", async () => {
     const handle = await repo.create()
     expect(handle).toBeInstanceOf(DocHandle)
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
   })
 
   it("should create a document with a specific ID", async () => {
     const documentId = "custom-doc-id"
     const handle = await repo.create({ documentId })
     expect(handle.documentId).toBe(documentId)
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
   })
 
   it("should create a document with initial value", async () => {
-    const handle = (await repo.create()).change(doc => {
+    const handle = (await repo.create()).change((doc: any) => {
       const root = doc.getMap("root")
       root.set("text", "initial")
     })
 
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
 
     // The document should have the initial value
     const doc = handle.doc()
@@ -79,11 +79,11 @@ describe("Repo", () => {
     // Capture the first returned handle
     const handle = await getOrCreateHandleSpy.mock.results[0]?.value
 
-    expect(handle.state).toBe("storage-loading")
+    expect(handle.fullState).toBe("storage-loading")
 
     await vi.runAllTimersAsync()
 
-    expect(handle.state).toBe("unavailable")
+    expect(handle.fullState).toBe("unavailable")
 
     // Clean up the spy
     getOrCreateHandleSpy.mockRestore()
@@ -96,31 +96,34 @@ describe("Repo", () => {
     await vi.runAllTimersAsync()
 
     const handle = await findOrCreatePromise
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
   })
 
   it("should find a document from a peer", async () => {
-    const broker = new InProcessNetworkBroker()
+    const bridge = new InProcessBridge()
 
+    const networkA = new InProcessNetworkAdapter(bridge)
     const repoA = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
+      network: [networkA],
       peerId: "repoA",
     })
+
     const handleA = await repoA.create()
+
     handleA.change(doc => {
       const root = doc.getMap("root")
       root.set("text", "hello")
     })
-    expect(handleA.state).toBe("ready")
+    expect(handleA.fullState).toBe("ready")
 
+    const networkB = new InProcessNetworkAdapter(bridge)
     const repoB = new Repo({
-      network: [new InProcessNetworkAdapter(broker)],
+      network: [networkB],
       peerId: "repoB",
     })
 
-    // This should work with the network sync
     const handleB = await repoB.find(handleA.documentId)
-    expect(handleB.state).toBe("ready")
+    expect(handleB.fullState).toBe("ready")
     const docB = handleB.doc()
     const rootB = docB.getMap("root")
     expect(rootB.get("text")).toBe("hello")
@@ -128,11 +131,11 @@ describe("Repo", () => {
 
   // it("should delete a document", async () => {
   //   const handle = await repo.create()
-  //   expect(handle.state).toBe("ready")
+  //   expect(handle.fullState).toBe("ready")
 
   //   await repo.delete(handle.documentId)
 
-  //   expect(handle.state).toBe("deleted")
+  //   expect(handle.fullState).toBe("deleted")
   //   const fromStorage = await storage.load([handle.documentId])
   //   // Storage returns undefined for non-existent items
   //   expect(fromStorage).toBeUndefined()
@@ -151,12 +154,12 @@ describe("Repo", () => {
     // Advance timers to trigger the network timeout
     await vi.runAllTimersAsync()
 
-    const handle = (await findOrCreatePromise).change(doc => {
+    const handle = (await findOrCreatePromise).change((doc: any) => {
       const root = doc.getMap("root")
       root.set("text", "created")
     })
 
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
     const doc = handle.doc()
     const root = doc.getMap("root")
     expect(root.get("text")).toBe("created")
@@ -200,7 +203,7 @@ describe("Repo", () => {
       saveSpy.mockClear()
 
       // Make multiple changes that actually modify the document version
-      handle.change(doc => {
+      handle.change((doc: any) => {
         const root = doc.getMap("root")
         root.set("text", "first")
         root.set("counter", 1)
@@ -209,7 +212,7 @@ describe("Repo", () => {
       // Wait a bit to ensure version changes
       await vi.runAllTimersAsync()
 
-      handle.change(doc => {
+      handle.change((doc: any) => {
         const root = doc.getMap("root")
         root.set("text", "second")
         root.set("counter", 2)
@@ -239,7 +242,7 @@ describe("Repo", () => {
 
       // First create and save a document
       const handle1 = await repo.create({ documentId: "test-doc" })
-      handle1.change(doc => {
+      handle1.change((doc: any) => {
         const root = doc.getMap("root")
         root.set("text", "stored")
       })
@@ -292,6 +295,6 @@ describe("Repo", () => {
   //   await new Promise(resolve => setTimeout(resolve, 100))
 
   //   // Check that repoA has the update
-  //   expect(handleA.doc().toJSON()).toMatchObject({ root: { text: "updated from B" } })
+  //   expect(handleA.doc().toJSON()).toMatchObject({ doc: { text: "updated from B" } })
   // })
 })

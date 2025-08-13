@@ -22,11 +22,13 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "vitest"
+    "test": "vitest",
+    "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
     "@loro-extended/change": "workspace:^",
     "emittery": "^1.0.1",
+    "mutative": "^1.2.0",
     "raj-ts": "^0.0.2",
     "uuid": "^9.0.1"
   },

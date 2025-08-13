@@ -1,8 +1,8 @@
 import Emittery from "emittery"
 import { LoroDoc, type LoroEventBatch } from "loro-crdt"
-
 import {
   type Command,
+  type DocHandleState,
   FIND_OR_CREATE_DEFAULT_TIMEOUT,
   type HandleState,
   type Message,
@@ -43,6 +43,8 @@ type DocHandleEvents<T extends DocContent> = {
   "doc-handle-local-change": Uint8Array
 }
 
+export type DocHandleSimplifiedState = "loading" | "ready" | "unavailable"
+
 /**
  * A handle to a Loro document that manages its lifecycle and state
  * transitions according to The Elm Architecture (TEA).
@@ -81,8 +83,20 @@ export class DocHandle<T extends DocContent> {
     }
   }
 
+  public get state(): DocHandleSimplifiedState {
+    switch (this.#state.state) {
+      case "deleted":
+      case "unavailable":
+        return "unavailable"
+      case "ready":
+        return "ready"
+      default:
+        return "loading"
+    }
+  }
+
   /** The current state of the handle (e.g., "idle", "loading", "ready"). */
-  public get state(): HandleState<T>["state"] {
+  public get fullState(): DocHandleState {
     return this.#state.state
   }
 
@@ -158,9 +172,9 @@ export class DocHandle<T extends DocContent> {
    * @param mutator A function that receives a draft of the document to modify.
    */
   public change(mutator: LoroDocMutator<T>): DocHandle<T> {
-    if (this.state !== "ready") {
+    if (this.fullState !== "ready") {
       throw new Error(
-        `Cannot change a document that is not ready. Current state: '${this.state}'`,
+        `Cannot change a document that is not ready. Current state: '${this.fullState}'`,
       )
     }
 
@@ -177,7 +191,7 @@ export class DocHandle<T extends DocContent> {
    * @internal
    */
   public applySyncMessage(message: Uint8Array): void {
-    if (this.state === "ready" && "doc" in this.#state) {
+    if (this.fullState === "ready" && "doc" in this.#state) {
       this.#dispatch({ type: "msg-remote-change", message })
     } else {
       // If we're not ready, we need to create a temporary doc to import into.
@@ -193,7 +207,9 @@ export class DocHandle<T extends DocContent> {
    */
   public doc(): LoroDoc<T> {
     if (this.#state.state !== "ready") {
-      throw new Error(`DocHandle is not ready. Current state: '${this.state}'`)
+      throw new Error(
+        `DocHandle is not ready. Current state: '${this.fullState}'`,
+      )
     }
     return this.#state.doc
   }

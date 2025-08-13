@@ -7,7 +7,7 @@ import type { RequestId } from "./request-tracker.js"
 import type { DocumentId } from "./types.js"
 
 type TestSchema = {
-  root: LoroMap<{
+  doc: LoroMap<{
     text: string
   }>
 }
@@ -208,7 +208,7 @@ describe("DocHandle program", () => {
     it("should handle an initial value function", () => {
       const [initialState] = init<TestSchema>()
       const initialize = (doc: LoroDoc) => {
-        doc.getMap("root").set("text", "hello")
+        doc.getMap("doc").set("text", "hello")
       }
       const [newState, command] = update(
         { type: "msg-create", initialize, requestId: reqId },

@@ -1,85 +1,125 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-
 import type { PeerId } from "../types.js"
 import {
+  InProcessBridge,
   InProcessNetworkAdapter,
-  InProcessNetworkBroker,
 } from "./in-process-network-adapter.js"
-import type { AnnounceDocumentMessage } from "./network-messages.js"
+import type { NetMsgDirectoryRequest } from "./network-messages.js"
 
 describe("InProcessNetworkAdapter", () => {
-  let broker: InProcessNetworkBroker
+  let bridge: InProcessBridge
 
   beforeEach(() => {
-    broker = new InProcessNetworkBroker()
+    bridge = new InProcessBridge()
   })
 
   it("should allow two peers to connect and exchange messages", async () => {
-    const adapter1 = new InProcessNetworkAdapter(broker)
-    const adapter2 = new InProcessNetworkAdapter(broker)
+    const peer1Id: PeerId = "peer1"
+    const peer2Id: PeerId = "peer2"
 
-    const peer1Id = "peer1" as PeerId
-    const peer2Id = "peer2" as PeerId
+    const adapter1 = new InProcessNetworkAdapter(bridge)
+    const adapter2 = new InProcessNetworkAdapter(bridge)
 
-    const peer1CandidateMock = vi.fn()
-    const peer2CandidateMock = vi.fn()
-    adapter1.on("peer-candidate", peer1CandidateMock)
-    adapter2.on("peer-candidate", peer2CandidateMock)
+    const messageMock1 = vi.fn()
+    const messageMock2 = vi.fn()
+    adapter1.on("message-received", messageMock1)
+    adapter2.on("message-received", messageMock2)
 
-    // Connect the first peer
-    adapter1.connect(peer1Id, {})
+    // Connect peers
+    adapter1.start(peer1Id)
+    adapter2.start(peer2Id)
 
-    // The first peer should not see any candidates yet
-    expect(peer1CandidateMock).not.toHaveBeenCalled()
+    adapter1.markAsReady()
+    adapter2.markAsReady()
 
-    // Connect the second peer
-    adapter2.connect(peer2Id, {})
+    // Verify peers are connected in the peer state manager
+    expect(bridge.peerIds).toEqual(new Set([peer1Id, peer2Id]))
 
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    // Now they should see each other
-    expect(peer1CandidateMock).toHaveBeenCalledWith({
-      peerId: peer2Id,
-      metadata: {},
-    })
-    expect(peer2CandidateMock).toHaveBeenCalledWith({
-      peerId: peer1Id,
-      metadata: {},
-    })
-
-    const messageMock = vi.fn()
-    adapter2.on("message", messageMock)
-
-    const message: AnnounceDocumentMessage = {
-      type: "announce-document",
+    const message: NetMsgDirectoryRequest = {
+      type: "directory-request",
       senderId: peer1Id,
       targetIds: [peer2Id],
-      documentIds: ["docA", "docB"],
     }
     adapter1.send(message)
 
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(messageMock).toHaveBeenCalledWith(message)
+    expect(messageMock2).toHaveBeenCalledWith({ message })
   })
 
-  it("should notify peers of disconnection", async () => {
-    const adapter1 = new InProcessNetworkAdapter(broker)
-    const adapter2 = new InProcessNetworkAdapter(broker)
+  it("should handle sending messages to non-existent peers gracefully", async () => {
+    const adapter = new InProcessNetworkAdapter(bridge)
+    const peerId: PeerId = "peer1"
+    const nonExistentPeerId: PeerId = "non-existent"
 
-    const peer1Id = "peer1" as PeerId
-    const peer2Id = "peer2" as PeerId
+    adapter.start(peerId)
 
-    adapter1.connect(peer1Id, {})
-    adapter2.connect(peer2Id, {})
+    const message: NetMsgDirectoryRequest = {
+      type: "directory-request",
+      senderId: peerId,
+      targetIds: [nonExistentPeerId],
+    }
 
-    const disconnectMock = vi.fn()
-    adapter2.on("peer-disconnected", disconnectMock)
+    // This should not throw an error
+    expect(() => adapter.send(message)).not.toThrow()
+  })
 
-    adapter1.disconnect()
+  it("should handle sending messages to multiple peers", async () => {
+    const adapter1 = new InProcessNetworkAdapter(bridge) // sender
+    const adapter2 = new InProcessNetworkAdapter(bridge) // receiver 1
+    const adapter3 = new InProcessNetworkAdapter(bridge) // receiver 2
+    const adapter4 = new InProcessNetworkAdapter(bridge) // not in address list
+
+    const messageMock2 = vi.fn()
+    const messageMock3 = vi.fn()
+    const messageMock4 = vi.fn()
+    adapter2.on("message-received", messageMock2)
+    adapter3.on("message-received", messageMock3)
+    adapter4.on("message-received", messageMock4)
+
+    const peer1Id: PeerId = "peer1"
+    const peer2Id: PeerId = "peer2"
+    const peer3Id: PeerId = "peer3"
+    const peer4Id: PeerId = "peer4"
+
+    adapter1.start(peer1Id)
+    adapter2.start(peer2Id)
+    adapter3.start(peer3Id)
+    adapter4.start(peer4Id)
+
+    adapter1.markAsReady()
+    adapter2.markAsReady()
+    adapter3.markAsReady()
+    adapter4.markAsReady()
+
+    const message: NetMsgDirectoryRequest = {
+      type: "directory-request",
+      senderId: peer1Id,
+      targetIds: [peer2Id, peer3Id],
+    }
+
+    adapter1.send(message)
 
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(disconnectMock).toHaveBeenCalledWith({ peerId: peer1Id })
+    expect(messageMock2).toHaveBeenCalledWith({ message })
+    expect(messageMock3).toHaveBeenCalledWith({ message })
+    expect(messageMock4).not.toHaveBeenCalledWith({ message })
+  })
+
+  it("should handle sending a message with empty target IDs array", async () => {
+    const adapter = new InProcessNetworkAdapter(bridge)
+    const peerId: PeerId = "peer1"
+
+    adapter.start(peerId)
+
+    const message: NetMsgDirectoryRequest = {
+      type: "directory-request",
+      senderId: peerId,
+      targetIds: [],
+    }
+
+    // This should not throw an error
+    expect(() => adapter.send(message)).not.toThrow()
   })
 })

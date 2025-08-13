@@ -19,7 +19,7 @@ describe("DocHandle Storage Integration", () => {
 
     // Make a local change
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "hello")
     })
 
@@ -54,7 +54,7 @@ describe("DocHandle Storage Integration", () => {
 
     // Create a sync message from another doc
     const otherDoc = new LoroDoc()
-    otherDoc.getMap("root").set("text", "from remote")
+    otherDoc.getMap("doc").set("text", "from remote")
     const syncMessage = otherDoc.export({ mode: "update" })
 
     // Apply the sync message
@@ -91,7 +91,7 @@ describe("DocHandle Storage Integration", () => {
     // This should not throw even without saveToStorage
     expect(() => {
       handle.change(doc => {
-        const root = doc.getMap("root")
+        const root = doc.getMap("doc")
         root.set("text", "hello")
       })
     }).not.toThrow()
@@ -115,7 +115,7 @@ describe("DocHandle Storage Integration", () => {
 
     // Make a change that will trigger a failed save
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "hello")
     })
 
@@ -156,7 +156,7 @@ describe("DocHandle Storage Integration", () => {
 
     // Make a local change
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "hello")
     })
 
@@ -186,7 +186,7 @@ describe("DocHandle Storage Integration", () => {
 
     // Make a change
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("value", 1)
     })
 

@@ -1,9 +1,6 @@
 import type { LoroDoc } from "loro-crdt"
 import type { DocHandle } from "./doc-handle.js"
-import type {
-  RepoMessage,
-  UnsentRepoMessage,
-} from "./network/network-messages.js"
+import type { AddressedNetMsg, NetMsg } from "./network/network-messages.js"
 import type { PermissionAdapter } from "./permission-adapter.js"
 import { RequestTracker } from "./request-tracker.js"
 import {
@@ -16,11 +13,11 @@ import {
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
 export interface SynchronizerServices {
-  sendMessage: (message: UnsentRepoMessage) => void
+  send: (message: AddressedNetMsg) => void
   // biome-ignore lint/suspicious/noExplicitAny: many docs possible
   getDoc: (documentId: DocumentId) => DocHandle<any>
+
   permissions: PermissionAdapter
-  onDocAvailable: (documentId: DocumentId) => void
 }
 
 export class Synchronizer {
@@ -65,9 +62,13 @@ export class Synchronizer {
     this.#dispatch({ type: "msg-local-change", documentId, data })
   }
 
-  public handleRepoMessage(message: RepoMessage) {
+  public isPeerConnected(peerId: PeerId): boolean {
+    return this.#model.peers.has(peerId)
+  }
+
+  public handleRepoMessage(message: NetMsg) {
     switch (message.type) {
-      case "announce-document": {
+      case "directory-response": {
         this.#dispatch({
           type: "msg-received-doc-announced",
           from: message.senderId,
@@ -75,7 +76,7 @@ export class Synchronizer {
         })
         break
       }
-      case "request-sync": {
+      case "sync-request": {
         this.#dispatch({
           type: "msg-received-doc-request",
           from: message.senderId,
@@ -83,13 +84,13 @@ export class Synchronizer {
         })
         break
       }
-      case "sync": {
-        if (!message.data) return
+      case "sync-response": {
+        if (message.transmission.type === "up-to-date") return
         this.#dispatch({
           type: "msg-received-sync",
           from: message.senderId,
           documentId: message.documentId,
-          data: message.data,
+          transmission: message.transmission,
           hopCount: message.hopCount,
         })
         break
@@ -138,21 +139,25 @@ export class Synchronizer {
     switch (command.type) {
       case "cmd-notify-docs-available":
         for (const documentId of command.documentIds) {
-          this.#services.onDocAvailable(documentId)
+          // Effectful getDoc: registers documentId in its cache
+          this.#services.getDoc(documentId)
         }
         break
       case "cmd-send-message": {
-        this.#services.sendMessage(command.message)
+        this.#services.send(command.message)
         break
       }
       case "cmd-load-and-send-sync": {
         const handle = this.#services.getDoc(command.documentId)
-        if (handle.state === "ready") {
-          this.#services.sendMessage({
-            type: "sync",
+        if (handle.fullState === "ready") {
+          this.#services.send({
+            type: "sync-response",
             targetIds: [command.to],
             documentId: command.documentId,
-            data: handle.doc().exportSnapshot(),
+            transmission: {
+              type: "update",
+              data: handle.doc().export({ mode: "snapshot" }),
+            },
             hopCount: 0, // Original message from this peer
           })
         }
@@ -162,13 +167,16 @@ export class Synchronizer {
         // First check if we already have the document in memory
         const handle = this.#services.getDoc(command.documentId)
 
-        if (handle.state === "ready") {
+        if (handle.fullState === "ready") {
           // Document is already loaded in memory, send it directly
-          this.#services.sendMessage({
-            type: "sync",
+          this.#services.send({
+            type: "sync-response",
             targetIds: [command.to],
             documentId: command.documentId,
-            data: handle.doc().exportSnapshot(),
+            transmission: {
+              type: "update",
+              data: handle.doc().export({ mode: "update" }),
+            },
             hopCount: 0, // Original message from this peer
           })
         } else {
@@ -178,19 +186,23 @@ export class Synchronizer {
             .findInStorageOnly()
             .then(() => {
               // After findInStorageOnly completes, check if the document is now ready
-              if (handle.state === "ready") {
-                this.#services.sendMessage({
-                  type: "sync",
+              if (handle.fullState === "ready") {
+                this.#services.send({
+                  type: "sync-response",
                   targetIds: [command.to],
                   documentId: command.documentId,
-                  data: handle.doc().exportSnapshot(),
+                  transmission: {
+                    type: "update",
+                    data: handle.doc().export({ mode: "update" }),
+                  },
                   hopCount: 0, // Original message from this peer
                 })
               }
               // If the document couldn't be loaded from storage, findInStorageOnly will reject
               // and we won't send a response, maintaining the same behavior as before
             })
-            .catch(() => {
+            .catch(error => {
+              console.log("findInStorageOnly failed:", error)
               // If findInStorageOnly() rejects, the document doesn't exist in storage
               // We don't send a response, maintaining the same behavior as before
             })
@@ -214,7 +226,13 @@ export class Synchronizer {
       }
       case "cmd-sync-succeeded": {
         const handle = this.#services.getDoc(command.documentId)
-        handle.applySyncMessage(command.data)
+
+        switch (command.transmission.type) {
+          case "snapshot":
+          case "update":
+          case "update-with-version":
+            handle.applySyncMessage(command.transmission.data)
+        }
 
         if (command.requestId !== undefined) {
           this.#networkRequestTracker.resolve(command.requestId, handle.doc())
@@ -239,16 +257,21 @@ export class Synchronizer {
   #clearTimeout(documentId: DocumentId) {
     const timeout = this.#timeouts.get(documentId)
 
-    if (timeout) {
-      clearTimeout(timeout)
-      this.#timeouts.delete(documentId)
+    if (!timeout) return
+
+    clearTimeout(timeout)
+    this.#timeouts.delete(documentId)
+  }
+
+  public clearAllTimeouts() {
+    for (const documentId of this.#timeouts.keys()) {
+      this.#clearTimeout(documentId)
     }
   }
 
-  public _clearAllTimeouts() {
-    for (const timeoutId of this.#timeouts.values()) {
-      clearTimeout(timeoutId)
-    }
-    this.#timeouts.clear()
+  public reset() {
+    const [initialModel] = programInit(this.#services.permissions)
+    this.#model = initialModel
+    this.clearAllTimeouts()
   }
 }

@@ -12,10 +12,9 @@ describe("Synchronizer (Host)", () => {
 
   beforeEach(() => {
     mockServices = {
-      sendMessage: vi.fn(),
+      send: vi.fn(),
       getDoc: vi.fn(),
       permissions: createPermissions(),
-      onDocAvailable: vi.fn(),
     }
     synchronizer = new Synchronizer(mockServices)
   })
@@ -28,8 +27,8 @@ describe("Synchronizer (Host)", () => {
     synchronizer.addPeer("peer-1")
     await tick()
 
-    expect(mockServices.sendMessage).toHaveBeenCalledWith({
-      type: "announce-document",
+    expect(mockServices.send).toHaveBeenCalledWith({
+      type: "directory-response",
       targetIds: ["peer-1"],
       documentIds: ["doc-1"],
     })
@@ -37,10 +36,8 @@ describe("Synchronizer (Host)", () => {
 
   it("should execute a load-and-send-sync command", async () => {
     const mockHandle = {
-      state: "ready",
-      doc: () => ({
-        exportSnapshot: () => new Uint8Array([1, 2, 3]),
-      }),
+      fullState: "ready",
+      doc: () => ({ export: () => new Uint8Array([1, 2, 3]) }),
     }
 
     ;(mockServices.getDoc as any).mockReturnValue(mockHandle)
@@ -49,7 +46,7 @@ describe("Synchronizer (Host)", () => {
     await tick()
 
     synchronizer.handleRepoMessage({
-      type: "request-sync",
+      type: "sync-request",
       senderId: "peer-2",
       targetIds: ["test-peer"],
       documentId: "doc-1",
@@ -58,11 +55,11 @@ describe("Synchronizer (Host)", () => {
     await tick()
 
     expect(mockServices.getDoc).toHaveBeenCalledWith("doc-1")
-    expect(mockServices.sendMessage).toHaveBeenCalledWith({
-      type: "sync",
+    expect(mockServices.send).toHaveBeenCalledWith({
+      type: "sync-response",
       targetIds: ["peer-2"],
       documentId: "doc-1",
-      data: new Uint8Array([1, 2, 3]),
+      transmission: { type: "update", data: new Uint8Array([1, 2, 3]) },
       hopCount: 0, // Original message from this peer
     })
   })
@@ -79,11 +76,11 @@ describe("Synchronizer (Host)", () => {
     await tick()
 
     synchronizer.handleRepoMessage({
-      type: "sync",
+      type: "sync-response",
       senderId: "peer-2",
       targetIds: ["test-peer"],
       documentId: "doc-1",
-      data: new Uint8Array([4, 5, 6]),
+      transmission: { type: "update", data: new Uint8Array([4, 5, 6]) },
       hopCount: 0, // Original message from peer-2
     })
     await tick()

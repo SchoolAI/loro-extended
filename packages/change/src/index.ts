@@ -13,7 +13,7 @@ import {
 // #################
 
 /**
- * ExtendedLoroDoc wraps a LoroDoc to provide a cleaner API that hides the internal "root" map.
+ * ExtendedLoroDoc wraps a LoroDoc to provide a cleaner API that hides the internal "doc" map.
  * It provides convenient methods for casual users while exposing the underlying LoroDoc for advanced use cases.
  */
 export class ExtendedLoroDoc<T = any> {
@@ -23,15 +23,15 @@ export class ExtendedLoroDoc<T = any> {
 
   constructor(doc?: LoroDoc) {
     this._doc = doc || new LoroDoc()
-    this._rootMap = this._doc.getMap("root")
+    this._rootMap = this._doc.getMap("doc")
   }
 
   /**
-   * Returns the data as clean JSON without the "root" wrapper.
+   * Returns the data as clean JSON without the "doc" wrapper.
    */
   toJSON(): T {
     const json = this._doc.toJSON()
-    return (json.root as T) || ({} as T)
+    return (json.doc as T) || ({} as T)
   }
 
   /**
@@ -250,8 +250,8 @@ export function change<T>(
   callback: ChangeFn<T>,
 ): ExtendedLoroDoc<T> {
   // The root container is always a map.
-  const rootContainer = doc.getMap("root")
-  const proxy = createProxy(rootContainer)
+  const rootMap = doc.getMap("doc")
+  const proxy = createProxy(rootMap)
   callback(proxy as T)
   doc.commit()
   return doc

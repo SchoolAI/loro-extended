@@ -19,7 +19,7 @@ function App() {
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
   // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, state] = useLoroDoc<TodoDoc>(docId)
+  const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>(docId)
 
   useEffect(() => {
     console.log("doc state", doc)
@@ -56,6 +56,8 @@ function App() {
       }
     })
   }
+
+  const state = handle?.state || "loading"
 
   return (
     <div className="app-container">

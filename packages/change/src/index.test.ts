@@ -246,7 +246,7 @@ describe("change", () => {
 describe("LoroText handling", () => {
   it("should automatically convert strings to LoroText containers", () => {
     const doc = from({ title: "hello" })
-    const map = doc.getMap("root")
+    const map = doc.getMap("doc")
     const title = map.get("title")
     // By default, strings are now primitive LWW values
     expect(title).toBe("hello")
@@ -260,7 +260,7 @@ describe("LoroText handling", () => {
       d.title.insert(0, "world")
     })
 
-    const map = doc.getMap("root")
+    const map = doc.getMap("doc")
     const title = map.get("title") as LoroText
     expect(title).toBeInstanceOf(LoroText)
     expect(title.toString()).toBe("world")
@@ -272,7 +272,7 @@ describe("LoroText handling", () => {
       d.title.insert(5, " world")
     })
 
-    const map = doc.getMap("root")
+    const map = doc.getMap("doc")
     const title = map.get("title") as LoroText
     expect(title.toString()).toBe("hello world")
   })
@@ -281,7 +281,7 @@ describe("LoroText handling", () => {
 describe("LoroCounter handling", () => {
   it("should create a document with a LoroCounter", () => {
     const doc = from({ counter: CRDT.Counter(10) })
-    const counter = doc.getMap("root").get("counter") as LoroCounter
+    const counter = doc.getMap("doc").get("counter") as LoroCounter
     expect(counter).toBeInstanceOf(LoroCounter)
     expect(counter.value).toBe(10)
   })
@@ -292,12 +292,12 @@ describe("LoroCounter handling", () => {
     change(doc, d => {
       d.counter.increment(5)
     })
-    expect((doc.getMap("root").get("counter") as LoroCounter).value).toBe(5)
+    expect((doc.getMap("doc").get("counter") as LoroCounter).value).toBe(5)
 
     change(doc, d => {
       d.counter.decrement(3)
     })
-    expect((doc.getMap("root").get("counter") as LoroCounter).value).toBe(2)
+    expect((doc.getMap("doc").get("counter") as LoroCounter).value).toBe(2)
   })
 
   it("should handle counters in nested objects", () => {
@@ -307,7 +307,7 @@ describe("LoroCounter handling", () => {
       d.stats.scores.increment(50)
     })
 
-    const root = doc.getMap("root")
+    const root = doc.getMap("doc")
     const stats = root.get("stats") as LoroMap
     const scores = stats.get("scores") as LoroCounter
     expect(scores.value).toBe(150)
@@ -321,7 +321,7 @@ describe("LoroCounter handling", () => {
       d.counters[1].decrement(1)
     })
 
-    const counters = doc.getMap("root").get("counters") as LoroList
+    const counters = doc.getMap("doc").get("counters") as LoroList
     expect((counters.get(0) as LoroCounter).value).toBe(2)
     expect((counters.get(1) as LoroCounter).value).toBe(1)
   })

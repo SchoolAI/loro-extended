@@ -1,8 +1,8 @@
-import { SseServerNetworkAdapter } from "@loro-extended/network-sse/server"
+import { SseServerNetworkAdapter } from "@loro-extended/adapters/network/sse/server"
+import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
 import { Repo } from "@loro-extended/repo"
 import cors from "cors"
 import express from "express"
-import { LevelStorageAdapter } from "./level-storage-adapter.js"
 
 const app = express()
 app.use(cors())
@@ -10,7 +10,7 @@ app.use(express.json())
 
 // 1. Create the adapter instances.
 const sseAdapter = new SseServerNetworkAdapter()
-const storageAdapter = new LevelStorageAdapter("loro-todo-app.db")
+const storageAdapter = new LevelDBStorageAdapter("loro-todo-app.db")
 
 // 2. Create the Repo, passing the adapters in the config.
 // The repo is not directly used, but its constructor sets up the listeners

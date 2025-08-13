@@ -1,99 +1,192 @@
 import Emittery from "emittery"
-
 import type { PeerId } from "../types.js"
-import type {
-  NetworkAdapter,
-  NetworkAdapterEvents,
-  PeerMetadata,
-} from "./network-adapter.js"
-import type { RepoMessage } from "./network-messages.js"
+import { NetworkAdapter } from "./network-adapter.js"
+import type { NetMsg } from "./network-messages.js"
+
+interface InProcessBridgeEvents {
+  "peer-added": { peerId: PeerId; metadata: any }
+  "peer-removed": { peerId: PeerId }
+  message: { message: NetMsg }
+}
 
 /**
- * A "network" adapter that allows for direct, in-process communication
- * between two Repo instances. This is useful for testing.
- *
- * It uses a static broker to connect all instances of the adapter together.
+ * A bridge that connects multiple InProcessNetworkAdapters within the same process.
+ * This enables direct message passing between adapters for testing purposes.
  */
-export class InProcessNetworkAdapter
-  extends Emittery<NetworkAdapterEvents>
-  implements NetworkAdapter
-{
-  peerId?: PeerId
-  #broker: InProcessNetworkBroker
+export class InProcessBridge extends Emittery<InProcessBridgeEvents> {
+  readonly #adapters = new Map<PeerId, InProcessNetworkAdapter>()
 
-  constructor(broker = inProcessNetworkBroker) {
-    super()
-    this.#broker = broker
+  /**
+   * Register an adapter with this bridge
+   */
+  addAdapter(adapter: InProcessNetworkAdapter): void {
+    if (!adapter.peerId) throw new Error("can't addAdapter without peerId")
+
+    this.#adapters.set(adapter.peerId, adapter)
   }
 
-  connect(peerId: PeerId, metadata: PeerMetadata): void {
-    this.peerId = peerId
-    this.#broker.addPeer(peerId, metadata, this)
+  /**
+   * Remove an adapter from this bridge
+   */
+  removeAdapter(peerId: PeerId): void {
+    this.#adapters.delete(peerId)
   }
 
-  send(message: RepoMessage): void {
-    const { targetIds } = message
-    for (const targetId of targetIds) {
-      this.#broker.sendMessage(targetId, message)
-    }
+  /**
+   * Send a message through the bridge
+   */
+  send(message: NetMsg): void {
+    this.emit("message", { message })
   }
 
-  disconnect(): void {
-    if (this.peerId) {
-      this.#broker.removePeer(this.peerId)
-    }
+  /**
+   * Broadcast that a peer has been added to the network
+   */
+  peerAdded(peerId: PeerId, metadata: any): void {
+    this.emit("peer-added", { peerId, metadata })
+  }
+
+  /**
+   * Broadcast that a peer has been removed from the network
+   */
+  peerRemoved(peerId: PeerId): void {
+    this.emit("peer-removed", { peerId })
+  }
+
+  /**
+   * Get all peer IDs currently in the network
+   */
+  get peerIds(): Set<PeerId> {
+    return new Set(this.#adapters.keys())
+  }
+
+  /**
+   * Get the metadata for a peer
+   */
+  getPeerMetadata(peerId: PeerId): any {
+    const adapter = this.#adapters.get(peerId)
+    return adapter?.metadata
   }
 }
 
-/** The "broker" is a shared space for all InProcessNetworkAdapters to find each other. */
-export class InProcessNetworkBroker {
-  #peers = new Map<
-    PeerId,
-    { metadata: PeerMetadata; adapter: InProcessNetworkAdapter }
-  >()
+/**
+ * A network adapter for in-process communication between Repo instances.
+ * This adapter is designed for testing scenarios where network communication
+ * needs to be simulated without actual network overhead, e.g. testing.
+ *
+ * All adapters using the same bridge instance will be able to communicate
+ * with each other directly.
+ *
+ * @example
+ * ```typescript
+ * // Create a shared bridge
+ * const bridge = new InProcessBridge();
+ *
+ * // Create two adapters using the same bridge
+ * const adapter1 = new InProcessNetworkAdapter("peer1", bridge);
+ * const adapter2 = new InProcessNetworkAdapter("peer2", bridge);
+ *
+ * // Start both adapters
+ * await adapter1.start("peer1", {});
+ * await adapter2.start("peer2", {});
+ *
+ * // Send a message from peer1 to peer2
+ * await adapter1.send({
+ *   type: "announce-document",
+ *   senderId: "peer1",
+ *   targetId: "peer2",
+ *   documentIds: ["doc1"]
+ * });
+ * ```
+ */
+export class InProcessNetworkAdapter extends NetworkAdapter {
+  readonly #bridge: InProcessBridge
+  #bridgeUnsubscribes: (() => void)[] = []
 
-  addPeer(
-    peerId: PeerId,
-    metadata: PeerMetadata,
-    adapter: InProcessNetworkAdapter,
-  ) {
-    // Announce the new peer to all existing peers
-    for (const [existingPeerId, existingPeer] of this.#peers.entries()) {
-      existingPeer.adapter.emit("peer-candidate", { peerId, metadata })
-      // Announce existing peers to the new one
-      adapter.emit("peer-candidate", {
-        peerId: existingPeerId,
-        metadata: existingPeer.metadata,
-      })
-    }
-    this.#peers.set(peerId, { metadata, adapter })
+  peerId?: PeerId
+  metadata: any
+
+  constructor(bridge: InProcessBridge) {
+    super()
+    this.#bridge = bridge
   }
 
-  sendMessage(targetId: PeerId, message: RepoMessage) {
-    if (targetId === "broadcast") {
-      // Send to all peers except the sender
-      for (const [peerId, peer] of this.#peers.entries()) {
-        if (peerId !== message.senderId) {
-          peer.adapter.emit("message", message)
+  /**
+   * Start participating in the in-process network.
+   * Registers this adapter with the bridge and begins listening for network events.
+   */
+  async start(peerId: PeerId, metadata: any = {}): Promise<void> {
+    this.peerId = peerId
+    this.metadata = metadata
+    this.#bridge.addAdapter(this)
+
+    // Listen for network events
+    this.#bridgeUnsubscribes.push(
+      this.#bridge.on(
+        "peer-added",
+        ({ peerId: newPeerId, metadata: newMetadata }) => {
+          // Don't notify about ourselves
+          if (newPeerId === peerId) return
+
+          this.peerAvailable(newPeerId, newMetadata)
+        },
+      ),
+    )
+
+    this.#bridgeUnsubscribes.push(
+      this.#bridge.on("peer-removed", ({ peerId: removedPeerId }) => {
+        // Don't notify about ourselves
+        if (removedPeerId === peerId) return
+
+        this.peerDisconnected(removedPeerId)
+      }),
+    )
+
+    this.#bridgeUnsubscribes.push(
+      this.#bridge.on("message", ({ message }) => {
+        // Only process messages intended for us
+        if (!message.targetIds.includes(peerId)) return
+
+        this.messageReceived(message)
+      }),
+    )
+
+    // Notify network about our presence
+    this.#bridge.peerAdded(peerId, metadata)
+
+    // Notify about existing peers (excluding ourselves)
+    // These will be queued until markAsReady() is called by the NetworkSubsystem
+    for (const existingPeerId of this.#bridge.peerIds) {
+      if (existingPeerId !== peerId) {
+        // Get the existing adapter's metadata
+        const existingMetadata = this.#bridge.getPeerMetadata(existingPeerId)
+        if (existingMetadata !== undefined) {
+          this.peerAvailable(existingPeerId, existingMetadata)
         }
       }
-    } else {
-      const peer = this.#peers.get(targetId)
-      if (peer) {
-        // The `message` event is emitted on the target adapter, which is then
-        // picked up by the NetworkSubsystem and passed to the Repo.
-        peer.adapter.emit("message", message)
-      }
     }
   }
 
-  removePeer(peerId: PeerId) {
-    this.#peers.delete(peerId)
-    for (const { adapter } of this.#peers.values()) {
-      adapter.emit("peer-disconnected", { peerId })
-    }
+  /**
+   * Send a message to peers via the bridge.
+   * The bridge will route the message to the appropriate recipients.
+   */
+  async send(message: NetMsg): Promise<void> {
+    this.#bridge.send(message)
+  }
+
+  /**
+   * Stop participating in the in-process network.
+   * Removes this adapter from the bridge and notifies other adapters.
+   */
+  async stop(): Promise<void> {
+    if (!this.peerId) throw new Error("can't stop adapter: peerId not set")
+
+    // Remove all bridge event listeners
+    this.#bridgeUnsubscribes.forEach(unsubscribe => unsubscribe())
+    this.#bridgeUnsubscribes = []
+
+    this.#bridge.peerRemoved(this.peerId)
+    this.#bridge.removeAdapter(this.peerId)
   }
 }
-
-/** A singleton broker for all InProcessNetworkAdapters to use. */
-const inProcessNetworkBroker = new InProcessNetworkBroker()

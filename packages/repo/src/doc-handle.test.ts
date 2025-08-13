@@ -39,7 +39,7 @@ describe("DocHandle Integration Tests", () => {
 
   it("should initialize in an idle state", () => {
     const handle = new DocHandle("test-doc")
-    expect(handle.state).toBe("idle")
+    expect(handle.fullState).toBe("idle")
   })
 
   it("should become 'unavailable' if find() is unsuccessful (no return)", async () => {
@@ -51,11 +51,11 @@ describe("DocHandle Integration Tests", () => {
 
     // We don't await the promise here because we want to inspect the intermediate state
     handle.find()
-    expect(handle.state).toBe("storage-loading")
+    expect(handle.fullState).toBe("storage-loading")
     await vi.runAllTimersAsync()
 
     // The state transition to storage-loading is synchronous
-    expect(handle.state).toBe("unavailable")
+    expect(handle.fullState).toBe("unavailable")
     expect(services.loadFromStorage).toHaveBeenCalledWith("test-doc")
   })
 
@@ -69,7 +69,7 @@ describe("DocHandle Integration Tests", () => {
 
     const resolvedHandle = await handle.find()
 
-    expect(resolvedHandle.state).toBe("ready")
+    expect(resolvedHandle.fullState).toBe("ready")
     expect(resolvedHandle.doc()).toBe(doc)
     expect(services.loadFromStorage).toHaveBeenCalledOnce()
     expect(handle).toBe(resolvedHandle) // The resolved handle should be the same instance
@@ -84,12 +84,12 @@ describe("DocHandle Integration Tests", () => {
     const handle = new DocHandle("test-doc", services)
     await handle.findOrCreate()
 
-    expect(handle.state).toBe("ready")
+    expect(handle.fullState).toBe("ready")
     expect(handle.doc()).toBeInstanceOf(LoroDoc)
   })
 
   it("should allow changing a document once ready", async () => {
-    type TestSchema = { root: LoroMap<{ text: string }> }
+    type TestSchema = { doc: LoroMap<{ text: string }> }
     const doc = new LoroDoc<TestSchema>()
     const services: DocHandleServices<TestSchema> = {
       loadFromStorage: async () => doc,
@@ -102,13 +102,13 @@ describe("DocHandle Integration Tests", () => {
     const changePromise = waitForEvent(handle, "doc-handle-change")
 
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "hello world")
     })
 
     await changePromise
     const loroDoc = handle.doc()
-    const jsDoc = loroDoc.getMap("root").toJSON()
+    const jsDoc = loroDoc.getMap("doc").toJSON()
     expect(jsDoc.text).toBe("hello world")
   })
 
@@ -126,7 +126,7 @@ describe("DocHandle Integration Tests", () => {
     handle.on("doc-handle-local-change", listener)
 
     handle.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "hello")
     })
 
@@ -137,7 +137,7 @@ describe("DocHandle Integration Tests", () => {
 
   it("should throw when trying to change a non-ready document", () => {
     const handle = new DocHandle("test-doc")
-    expect(handle.state).not.toBe("ready")
+    expect(handle.fullState).not.toBe("ready")
     expect(() => {
       handle.change(() => {})
     }).toThrow()
@@ -159,14 +159,14 @@ describe("DocHandle Integration Tests", () => {
 
     const changePromise = waitForEvent(handleB, "doc-handle-change")
     handleA.change(doc => {
-      const root = doc.getMap("root")
+      const root = doc.getMap("doc")
       root.set("text", "synced")
     })
 
     await changePromise
 
     const retrievedDocB = handleB.doc()
-    const jsDocB = retrievedDocB.getMap("root").toJSON()
+    const jsDocB = retrievedDocB.getMap("doc").toJSON()
     expect(jsDocB.text).toBe("synced")
   })
 })
