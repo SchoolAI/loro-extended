@@ -10,10 +10,8 @@ export class DebugModel {
   public readonly doc: LoroDoc
   private readonly peersMap: LoroMap
   private readonly localDocsList: LoroList
-  private enabled: boolean
 
-  constructor(enabled = true) {
-    this.enabled = enabled
+  constructor() {
     this.doc = new LoroDoc()
 
     // Initialize the containers
@@ -25,8 +23,6 @@ export class DebugModel {
    * Apply patches from the synchronizer to the debug model.
    */
   public applyPatches(patches: Patch[]): void {
-    if (!this.enabled) return
-
     for (const patch of patches) {
       this.applyPatch(patch)
     }
@@ -154,20 +150,6 @@ export class DebugModel {
   public subscribeToSyncStates(callback: () => void): () => void {
     const syncStatesMap = this.doc.getMap("syncStates")
     return syncStatesMap.subscribe(callback)
-  }
-
-  /**
-   * Enable or disable the debug model.
-   */
-  public setEnabled(enabled: boolean): void {
-    this.enabled = enabled
-  }
-
-  /**
-   * Check if the debug model is enabled.
-   */
-  public isEnabled(): boolean {
-    return this.enabled
   }
 
   /**

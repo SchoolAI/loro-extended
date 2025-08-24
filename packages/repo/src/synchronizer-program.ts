@@ -185,7 +185,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
       model.peers.delete(msg.peerId)
       // Remove the peer from all document relationships
       removePeerFromAllDocuments(model.remoteDocs, msg.peerId)
-      return undefined
+      return
     }
 
     case "msg-document-added": {
@@ -319,7 +319,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
       const syncState = model.syncStates.get(documentId)
 
       if (!model.permissions.canWrite(from, documentId)) {
-        return undefined
+        return
       }
 
       const commands: Command[] = []
@@ -372,7 +372,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
 
       // Get peers aware of document from model.remoteDocs
       const awarePeers = getPeersAwareOfDocument(model.remoteDocs, documentId)
-      if (awarePeers.length === 0) return undefined
+      if (awarePeers.length === 0) return
 
       return {
         type: "cmd-send-message",
@@ -404,7 +404,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
           // For now, we'll assume the caller of `queryNetwork` which calls this
           // will get the document from the handle directly.
         }
-        return undefined
+        return
       }
 
       const commands: Command[] = []
@@ -460,7 +460,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
     case "msg-sync-timeout-fired": {
       const { documentId } = msg
       const syncState = model.syncStates.get(documentId)
-      if (!syncState) return undefined
+      if (!syncState) return
 
       // If this was a user-specified timeout (from findOrCreate), fail immediately
       // Otherwise, this is a regular sync that can be retried when peers connect
@@ -475,9 +475,6 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
         },
       ])
     }
-
-    default:
-      return undefined
   }
 }
 
@@ -485,9 +482,7 @@ function updateMutative(msg: Message, model: Model): Command | undefined {
  * Standard raj-compatible update function.
  * Uses the transformer to provide immutability while keeping the logic clean.
  */
-export function update(msg: Message, model: Model): [Model, Command?] {
-  return makeMutableUpdate(updateMutative)(msg, model)
-}
+export const update = makeMutableUpdate(updateMutative)
 
 /**
  * Update function with patch generation for debugging.

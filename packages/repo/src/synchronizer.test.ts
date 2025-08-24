@@ -149,11 +149,8 @@ describe("Synchronizer with Debugging", () => {
 
     const synchronizer = new Synchronizer({
       services: mockServices,
-      enableDebugging: true,
       onPatch,
     })
-
-    expect(synchronizer.isDebuggingEnabled()).toBe(true)
 
     // Add a peer - should generate patches
     synchronizer.addPeer("peer-1")
@@ -167,43 +164,12 @@ describe("Synchronizer with Debugging", () => {
     expect(peerPatch).toBeDefined()
   })
 
-  it("should not generate patches when debugging is disabled", async () => {
-    const onPatch = vi.fn()
-
-    const synchronizer = new Synchronizer({
-      services: mockServices,
-      enableDebugging: false,
-      onPatch,
-    })
-
-    expect(synchronizer.isDebuggingEnabled()).toBe(false)
-
-    synchronizer.addPeer("peer-1")
-    await tick()
-
-    expect(onPatch).not.toHaveBeenCalled()
-  })
-
-  it("should work with legacy constructor (backward compatibility)", async () => {
-    const synchronizer = new Synchronizer(mockServices)
-
-    expect(synchronizer.isDebuggingEnabled()).toBe(false)
-    expect(synchronizer.getModelSnapshot()).toBeNull()
-
-    // Should still work normally
-    synchronizer.addPeer("peer-1")
-    await tick()
-
-    expect(mockServices.send).toHaveBeenCalled()
-  })
-
   it("should apply patches correctly to debug model", async () => {
-    const debugModel = new DebugModel(true)
+    const debugModel = new DebugModel()
     const patches: Patch[] = []
 
     const synchronizer = new Synchronizer({
       services: mockServices,
-      enableDebugging: true,
       onPatch: (newPatches: Patch[]) => {
         patches.push(...newPatches)
         debugModel.applyPatches(newPatches)
@@ -239,7 +205,6 @@ describe("Synchronizer with Debugging", () => {
   it("should provide model snapshots when debugging is enabled", async () => {
     const synchronizer = new Synchronizer({
       services: mockServices,
-      enableDebugging: true,
     })
 
     // Add some state
@@ -249,17 +214,16 @@ describe("Synchronizer with Debugging", () => {
 
     const snapshot = synchronizer.getModelSnapshot()
     expect(snapshot).not.toBeNull()
-    expect(snapshot.peers["peer-1"]).toBeDefined()
+    expect(snapshot.peers.get("peer-1")).toBeDefined()
     expect(snapshot.localDocs).toContain("doc-1")
   })
 
   it("should track complex state changes through patches", async () => {
-    const debugModel = new DebugModel(true)
+    const debugModel = new DebugModel()
     let patchCount = 0
 
     const synchronizer = new Synchronizer({
       services: mockServices,
-      enableDebugging: true,
       onPatch: (patches: Patch[]) => {
         patchCount += patches.length
         debugModel.applyPatches(patches)

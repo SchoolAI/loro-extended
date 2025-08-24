@@ -1,5 +1,5 @@
 import type { LoroDoc } from "loro-crdt"
-import type { Patch } from "mutative"
+import { create, type Patch } from "mutative"
 import type { DocHandle } from "./doc-handle.js"
 import type { AddressedNetMsg, NetMsg } from "./network/network-messages.js"
 import type { PermissionAdapter } from "./permission-adapter.js"
@@ -24,7 +24,6 @@ export interface SynchronizerServices {
 
 export interface SynchronizerConfig {
   services: SynchronizerServices
-  enableDebugging?: boolean
   onPatch?: (patches: Patch[]) => void
 }
 
@@ -34,22 +33,18 @@ export class Synchronizer {
   #timeouts = new Map<DocumentId, NodeJS.Timeout>()
   #networkRequestTracker = new RequestTracker<LoroDoc<DocContent> | null>()
   #updateFunction: (msg: Message, model: Model) => [Model, Command?]
-  #debuggingEnabled: boolean
 
   constructor(config: SynchronizerServices | SynchronizerConfig) {
     // Support both old and new constructor signatures for backward compatibility
     if ("services" in config) {
       // New config-based constructor
       this.#services = config.services
-      this.#debuggingEnabled = config.enableDebugging ?? false
-      this.#updateFunction =
-        config.enableDebugging && config.onPatch
-          ? updateWithPatches(config.onPatch)
-          : programUpdate
+      this.#updateFunction = config.onPatch
+        ? updateWithPatches(config.onPatch)
+        : programUpdate
     } else {
       // Legacy constructor for backward compatibility
       this.#services = config
-      this.#debuggingEnabled = false
       this.#updateFunction = programUpdate
     }
 
@@ -303,37 +298,7 @@ export class Synchronizer {
    * Get the current model state (for debugging purposes).
    * Returns a deep copy to prevent accidental mutations.
    */
-  public getModelSnapshot(): any {
-    if (!this.#debuggingEnabled) {
-      console.warn("Model snapshot requested but debugging is not enabled")
-      return null
-    }
-
-    return JSON.parse(
-      JSON.stringify({
-        localDocs: Array.from(this.#model.localDocs),
-        peers: Object.fromEntries(this.#model.peers),
-        syncStates: Object.fromEntries(this.#model.syncStates),
-        remoteDocs: {
-          peersWithDoc: Object.fromEntries(
-            Array.from(this.#model.remoteDocs.peersWithDoc.entries()).map(
-              ([key, value]) => [key, Array.from(value)],
-            ),
-          ),
-          peersAwareOfDoc: Object.fromEntries(
-            Array.from(this.#model.remoteDocs.peersAwareOfDoc.entries()).map(
-              ([key, value]) => [key, Array.from(value)],
-            ),
-          ),
-        },
-      }),
-    )
-  }
-
-  /**
-   * Check if debugging is enabled.
-   */
-  public isDebuggingEnabled(): boolean {
-    return this.#debuggingEnabled
+  public getModelSnapshot(): Model {
+    return create(this.#model)[0]
   }
 }

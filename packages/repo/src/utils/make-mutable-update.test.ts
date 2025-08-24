@@ -1,6 +1,6 @@
-import type { Patch } from "mutative";
-import { describe, expect, it } from "vitest";
-import { makeMutableUpdate } from "./make-mutable-update.js";
+import type { Patch } from "mutative"
+import { describe, expect, it } from "vitest"
+import { makeMutableUpdate } from "./make-mutable-update.js"
 
 // Simple test types
 type TestMessage =
@@ -117,7 +117,7 @@ describe("makeMutableUpdate", () => {
     ): TestCommand | undefined => {
       // This update function doesn't return commands
       model.count += 1
-      return undefined
+      return
     }
 
     const rajUpdate = makeMutableUpdate(mutativeUpdate)
