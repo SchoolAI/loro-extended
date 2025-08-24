@@ -1,4 +1,5 @@
 import type { LoroDoc } from "loro-crdt"
+import type { Patch } from "mutative"
 import type { DocHandle } from "./doc-handle.js"
 import type { AddressedNetMsg, NetMsg } from "./network/network-messages.js"
 import type { PermissionAdapter } from "./permission-adapter.js"
@@ -9,6 +10,7 @@ import {
   type Model,
   init as programInit,
   update as programUpdate,
+  updateWithPatches,
 } from "./synchronizer-program.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
@@ -20,14 +22,36 @@ export interface SynchronizerServices {
   permissions: PermissionAdapter
 }
 
+export interface SynchronizerConfig {
+  services: SynchronizerServices
+  enableDebugging?: boolean
+  onPatch?: (patches: Patch[]) => void
+}
+
 export class Synchronizer {
   #services: SynchronizerServices
   #model: Model
   #timeouts = new Map<DocumentId, NodeJS.Timeout>()
   #networkRequestTracker = new RequestTracker<LoroDoc<DocContent> | null>()
+  #updateFunction: (msg: Message, model: Model) => [Model, Command?]
+  #debuggingEnabled: boolean
 
-  constructor(services: SynchronizerServices) {
-    this.#services = services
+  constructor(config: SynchronizerServices | SynchronizerConfig) {
+    // Support both old and new constructor signatures for backward compatibility
+    if ("services" in config) {
+      // New config-based constructor
+      this.#services = config.services
+      this.#debuggingEnabled = config.enableDebugging ?? false
+      this.#updateFunction =
+        config.enableDebugging && config.onPatch
+          ? updateWithPatches(config.onPatch)
+          : programUpdate
+    } else {
+      // Legacy constructor for backward compatibility
+      this.#services = config
+      this.#debuggingEnabled = false
+      this.#updateFunction = programUpdate
+    }
 
     const [initialModel, initialCommand] = programInit(
       this.#services.permissions,
@@ -127,7 +151,7 @@ export class Synchronizer {
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   #dispatch(message: Message) {
-    const [newModel, command] = programUpdate(message, this.#model)
+    const [newModel, command] = this.#updateFunction(message, this.#model)
     this.#model = newModel
 
     if (command) {
@@ -273,5 +297,43 @@ export class Synchronizer {
     const [initialModel] = programInit(this.#services.permissions)
     this.#model = initialModel
     this.clearAllTimeouts()
+  }
+
+  /**
+   * Get the current model state (for debugging purposes).
+   * Returns a deep copy to prevent accidental mutations.
+   */
+  public getModelSnapshot(): any {
+    if (!this.#debuggingEnabled) {
+      console.warn("Model snapshot requested but debugging is not enabled")
+      return null
+    }
+
+    return JSON.parse(
+      JSON.stringify({
+        localDocs: Array.from(this.#model.localDocs),
+        peers: Object.fromEntries(this.#model.peers),
+        syncStates: Object.fromEntries(this.#model.syncStates),
+        remoteDocs: {
+          peersWithDoc: Object.fromEntries(
+            Array.from(this.#model.remoteDocs.peersWithDoc.entries()).map(
+              ([key, value]) => [key, Array.from(value)],
+            ),
+          ),
+          peersAwareOfDoc: Object.fromEntries(
+            Array.from(this.#model.remoteDocs.peersAwareOfDoc.entries()).map(
+              ([key, value]) => [key, Array.from(value)],
+            ),
+          ),
+        },
+      }),
+    )
+  }
+
+  /**
+   * Check if debugging is enabled.
+   */
+  public isDebuggingEnabled(): boolean {
+    return this.#debuggingEnabled
   }
 }

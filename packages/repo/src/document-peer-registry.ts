@@ -1,4 +1,3 @@
-import { create } from "mutative"
 import { addToSet, removeFromSet } from "./map-set-utils.js"
 import type { DocumentId, PeerId } from "./types.js"
 
@@ -23,62 +22,58 @@ export function createDocumentPeerRegistry(): DocumentPeerRegistry {
 
 /**
  * Add a peer to the set of peers that have a specific document.
+ * Mutates the registry in place.
  */
 export function addPeersWithDocuments(
   registry: DocumentPeerRegistry,
   peerIds: PeerId[],
   documentIds: DocumentId[],
-): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    for (const documentId of documentIds) {
-      addToSet(draft.peersWithDoc, documentId, peerIds)
-    }
-  })
+): void {
+  for (const documentId of documentIds) {
+    addToSet(registry.peersWithDoc, documentId, peerIds)
+  }
 }
 
 /**
  * Remove a peer from the set of peers that have a specific document.
+ * Mutates the registry in place.
  */
 export function removePeersFromDocuments(
   registry: DocumentPeerRegistry,
   peerIds: PeerId[],
   documentIds: DocumentId[],
-): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    for (const documentId of documentIds) {
-      removeFromSet(draft.peersWithDoc, documentId, peerIds)
-    }
-  })
+): void {
+  for (const documentId of documentIds) {
+    removeFromSet(registry.peersWithDoc, documentId, peerIds)
+  }
 }
 
 /**
  * Add a peer to the set of peers that are aware of a specific document.
+ * Mutates the registry in place.
  */
 export function addPeersAwareOfDocuments(
   registry: DocumentPeerRegistry,
   peerIds: PeerId[],
   documentIds: DocumentId[],
-): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    for (const documentId of documentIds) {
-      addToSet(draft.peersAwareOfDoc, documentId, peerIds)
-    }
-  })
+): void {
+  for (const documentId of documentIds) {
+    addToSet(registry.peersAwareOfDoc, documentId, peerIds)
+  }
 }
 
 /**
  * Remove a peer from the set of peers that are aware of a specific document.
+ * Mutates the registry in place.
  */
 export function removePeersAwareOfDocuments(
   registry: DocumentPeerRegistry,
   peerIds: PeerId[],
   documentIds: DocumentId[],
-): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    for (const documentId of documentIds) {
-      removeFromSet(draft.peersAwareOfDoc, documentId, peerIds)
-    }
-  })
+): void {
+  for (const documentId of documentIds) {
+    removeFromSet(registry.peersAwareOfDoc, documentId, peerIds)
+  }
 }
 
 /**
@@ -118,41 +113,39 @@ export function isPeerAwareOfDocument(
 /**
  * Remove a peer from all document relationships.
  * This should be called when a peer disconnects.
+ * Mutates the registry in place.
  */
 export function removePeerFromAllDocuments(
   registry: DocumentPeerRegistry,
   peerId: PeerId,
-): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    // Remove from peersWithDoc
-    for (const [documentId, peers] of draft.peersWithDoc.entries()) {
-      if (peers.has(peerId)) {
-        peers.delete(peerId)
-        if (peers.size === 0) {
-          draft.peersWithDoc.delete(documentId)
-        }
+): void {
+  // Remove from peersWithDoc
+  for (const [documentId, peers] of registry.peersWithDoc.entries()) {
+    if (peers.has(peerId)) {
+      peers.delete(peerId)
+      if (peers.size === 0) {
+        registry.peersWithDoc.delete(documentId)
       }
     }
+  }
 
-    // Remove from peersAwareOfDoc
-    for (const [documentId, peers] of draft.peersAwareOfDoc.entries()) {
-      if (peers.has(peerId)) {
-        peers.delete(peerId)
-        if (peers.size === 0) {
-          draft.peersAwareOfDoc.delete(documentId)
-        }
+  // Remove from peersAwareOfDoc
+  for (const [documentId, peers] of registry.peersAwareOfDoc.entries()) {
+    if (peers.has(peerId)) {
+      peers.delete(peerId)
+      if (peers.size === 0) {
+        registry.peersAwareOfDoc.delete(documentId)
       }
     }
-  })
+  }
 }
 
 /**
  * Clear all document relationships.
  * This should be called when shutting down.
+ * Mutates the registry in place.
  */
-export function clear(registry: DocumentPeerRegistry): DocumentPeerRegistry {
-  return create(registry, (draft: DocumentPeerRegistry) => {
-    draft.peersWithDoc.clear()
-    draft.peersAwareOfDoc.clear()
-  })
+export function clear(registry: DocumentPeerRegistry): void {
+  registry.peersWithDoc.clear()
+  registry.peersAwareOfDoc.clear()
 }

@@ -1,12 +1,11 @@
-import { create } from "mutative"
 import {
   addPeersAwareOfDocuments,
   addPeersWithDocuments,
   createDocumentPeerRegistry,
+  type DocumentPeerRegistry,
   getPeersAwareOfDocument,
   getPeersWithDocument,
   removePeerFromAllDocuments,
-  type DocumentPeerRegistry,
 } from "./document-peer-registry.js"
 import type { PeerMetadata } from "./network/network-adapter.js"
 import type {
@@ -16,6 +15,7 @@ import type {
 import type { PermissionAdapter } from "./permission-adapter.js"
 import type { RequestId } from "./request-tracker.js"
 import type { DocumentId, PeerId } from "./types.js"
+import { makeMutableUpdate } from "./utils/make-mutable-update.js"
 
 // STATE
 
@@ -153,26 +153,24 @@ export function init(permissions: PermissionAdapter): [Model, Command?] {
   ]
 }
 
-export function update(msg: Message, model: Model): [Model, Command?] {
+/**
+ * Mutative update function that directly modifies the model and returns only a command.
+ * This is used internally by the transformer to provide cleaner update logic.
+ */
+function updateMutative(msg: Message, model: Model): Command | undefined {
   switch (msg.type) {
     case "msg-peer-added": {
+      // Read from model BEFORE mutating
       const docIds: PeerId[] = [...model.localDocs].filter(docId =>
         model.permissions.canList(msg.peerId, docId),
       )
 
-      // Track that this peer is now aware of our documents
-      const newModel = create(model, (draft: Model) => {
-        draft.peers.set(msg.peerId, { connected: true })
-        draft.remoteDocs = addPeersAwareOfDocuments(
-          draft.remoteDocs,
-          [msg.peerId],
-          docIds,
-        )
-      })
+      // Now mutate the model directly
+      model.peers.set(msg.peerId, { connected: true })
+      addPeersAwareOfDocuments(model.remoteDocs, [msg.peerId], docIds)
 
-      // As an optimization, we respond to the new peer with a directory of our existing
-      // documents, as permitted by the PermissionAdapter (canList)
-      const command: Command = {
+      // Return the command
+      return {
         type: "cmd-send-message",
         message: {
           type: "directory-response",
@@ -180,38 +178,30 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           targetIds: [msg.peerId],
         },
       }
-
-      return [newModel, command]
     }
 
     case "msg-peer-removed": {
+      // Remove the peer from the peers map
+      model.peers.delete(msg.peerId)
       // Remove the peer from all document relationships
-      const newModel = create(model, (draft: Model) => {
-        draft.remoteDocs = removePeerFromAllDocuments(
-          draft.remoteDocs,
-          msg.peerId,
-        )
-      })
-
-      return [newModel]
+      removePeerFromAllDocuments(model.remoteDocs, msg.peerId)
+      return undefined
     }
 
     case "msg-document-added": {
+      // Read from model BEFORE mutating
       const announceTargetIds = [...model.peers.keys()].filter(peerId =>
         model.permissions.canList(peerId, msg.documentId),
       )
 
-      const newModel = create(model, (draft: Model) => {
-        draft.localDocs.add(msg.documentId)
-        draft.remoteDocs = addPeersAwareOfDocuments(
-          draft.remoteDocs,
-          announceTargetIds,
-          [msg.documentId],
-        )
-      })
+      // Now mutate the model directly
+      model.localDocs.add(msg.documentId)
+      addPeersAwareOfDocuments(model.remoteDocs, announceTargetIds, [
+        msg.documentId,
+      ])
 
-      // Announce the new document to peers that are permitted to know
-      const command: Command = {
+      // Return the command
+      return {
         type: "cmd-send-message",
         message: {
           type: "directory-response",
@@ -219,25 +209,19 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           targetIds: announceTargetIds,
         },
       }
-
-      return [newModel, command]
     }
 
     case "msg-document-removed": {
-      // Get all connected peers from model.peers
+      // Read from model BEFORE mutating
       const connectedPeers = [...model.peers.keys()]
 
-      const newModel = create(model, (draft: Model) => {
-        draft.localDocs.delete(msg.documentId)
-        // Remove the document from remoteDocs registry
-        draft.remoteDocs = removePeerFromAllDocuments(
-          draft.remoteDocs,
-          msg.documentId,
-        )
-      })
+      // Now mutate the model directly
+      model.localDocs.delete(msg.documentId)
+      // Remove the document from remoteDocs registry
+      removePeerFromAllDocuments(model.remoteDocs, msg.documentId)
 
-      // Inform peers that the document is deleted
-      const command: Command = {
+      // Return the command
+      return {
         type: "cmd-send-message",
         message: {
           type: "delete-response",
@@ -246,8 +230,6 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           targetIds: connectedPeers,
         },
       }
-
-      return [newModel, command]
     }
 
     case "msg-received-doc-announced": {
@@ -255,67 +237,57 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       const commands: Command[] = []
       const newlyDiscoveredDocs: DocumentId[] = []
 
-      const newModel = create(model, (draft: Model) => {
-        for (const documentId of documentIds) {
-          const isAlreadyKnown =
-            draft.localDocs.has(documentId) || draft.syncStates.has(documentId)
+      for (const documentId of documentIds) {
+        const isAlreadyKnown =
+          model.localDocs.has(documentId) || model.syncStates.has(documentId)
 
-          // Record that this peer HAS this document
-          draft.remoteDocs = addPeersWithDocuments(
-            draft.remoteDocs,
-            [fromPeerId],
-            [documentId],
-          )
+        // Record that this peer HAS this document
+        addPeersWithDocuments(model.remoteDocs, [fromPeerId], [documentId])
 
-          // Also record that this peer KNOWS ABOUT this document
-          draft.remoteDocs = addPeersAwareOfDocuments(
-            draft.remoteDocs,
-            [fromPeerId],
-            [documentId],
-          )
+        // Also record that this peer KNOWS ABOUT this document
+        addPeersAwareOfDocuments(model.remoteDocs, [fromPeerId], [documentId])
 
-          // If we are not already tracking this document, we need to
-          if (!isAlreadyKnown) {
-            newlyDiscoveredDocs.push(documentId)
-          }
-
-          // Record that we know about the peer that announced the document
-          if (!model.peers.has(fromPeerId)) {
-            console.warn(
-              "we only found out about a peer when it announced a doc",
-              fromPeerId,
-            )
-            draft.peers.set(fromPeerId, {})
-          }
-
-          // If we are searching for this document, we can now request it
-          const syncState = draft.syncStates.get(documentId)
-          if (syncState?.state === "searching") {
-            draft.syncStates.set(documentId, {
-              state: "syncing",
-              peerId: fromPeerId,
-              userTimeout: syncState.userTimeout,
-              requestId: syncState.requestId,
-            })
-
-            commands.push({ type: "cmd-clear-timeout", documentId })
-            commands.push({
-              type: "cmd-send-message",
-              message: {
-                type: "sync-request",
-                documentId,
-                targetIds: [fromPeerId],
-              },
-            })
-            // Use user timeout if specified, otherwise default
-            commands.push({
-              type: "cmd-set-timeout",
-              documentId,
-              duration: syncState.userTimeout || DEFAULT_SYNC_TIMEOUT,
-            })
-          }
+        // If we are not already tracking this document, we need to
+        if (!isAlreadyKnown) {
+          newlyDiscoveredDocs.push(documentId)
         }
-      })
+
+        // Record that we know about the peer that announced the document
+        if (!model.peers.has(fromPeerId)) {
+          console.warn(
+            "we only found out about a peer when it announced a doc",
+            fromPeerId,
+          )
+          model.peers.set(fromPeerId, {})
+        }
+
+        // If we are searching for this document, we can now request it
+        const syncState = model.syncStates.get(documentId)
+        if (syncState?.state === "searching") {
+          model.syncStates.set(documentId, {
+            state: "syncing",
+            peerId: fromPeerId,
+            userTimeout: syncState.userTimeout,
+            requestId: syncState.requestId,
+          })
+
+          commands.push({ type: "cmd-clear-timeout", documentId })
+          commands.push({
+            type: "cmd-send-message",
+            message: {
+              type: "sync-request",
+              documentId,
+              targetIds: [fromPeerId],
+            },
+          })
+          // Use user timeout if specified, otherwise default
+          commands.push({
+            type: "cmd-set-timeout",
+            documentId,
+            duration: syncState.userTimeout || DEFAULT_SYNC_TIMEOUT,
+          })
+        }
+      }
 
       // Tell the repo about any new documents we discovered
       if (newlyDiscoveredDocs.length > 0) {
@@ -325,30 +297,21 @@ export function update(msg: Message, model: Model): [Model, Command?] {
         })
       }
 
-      const command = createCommand(commands)
-
-      return [newModel, command]
+      return createCommand(commands)
     }
 
     case "msg-received-doc-request": {
       const { from, documentId } = msg
 
       // Track that this peer is now aware of this document
-      const newModel = create(model, (draft: Model) => {
-        draft.remoteDocs = addPeersAwareOfDocuments(
-          draft.remoteDocs,
-          [from],
-          [documentId],
-        )
-      })
+      addPeersAwareOfDocuments(model.remoteDocs, [from], [documentId])
 
       // Always check storage (even if not in localDocs) by delegating to the host
-      const command: Command = {
+      return {
         type: "cmd-check-storage-and-respond",
         documentId,
         to: from,
       }
-      return [newModel, command]
     }
 
     case "msg-received-sync": {
@@ -356,7 +319,7 @@ export function update(msg: Message, model: Model): [Model, Command?] {
       const syncState = model.syncStates.get(documentId)
 
       if (!model.permissions.canWrite(from, documentId)) {
-        return [model]
+        return undefined
       }
 
       const commands: Command[] = []
@@ -397,17 +360,11 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
       // If we were syncing, we can stop now.
       if (syncState) {
-        const newModel = create(model, (draft: Model) => {
-          draft.syncStates.delete(documentId)
-        })
+        model.syncStates.delete(documentId)
         commands.unshift({ type: "cmd-clear-timeout", documentId })
-        const command = createCommand(commands)
-        return [newModel, command]
       }
 
-      const command = createCommand(commands)
-
-      return [model, command]
+      return createCommand(commands)
     }
 
     case "msg-local-change": {
@@ -415,9 +372,9 @@ export function update(msg: Message, model: Model): [Model, Command?] {
 
       // Get peers aware of document from model.remoteDocs
       const awarePeers = getPeersAwareOfDocument(model.remoteDocs, documentId)
-      if (awarePeers.length === 0) return [model]
+      if (awarePeers.length === 0) return undefined
 
-      const command: Command = {
+      return {
         type: "cmd-send-message",
         message: {
           type: "sync-response",
@@ -431,7 +388,6 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           hopCount: 0, // Original message for local changes
         },
       }
-      return [model, command]
     }
 
     case "msg-sync-started": {
@@ -448,74 +404,69 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           // For now, we'll assume the caller of `queryNetwork` which calls this
           // will get the document from the handle directly.
         }
-        return [model]
+        return undefined
       }
 
       const commands: Command[] = []
       const timeoutDuration = timeout || DEFAULT_SYNC_TIMEOUT
 
-      const newModel = create(model, (draft: Model) => {
-        if (knownPeers.length > 0) {
-          // We know who has the doc, request it from one of them.
-          const peerId = knownPeers[0]
-          draft.syncStates.set(documentId, {
-            state: "syncing",
-            peerId,
-            userTimeout: timeout,
-            requestId,
-          })
-          commands.push({
-            type: "cmd-send-message",
-            message: {
-              type: "sync-request",
-              documentId,
-              targetIds: [peerId],
-            },
-          })
-          commands.push({
-            type: "cmd-set-timeout",
+      if (knownPeers.length > 0) {
+        // We know who has the doc, request it from one of them.
+        const peerId = knownPeers[0]
+        model.syncStates.set(documentId, {
+          state: "syncing",
+          peerId,
+          userTimeout: timeout,
+          requestId,
+        })
+        commands.push({
+          type: "cmd-send-message",
+          message: {
+            type: "sync-request",
             documentId,
-            duration: timeoutDuration,
-          })
-        } else {
-          // We don't know who has the doc, ask everyone.
-          draft.syncStates.set(documentId, {
-            state: "searching",
-            userTimeout: timeout,
-            requestId,
-          })
-          commands.push({
-            type: "cmd-send-message",
-            message: {
-              type: "sync-request",
-              documentId,
-              targetIds: [...draft.peers.keys()],
-            },
-          })
-          commands.push({
-            type: "cmd-set-timeout",
+            targetIds: [peerId],
+          },
+        })
+        commands.push({
+          type: "cmd-set-timeout",
+          documentId,
+          duration: timeoutDuration,
+        })
+      } else {
+        // We don't know who has the doc, ask everyone.
+        model.syncStates.set(documentId, {
+          state: "searching",
+          userTimeout: timeout,
+          requestId,
+        })
+        commands.push({
+          type: "cmd-send-message",
+          message: {
+            type: "sync-request",
             documentId,
-            duration: timeoutDuration,
-          })
-        }
-      })
+            targetIds: [...model.peers.keys()],
+          },
+        })
+        commands.push({
+          type: "cmd-set-timeout",
+          documentId,
+          duration: timeoutDuration,
+        })
+      }
 
-      const command = createCommand(commands)
-      return [newModel, command]
+      return createCommand(commands)
     }
 
     case "msg-sync-timeout-fired": {
       const { documentId } = msg
       const syncState = model.syncStates.get(documentId)
-      if (!syncState) return [model]
+      if (!syncState) return undefined
 
       // If this was a user-specified timeout (from findOrCreate), fail immediately
       // Otherwise, this is a regular sync that can be retried when peers connect
-      const newModel = create(model, (draft: Model) => {
-        draft.syncStates.delete(documentId)
-      })
+      model.syncStates.delete(documentId)
 
-      const command = createCommand([
+      return createCommand([
         { type: "cmd-clear-timeout", documentId },
         {
           type: "cmd-sync-failed",
@@ -523,10 +474,27 @@ export function update(msg: Message, model: Model): [Model, Command?] {
           requestId: syncState.requestId,
         },
       ])
-      return [newModel, command]
     }
 
     default:
-      return [model]
+      return undefined
   }
+}
+
+/**
+ * Standard raj-compatible update function.
+ * Uses the transformer to provide immutability while keeping the logic clean.
+ */
+export function update(msg: Message, model: Model): [Model, Command?] {
+  return makeMutableUpdate(updateMutative)(msg, model)
+}
+
+/**
+ * Update function with patch generation for debugging.
+ * This is used when debugging capabilities are needed.
+ */
+export function updateWithPatches(
+  onPatch: (patches: import("mutative").Patch[]) => void,
+): (msg: Message, model: Model) => [Model, Command?] {
+  return makeMutableUpdate(updateMutative, onPatch)
 }

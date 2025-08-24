@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
+import type { Patch } from "mutative"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { DebugModel } from "./debug-model.js"
 import { createPermissions } from "./permission-adapter.js"
 import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 
@@ -126,4 +128,166 @@ describe("Synchronizer (Host)", () => {
 
     vi.useRealTimers()
   }, 10000) // Increase test timeout to 10 seconds
+})
+
+describe("Synchronizer with Debugging", () => {
+  let mockServices: SynchronizerServices
+
+  beforeEach(() => {
+    mockServices = {
+      send: vi.fn(),
+      getDoc: vi.fn(),
+      permissions: createPermissions(),
+    }
+  })
+
+  it("should generate patches when debugging is enabled", async () => {
+    const patches: Patch[] = []
+    const onPatch = vi.fn((newPatches: Patch[]) => {
+      patches.push(...newPatches)
+    })
+
+    const synchronizer = new Synchronizer({
+      services: mockServices,
+      enableDebugging: true,
+      onPatch,
+    })
+
+    expect(synchronizer.isDebuggingEnabled()).toBe(true)
+
+    // Add a peer - should generate patches
+    synchronizer.addPeer("peer-1")
+    await tick()
+
+    expect(onPatch).toHaveBeenCalled()
+    expect(patches.length).toBeGreaterThan(0)
+
+    // Check that patches contain peer addition
+    const peerPatch = patches.find(p => p.path[0] === "peers")
+    expect(peerPatch).toBeDefined()
+  })
+
+  it("should not generate patches when debugging is disabled", async () => {
+    const onPatch = vi.fn()
+
+    const synchronizer = new Synchronizer({
+      services: mockServices,
+      enableDebugging: false,
+      onPatch,
+    })
+
+    expect(synchronizer.isDebuggingEnabled()).toBe(false)
+
+    synchronizer.addPeer("peer-1")
+    await tick()
+
+    expect(onPatch).not.toHaveBeenCalled()
+  })
+
+  it("should work with legacy constructor (backward compatibility)", async () => {
+    const synchronizer = new Synchronizer(mockServices)
+
+    expect(synchronizer.isDebuggingEnabled()).toBe(false)
+    expect(synchronizer.getModelSnapshot()).toBeNull()
+
+    // Should still work normally
+    synchronizer.addPeer("peer-1")
+    await tick()
+
+    expect(mockServices.send).toHaveBeenCalled()
+  })
+
+  it("should apply patches correctly to debug model", async () => {
+    const debugModel = new DebugModel(true)
+    const patches: Patch[] = []
+
+    const synchronizer = new Synchronizer({
+      services: mockServices,
+      enableDebugging: true,
+      onPatch: (newPatches: Patch[]) => {
+        patches.push(...newPatches)
+        debugModel.applyPatches(newPatches)
+      },
+    })
+
+    // Add a peer
+    synchronizer.addPeer("peer-1")
+    await tick()
+
+    // Check that debug model was updated
+    const peers = debugModel.getPeers()
+    expect(peers["peer-1"]).toBeDefined()
+    expect(peers["peer-1"].connected).toBe(true)
+
+    // Add a document
+    synchronizer.addDocument("doc-1")
+    await tick()
+
+    // Check that debug model was updated
+    const localDocs = debugModel.getLocalDocs()
+    expect(localDocs).toContain("doc-1")
+
+    // Remove the peer
+    synchronizer.removePeer("peer-1")
+    await tick()
+
+    // Check that peer was removed from debug model
+    const updatedPeers = debugModel.getPeers()
+    expect(updatedPeers["peer-1"]).toBeUndefined()
+  })
+
+  it("should provide model snapshots when debugging is enabled", async () => {
+    const synchronizer = new Synchronizer({
+      services: mockServices,
+      enableDebugging: true,
+    })
+
+    // Add some state
+    synchronizer.addPeer("peer-1")
+    synchronizer.addDocument("doc-1")
+    await tick()
+
+    const snapshot = synchronizer.getModelSnapshot()
+    expect(snapshot).not.toBeNull()
+    expect(snapshot.peers["peer-1"]).toBeDefined()
+    expect(snapshot.localDocs).toContain("doc-1")
+  })
+
+  it("should track complex state changes through patches", async () => {
+    const debugModel = new DebugModel(true)
+    let patchCount = 0
+
+    const synchronizer = new Synchronizer({
+      services: mockServices,
+      enableDebugging: true,
+      onPatch: (patches: Patch[]) => {
+        patchCount += patches.length
+        debugModel.applyPatches(patches)
+      },
+    })
+
+    // Perform a sequence of operations
+    synchronizer.addPeer("peer-1")
+    await tick()
+
+    synchronizer.addDocument("doc-1")
+    await tick()
+
+    synchronizer.addPeer("peer-2")
+    await tick()
+
+    synchronizer.removePeer("peer-1")
+    await tick()
+
+    // Should have generated multiple patches
+    expect(patchCount).toBeGreaterThan(0)
+
+    // Debug model should reflect final state
+    const peers = debugModel.getPeers()
+    const localDocs = debugModel.getLocalDocs()
+
+    expect(peers["peer-1"]).toBeUndefined() // Removed
+    expect(peers["peer-2"]).toBeDefined() // Still there
+    expect(localDocs).toContain("doc-1")
+  })
 })
