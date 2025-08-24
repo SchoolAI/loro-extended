@@ -9,20 +9,23 @@ import {
 import type { PeerMetadata } from "./network/network-adapter.js"
 import { createPermissions } from "./permission-adapter.js"
 import {
+  createUpdate,
   type Message,
   type Model,
   init as programInit,
-  update,
 } from "./synchronizer-program.js"
 
 describe("Synchronizer program", () => {
+  let update: ReturnType<typeof createUpdate>
+
   beforeEach(() => {
-    // No services needed anymore
+    // Create update function with default permissions for each test
+    update = createUpdate(createPermissions())
   })
 
   describe("initialization", () => {
     it("should initialize correctly", () => {
-      const [model, command] = programInit(createPermissions())
+      const [model, command] = programInit()
       expect(model.localDocs.size).toBe(0)
       expect(model.syncStates.size).toBe(0)
       expect(command).toBeUndefined()
@@ -31,7 +34,7 @@ describe("Synchronizer program", () => {
 
   describe("peer management", () => {
     it("should announce local documents when a peer is added", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const documentId = "doc-1"
       const modelWithDoc: Model = {
         ...initialModel,
@@ -57,7 +60,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should remove a peer from the model when disconnected", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // First add a peer to have something to remove
       const modelWithPeer: Model = {
@@ -85,12 +88,14 @@ describe("Synchronizer program", () => {
 
   describe("document management", () => {
     it("should announce a new document to connected peers", () => {
-      // Mock permissions to allow listing for all peers
-      const permissions = createPermissions({
-        canList: vi.fn().mockReturnValue(true),
-      })
+      // Create update function with permissions that allow listing for all peers
+      update = createUpdate(
+        createPermissions({
+          canList: vi.fn().mockReturnValue(true),
+        }),
+      )
 
-      const [initialModel] = programInit(permissions)
+      const [initialModel] = programInit()
       const documentId = "doc-1"
 
       // Create a model with connected peers
@@ -116,7 +121,8 @@ describe("Synchronizer program", () => {
     })
 
     it("should not announce a new document to peers if canList returns false", () => {
-      const [initialModel] = programInit(
+      // Create update function with specific permissions
+      update = createUpdate(
         createPermissions({
           canList: (peerId, documentId) => {
             if (peerId === "peer-2" && documentId === "doc-1") return false
@@ -124,6 +130,8 @@ describe("Synchronizer program", () => {
           },
         }),
       )
+
+      const [initialModel] = programInit()
 
       // Create a model with connected peers
       const modelWithPeers: Model = {
@@ -144,7 +152,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should inform peers when a document is deleted", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const documentId = "doc-1"
 
       // Create a model with connected peers
@@ -173,7 +181,7 @@ describe("Synchronizer program", () => {
 
   describe("synchronization", () => {
     it("should start syncing when a document is requested", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with connected peers
       const modelWithPeers: Model = {
@@ -208,7 +216,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should transition from searching to syncing when an announcement is received", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const modelWithSyncState: Model = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
@@ -243,7 +251,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should respond to a sync request if the document is available", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const modelWithDoc: Model = {
         ...initialModel,
         localDocs: new Set(["doc-1"]),
@@ -264,7 +272,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should clear sync state on successful sync", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const modelWithSyncState: Model = {
         ...initialModel,
         syncStates: new Map([
@@ -299,7 +307,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should fail immediately on timeout with no retries", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const model: Model = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
@@ -329,7 +337,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should respect user timeout when specified", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const model: Model = {
         ...initialModel,
         syncStates: new Map([
@@ -361,7 +369,8 @@ describe("Synchronizer program", () => {
     })
 
     it("should not apply a sync message if canWrite returns false", () => {
-      const [initialModel] = programInit(
+      // Create update function with specific permissions
+      update = createUpdate(
         createPermissions({
           canWrite: (peerId, documentId) => {
             if (peerId === "peer-1" && documentId === "doc-1") return false
@@ -369,6 +378,8 @@ describe("Synchronizer program", () => {
           },
         }),
       )
+
+      const [initialModel] = programInit()
       const modelWithSyncState: Model = {
         ...initialModel,
         syncStates: new Map([
@@ -391,7 +402,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should send a sync message to peers aware of document on local change", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
       const modelWithAwarePeers: Model = {
@@ -419,7 +430,7 @@ describe("Synchronizer program", () => {
 
   describe("document announcement handling", () => {
     it("should track peer document ownership when announcement is received", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const documentIds = ["doc-1", "doc-2"]
 
       const message: Message = {
@@ -442,7 +453,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should notify about newly discovered documents", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const documentIds = ["doc-1", "doc-2"]
 
       const message: Message = {
@@ -461,7 +472,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should request sync from peers that have documents we're searching for", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
       const modelWithSyncState: Model = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
@@ -501,7 +512,7 @@ describe("Synchronizer program", () => {
 
   describe("document request handling", () => {
     it("should track peer awareness when a document is requested", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       const message: Message = {
         type: "msg-received-doc-request",
@@ -527,7 +538,7 @@ describe("Synchronizer program", () => {
 
   describe("sync message forwarding with hop count", () => {
     it("should forward received sync messages to other peers aware of document with hop count", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
       const modelWithAwarePeers: Model = {
@@ -578,7 +589,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should NOT forward messages that have already been forwarded (hopCount >= 1)", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
       const modelWithAwarePeers: Model = {
@@ -620,7 +631,7 @@ describe("Synchronizer program", () => {
     })
 
     it("should not forward if no other peers are aware", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with only the sender as aware of the document
       const modelWithAwarePeers: Model = {
@@ -654,7 +665,7 @@ describe("Synchronizer program", () => {
     it("should prevent cascade in hub-and-spoke topology", () => {
       // Scenario: Server receives sync from Browser A and forwards to Browser B
       // Browser B should NOT forward it back
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
       const modelWithAwarePeers: Model = {
@@ -687,7 +698,7 @@ describe("Synchronizer program", () => {
 
     it("should allow single-hop forwarding in hub topology", () => {
       // Server receives original message and forwards once
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
       const modelWithAwarePeers: Model = {
@@ -731,9 +742,16 @@ describe("Synchronizer program", () => {
 })
 
 describe("Peer Management Integration", () => {
+  let update: ReturnType<typeof createUpdate>
+
+  beforeEach(() => {
+    // Create update function with default permissions for each test
+    update = createUpdate(createPermissions())
+  })
+
   describe("peer connectivity in model", () => {
     it("should track connected peers in model state", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with connected peers
       const modelWithPeers: Model = {
@@ -751,7 +769,7 @@ describe("Peer Management Integration", () => {
     })
 
     it("should handle peer disconnection in model state", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with connected peers
       const modelWithPeers: Model = {
@@ -777,7 +795,7 @@ describe("Peer Management Integration", () => {
     })
 
     it("should handle peer metadata", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers that have metadata
       const modelWithPeers: Model = {
@@ -800,7 +818,7 @@ describe("Peer Management Integration", () => {
 
   describe("peer and document interactions", () => {
     it("should announce documents to connected peers", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers and documents
       const modelWithPeersAndDocs: Model = {
@@ -825,7 +843,7 @@ describe("Peer Management Integration", () => {
     })
 
     it("should handle peer removal with document cleanup", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers and document relationships
       const modelWithRelationships: Model = {
@@ -857,9 +875,16 @@ describe("Peer Management Integration", () => {
 })
 
 describe("DocumentPeerRegistry Integration", () => {
+  let update: ReturnType<typeof createUpdate>
+
+  beforeEach(() => {
+    // Create update function with default permissions for each test
+    update = createUpdate(createPermissions())
+  })
+
   describe("peer document ownership in model", () => {
     it("should track peers that have documents in model.remoteDocs", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers that have documents
       const modelWithDocOwnership: Model = {
@@ -880,7 +905,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should track peers that are aware of documents in model.remoteDocs", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peers aware of documents
       const modelWithDocAwareness: Model = {
@@ -901,7 +926,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should handle multiple peers with documents", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with multiple peers that have documents
       const modelWithMultiplePeers: Model = {
@@ -923,7 +948,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should handle multiple documents", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with multiple documents
       const modelWithMultipleDocs: Model = {
@@ -947,7 +972,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should handle empty document relationships", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Check that empty relationships are handled correctly
       expect(getPeersWithDocument(initialModel.remoteDocs, "doc-1")).toEqual([])
@@ -959,7 +984,7 @@ describe("DocumentPeerRegistry Integration", () => {
 
   describe("document registry updates through messages", () => {
     it("should update document registry when peer is added", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with local documents
       const modelWithDocs: Model = {
@@ -977,7 +1002,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should update document registry when document is announced", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Receive document announcement
       const message: Message = {
@@ -996,7 +1021,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should update document registry when document is requested", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Receive document request
       const message: Message = {
@@ -1012,7 +1037,7 @@ describe("DocumentPeerRegistry Integration", () => {
     })
 
     it("should update document registry when peer is removed", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peer relationships
       const modelWithRelationships: Model = {
@@ -1040,7 +1065,7 @@ describe("DocumentPeerRegistry Integration", () => {
 
   describe("helper functions", () => {
     it("should check if peer is aware of document", () => {
-      const [initialModel] = programInit(createPermissions())
+      const [initialModel] = programInit()
 
       // Create a model with peer awareness
       const modelWithAwareness: Model = {

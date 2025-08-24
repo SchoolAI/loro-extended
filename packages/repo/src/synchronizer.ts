@@ -6,11 +6,11 @@ import type { PermissionAdapter } from "./permission-adapter.js"
 import { RequestTracker } from "./request-tracker.js"
 import {
   type Command,
+  createUpdate,
+  createUpdateWithPatches,
   type Message,
   type Model,
   init as programInit,
-  update as programUpdate,
-  updateWithPatches,
 } from "./synchronizer-program.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
@@ -40,17 +40,15 @@ export class Synchronizer {
       // New config-based constructor
       this.#services = config.services
       this.#updateFunction = config.onPatch
-        ? updateWithPatches(config.onPatch)
-        : programUpdate
+        ? createUpdateWithPatches(this.#services.permissions, config.onPatch)
+        : createUpdate(this.#services.permissions)
     } else {
       // Legacy constructor for backward compatibility
       this.#services = config
-      this.#updateFunction = programUpdate
+      this.#updateFunction = createUpdate(this.#services.permissions)
     }
 
-    const [initialModel, initialCommand] = programInit(
-      this.#services.permissions,
-    )
+    const [initialModel, initialCommand] = programInit()
     this.#model = initialModel
     if (initialCommand) {
       this.#executeCommand(initialCommand)
@@ -289,7 +287,7 @@ export class Synchronizer {
   }
 
   public reset() {
-    const [initialModel] = programInit(this.#services.permissions)
+    const [initialModel] = programInit()
     this.#model = initialModel
     this.clearAllTimeouts()
   }
