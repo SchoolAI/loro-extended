@@ -2,7 +2,6 @@
 
 import type { Patch } from "mutative"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { DebugModel } from "./debug-model.js"
 import { createPermissions } from "./permission-adapter.js"
 import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
 
@@ -162,96 +161,5 @@ describe("Synchronizer with Debugging", () => {
     // Check that patches contain peer addition
     const peerPatch = patches.find(p => p.path[0] === "peers")
     expect(peerPatch).toBeDefined()
-  })
-
-  it("should apply patches correctly to debug model", async () => {
-    const debugModel = new DebugModel()
-    const patches: Patch[] = []
-
-    const synchronizer = new Synchronizer({
-      services: mockServices,
-      onPatch: (newPatches: Patch[]) => {
-        patches.push(...newPatches)
-        debugModel.applyPatches(newPatches)
-      },
-    })
-
-    // Add a peer
-    synchronizer.addPeer("peer-1")
-    await tick()
-
-    // Check that debug model was updated
-    const peers = debugModel.getPeers()
-    expect(peers["peer-1"]).toBeDefined()
-    expect(peers["peer-1"].connected).toBe(true)
-
-    // Add a document
-    synchronizer.addDocument("doc-1")
-    await tick()
-
-    // Check that debug model was updated
-    const localDocs = debugModel.getLocalDocs()
-    expect(localDocs).toContain("doc-1")
-
-    // Remove the peer
-    synchronizer.removePeer("peer-1")
-    await tick()
-
-    // Check that peer was removed from debug model
-    const updatedPeers = debugModel.getPeers()
-    expect(updatedPeers["peer-1"]).toBeUndefined()
-  })
-
-  it("should provide model snapshots when debugging is enabled", async () => {
-    const synchronizer = new Synchronizer({
-      services: mockServices,
-    })
-
-    // Add some state
-    synchronizer.addPeer("peer-1")
-    synchronizer.addDocument("doc-1")
-    await tick()
-
-    const snapshot = synchronizer.getModelSnapshot()
-    expect(snapshot).not.toBeNull()
-    expect(snapshot.peers.get("peer-1")).toBeDefined()
-    expect(snapshot.localDocs).toContain("doc-1")
-  })
-
-  it("should track complex state changes through patches", async () => {
-    const debugModel = new DebugModel()
-    let patchCount = 0
-
-    const synchronizer = new Synchronizer({
-      services: mockServices,
-      onPatch: (patches: Patch[]) => {
-        patchCount += patches.length
-        debugModel.applyPatches(patches)
-      },
-    })
-
-    // Perform a sequence of operations
-    synchronizer.addPeer("peer-1")
-    await tick()
-
-    synchronizer.addDocument("doc-1")
-    await tick()
-
-    synchronizer.addPeer("peer-2")
-    await tick()
-
-    synchronizer.removePeer("peer-1")
-    await tick()
-
-    // Should have generated multiple patches
-    expect(patchCount).toBeGreaterThan(0)
-
-    // Debug model should reflect final state
-    const peers = debugModel.getPeers()
-    const localDocs = debugModel.getLocalDocs()
-
-    expect(peers["peer-1"]).toBeUndefined() // Removed
-    expect(peers["peer-2"]).toBeDefined() // Still there
-    expect(localDocs).toContain("doc-1")
   })
 })

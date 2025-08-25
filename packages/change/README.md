@@ -89,11 +89,11 @@ change(doc, (draft) => {
   draft.title = "New Title";
   draft.items.push({ id: 3, text: "New item", done: false });
   draft.items[0].done = true;
-  
+
   // CRDT operations have direct access
   draft.counter.increment(5);
   draft.text.insert(0, "Hello ");
-  
+
   draft.metadata = { lastModified: Date.now() };
 });
 
@@ -194,11 +194,15 @@ const doc = from({
 });
 
 // Enable patch generation by passing enablePatches: true
-const [updatedDoc, patches] = change(doc, (draft) => {
-  draft.name = "Alice";           // → Standard mutative patch
-  draft.counter.increment(5);     // → Custom CRDT patch
-  draft.text.insert(0, "Hello");  // → Custom CRDT patch
-}, { enablePatches: true });
+const [updatedDoc, patches] = change(
+  doc,
+  (draft) => {
+    draft.name = "Alice"; // → Standard mutative patch
+    draft.counter.increment(5); // → Custom CRDT patch
+    draft.text.insert(0, "Hello"); // → Custom CRDT patch
+  },
+  { enablePatches: true }
+);
 
 // Access patches directly from the return value
 console.log(patches);
@@ -212,10 +216,14 @@ console.log(patches);
 const allPatches = [];
 let currentDoc = doc;
 
-[currentDoc, patches] = change(currentDoc, d => d.counter.increment(10), { enablePatches: true });
+[currentDoc, patches] = change(currentDoc, (d) => d.counter.increment(10), {
+  enablePatches: true,
+});
 allPatches.push(...patches);
 
-[currentDoc, patches] = change(currentDoc, d => d.name = "Bob", { enablePatches: true });
+[currentDoc, patches] = change(currentDoc, (d) => (d.name = "Bob"), {
+  enablePatches: true,
+});
 allPatches.push(...patches);
 ```
 
@@ -371,12 +379,12 @@ const CRDT = {
 type AsLoro<T> = T extends LoroTextWrapper
   ? LoroText
   : T extends LoroCounterWrapper
-    ? LoroCounter
-    : T extends (infer E)[]
-      ? AsLoro<E>[]
-      : T extends Record<string, unknown>
-        ? { [K in keyof T]: AsLoro<T[K]> }
-        : T
+  ? LoroCounter
+  : T extends (infer E)[]
+  ? AsLoro<E>[]
+  : T extends Record<string, unknown>
+  ? { [K in keyof T]: AsLoro<T[K]> }
+  : T;
 ```
 
 ## Contributing
