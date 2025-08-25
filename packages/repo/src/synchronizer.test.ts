@@ -15,9 +15,11 @@ describe("Synchronizer (Host)", () => {
     mockServices = {
       send: vi.fn(),
       getDoc: vi.fn(),
-      permissions: createPermissions(),
     }
-    synchronizer = new Synchronizer(mockServices)
+
+    synchronizer = new Synchronizer(mockServices, {
+      permissions: createPermissions(),
+    })
   })
 
   it("should send an announce-document message when a peer is added", async () => {
@@ -136,7 +138,6 @@ describe("Synchronizer with Debugging", () => {
     mockServices = {
       send: vi.fn(),
       getDoc: vi.fn(),
-      permissions: createPermissions(),
     }
   })
 
@@ -146,8 +147,7 @@ describe("Synchronizer with Debugging", () => {
       patches.push(...newPatches)
     })
 
-    const synchronizer = new Synchronizer({
-      services: mockServices,
+    const synchronizer = new Synchronizer(mockServices, {
       onPatch,
     })
 

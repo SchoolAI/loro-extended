@@ -12,7 +12,7 @@ import {
 } from "./permission-adapter.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
-import { Synchronizer, type SynchronizerServices } from "./synchronizer.js"
+import { Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
 /**
@@ -113,18 +113,14 @@ export class Repo {
     // Create the permissions manager
     this.permissionAdapter = createPermissions(permissions)
 
-    // Create services object for the synchronizer
-    const services: SynchronizerServices = {
-      // functions
-      send: message => this.networkSubsystem.send(message),
-      getDoc: documentId => this.getOrCreateHandle(documentId),
-
-      // services
-      permissions: this.permissionAdapter,
-    }
-
     // Instantiate synchronizer
-    this.synchronizer = new Synchronizer(services)
+    this.synchronizer = new Synchronizer(
+      {
+        send: message => this.networkSubsystem.send(message),
+        getDoc: documentId => this.getOrCreateHandle(documentId),
+      },
+      { permissions: this.permissionAdapter },
+    )
 
     this.networkSubsystem = this.#initializeNetworkSubsystem(network)
   }

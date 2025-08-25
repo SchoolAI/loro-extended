@@ -34,10 +34,11 @@ export interface PermissionAdapter {
   canDelete(peerId: PeerId, documentId: DocumentId): boolean
 }
 
+const defaultPermission = () => true
+
 export function createPermissions(
   permissions: Partial<PermissionAdapter> = {},
 ): PermissionAdapter {
-  const defaultPermission = () => true
   return {
     canList: permissions?.canList ?? defaultPermission,
     canWrite: permissions?.canWrite ?? defaultPermission,

@@ -2,7 +2,10 @@ import type { LoroDoc } from "loro-crdt"
 import { create, type Patch } from "mutative"
 import type { DocHandle } from "./doc-handle.js"
 import type { AddressedNetMsg, NetMsg } from "./network/network-messages.js"
-import type { PermissionAdapter } from "./permission-adapter.js"
+import {
+  createPermissions,
+  type PermissionAdapter,
+} from "./permission-adapter.js"
 import { RequestTracker } from "./request-tracker.js"
 import {
   type Command,
@@ -13,16 +16,14 @@ import {
 } from "./synchronizer-program.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
-export interface SynchronizerServices {
+export type SynchronizerServices = {
   send: (message: AddressedNetMsg) => void
   // biome-ignore lint/suspicious/noExplicitAny: many docs possible
   getDoc: (documentId: DocumentId) => DocHandle<any>
-
-  permissions: PermissionAdapter
 }
 
-export interface SynchronizerConfig {
-  services: SynchronizerServices
+export type SynchronizerOptions = {
+  permissions?: PermissionAdapter
   onPatch?: (patches: Patch[]) => void
 }
 
@@ -33,22 +34,16 @@ export class Synchronizer {
   #networkRequestTracker = new RequestTracker<LoroDoc<DocContent> | null>()
   #updateFunction: (msg: Message, model: Model) => [Model, Command?]
 
-  constructor(config: SynchronizerServices | SynchronizerConfig) {
-    // Support both old and new constructor signatures for backward compatibility
-    if ("services" in config) {
-      // New config-based constructor
-      this.#services = config.services
-      this.#updateFunction = createSynchronizerUpdate(
-        this.#services.permissions,
-        config.onPatch,
-      )
-    } else {
-      // Legacy constructor for backward compatibility
-      this.#services = config
-      this.#updateFunction = createSynchronizerUpdate(
-        this.#services.permissions,
-      )
-    }
+  constructor(
+    services: SynchronizerServices,
+    options: SynchronizerOptions = {},
+  ) {
+    this.#services = services
+
+    this.#updateFunction = createSynchronizerUpdate(
+      createPermissions(options.permissions),
+      options.onPatch,
+    )
 
     const [initialModel, initialCommand] = programInit()
     this.#model = initialModel
