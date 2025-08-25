@@ -6,8 +6,7 @@ import type { PermissionAdapter } from "./permission-adapter.js"
 import { RequestTracker } from "./request-tracker.js"
 import {
   type Command,
-  createUpdate,
-  createUpdateWithPatches,
+  createSynchronizerUpdate,
   type Message,
   type Model,
   init as programInit,
@@ -39,13 +38,16 @@ export class Synchronizer {
     if ("services" in config) {
       // New config-based constructor
       this.#services = config.services
-      this.#updateFunction = config.onPatch
-        ? createUpdateWithPatches(this.#services.permissions, config.onPatch)
-        : createUpdate(this.#services.permissions)
+      this.#updateFunction = createSynchronizerUpdate(
+        this.#services.permissions,
+        config.onPatch,
+      )
     } else {
       // Legacy constructor for backward compatibility
       this.#services = config
-      this.#updateFunction = createUpdate(this.#services.permissions)
+      this.#updateFunction = createSynchronizerUpdate(
+        this.#services.permissions,
+      )
     }
 
     const [initialModel, initialCommand] = programInit()

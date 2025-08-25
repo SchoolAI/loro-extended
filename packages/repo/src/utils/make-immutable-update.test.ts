@@ -1,6 +1,6 @@
 import type { Patch } from "mutative"
 import { describe, expect, it } from "vitest"
-import { makeMutableUpdate } from "./make-mutable-update.js"
+import { makeImmutableUpdate } from "./make-immutable-update.js"
 
 // Simple test types
 type TestMessage =
@@ -50,7 +50,7 @@ describe("makeMutableUpdate", () => {
       patches.push(...newPatches)
     }
 
-    const rajUpdate = makeMutableUpdate(testUpdateMutative, onPatch)
+    const rajUpdate = makeImmutableUpdate(testUpdateMutative, onPatch)
 
     const initialModel: TestModel = {
       count: 0,
@@ -92,7 +92,7 @@ describe("makeMutableUpdate", () => {
   })
 
   it("should work without patch callback", () => {
-    const rajUpdate = makeMutableUpdate(testUpdateMutative)
+    const rajUpdate = makeImmutableUpdate(testUpdateMutative)
 
     const initialModel: TestModel = {
       count: 5,
@@ -120,7 +120,7 @@ describe("makeMutableUpdate", () => {
       return
     }
 
-    const rajUpdate = makeMutableUpdate(mutativeUpdate)
+    const rajUpdate = makeImmutableUpdate(mutativeUpdate)
 
     const initialModel: TestModel = {
       count: 0,
@@ -139,7 +139,7 @@ describe("makeMutableUpdate", () => {
       patches.push(...newPatches)
     }
 
-    const rajUpdate = makeMutableUpdate(testUpdateMutative, onPatch)
+    const rajUpdate = makeImmutableUpdate(testUpdateMutative, onPatch)
 
     const initialModel: TestModel = {
       count: 0,

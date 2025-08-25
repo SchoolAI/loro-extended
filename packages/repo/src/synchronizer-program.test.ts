@@ -9,18 +9,18 @@ import {
 import type { PeerMetadata } from "./network/network-adapter.js"
 import { createPermissions } from "./permission-adapter.js"
 import {
-  createUpdate,
+  createSynchronizerUpdate,
   type Message,
   type Model,
   init as programInit,
 } from "./synchronizer-program.js"
 
 describe("Synchronizer program", () => {
-  let update: ReturnType<typeof createUpdate>
+  let update: ReturnType<typeof createSynchronizerUpdate>
 
   beforeEach(() => {
     // Create update function with default permissions for each test
-    update = createUpdate(createPermissions())
+    update = createSynchronizerUpdate(createPermissions())
   })
 
   describe("initialization", () => {
@@ -89,7 +89,7 @@ describe("Synchronizer program", () => {
   describe("document management", () => {
     it("should announce a new document to connected peers", () => {
       // Create update function with permissions that allow listing for all peers
-      update = createUpdate(
+      update = createSynchronizerUpdate(
         createPermissions({
           canList: vi.fn().mockReturnValue(true),
         }),
@@ -122,7 +122,7 @@ describe("Synchronizer program", () => {
 
     it("should not announce a new document to peers if canList returns false", () => {
       // Create update function with specific permissions
-      update = createUpdate(
+      update = createSynchronizerUpdate(
         createPermissions({
           canList: (peerId, documentId) => {
             if (peerId === "peer-2" && documentId === "doc-1") return false
@@ -370,7 +370,7 @@ describe("Synchronizer program", () => {
 
     it("should not apply a sync message if canWrite returns false", () => {
       // Create update function with specific permissions
-      update = createUpdate(
+      update = createSynchronizerUpdate(
         createPermissions({
           canWrite: (peerId, documentId) => {
             if (peerId === "peer-1" && documentId === "doc-1") return false
@@ -742,11 +742,11 @@ describe("Synchronizer program", () => {
 })
 
 describe("Peer Management Integration", () => {
-  let update: ReturnType<typeof createUpdate>
+  let update: ReturnType<typeof createSynchronizerUpdate>
 
   beforeEach(() => {
     // Create update function with default permissions for each test
-    update = createUpdate(createPermissions())
+    update = createSynchronizerUpdate(createPermissions())
   })
 
   describe("peer connectivity in model", () => {
@@ -875,11 +875,11 @@ describe("Peer Management Integration", () => {
 })
 
 describe("DocumentPeerRegistry Integration", () => {
-  let update: ReturnType<typeof createUpdate>
+  let update: ReturnType<typeof createSynchronizerUpdate>
 
   beforeEach(() => {
     // Create update function with default permissions for each test
-    update = createUpdate(createPermissions())
+    update = createSynchronizerUpdate(createPermissions())
   })
 
   describe("peer document ownership in model", () => {

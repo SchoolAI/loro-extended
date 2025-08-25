@@ -15,7 +15,7 @@ import type {
 import type { PermissionAdapter } from "./permission-adapter.js"
 import type { RequestId } from "./request-tracker.js"
 import type { DocumentId, PeerId } from "./types.js"
-import { makeMutableUpdate } from "./utils/make-mutable-update.js"
+import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
 // STATE
 
@@ -153,8 +153,11 @@ export function init(): [Model, Command?] {
  * Creates a mutative update function that captures permissions in closure.
  * This is used internally by the transformer to provide cleaner update logic.
  */
-function createUpdateMutative(permissions: PermissionAdapter) {
-  return function updateMutative(
+function createSynchronizerLogic(permissions: PermissionAdapter) {
+  // A mutating update function is easier to read and write, because we need only concern ourselves
+  // with what needs to change, using standard assignment and JS operations. But the machinery
+  // around this function turns it back into an immutable `update` function like raj/TEA expects.
+  return function mutatingUpdate(
     msg: Message,
     model: Model,
   ): Command | undefined {
@@ -488,18 +491,12 @@ function createUpdateMutative(permissions: PermissionAdapter) {
 /**
  * Creates a standard raj-compatible update function with permissions captured in closure.
  * Uses the transformer to provide immutability while keeping the logic clean.
+ *
+ * onPatch: optional debug callback that receives a list of changes at each update cycle
  */
-export function createUpdate(permissions: PermissionAdapter) {
-  return makeMutableUpdate(createUpdateMutative(permissions))
-}
-
-/**
- * Creates an update function with patch generation for debugging and permissions captured in closure.
- * This is used when debugging capabilities are needed.
- */
-export function createUpdateWithPatches(
+export function createSynchronizerUpdate(
   permissions: PermissionAdapter,
-  onPatch: (patches: import("mutative").Patch[]) => void,
-): (msg: Message, model: Model) => [Model, Command?] {
-  return makeMutableUpdate(createUpdateMutative(permissions), onPatch)
+  onPatch?: (patches: import("mutative").Patch[]) => void,
+) {
+  return makeImmutableUpdate(createSynchronizerLogic(permissions), onPatch)
 }
