@@ -1,7 +1,12 @@
 import type { LoroCounter, LoroText } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-
-import { type CombinedPatch, CRDT, change, from } from "./index.js"
+import {
+  change,
+  type CombinedPatch,
+  CRDT,
+  type CRDTPatch,
+  from,
+} from "./index.js"
 
 // Helper to collect patches from multiple change operations
 class PatchCollector {
@@ -42,110 +47,142 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
     it("should generate mutative patches for POJO operations", () => {
       const doc = from({ name: "Alice", age: 30 })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.name = "Bob"
-        d.age = 31
-      }, { enablePatches: true })
+      const [updatedDoc, patches] = change(
+        doc,
+        d => {
+          d.name = "Bob"
+          d.age = 31
+        },
+        { enablePatches: true },
+      )
 
       expect(patches.length).toBeGreaterThan(0)
-      
+
       // Should have mutative patches for POJO changes
-      const mutativePatches = patches.filter((p: CombinedPatch) => p.op !== "crdt")
+      const mutativePatches = patches.filter(
+        (p: CombinedPatch) => p.op !== "crdt",
+      )
       expect(mutativePatches.length).toBeGreaterThan(0)
-      
+
       // Verify the changes were applied
       expect(updatedDoc.toJSON()).toEqual({ name: "Bob", age: 31 })
     })
 
     it("should generate CRDT patches for counter operations", () => {
-      const doc = from({ 
+      const doc = from({
         score: CRDT.Counter(10),
-        name: "Player1" 
+        name: "Player1",
       })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.score.increment(5)
-        d.score.decrement(2)
-        d.name = "Player2" // This should generate a mutative patch
-      }, { enablePatches: true })
+      const [updatedDoc, patches] = change(
+        doc,
+        d => {
+          d.score.increment(5)
+          d.score.decrement(2)
+          d.name = "Player2" // This should generate a mutative patch
+        },
+        { enablePatches: true },
+      )
 
       // Should have CRDT patches for counter operations
       const crdtPatches = patches.filter((p: CombinedPatch) => p.op === "crdt")
       expect(crdtPatches.length).toBe(2)
-      
-      const incrementPatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "increment")
+
+      const incrementPatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "increment",
+      )
       expect(incrementPatch).toBeDefined()
       expect(incrementPatch?.args).toEqual([5])
       expect(incrementPatch?.crdtType).toBe("counter")
       expect(incrementPatch?.path).toEqual(["score"])
-      
-      const decrementPatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "decrement")
+
+      const decrementPatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "decrement",
+      )
       expect(decrementPatch).toBeDefined()
       expect(decrementPatch?.args).toEqual([2])
-      
+
       // Should also have mutative patches for POJO changes
-      const mutativePatches = patches.filter((p: CombinedPatch) => p.op !== "crdt")
+      const mutativePatches = patches.filter(
+        (p: CombinedPatch) => p.op !== "crdt",
+      )
       expect(mutativePatches.length).toBeGreaterThan(0)
-      
+
       // Verify the changes were applied
       const result = updatedDoc.toJSON()
       expect(result.name).toBe("Player2")
-      expect((updatedDoc.getMap("doc").get("score") as LoroCounter).value).toBe(13) // 10 + 5 - 2
+      expect((updatedDoc.getMap("doc").get("score") as LoroCounter).value).toBe(
+        13,
+      ) // 10 + 5 - 2
     })
 
     it("should generate CRDT patches for text operations", () => {
-      const doc = from({ 
+      const doc = from({
         title: CRDT.Text("Hello"),
-        subtitle: "World" 
+        subtitle: "World",
       })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.title.insert(5, " World")
-        d.title.delete(0, 5) // Remove "Hello"
-        d.subtitle = "Universe" // This should generate a mutative patch
-      }, { enablePatches: true })
+      const [updatedDoc, patches] = change(
+        doc,
+        d => {
+          d.title.insert(5, " World")
+          d.title.delete(0, 5) // Remove "Hello"
+          d.subtitle = "Universe" // This should generate a mutative patch
+        },
+        { enablePatches: true },
+      )
 
       // Should have CRDT patches for text operations
       const crdtPatches = patches.filter((p: CombinedPatch) => p.op === "crdt")
       expect(crdtPatches.length).toBe(2)
-      
-      const insertPatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "insert")
+
+      const insertPatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "insert",
+      )
       expect(insertPatch).toBeDefined()
       expect(insertPatch?.args).toEqual([5, " World"])
       expect(insertPatch?.crdtType).toBe("text")
       expect(insertPatch?.path).toEqual(["title"])
-      
-      const deletePatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "delete")
+
+      const deletePatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "delete",
+      )
       expect(deletePatch).toBeDefined()
       expect(deletePatch?.args).toEqual([0, 5])
-      
+
       // Verify the changes were applied
       const result = updatedDoc.toJSON()
       expect(result.subtitle).toBe("Universe")
-      expect((updatedDoc.getMap("doc").get("title") as LoroText).toString()).toBe(" World")
+      expect(
+        (updatedDoc.getMap("doc").get("title") as LoroText).toString(),
+      ).toBe(" World")
     })
 
     it("should generate patches for nested CRDT operations", () => {
-      const doc = from({ 
+      const doc = from({
         user: {
           name: "Alice",
           stats: {
             score: CRDT.Counter(100),
-            level: 5
-          }
-        }
+            level: 5,
+          },
+        },
       })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.user.stats.score.increment(25)
-        d.user.stats.level = 6
-        d.user.name = "Bob"
-      }, { enablePatches: true })
+      const [, patches] = change(
+        doc,
+        d => {
+          d.user.stats.score.increment(25)
+          d.user.stats.level = 6
+          d.user.name = "Bob"
+        },
+        { enablePatches: true },
+      )
 
       // Should have CRDT patch for nested counter
       const crdtPatches = patches.filter((p: CombinedPatch) => p.op === "crdt")
       expect(crdtPatches.length).toBe(1)
-      
+
       const incrementPatch = crdtPatches[0]
       expect(incrementPatch.op).toBe("crdt")
       if (incrementPatch.op === "crdt") {
@@ -153,9 +190,11 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
         expect(incrementPatch.path).toEqual(["user", "stats", "score"])
         expect(incrementPatch.args).toEqual([25])
       }
-      
+
       // Should have mutative patches for POJO changes
-      const mutativePatches = patches.filter((p: CombinedPatch) => p.op !== "crdt")
+      const mutativePatches = patches.filter(
+        (p: CombinedPatch) => p.op !== "crdt",
+      )
       expect(mutativePatches.length).toBeGreaterThan(0)
     })
   })
@@ -173,9 +212,9 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
     })
 
     it("should maintain CRDT functionality without patches", () => {
-      const doc = from({ 
+      const doc = from({
         counter: CRDT.Counter(10),
-        text: CRDT.Text("Hello")
+        text: CRDT.Text("Hello"),
       })
 
       const updatedDoc = change(doc, d => {
@@ -185,7 +224,7 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
 
       const counter = updatedDoc.getMap("doc").get("counter") as LoroCounter
       const text = updatedDoc.getMap("doc").get("text") as LoroText
-      
+
       expect(counter.value).toBe(15)
       expect(text.toString()).toBe("Hello World")
     })
@@ -194,14 +233,18 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
   describe("TEA Integration", () => {
     it("should support patch collection for time-travel debugging", () => {
       const patchCollector = new PatchCollector()
-      let doc = from({ name: "Alice" })
+      const doc = from({ name: "Alice" })
 
       const patchCallback = vi.fn()
       patchCollector.subscribe(patchCallback)
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.name = "Bob"
-      }, { enablePatches: true })
+      const [, patches] = change(
+        doc,
+        d => {
+          d.name = "Bob"
+        },
+        { enablePatches: true },
+      )
 
       patchCollector.addPatches(patches)
 
@@ -213,25 +256,33 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
 
     it("should support time-travel debugging through patch replay", () => {
       const patchCollector = new PatchCollector()
-      let doc = from({ counter: CRDT.Counter(0) })
+      const doc = from({ counter: CRDT.Counter(0) })
 
       // Make several changes
-      let result1 = change(doc, d => d.counter.increment(10), { enablePatches: true })
+      const result1 = change(doc, d => d.counter.increment(10), {
+        enablePatches: true,
+      })
       patchCollector.addPatches(result1[1])
-      
-      let result2 = change(result1[0], d => d.counter.increment(5), { enablePatches: true })
+
+      const result2 = change(result1[0], d => d.counter.increment(5), {
+        enablePatches: true,
+      })
       patchCollector.addPatches(result2[1])
-      
-      let result3 = change(result2[0], d => d.counter.decrement(3), { enablePatches: true })
+
+      const result3 = change(result2[0], d => d.counter.decrement(3), {
+        enablePatches: true,
+      })
       patchCollector.addPatches(result3[1])
 
       const allPatches = patchCollector.getAllPatches()
       expect(allPatches.length).toBe(3)
 
       // Verify all patches are CRDT patches with correct operations
-      const crdtPatches = allPatches.filter((p: CombinedPatch) => p.op === "crdt")
+      const crdtPatches = allPatches.filter(
+        (p: CombinedPatch) => p.op === "crdt",
+      )
       expect(crdtPatches.length).toBe(3)
-      
+
       if (crdtPatches[0].op === "crdt") {
         expect(crdtPatches[0].method).toBe("increment")
         expect(crdtPatches[0].args).toEqual([10])
@@ -251,30 +302,40 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
     })
 
     it("should handle mixed POJO and CRDT operations in single change", () => {
-      const doc = from({ 
+      const doc = from({
         name: "Alice",
         score: CRDT.Counter(100),
         description: CRDT.Text("Player"),
-        level: 1
+        level: 1,
       })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.name = "Bob"           // Mutative patch
-        d.score.increment(50)    // CRDT patch
-        d.description.insert(6, " One") // CRDT patch
-        d.level = 2              // Mutative patch
-      }, { enablePatches: true })
+      const [updatedDoc, patches] = change(
+        doc,
+        d => {
+          d.name = "Bob" // Mutative patch
+          d.score.increment(50) // CRDT patch
+          d.description.insert(6, " One") // CRDT patch
+          d.level = 2 // Mutative patch
+        },
+        { enablePatches: true },
+      )
 
       const crdtPatches = patches.filter((p: CombinedPatch) => p.op === "crdt")
-      const mutativePatches = patches.filter((p: CombinedPatch) => p.op !== "crdt")
+      const mutativePatches = patches.filter(
+        (p: CombinedPatch) => p.op !== "crdt",
+      )
 
       expect(crdtPatches.length).toBe(2)
       expect(mutativePatches.length).toBeGreaterThan(0)
 
       // Verify CRDT patches
-      const incrementPatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "increment")
-      const insertPatch = crdtPatches.find((p: CombinedPatch) => p.op === "crdt" && p.method === "insert")
-      
+      const incrementPatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "increment",
+      )
+      const insertPatch = crdtPatches.find(
+        (p: CombinedPatch) => p.op === "crdt" && p.method === "insert",
+      )
+
       expect(incrementPatch?.path).toEqual(["score"])
       expect(incrementPatch?.args).toEqual([50])
       expect(insertPatch?.path).toEqual(["description"])
@@ -284,8 +345,12 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
       const result = updatedDoc.toJSON()
       expect(result.name).toBe("Bob")
       expect(result.level).toBe(2)
-      expect((updatedDoc.getMap("doc").get("score") as LoroCounter).value).toBe(150)
-      expect((updatedDoc.getMap("doc").get("description") as LoroText).toString()).toBe("Player One")
+      expect((updatedDoc.getMap("doc").get("score") as LoroCounter).value).toBe(
+        150,
+      )
+      expect(
+        (updatedDoc.getMap("doc").get("description") as LoroText).toString(),
+      ).toBe("Player One")
     })
   })
 
@@ -294,26 +359,36 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
       const doc = from({ counter: CRDT.Counter(0) })
 
       const startTime = Date.now()
-      
-      const [updatedDoc, patches] = change(doc, d => {
-        for (let i = 0; i < 100; i++) {
-          d.counter.increment(1)
-        }
-      }, { enablePatches: true })
+
+      const [updatedDoc, patches] = change(
+        doc,
+        d => {
+          for (let i = 0; i < 100; i++) {
+            d.counter.increment(1)
+          }
+        },
+        { enablePatches: true },
+      )
 
       const endTime = Date.now()
       expect(endTime - startTime).toBeLessThan(1000) // Should complete in under 1 second
 
       expect(patches.length).toBe(100)
-      expect((updatedDoc.getMap("doc").get("counter") as LoroCounter).value).toBe(100)
+      expect(
+        (updatedDoc.getMap("doc").get("counter") as LoroCounter).value,
+      ).toBe(100)
     })
 
     it("should handle empty changes gracefully", () => {
       const doc = from({ name: "Alice" })
 
-      const [updatedDoc, patches] = change(doc, d => {
-        // No operations
-      }, { enablePatches: true })
+      const [updatedDoc, patches] = change(
+        doc,
+        _d => {
+          // No operations
+        },
+        { enablePatches: true },
+      )
 
       expect(patches.length).toBe(0)
       expect(updatedDoc.toJSON()).toEqual({ name: "Alice" })
@@ -324,11 +399,15 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
 
       const startTime = Date.now()
 
-      const [updatedDoc, patches] = change(doc, d => {
-        d.counter.increment(1)
-        d.counter.increment(2)
-        d.counter.increment(3)
-      }, { enablePatches: true })
+      const [, patches] = change(
+        doc,
+        d => {
+          d.counter.increment(1)
+          d.counter.increment(2)
+          d.counter.increment(3)
+        },
+        { enablePatches: true },
+      )
 
       expect(patches.length).toBe(3)
 
@@ -338,9 +417,9 @@ describe("Dual-Mode Proxy with TEA Integration", () => {
         if (patch.op === "crdt") {
           expect(patch.timestamp).toBeGreaterThanOrEqual(startTime)
           expect(patch.timestamp).toBeLessThanOrEqual(Date.now())
-          
-          if (i > 0 && patches[i-1].op === "crdt") {
-            const prevPatch = patches[i-1] as any
+
+          if (i > 0 && patches[i - 1].op === "crdt") {
+            const prevPatch = patches[i - 1] as CRDTPatch
             expect(patch.timestamp).toBeGreaterThanOrEqual(prevPatch.timestamp)
           }
         }
