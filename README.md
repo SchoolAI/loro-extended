@@ -21,20 +21,21 @@ These packages will soon provide production-ready solutions to these common need
 Want to build a real-time collaborative app? With the @loro-extended/react package, it's as simple as:
 
 ```tsx
-import { useLoroDoc } from '@loro-extended/react'
+import { useLoroDoc } from "@loro-extended/react";
 
-const [doc, changeDoc, state] = useLoroDoc<TodoDoc>("document-id")
+const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>("document-id");
 
 // Make changes with natural JavaScript syntax
-changeDoc(d => {
-  d.todos.push({ id: "1", text: "Build something amazing", done: false })
-})
+changeDoc((d) => {
+  d.todos.push({ id: "1", text: "Build something amazing", done: false });
+});
 
 // Your UI automatically updates when any user makes changes!
-// <>{doc.map(...)}</>
+// <>{doc.todos.map(...)}</>
 ```
 
 The `useLoroDoc` hook (and accompanying RepoProvider) handles everything:
+
 - ✅ **Automatic synchronization** across all connected users
 - ✅ **Offline support** with automatic reconnection and merge
 - ✅ **Type-safe** mutations with TypeScript
@@ -44,17 +45,35 @@ This single hook connects all the pieces: `@loro-extended/change` for natural mu
 
 ## Packages
 
--   **`packages/change`**: A utility that provides a simple, Immer-style `change()` method for mutating Loro documents.
-    -   [View Package README](./packages/change/README.md)
+- **`packages/change`**: A utility that provides a simple, Immer-style `change()` method for mutating Loro documents with an `ExtendedLoroDoc` wrapper that hides internal complexity.
 
--   **`packages/repo`**: A peer-to-peer document syncing repository, with plugable storage and network adapters.
-    -   [View Package README](./packages/repo/README.md)
+  - [View Package README](./packages/change/README.md)
 
--   **`packages/network-sse`**: Server-Sent Events network adapter for real-time synchronization between clients and servers.
-    -   [View Package README](./packages/network-sse/README.md)
+- **`packages/repo`**: A peer-to-peer document syncing repository with pluggable storage and network adapters. Re-exports all change utilities for convenience.
 
--   **`packages/react`**: React hooks and utilities for using Loro in React applications.
-    -   [View Package README](./packages/react/README.md)
+  - [View Package README](./packages/repo/README.md)
 
--   **`examples/todo-app`**: An example implementation of a React + Vite + ExpressJS app using `@loro-extended/change` and `@loro-extended/repo`.
-    -   [View Package README](./examples/todo-app/README.md)
+- **`packages/adapters`**: A collection of network and storage adapters including Server-Sent Events for real-time synchronization, IndexedDB for browser storage, and LevelDB for server storage.
+
+  - [View Package README](./packages/adapters/README.md)
+
+- **`packages/react`**: React hooks and utilities for building collaborative applications with automatic synchronization and optimized re-renders.
+
+  - [View Package README](./packages/react/README.md)
+
+- **`examples/todo-app`**: An example implementation of a React + Vite + ExpressJS app demonstrating real-time collaborative editing.
+  - [View Package README](./examples/todo-app/README.md)
+
+## Architecture
+
+This library uses sophisticated patterns for reliable distributed state management:
+
+- **The Elm Architecture (TEA)**: Pure functional state machines with impure runtime hosts for predictable state transitions
+- **Pluggable Adapter System**: Modular storage and network backends for different environments
+- **Event-Driven Synchronization**: Robust peer-to-peer protocol with automatic conflict resolution
+
+For detailed architectural information, see:
+
+- [Repo Architecture](./packages/repo/src/repo.md) - Overall system design and orchestration
+- [DocHandle State Machine](./packages/repo/src/doc-handle.md) - Document lifecycle management
+- [Synchronizer Protocol](./packages/repo/src/synchronizer.md) - Peer-to-peer synchronization details

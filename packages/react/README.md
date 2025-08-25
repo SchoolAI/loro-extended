@@ -9,6 +9,7 @@ This package provides React-specific bindings for Loro, making it easy to build 
 ## Why Use This?
 
 Building collaborative React apps with raw Loro requires:
+
 - Manual subscription to document changes
 - Converting between Loro's internal format and React state
 - Managing document lifecycle and synchronization
@@ -31,42 +32,44 @@ The `useLoroDoc` hook provides a reactive interface to Loro documents with autom
 ### Basic Usage
 
 ```tsx
-import { useLoroDoc } from "@loro-extended/react"
+import { useLoroDoc } from "@loro-extended/react";
 
 interface MyDoc {
-  title: string
-  items: Array<{ id: string; text: string; done: boolean }>
+  title: string;
+  items: Array<{ id: string; text: string; done: boolean }>;
 }
 
 function MyComponent() {
-  const [doc, changeDoc, state] = useLoroDoc<MyDoc>("document-id")
+  const [doc, changeDoc, handle] = useLoroDoc<MyDoc>("document-id");
 
-  if (state !== "ready") {
-    return <div>Loading...</div>
+  if (handle?.state !== "ready") {
+    return <div>Loading...</div>;
   }
 
   return (
     <div>
       <h1>{doc.title}</h1>
-      <button onClick={() => changeDoc(d => d.title = "New Title")}>
+      <button onClick={() => changeDoc((d) => (d.title = "New Title"))}>
         Change Title
       </button>
-      
-      {doc.items.map(item => (
+
+      {doc.items.map((item) => (
         <div key={item.id}>
           <input
             type="checkbox"
             checked={item.done}
-            onChange={() => changeDoc(d => {
-              const found = d.items.find(i => i.id === item.id)
-              if (found) found.done = !found.done
-            })}
+            onChange={() =>
+              changeDoc((d) => {
+                const found = d.items.find((i) => i.id === item.id);
+                if (found) found.done = !found.done;
+              })
+            }
           />
           {item.text}
         </div>
       ))}
     </div>
-  )
+  );
 }
 ```
 
@@ -75,92 +78,101 @@ function MyComponent() {
 `useLoroDoc` returns a tuple with three elements:
 
 1. **`doc: T | undefined`** - The current document state
+
    - Automatically updates when local or remote changes occur
    - `undefined` when loading or unavailable
 
 2. **`changeDoc: (fn: (doc: T) => void) => void`** - Function to modify the document
+
    - Uses an Immer-style API for natural mutations
    - Changes are automatically converted to CRDT operations
    - Synchronizes with all connected peers
 
-3. **`state: "loading" | "ready" | "unavailable"`** - Current document state
-   - `"loading"` - Document is being loaded from storage or network
-   - `"ready"` - Document is available and synchronized
-   - `"unavailable"` - Document cannot be accessed
+3. **`handle: DocHandle<DocWrapper> | null`** - The DocHandle instance
+   - Provides access to the underlying document and state
+   - Use `handle.state` to check current state: `"idle" | "loading" | "ready" | "unavailable"`
+   - Emits events for state changes and document updates
 
 ## Setting Up the Repo Context
 
 Before using `useLoroDoc`, you need to provide a Repo instance via context:
 
 ```tsx
-import { RepoProvider } from "@loro-extended/react"
-import { Repo } from "@loro-extended/repo"
-import { SseClientNetworkAdapter } from "@loro-extended/network-sse/client"
+import { RepoProvider } from "@loro-extended/react";
+import { Repo } from "@loro-extended/repo";
+import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
+import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
 
 // Create adapters for network and storage
-const network = new SseClientNetworkAdapter("/api/sync")
-const storage = new IndexedDBStorageAdapter()
+const network = new SseClientNetworkAdapter("/api/sync");
+const storage = new IndexedDBStorageAdapter();
 
 // Create the Repo instance
-const repo = new Repo({ 
-  network: [network], 
-  storage 
-})
+const repo = new Repo({
+  network: [network],
+  storage,
+});
 
 // Wrap your app with the provider
 function App() {
   return (
-    <RepoProvider value={repo}>
+    <RepoProvider config={{ network: [network], storage }}>
       <YourComponents />
     </RepoProvider>
-  )
+  );
 }
 ```
 
 ## Features
 
 ### 🔄 Real-time Synchronization
+
 Changes made by any user are instantly synchronized to all connected clients. The hook automatically re-renders your component when remote changes arrive.
 
 ### 🔌 Offline Support
+
 Documents are persisted locally and changes are queued when offline. When reconnected, changes automatically sync and merge.
 
 ### 🎯 Type Safety
+
 Full TypeScript support with type inference for your document schema:
 
 ```typescript
 interface TodoDoc {
   todos: Array<{
-    id: string
-    text: string
-    completed: boolean
-  }>
+    id: string;
+    text: string;
+    completed: boolean;
+  }>;
 }
 
-const [doc, changeDoc] = useLoroDoc<TodoDoc>("todos")
+const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>("todos");
 // doc is typed as TodoDoc | undefined
 // changeDoc enforces TodoDoc structure
+// handle provides access to state and events
 ```
 
 ### ⚡ Optimized Re-renders
+
 The hook uses React's `useSyncExternalStore` for optimal performance, only re-rendering when the document actually changes.
 
 ### 🛠️ Natural API
+
 Write mutations using familiar JavaScript syntax:
 
 ```typescript
-changeDoc(d => {
+changeDoc((d) => {
   // Array operations
-  d.items.push({ id: "1", text: "New item" })
-  d.items.splice(0, 1)
-  
+  d.items.push({ id: "1", text: "New item" });
+  d.items.splice(0, 1);
+
   // Object mutations
-  d.settings.theme = "dark"
-  delete d.settings.oldProp
-  
+  d.settings.theme = "dark";
+  delete d.settings.oldProp;
+
   // Nested updates
-  d.users[0].profile.name = "Alice"
-})
+  d.users[0].profile.name = "Alice";
+});
 ```
 
 ## Complete Example
