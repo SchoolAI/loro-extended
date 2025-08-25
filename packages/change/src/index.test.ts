@@ -338,8 +338,8 @@ describe("Array methods on LoroList proxy", () => {
     })
 
     // Test outside of change function to check if proxy works correctly
-    const todos = doc.data.todos
-    const foundTodo = todos.find((t: any) => t.id === "2")
+    const todos = doc.toJSON().todos
+    const foundTodo = todos.find(t => t.id === "2")
 
     expect(foundTodo).toBeDefined()
     expect(foundTodo?.id).toBe("2")
@@ -356,8 +356,8 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const todos = doc.data.todos
-    const index = todos.findIndex((t: any) => t.id === "2")
+    const todos = doc.toJSON().todos
+    const index = todos.findIndex(t => t.id === "2")
 
     expect(index).toBe(1)
   })
@@ -365,7 +365,7 @@ describe("Array methods on LoroList proxy", () => {
   it("should support map method", () => {
     const doc = from({ numbers: [1, 2, 3, 4, 5] })
 
-    const numbers = doc.data.numbers
+    const numbers = doc.toJSON().numbers
     const doubled = numbers.map((n: number) => n * 2)
 
     expect(doubled).toEqual([2, 4, 6, 8, 10])
@@ -380,8 +380,8 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const todos = doc.data.todos
-    const incompleteTodos = todos.filter((t: any) => !t.done)
+    const todos = doc.toJSON().todos
+    const incompleteTodos = todos.filter(t => !t.done)
 
     expect(incompleteTodos).toHaveLength(2)
     expect(incompleteTodos[0].id).toBe("1")
@@ -392,7 +392,7 @@ describe("Array methods on LoroList proxy", () => {
     const doc = from({ numbers: [1, 2, 3] })
 
     const collected: number[] = []
-    const numbers = doc.data.numbers
+    const numbers = doc.toJSON().numbers
     numbers.forEach((n: number) => collected.push(n * 2))
 
     expect(collected).toEqual([2, 4, 6])
@@ -407,9 +407,9 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const todos = doc.data.todos
-    const hasCompleted = todos.some((t: any) => t.done)
-    const hasIncomplete = todos.some((t: any) => !t.done)
+    const todos = doc.toJSON().todos
+    const hasCompleted = todos.some(t => t.done)
+    const hasIncomplete = todos.some(t => !t.done)
 
     expect(hasCompleted).toBe(true)
     expect(hasIncomplete).toBe(true)
@@ -423,8 +423,8 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const todos = doc.data.todos
-    const allDone = todos.every((t: any) => t.done)
+    const todos = doc.toJSON().todos
+    const allDone = todos.every(t => t.done)
 
     expect(allDone).toBe(true)
 
@@ -433,14 +433,14 @@ describe("Array methods on LoroList proxy", () => {
       d.todos.push({ id: "3", text: "Write code", done: false })
     })
 
-    const allDoneAfter = doc.data.todos.every((t: any) => t.done)
+    const allDoneAfter = doc.toJSON().todos.every(t => t.done)
     expect(allDoneAfter).toBe(false)
   })
 
   it("should support includes method", () => {
     const doc = from({ tags: ["javascript", "typescript", "react"] })
 
-    const tags = doc.data.tags
+    const tags = doc.toJSON().tags
     const hasJS = tags.includes("javascript")
     const hasPython = tags.includes("python")
 
@@ -451,7 +451,7 @@ describe("Array methods on LoroList proxy", () => {
   it("should support indexOf method", () => {
     const doc = from({ tags: ["javascript", "typescript", "react"] })
 
-    const tags = doc.data.tags
+    const tags = doc.toJSON().tags
     const tsIndex = tags.indexOf("typescript")
     const pythonIndex = tags.indexOf("python")
 
@@ -462,7 +462,7 @@ describe("Array methods on LoroList proxy", () => {
   it("should support reduce method", () => {
     const doc = from({ numbers: [1, 2, 3, 4, 5] })
 
-    const numbers = doc.data.numbers
+    const numbers = doc.toJSON().numbers
     const sum = numbers.reduce((acc: number, n: number) => acc + n, 0)
     const product = numbers.reduce((acc: number, n: number) => acc * n, 1)
 
@@ -473,7 +473,7 @@ describe("Array methods on LoroList proxy", () => {
   it("should support reduce without initial value", () => {
     const doc = from({ numbers: [1, 2, 3, 4] })
 
-    const numbers = doc.data.numbers
+    const numbers = doc.toJSON().numbers
     const sum = numbers.reduce((acc: number, n: number) => acc + n)
 
     expect(sum).toBe(10)
@@ -487,12 +487,15 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const users = doc.data.users
-    const allPosts = users.reduce((acc: any[], user: any) => {
-      return acc.concat(
-        user.posts.map((p: any) => ({ title: p.title, author: user.name })),
-      )
-    }, [] as any[])
+    const users = doc.toJSON().users
+    const allPosts = users.reduce(
+      (acc, user) => {
+        return acc.concat(
+          user.posts.map(p => ({ title: p.title, author: user.name })),
+        )
+      },
+      [] as { title: string; author: string }[],
+    )
 
     expect(allPosts).toEqual([
       { title: "Post 1", author: "Alice" },
@@ -531,7 +534,7 @@ describe("Array methods on LoroList proxy", () => {
 
     // Test accessing undefined/null properties doesn't crash
     expect(() => {
-      const data = doc.data.data
+      const data = doc.toJSON().data
       // Try to access properties that might be null/undefined
       const undefinedProp = (data as any)[undefined as any]
       const nullProp = (data as any)[null as any]
@@ -551,25 +554,25 @@ describe("Array methods on LoroList proxy", () => {
       ],
     })
 
-    const itemWithId2 = doc.data.items.find((item: any) => item.id === "2")
+    const itemWithId2 = doc.toJSON().items.find(item => item.id === "2")
     expect(itemWithId2).toBeUndefined()
 
-    const itemWithName2 = doc.data.items.find(
-      (item: any) => item.name === "Item 2",
-    )
+    const itemWithName2 = doc
+      .toJSON()
+      .items.find(item => item.name === "Item 2")
     expect(itemWithName2).toBeDefined()
     expect(itemWithName2?.name).toBe("Item 2")
 
     // Should not throw when accessing missing properties
-    const allHaveIds = doc.data.items.every(
-      (item: any) => item.id !== null && item.id !== undefined,
-    )
+    const allHaveIds = doc
+      .toJSON()
+      .items.every(item => item.id !== null && item.id !== undefined)
     expect(allHaveIds).toBe(false)
 
     // Test that we can safely check for properties that don't exist
-    const hasDescription = doc.data.items.some(
-      (item: any) => item.description !== undefined,
-    )
+    const hasDescription = doc
+      .toJSON()
+      .items.some((item: any) => item.description !== undefined)
     expect(hasDescription).toBe(false)
   })
 })

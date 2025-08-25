@@ -25,7 +25,8 @@
     "test": "vitest"
   },
   "dependencies": {
-    "loro-crdt": "^1.5.9"
+    "loro-crdt": "^1.5.9",
+    "mutative": "^1.2.0"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
