@@ -15,8 +15,8 @@ type TestModel = {
 
 type TestCommand = { type: "log"; message: string }
 
-// Simple mutative update function for testing
-function testUpdateMutative(
+// Simple mutable update function for testing
+function testMutableUpdate(
   msg: TestMessage,
   model: TestModel,
 ): TestCommand | undefined {
@@ -43,14 +43,14 @@ function testUpdateMutative(
   }
 }
 
-describe("makeMutableUpdate", () => {
-  it("should transform mutative update to raj-compatible update", () => {
+describe("makeImmutableUpdate", () => {
+  it("should transform mutable update fn to immutable (raj-compatible) update fn", () => {
     const patches: Patch[] = []
     const onPatch = (newPatches: Patch[]) => {
       patches.push(...newPatches)
     }
 
-    const rajUpdate = makeImmutableUpdate(testUpdateMutative, onPatch)
+    const rajUpdate = makeImmutableUpdate(testMutableUpdate, onPatch)
 
     const initialModel: TestModel = {
       count: 0,
@@ -92,7 +92,7 @@ describe("makeMutableUpdate", () => {
   })
 
   it("should work without patch callback", () => {
-    const rajUpdate = makeImmutableUpdate(testUpdateMutative)
+    const rajUpdate = makeImmutableUpdate(testMutableUpdate)
 
     const initialModel: TestModel = {
       count: 5,
@@ -111,7 +111,7 @@ describe("makeMutableUpdate", () => {
   })
 
   it("should handle undefined commands", () => {
-    const mutativeUpdate = (
+    const mutableUpdate = (
       msg: TestMessage,
       model: TestModel,
     ): TestCommand | undefined => {
@@ -120,14 +120,14 @@ describe("makeMutableUpdate", () => {
       return
     }
 
-    const rajUpdate = makeImmutableUpdate(mutativeUpdate)
+    const update = makeImmutableUpdate(mutableUpdate)
 
     const initialModel: TestModel = {
       count: 0,
       history: [],
     }
 
-    const [newModel, command] = rajUpdate({ type: "increment" }, initialModel)
+    const [newModel, command] = update({ type: "increment" }, initialModel)
 
     expect(newModel.count).toBe(1)
     expect(command).toBeUndefined()
@@ -139,7 +139,7 @@ describe("makeMutableUpdate", () => {
       patches.push(...newPatches)
     }
 
-    const rajUpdate = makeImmutableUpdate(testUpdateMutative, onPatch)
+    const rajUpdate = makeImmutableUpdate(testMutableUpdate, onPatch)
 
     const initialModel: TestModel = {
       count: 0,
