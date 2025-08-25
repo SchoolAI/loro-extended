@@ -375,16 +375,6 @@ const CRDT = {
   Text: (initialValue?: string) => LoroTextWrapper,
   Counter: (initialValue?: number) => LoroCounterWrapper,
 };
-
-type AsLoro<T> = T extends LoroTextWrapper
-  ? LoroText
-  : T extends LoroCounterWrapper
-  ? LoroCounter
-  : T extends (infer E)[]
-  ? AsLoro<E>[]
-  : T extends Record<string, unknown>
-  ? { [K in keyof T]: AsLoro<T[K]> }
-  : T;
 ```
 
 ## Contributing
