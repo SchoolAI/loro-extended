@@ -35,38 +35,19 @@ export type UseLoroDocReturn<T extends object> = [
 ]
 
 /**
- * A hook that provides a reactive interface to a Loro document handle.
- *
- * It returns a tuple containing the document's data, a function to
- * modify it, and the current state of the handle (e.g., 'loading', 'ready').
- *
- * @example
- * ```tsx
- * const [doc, changeDoc, state] = useLoroDoc(handle)
- *
- * if (state !== 'ready') {
- *   return <Loading />
- * }
- *
- * return (
- *  <div>
- *    <p>{doc.title}</p>
- *    <button onClick={() => changeDoc(d => d.title = "New Title")}>
- *      Change Title
- *    </button>
- *  </div>
- * )
- * ```
+ * Internal hook that manages Loro document state, including handle lifecycle,
+ * event subscriptions, and reactive state synchronization.
  */
-export function useLoroDoc<T extends object>(
-  documentId: DocumentId,
-): UseLoroDocReturn<T> {
+function useLoroDocState<T extends object>(documentId: DocumentId) {
   const repo = useRepo()
   const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
+  
+  // Handle lifecycle management
   useEffect(() => {
     repo.findOrCreate<DocWrapper>(documentId).then(setHandle)
   }, [repo, documentId])
 
+  // Event subscription management
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       if (!handle) return () => {}
@@ -80,7 +61,7 @@ export function useLoroDoc<T extends object>(
     [handle],
   )
 
-  // Use refs to maintain stable state
+  // State synchronization with stable snapshots
   const snapshotRef = useRef<{
     version: number
     state: DocHandleSimplifiedState
@@ -108,13 +89,13 @@ export function useLoroDoc<T extends object>(
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
+  // Data transformation from Loro to JSON
   const doc = useMemo(() => {
     if (snapshot.state !== "ready" || snapshot.version === -1) {
       return undefined
     }
 
     const loroDoc = handle?.doc()
-
     if (!loroDoc) return undefined
 
     // Wrap and return the plain JSON representation
@@ -122,7 +103,15 @@ export function useLoroDoc<T extends object>(
     return extendedDoc.toJSON()
   }, [snapshot, handle])
 
-  const changeDoc = useCallback(
+  return { doc: doc as T | undefined, handle, snapshot }
+}
+
+/**
+ * Internal hook that provides document mutation capabilities.
+ * Separated from state management for clear separation of read vs write operations.
+ */
+function useLoroDocChanger<T extends object>(handle: DocHandle<DocWrapper> | null) {
+  return useCallback(
     (fn: ChangeFn<T>) => {
       if (!handle) {
         console.warn("doc handle not available for change")
@@ -136,6 +125,37 @@ export function useLoroDoc<T extends object>(
     },
     [handle],
   )
+}
 
-  return [doc as T | undefined, changeDoc, handle]
+/**
+ * A hook that provides a reactive interface to a Loro document handle.
+ *
+ * It returns a tuple containing the document's data, a function to
+ * modify it, and the current state of the handle (e.g., 'loading', 'ready').
+ *
+ * @example
+ * ```tsx
+ * const [doc, changeDoc, handle] = useLoroDoc(documentId)
+ *
+ * if (!doc) {
+ *   return <Loading />
+ * }
+ *
+ * return (
+ *  <div>
+ *    <p>{doc.title}</p>
+ *    <button onClick={() => changeDoc(d => d.title = "New Title")}>
+ *      Change Title
+ *    </button>
+ *  </div>
+ * )
+ * ```
+ */
+export function useLoroDoc<T extends object>(
+  documentId: DocumentId,
+): UseLoroDocReturn<T> {
+  const { doc, handle } = useLoroDocState<T>(documentId)
+  const changeDoc = useLoroDocChanger<T>(handle)
+  
+  return [doc, changeDoc, handle]
 }
