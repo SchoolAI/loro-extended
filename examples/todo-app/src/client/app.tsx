@@ -1,4 +1,4 @@
-import { useLoroDoc } from "@loro-extended/react"
+import { useDocument } from "@loro-extended/react"
 import type { DocumentId } from "@loro-extended/repo"
 import { useEffect } from "react"
 import type { Todo } from "../shared/types"
@@ -19,7 +19,7 @@ function App() {
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
   // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>(docId)
+  const [doc, changeDoc, handle] = useDocument<TodoDoc>(docId)
 
   useEffect(() => {
     console.log("doc state", doc)

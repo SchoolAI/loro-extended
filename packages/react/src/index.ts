@@ -1,3 +1,5 @@
+export { useDocument } from "./hooks/use-document.js"
+export type { UseDocumentReturn as UseLoroDocReturn } from "./hooks/use-document.js"
+export type { ChangeFn } from "./hooks/use-loro-doc-changer.js"
+export type { DocWrapper } from "./hooks/use-loro-doc-state.js"
 export * from "./repo-context.js"
-export * from "./use-loro-doc.js"
-
