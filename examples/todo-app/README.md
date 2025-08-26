@@ -17,7 +17,7 @@ This todo app showcases:
 
 ## Architecture
 
-The app uses two key packages from this monorepo:
+The app uses two key packages from this monorepo, via `@loro-extended/react`:
 
 ### `@loro-extended/change`
 

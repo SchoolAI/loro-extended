@@ -10,9 +10,9 @@ import { RequestTracker } from "./request-tracker.js"
 import {
   type Command,
   createSynchronizerUpdate,
-  type Message,
-  type Model,
   init as programInit,
+  type SynchronizerMessage,
+  type SynchronizerModel,
 } from "./synchronizer-program.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
 
@@ -29,10 +29,13 @@ export type SynchronizerOptions = {
 
 export class Synchronizer {
   #services: SynchronizerServices
-  #model: Model
+  #model: SynchronizerModel
   #timeouts = new Map<DocumentId, NodeJS.Timeout>()
   #networkRequestTracker = new RequestTracker<LoroDoc<DocContent> | null>()
-  #updateFunction: (msg: Message, model: Model) => [Model, Command?]
+  #updateFunction: (
+    msg: SynchronizerMessage,
+    model: SynchronizerModel,
+  ) => [SynchronizerModel, Command?]
 
   constructor(
     services: SynchronizerServices,
@@ -140,7 +143,7 @@ export class Synchronizer {
   // INTERNAL RUNTIME
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-  #dispatch(message: Message) {
+  #dispatch(message: SynchronizerMessage) {
     const [newModel, command] = this.#updateFunction(message, this.#model)
     this.#model = newModel
 
@@ -293,7 +296,7 @@ export class Synchronizer {
    * Get the current model state (for debugging purposes).
    * Returns a deep copy to prevent accidental mutations.
    */
-  public getModelSnapshot(): Model {
+  public getModelSnapshot(): SynchronizerModel {
     return create(this.#model)[0]
   }
 }

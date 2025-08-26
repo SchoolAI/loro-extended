@@ -10,8 +10,8 @@ import type { PeerMetadata } from "./network/network-adapter.js"
 import { createPermissions } from "./permission-adapter.js"
 import {
   createSynchronizerUpdate,
-  type Message,
-  type Model,
+  type SynchronizerMessage,
+  type SynchronizerModel,
   init as programInit,
 } from "./synchronizer-program.js"
 
@@ -36,12 +36,12 @@ describe("Synchronizer program", () => {
     it("should announce local documents when a peer is added", () => {
       const [initialModel] = programInit()
       const documentId = "doc-1"
-      const modelWithDoc: Model = {
+      const modelWithDoc: SynchronizerModel = {
         ...initialModel,
         localDocs: new Set([documentId]),
       }
 
-      const message: Message = { type: "msg-peer-added", peerId: "peer-1" }
+      const message: SynchronizerMessage = { type: "msg-peer-added", peerId: "peer-1" }
       const [newModel, command] = update(message, modelWithDoc)
 
       expect(command).toEqual({
@@ -63,7 +63,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // First add a peer to have something to remove
-      const modelWithPeer: Model = {
+      const modelWithPeer: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -72,7 +72,7 @@ describe("Synchronizer program", () => {
         },
       }
 
-      const message: Message = { type: "msg-peer-removed", peerId: "peer-1" }
+      const message: SynchronizerMessage = { type: "msg-peer-removed", peerId: "peer-1" }
       const [newModel, command] = update(message, modelWithPeer)
 
       expect(command).toBeUndefined()
@@ -99,7 +99,7 @@ describe("Synchronizer program", () => {
       const documentId = "doc-1"
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -107,7 +107,7 @@ describe("Synchronizer program", () => {
         ]),
       }
 
-      const message: Message = { type: "msg-document-added", documentId }
+      const message: SynchronizerMessage = { type: "msg-document-added", documentId }
       const [, command] = update(message, modelWithPeers)
 
       expect(command).toEqual({
@@ -134,7 +134,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -142,7 +142,7 @@ describe("Synchronizer program", () => {
         ]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-document-added",
         documentId: "doc-1",
       }
@@ -156,7 +156,7 @@ describe("Synchronizer program", () => {
       const documentId = "doc-1"
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -164,7 +164,7 @@ describe("Synchronizer program", () => {
         ]),
       }
 
-      const message: Message = { type: "msg-document-removed", documentId }
+      const message: SynchronizerMessage = { type: "msg-document-removed", documentId }
       const [, command] = update(message, modelWithPeers)
 
       expect(command).toEqual({
@@ -184,12 +184,12 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([["peer-1", {} as PeerMetadata]]),
       }
 
-      const message: Message = { type: "msg-sync-started", documentId: "doc-1" }
+      const message: SynchronizerMessage = { type: "msg-sync-started", documentId: "doc-1" }
       const [newModel, command] = update(message, modelWithPeers)
 
       const syncState = newModel.syncStates.get("doc-1")
@@ -217,12 +217,12 @@ describe("Synchronizer program", () => {
 
     it("should transition from searching to syncing when an announcement is received", () => {
       const [initialModel] = programInit()
-      const modelWithSyncState: Model = {
+      const modelWithSyncState: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-announced",
         from: "peer-1",
         documentIds: ["doc-1"],
@@ -252,12 +252,12 @@ describe("Synchronizer program", () => {
 
     it("should respond to a sync request if the document is available", () => {
       const [initialModel] = programInit()
-      const modelWithDoc: Model = {
+      const modelWithDoc: SynchronizerModel = {
         ...initialModel,
         localDocs: new Set(["doc-1"]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-request",
         from: "peer-1",
         documentId: "doc-1",
@@ -273,14 +273,14 @@ describe("Synchronizer program", () => {
 
     it("should clear sync state on successful sync", () => {
       const [initialModel] = programInit()
-      const modelWithSyncState: Model = {
+      const modelWithSyncState: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([
           ["doc-1", { state: "syncing", peerId: "peer-1" }],
         ]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "peer-1",
         documentId: "doc-1",
@@ -308,7 +308,7 @@ describe("Synchronizer program", () => {
 
     it("should fail immediately on timeout with no retries", () => {
       const [initialModel] = programInit()
-      const model: Model = {
+      const model: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
       }
@@ -338,7 +338,7 @@ describe("Synchronizer program", () => {
 
     it("should respect user timeout when specified", () => {
       const [initialModel] = programInit()
-      const model: Model = {
+      const model: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([
           ["doc-1", { state: "searching", userTimeout: 3000, requestId: 0 }],
@@ -380,14 +380,14 @@ describe("Synchronizer program", () => {
       )
 
       const [initialModel] = programInit()
-      const modelWithSyncState: Model = {
+      const modelWithSyncState: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([
           ["doc-1", { state: "syncing", peerId: "peer-1", retryCount: 0 }],
         ]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "peer-1",
         documentId: "doc-1",
@@ -405,7 +405,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -413,7 +413,7 @@ describe("Synchronizer program", () => {
         },
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-local-change",
         documentId: "doc-1",
         data: new Uint8Array([1, 2, 3]),
@@ -433,7 +433,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
       const documentIds = ["doc-1", "doc-2"]
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-announced",
         from: "peer-1",
         documentIds,
@@ -456,7 +456,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
       const documentIds = ["doc-1", "doc-2"]
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-announced",
         from: "peer-1",
         documentIds,
@@ -473,12 +473,12 @@ describe("Synchronizer program", () => {
 
     it("should request sync from peers that have documents we're searching for", () => {
       const [initialModel] = programInit()
-      const modelWithSyncState: Model = {
+      const modelWithSyncState: SynchronizerModel = {
         ...initialModel,
         syncStates: new Map([["doc-1", { state: "searching" }]]),
       }
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-announced",
         from: "peer-1",
         documentIds: ["doc-1"],
@@ -514,7 +514,7 @@ describe("Synchronizer program", () => {
     it("should track peer awareness when a document is requested", () => {
       const [initialModel] = programInit()
 
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-request",
         from: "peer-1",
         documentId: "doc-1",
@@ -541,7 +541,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -552,7 +552,7 @@ describe("Synchronizer program", () => {
       }
 
       const syncData = new Uint8Array([1, 2, 3])
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "peer-1",
         documentId: "doc-1",
@@ -592,7 +592,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -603,7 +603,7 @@ describe("Synchronizer program", () => {
       }
 
       const syncData = new Uint8Array([1, 2, 3])
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "peer-1",
         documentId: "doc-1",
@@ -634,7 +634,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with only the sender as aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -645,7 +645,7 @@ describe("Synchronizer program", () => {
       }
 
       const syncData = new Uint8Array([1, 2, 3])
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "peer-1",
         documentId: "doc-1",
@@ -668,7 +668,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -680,7 +680,7 @@ describe("Synchronizer program", () => {
 
       // Message from server (already forwarded once)
       const syncData = new Uint8Array([1, 2, 3])
-      const messageFromServer: Message = {
+      const messageFromServer: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "server",
         documentId: "doc-1",
@@ -701,7 +701,7 @@ describe("Synchronizer program", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of the document
-      const modelWithAwarePeers: Model = {
+      const modelWithAwarePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -713,7 +713,7 @@ describe("Synchronizer program", () => {
 
       // Original message from browser-a
       const syncData = new Uint8Array([1, 2, 3])
-      const originalMessage: Message = {
+      const originalMessage: SynchronizerMessage = {
         type: "msg-received-sync",
         from: "browser-a",
         documentId: "doc-1",
@@ -754,7 +754,7 @@ describe("Peer Management Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -772,7 +772,7 @@ describe("Peer Management Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with connected peers
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -781,7 +781,7 @@ describe("Peer Management Integration", () => {
       }
 
       // Remove a peer
-      const modelAfterDisconnect: Model = {
+      const modelAfterDisconnect: SynchronizerModel = {
         ...modelWithPeers,
         peers: new Map([
           ["peer-2", {} as PeerMetadata], // Only peer-2 remains
@@ -798,7 +798,7 @@ describe("Peer Management Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers that have metadata
-      const modelWithPeers: Model = {
+      const modelWithPeers: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", { networkAdapter: "adapter1" } as PeerMetadata],
@@ -821,7 +821,7 @@ describe("Peer Management Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers and documents
-      const modelWithPeersAndDocs: Model = {
+      const modelWithPeersAndDocs: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -831,7 +831,7 @@ describe("Peer Management Integration", () => {
       }
 
       // Add a new document
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-document-added",
         documentId: "doc-2",
       }
@@ -846,7 +846,7 @@ describe("Peer Management Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers and document relationships
-      const modelWithRelationships: Model = {
+      const modelWithRelationships: SynchronizerModel = {
         ...initialModel,
         peers: new Map([
           ["peer-1", {} as PeerMetadata],
@@ -860,7 +860,7 @@ describe("Peer Management Integration", () => {
       }
 
       // Remove peer-1
-      const message: Message = { type: "msg-peer-removed", peerId: "peer-1" }
+      const message: SynchronizerMessage = { type: "msg-peer-removed", peerId: "peer-1" }
       const [newModel] = update(message, modelWithRelationships)
 
       // Check that peer-1 was removed from document relationships
@@ -887,7 +887,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers that have documents
-      const modelWithDocOwnership: Model = {
+      const modelWithDocOwnership: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -908,7 +908,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peers aware of documents
-      const modelWithDocAwareness: Model = {
+      const modelWithDocAwareness: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -929,7 +929,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with multiple peers that have documents
-      const modelWithMultiplePeers: Model = {
+      const modelWithMultiplePeers: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -951,7 +951,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with multiple documents
-      const modelWithMultipleDocs: Model = {
+      const modelWithMultipleDocs: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -987,13 +987,13 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with local documents
-      const modelWithDocs: Model = {
+      const modelWithDocs: SynchronizerModel = {
         ...initialModel,
         localDocs: new Set(["doc-1"]),
       }
 
       // Add a peer
-      const message: Message = { type: "msg-peer-added", peerId: "peer-1" }
+      const message: SynchronizerMessage = { type: "msg-peer-added", peerId: "peer-1" }
       const [newModel] = update(message, modelWithDocs)
 
       // Check that peer is now aware of the document
@@ -1005,7 +1005,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Receive document announcement
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-announced",
         from: "peer-1",
         documentIds: ["doc-1"],
@@ -1024,7 +1024,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Receive document request
-      const message: Message = {
+      const message: SynchronizerMessage = {
         type: "msg-received-doc-request",
         from: "peer-1",
         documentId: "doc-1",
@@ -1040,7 +1040,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peer relationships
-      const modelWithRelationships: Model = {
+      const modelWithRelationships: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,
@@ -1050,7 +1050,7 @@ describe("DocumentPeerRegistry Integration", () => {
       }
 
       // Remove peer-1
-      const message: Message = { type: "msg-peer-removed", peerId: "peer-1" }
+      const message: SynchronizerMessage = { type: "msg-peer-removed", peerId: "peer-1" }
       const [newModel] = update(message, modelWithRelationships)
 
       // Check that peer-1 was removed from all relationships
@@ -1068,7 +1068,7 @@ describe("DocumentPeerRegistry Integration", () => {
       const [initialModel] = programInit()
 
       // Create a model with peer awareness
-      const modelWithAwareness: Model = {
+      const modelWithAwareness: SynchronizerModel = {
         ...initialModel,
         remoteDocs: {
           ...initialModel.remoteDocs,

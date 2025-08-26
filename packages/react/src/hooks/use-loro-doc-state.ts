@@ -1,5 +1,4 @@
 import {
-  type AsLoro,
   type DocHandle,
   type DocHandleSimplifiedState,
   type DocumentId,
@@ -27,7 +26,7 @@ export type DocWrapper = {
 export function useLoroDocState<T extends object>(documentId: DocumentId) {
   const repo = useRepo()
   const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
-  
+
   // Handle lifecycle management
   useEffect(() => {
     repo.findOrCreate<DocWrapper>(documentId).then(setHandle)

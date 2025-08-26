@@ -20,7 +20,7 @@ import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 // STATE
 
 /** The pure-functional state of the synchronizer. */
-export type Model = {
+export type SynchronizerModel = {
   /** A map of which documents we have locally. */
   localDocs: Set<DocumentId>
 
@@ -54,7 +54,7 @@ export type SyncState =
 
 // MESSAGES (inputs to the update function)
 
-export type Message =
+export type SynchronizerMessage =
   // Events from the Repo
   | { type: "msg-peer-added"; peerId: PeerId }
   | { type: "msg-peer-removed"; peerId: PeerId }
@@ -135,10 +135,13 @@ function createCommand(commands: Command[]): Command | undefined {
 }
 
 export type Program = {
-  update(message: Message, model: Model): [Model, Command?]
+  update(
+    message: SynchronizerMessage,
+    model: SynchronizerModel,
+  ): [SynchronizerModel, Command?]
 }
 
-export function init(): [Model, Command?] {
+export function init(): [SynchronizerModel, Command?] {
   return [
     {
       localDocs: new Set(),
@@ -158,8 +161,8 @@ function createSynchronizerLogic(permissions: PermissionAdapter) {
   // with what needs to change, using standard assignment and JS operations. But the machinery
   // around this function turns it back into an immutable `update` function like raj/TEA expects.
   return function mutatingUpdate(
-    msg: Message,
-    model: Model,
+    msg: SynchronizerMessage,
+    model: SynchronizerModel,
   ): Command | undefined {
     switch (msg.type) {
       case "msg-peer-added": {
