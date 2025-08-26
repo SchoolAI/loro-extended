@@ -21,9 +21,9 @@ These packages will soon provide production-ready solutions to these common need
 Want to build a real-time collaborative app? With the @loro-extended/react package, it's as simple as:
 
 ```tsx
-import { useLoroDoc } from "@loro-extended/react";
+import { useDocument } from "@loro-extended/react";
 
-const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>("document-id");
+const [doc, changeDoc, handle] = useDocument<TodoDoc>("document-id");
 
 // Make changes with natural JavaScript syntax
 changeDoc((d) => {
@@ -34,7 +34,7 @@ changeDoc((d) => {
 // <>{doc.todos.map(...)}</>
 ```
 
-The `useLoroDoc` hook (and accompanying RepoProvider) handles everything:
+The `useDocument` hook (and accompanying RepoProvider) handles everything:
 
 - ✅ **Automatic synchronization** across all connected users
 - ✅ **Offline support** with automatic reconnection and merge

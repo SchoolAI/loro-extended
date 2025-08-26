@@ -13,7 +13,7 @@ This todo app showcases:
 - **Real-time collaboration** - Multiple users can add, edit, and delete todos simultaneously
 - **Offline-first** - Works offline and syncs when reconnected
 - **Automatic conflict resolution** - No merge conflicts, ever
-- **React integration** - Seamless reactive updates using the `useLoroDoc` hook
+- **React integration** - Seamless reactive updates using the `useDocument` hook
 
 ## Architecture
 
@@ -59,10 +59,10 @@ Open multiple browser windows to see real-time collaboration in action!
 
 ## Core Example
 
-The heart of the integration is the `useLoroDoc` hook:
+The heart of the integration is the `useDocument` hook:
 
 ```typescript
-const [doc, changeDoc, state] = useLoroDoc<TodoDoc>(TODO_DOC_ID);
+const [doc, changeDoc, state] = useDocument<TodoDoc>(TODO_DOC_ID);
 
 const addTodo = (text: string) => {
   changeDoc((d) => {

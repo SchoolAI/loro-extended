@@ -25,14 +25,14 @@ npm install @loro-extended/react
 pnpm add @loro-extended/react
 ```
 
-## Core Hook: `useLoroDoc`
+## Core Hook: `useDocument`
 
-The `useLoroDoc` hook provides a reactive interface to Loro documents with automatic synchronization.
+The `useDocument` hook provides a reactive interface to Loro documents with automatic synchronization.
 
 ### Basic Usage
 
 ```tsx
-import { useLoroDoc } from "@loro-extended/react";
+import { useDocument } from "@loro-extended/react";
 
 interface MyDoc {
   title: string;
@@ -40,7 +40,7 @@ interface MyDoc {
 }
 
 function MyComponent() {
-  const [doc, changeDoc, handle] = useLoroDoc<MyDoc>("document-id");
+  const [doc, changeDoc, handle] = useDocument<MyDoc>("document-id");
 
   if (handle?.state !== "ready") {
     return <div>Loading...</div>;
@@ -75,7 +75,7 @@ function MyComponent() {
 
 ### Hook Returns
 
-`useLoroDoc` returns a tuple with three elements:
+`useDocument` returns a tuple with three elements:
 
 1. **`doc: T | undefined`** - The current document state
 
@@ -95,7 +95,7 @@ function MyComponent() {
 
 ## Setting Up the Repo Context
 
-Before using `useLoroDoc`, you need to provide a Repo instance via context:
+Before using `useDocument`, you need to provide a Repo instance via context:
 
 ```tsx
 import { RepoProvider } from "@loro-extended/react";
@@ -146,7 +146,7 @@ interface TodoDoc {
   }>;
 }
 
-const [doc, changeDoc, handle] = useLoroDoc<TodoDoc>("todos");
+const [doc, changeDoc, handle] = useDocument<TodoDoc>("todos");
 // doc is typed as TodoDoc | undefined
 // changeDoc enforces TodoDoc structure
 // handle provides access to state and events
@@ -180,7 +180,7 @@ changeDoc((d) => {
 For a complete example of a collaborative React application using this package, see the [Todo App Example](../../examples/todo-app/README.md) in this repository. It demonstrates:
 
 - Setting up the Repo with network and storage adapters
-- Using `useLoroDoc` for reactive document state
+- Using `useDocument` for reactive document state
 - Building a fully collaborative todo list
 - Handling loading states and offline scenarios
 
