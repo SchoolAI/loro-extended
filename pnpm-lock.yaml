@@ -142,16 +142,25 @@ importers:
 
   packages/change:
     dependencies:
+      immer:
+        specifier: ^10.1.1
+        version: 10.1.1
       loro-crdt:
-        specifier: ^1.5.9
-        version: 1.5.9
+        specifier: ^1.6.0
+        version: 1.6.0
       mutative:
         specifier: ^1.2.0
         version: 1.2.0
+      zod:
+        specifier: ^4.1.4
+        version: 4.1.4
     devDependencies:
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(@swc/core@1.13.3)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.20.3
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
@@ -1386,6 +1395,9 @@ packages:
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
+  immer@10.1.1:
+    resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
+
   indent-string@4.0.0:
     resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
     engines: {node: '>=8'}
@@ -1474,6 +1486,9 @@ packages:
 
   loro-crdt@1.5.9:
     resolution: {integrity: sha512-edkfCYh5W42O7EmNVCx6iPrI0yTAhn0DRbEAk6tmiKaL42IpUoqyDREvtFDmdVVgofxKNgceDBQx8fIIjMdr2Q==}
+
+  loro-crdt@1.6.0:
+    resolution: {integrity: sha512-Jdtjo3GITCncKxFU9LbK1ykGwZ4zOmlhPtJFA1vzRYuy3tYpuu/gU6rXx0nZ3pSuDNv0ZklS+7mm1cSEjouOqQ==}
 
   loupe@3.2.0:
     resolution: {integrity: sha512-2NCfZcT5VGVNX9mSZIxLRkEAegDGBpuQZBy13desuHeVORmBDyAET4TkJr4SjqQy3A8JDofMN6LpkK8Xcm/dlw==}
@@ -2195,6 +2210,9 @@ packages:
   yn@3.1.1:
     resolution: {integrity: sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==}
     engines: {node: '>=6'}
+
+  zod@4.1.4:
+    resolution: {integrity: sha512-2YqJuWkU6IIK9qcE4k1lLLhyZ6zFw7XVRdQGpV97jEIZwTrscUw+DY31Xczd8nwaoksyJUIxCojZXwckJovWxA==}
 
 snapshots:
 
@@ -3292,6 +3310,8 @@ snapshots:
 
   ieee754@1.2.1: {}
 
+  immer@10.1.1: {}
+
   indent-string@4.0.0: {}
 
   inherits@2.0.4: {}
@@ -3371,6 +3391,8 @@ snapshots:
   lodash@4.17.21: {}
 
   loro-crdt@1.5.9: {}
+
+  loro-crdt@1.6.0: {}
 
   loupe@3.2.0: {}
 
@@ -4051,3 +4073,5 @@ snapshots:
       yargs-parser: 21.1.1
 
   yn@3.1.1: {}
+
+  zod@4.1.4: {}

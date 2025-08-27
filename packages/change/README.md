@@ -7,7 +7,7 @@ This package provides utilities for working with [Loro](https://github.com/loro-
 Loro is a powerful CRDT library for building local-first applications. However, working with Loro documents directly can involve verbose operations and internal implementation details. This package provides:
 
 - **`ExtendedLoroDoc`**: A wrapper class that hides Loro's internal "root" map structure
-- **`change()`**: A dual-mode function leveraging mutative for POJO operations and direct CRDT access
+- **`change()`**: A function that tracks operations (similar to Immer or mutative) and simplifies making changes to docs.
 - **`from()`**: Easy document creation from plain JavaScript objects
 - **Debug Integration**: Optional patch generation for debugging and state management
 
@@ -18,7 +18,6 @@ Loro is a powerful CRDT library for building local-first applications. However, 
 - 🛡️ **Type Safety**: Full TypeScript support with compile-time validation
 - ⚡ **Transactional**: All changes within a `change()` block are atomic
 - 🔗 **Interoperable**: Works seamlessly with existing Loro code
-- 🎭 **Dual-Mode Architecture**: Mutative handles POJO operations, direct CRDT access for specialized operations
 - 🐛 **Debug Support**: Optional patch generation for debugging and observability
 - 📊 **Simplified Codebase**: Dramatically reduced complexity while maintaining full functionality
 
@@ -79,13 +78,13 @@ const underlying = doc.doc;
 
 ### `change(doc, mutator)`
 
-The `change` function provides transactional mutations using a dual-mode architecture:
+The `change` function provides transactional mutations:
 
 ```typescript
 import { change } from "@loro-extended/change";
 
 change(doc, (draft) => {
-  // POJO operations handled by mutative (arrays, objects, primitives)
+  // POJO operations
   draft.title = "New Title";
   draft.items.push({ id: 3, text: "New item", done: false });
   draft.items[0].done = true;
@@ -100,19 +99,11 @@ change(doc, (draft) => {
 // Document is automatically committed after the function completes
 ```
 
-**Dual-Mode Architecture:**
-
-- **Mutative Mode**: Handles all POJO operations (objects, arrays, primitives) with natural JavaScript syntax
-- **CRDT Mode**: Provides direct access to CRDT containers for specialized operations
-- **Unified Interface**: Both modes work seamlessly together in a single change block
-- **Automatic Optimization**: The system chooses the most efficient approach for each operation
-
 **Key Benefits:**
 
 - All mutations are transactional and atomic
 - Natural JavaScript syntax for complex operations
 - Direct CRDT access for specialized operations
-- Dramatically simplified implementation (70% code reduction)
 - Optional patch generation for debugging
 - Type-safe mutations with TypeScript
 
@@ -179,6 +170,47 @@ change(doc, (draft) => {
 });
 ```
 
+## Nesting CRDTs
+
+A LoroList can contain a plain-old javascript object (POJO):
+
+```ts
+    const list = new LoroList();
+    list.push({ tags: ["javascript", "typescript"], title: "Article" });
+```
+
+The idea here is that you might want an object to exist inside the LoroList, complete and intact. There is no LoroMap inside a LoroList here--the object is either present within the list (presumably at the end, from the perspective of the local operation), or not.
+
+OTOH you may want to have a LoroList whose items are LoroMap objects:
+
+```ts
+    const list = new LoroList();
+    const map = new LoroMap();
+    map.set("tags", ["javascript", "typescript"]);
+    map.set("title", "Article");
+    list.pushContainer(map);
+```
+
+Perhaps we could go one step further, where we want to have a LoroList whose items are LoroMap objects, and arrays at the leaves are LoroList again:
+
+```ts
+    const list = new LoroList();
+    const map = new LoroMap();
+    const langList = new LoroList();
+    langList.push("javascript");
+    langList.push("typescript");
+    map.setContainer("tags", langList);
+    map.set("title", "Article");
+    list.pushContainer(map);
+```
+
+Each of these situations is "valid" within Loro's constraints, and represents a possible intent of the developer.
+
+There are also some "invalid" configurations--for example, it is not possible to have a LoroList with a POJO object in it, that then contains a LoroText. 
+
+In Loro, only containers (e.g., LoroMap, LoroList/MovableList, LoroText, LoroTree, etc.) participate in CRDT operations. Whenever you use a non-container value (a POJO, array, number, string, boolean, etc.), that value is a leaf in the document tree and Loro will not trace CRDT operations inside it. The APIs enforce this separation explicitly: there are “value” setters and “container” setters, and the value setters exclude containers. 
+
+
 ## Debug Integration
 
 For debugging and observability, you can enable patch generation to track all changes using the functional approach:
@@ -197,7 +229,7 @@ const doc = from({
 const [updatedDoc, patches] = change(
   doc,
   (draft) => {
-    draft.name = "Alice"; // → Standard mutative patch
+    draft.name = "Alice"; // → Standard patch
     draft.counter.increment(5); // → Custom CRDT patch
     draft.text.insert(0, "Hello"); // → Custom CRDT patch
   },
@@ -229,7 +261,7 @@ allPatches.push(...patches);
 
 **Patch Types:**
 
-- **Standard Patches**: Generated by mutative for POJO operations (objects, arrays, primitives)
+- **Standard Patches**: Generated for POJO operations (objects, arrays, primitives)
 - **CRDT Patches**: Custom patches that preserve semantic meaning of CRDT operations
 - **Combined Stream**: Both types are returned together when `enablePatches: true`
 
@@ -243,7 +275,6 @@ allPatches.push(...patches);
 
 **Functional Pattern Benefits:**
 
-- Follows mutative's proven API pattern
 - No complex interfaces to implement
 - Direct access to patches when needed
 - Consumers decide how to handle patches
@@ -302,20 +333,6 @@ const underlying = extended.doc;
 
 This package implements a dual-mode architecture that dramatically simplifies CRDT operations:
 
-### Dual-Mode Design
-
-- **Mutative Integration**: Leverages the proven mutative library for all POJO operations (objects, arrays, primitives)
-- **Direct CRDT Access**: Provides unproxied access to CRDT containers for specialized operations
-- **Unified Interface**: Both modes work seamlessly together in a single change block
-- **Patch Generation**: Optional comprehensive patch capture for debugging and observability
-
-### Simplification Achievements
-
-- **70% Code Reduction**: From 1,274 lines to 384 lines
-- **Eliminated Complex Proxies**: Removed 449 lines of array method reimplementations
-- **Leveraged Proven Libraries**: Offloaded POJO handling to mutative's optimized implementation
-- **Maintained Full Compatibility**: All existing tests pass without modification
-
 ### Internal Structure
 
 - **Internally**: Documents still use a root `LoroMap` container for compatibility
@@ -368,7 +385,7 @@ interface CRDTPatch {
   timestamp: number;
 }
 
-type CombinedPatch = Patch | CRDTPatch; // Patch from mutative
+type CombinedPatch = Patch | CRDTPatch; // Patch from JSON Patch
 
 // CRDT wrapper types
 const CRDT = {

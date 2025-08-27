@@ -22,14 +22,18 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "vitest"
+    "test": "vitest",
+    "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
-    "loro-crdt": "^1.5.9",
-    "mutative": "^1.2.0"
+    "immer": "^10.1.1",
+    "loro-crdt": "^1.6.0",
+    "mutative": "^1.2.0",
+    "zod": "^4.1.4"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
