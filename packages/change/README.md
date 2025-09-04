@@ -1,402 +1,511 @@
 # @loro-extended/change
 
-This package provides utilities for working with [Loro](https://github.com/loro-dev/loro) CRDT documents using natural JavaScript syntax. It includes the `ExtendedLoroDoc` wrapper class and `change()` function for intuitive document manipulation, with optional patch generation for debugging and observability.
+A schema-driven, type-safe wrapper for [Loro CRDT](https://github.com/loro-dev/loro) that provides natural JavaScript syntax for collaborative document editing. Build local-first applications with intuitive APIs while maintaining full CRDT capabilities.
 
-## Overview
+## What is Loro?
 
-Loro is a powerful CRDT library for building local-first applications. However, working with Loro documents directly can involve verbose operations and internal implementation details. This package provides:
+[Loro](https://github.com/loro-dev/loro) is a high-performance CRDT (Conflict-free Replicated Data Type) library that enables real-time collaborative editing without conflicts. It's perfect for building local-first applications like collaborative editors, task managers, and (turn-based) multiplayer games.
 
-- **`ExtendedLoroDoc`**: A wrapper class that hides Loro's internal "root" map structure
-- **`change()`**: A function that tracks operations (similar to Immer or mutative) and simplifies making changes to docs.
-- **`from()`**: Easy document creation from plain JavaScript objects
-- **Debug Integration**: Optional patch generation for debugging and state management
+## Why Use `change`?
 
-## Key Features
+Working with Loro directly involves somewhat verbose container operations and complex type management. The `change` package provides:
 
-- 🎯 **Clean API**: `doc.toJSON()` returns data directly without internal wrappers
-- 🔄 **Natural Mutations**: Write `doc.title = "New Title"` instead of verbose CRDT operations
-- 🛡️ **Type Safety**: Full TypeScript support with compile-time validation
-- ⚡ **Transactional**: All changes within a `change()` block are atomic
-- 🔗 **Interoperable**: Works seamlessly with existing Loro code
-- 🐛 **Debug Support**: Optional patch generation for debugging and observability
-- 📊 **Simplified Codebase**: Dramatically reduced complexity while maintaining full functionality
+- **Schema-First Design**: Define your document structure with type-safe schemas
+- **Natural Syntax**: Write `draft.title.insert(0, "Hello")` instead of verbose CRDT operations
+- **Empty State Overlay**: Seamlessly blend default values with CRDT state
+- **Full Type Safety**: Complete TypeScript support with compile-time validation
+- **Transactional Changes**: All mutations within a `change()` block are atomic
+- **Loro Compatible**: Works seamlessly with existing Loro code
 
 ## Installation
 
 ```bash
-npm install @loro-extended/change
+npm install @loro-extended/change loro-crdt zod
 # or
-pnpm add @loro-extended/change
+pnpm add @loro-extended/change loro-crdt zod
 ```
 
 ## Quick Start
 
 ```typescript
-import { from, change } from "@loro-extended/change";
+import { createTypedDoc, change, LoroShape } from "@loro-extended/change";
+import { z } from "zod";
 
-// Create a document from plain JavaScript
-const doc = from({
-  title: "My Document",
-  items: [{ id: 1, text: "First item", done: false }],
+// Define your document schema
+const schema = LoroShape.doc({
+  title: LoroShape.text(),
+  todos: LoroShape.list(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      completed: z.boolean(),
+    })
+  ),
 });
+
+// Define empty state (default values)
+const emptyState = {
+  title: "My Todo List",
+  todos: [],
+};
+
+// Create a typed document
+const doc = createTypedDoc(schema, emptyState);
 
 // Make changes with natural syntax
-change(doc, (d) => {
-  d.title = "Updated Document";
-  d.items.push({ id: 2, text: "Second item", done: true });
-  d.items[0].done = true;
+const result = doc.change((draft) => {
+  draft.title.insert(0, "📝 ");
+  draft.todos.push({
+    id: "1",
+    text: "Learn Loro",
+    completed: false,
+  });
 });
 
-// Get clean JSON output (no internal "root" wrapper)
-console.log(doc.toJSON());
-// Output: { title: "Updated Document", items: [...] }
+console.log(result);
+// { title: "📝 My Todo List", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
 ```
 
-## Core Components
+Note that this is even more useful in combination with `@loro-extended/react` (if your app uses React) and `@loro-extended/repo` for syncing between client/server or among peers.
 
-### `ExtendedLoroDoc<T>`
+## Core Concepts
 
-A wrapper around `LoroDoc` that provides a cleaner API:
+### Schema Definition with `LoroShape`
+
+Define your document structure using `LoroShape` builders (and optionally, zod):
 
 ```typescript
-import { ExtendedLoroDoc } from "@loro-extended/change";
-import { LoroDoc } from "loro-crdt";
+import { LoroShape } from "@loro-extended/change";
+import { z } from "zod";
 
-// Create from existing LoroDoc
-const loroDoc = new LoroDoc();
-const extendedDoc = ExtendedLoroDoc.wrap<MyType>(loroDoc);
+const blogSchema = LoroShape.doc({
+  // CRDT containers for collaborative editing
+  title: LoroShape.text(), // Collaborative text
+  viewCount: LoroShape.counter(), // Increment-only counter
 
-// Or create new
-const doc = new ExtendedLoroDoc<MyType>();
+  // Lists for ordered data
+  tags: LoroShape.list(z.string()), // List of strings
 
-// Clean JSON output (no .root required)
-const data = doc.toJSON(); // Returns MyType directly
+  // Maps for structured data
+  metadata: LoroShape.map({
+    author: z.string(), // Plain values (POJOs)
+    publishedAt: z.date(),
+    featured: z.boolean(),
+  }),
 
-// Access underlying LoroDoc when needed
-const underlying = doc.doc;
+  // Movable lists for reorderable content
+  sections: LoroShape.movableList(
+    LoroShape.map({
+      heading: LoroShape.text(), // Collaborative headings
+      content: LoroShape.text(), // Collaborative content
+      order: z.number(), // Plain metadata
+    })
+  ),
+});
 ```
 
-### `change(doc, mutator)`
+NOTE: Only put plain values inside Loro containers. A Loro container inside a plain js list or map won't work.
 
-The `change` function provides transactional mutations:
+### Empty State Overlay
+
+Empty state provides default values that appear when CRDT containers are empty:
 
 ```typescript
-import { change } from "@loro-extended/change";
-
-change(doc, (draft) => {
-  // POJO operations
-  draft.title = "New Title";
-  draft.items.push({ id: 3, text: "New item", done: false });
-  draft.items[0].done = true;
-
-  // CRDT operations have direct access
-  draft.counter.increment(5);
-  draft.text.insert(0, "Hello ");
-
-  draft.metadata = { lastModified: Date.now() };
-});
-
-// Document is automatically committed after the function completes
-```
-
-**Key Benefits:**
-
-- All mutations are transactional and atomic
-- Natural JavaScript syntax for complex operations
-- Direct CRDT access for specialized operations
-- Optional patch generation for debugging
-- Type-safe mutations with TypeScript
-
-### `from<T>(initialState)`
-
-Creates a new `ExtendedLoroDoc` from a plain JavaScript object:
-
-```typescript
-import { from, CRDT } from "@loro-extended/change";
-
-interface MyDoc {
-  title: string;
-  description: string | null;
-  items: Array<{ id: number; text: string; done: boolean }>;
-  metadata: { created: number };
-}
-
-const doc = from<MyDoc>({
-  title: "My Document",
-  description: null,
-  items: [],
-  metadata: { created: Date.now() },
-});
-```
-
-## Working with Rich CRDT Types
-
-For advanced use cases, you can use Loro's rich CRDT types like `LoroText` and `LoroCounter`:
-
-```typescript
-import { from, change, CRDT } from "@loro-extended/change";
-import type { LoroText, LoroCounter } from "loro-crdt";
-
-interface MyDoc {
-  title: LoroText; // Rich text with collaborative editing
-  description: string | null;
-  viewCount: LoroCounter; // Increment-only counter
-  tasks: Array<{
-    id: number;
-    text: string;
-    completed: boolean;
-  }>;
-}
-
-// Create document with rich CRDT types
-const doc = from<MyDoc>({
-  title: CRDT.Text("My Tasks"),
-  description: null,
-  viewCount: CRDT.Counter(0),
-  tasks: [],
-});
-
-// Work with rich types in change blocks
-change(doc, (draft) => {
-  // LoroText operations
-  draft.title.insert(0, "✅ ");
-  draft.title.insert(draft.title.length, " (Updated)");
-
-  // LoroCounter operations
-  draft.viewCount.increment(1);
-
-  // Regular array/object operations
-  draft.tasks.push({ id: 1, text: "Write docs", completed: false });
-});
-```
-
-## Nesting CRDTs
-
-A LoroList can contain a plain-old javascript object (POJO):
-
-```ts
-    const list = new LoroList();
-    list.push({ tags: ["javascript", "typescript"], title: "Article" });
-```
-
-The idea here is that you might want an object to exist inside the LoroList, complete and intact. There is no LoroMap inside a LoroList here--the object is either present within the list (presumably at the end, from the perspective of the local operation), or not.
-
-OTOH you may want to have a LoroList whose items are LoroMap objects:
-
-```ts
-    const list = new LoroList();
-    const map = new LoroMap();
-    map.set("tags", ["javascript", "typescript"]);
-    map.set("title", "Article");
-    list.pushContainer(map);
-```
-
-Perhaps we could go one step further, where we want to have a LoroList whose items are LoroMap objects, and arrays at the leaves are LoroList again:
-
-```ts
-    const list = new LoroList();
-    const map = new LoroMap();
-    const langList = new LoroList();
-    langList.push("javascript");
-    langList.push("typescript");
-    map.setContainer("tags", langList);
-    map.set("title", "Article");
-    list.pushContainer(map);
-```
-
-Each of these situations is "valid" within Loro's constraints, and represents a possible intent of the developer.
-
-There are also some "invalid" configurations--for example, it is not possible to have a LoroList with a POJO object in it, that then contains a LoroText. 
-
-In Loro, only containers (e.g., LoroMap, LoroList/MovableList, LoroText, LoroTree, etc.) participate in CRDT operations. Whenever you use a non-container value (a POJO, array, number, string, boolean, etc.), that value is a leaf in the document tree and Loro will not trace CRDT operations inside it. The APIs enforce this separation explicitly: there are “value” setters and “container” setters, and the value setters exclude containers. 
-
-
-## Debug Integration
-
-For debugging and observability, you can enable patch generation to track all changes using the functional approach:
-
-```typescript
-import { from, change } from "@loro-extended/change";
-
-// Create document
-const doc = from({
-  name: "Initial",
-  counter: CRDT.Counter(0),
-  text: CRDT.Text(""),
-});
-
-// Enable patch generation by passing enablePatches: true
-const [updatedDoc, patches] = change(
-  doc,
-  (draft) => {
-    draft.name = "Alice"; // → Standard patch
-    draft.counter.increment(5); // → Custom CRDT patch
-    draft.text.insert(0, "Hello"); // → Custom CRDT patch
+const emptyState = {
+  title: "Untitled Document", // unusual empty state, but technically ok
+  viewCount: 0,
+  tags: [],
+  metadata: {
+    author: "Anonymous",
+    publishedAt: new Date(),
+    featured: false,
   },
-  { enablePatches: true }
-);
+  sections: [],
+};
 
-// Access patches directly from the return value
-console.log(patches);
-// [
-//   { op: "replace", path: ["name"], value: "Alice" },
-//   { op: "crdt", path: ["counter"], method: "increment", args: [5], crdtType: "counter" },
-//   { op: "crdt", path: ["text"], method: "insert", args: [0, "Hello"], crdtType: "text" }
-// ]
+const doc = createTypedDoc(blogSchema, emptyState);
 
-// For multiple operations, collect patches manually
-const allPatches = [];
-let currentDoc = doc;
+// Initially returns empty state
+console.log(doc.value);
+// { title: "Untitled Document", viewCount: 0, ... }
 
-[currentDoc, patches] = change(currentDoc, (d) => d.counter.increment(10), {
-  enablePatches: true,
+// After changes, CRDT values overlay empty state
+doc.change((draft) => {
+  draft.title.insert(0, "My Blog Post");
+  draft.viewCount.increment(10);
 });
-allPatches.push(...patches);
 
-[currentDoc, patches] = change(currentDoc, (d) => (d.name = "Bob"), {
-  enablePatches: true,
-});
-allPatches.push(...patches);
+console.log(doc.value);
+// { title: "My Blog Post", viewCount: 10, tags: [], ... }
+//   ↑ CRDT value    ↑ CRDT value    ↑ empty state preserved
 ```
 
-**Patch Types:**
+### The `change()` Function
 
-- **Standard Patches**: Generated for POJO operations (objects, arrays, primitives)
-- **CRDT Patches**: Custom patches that preserve semantic meaning of CRDT operations
-- **Combined Stream**: Both types are returned together when `enablePatches: true`
+All mutations happen within transactional `change()` blocks:
 
-**Use Cases:**
+```typescript
+const result = doc.change((draft) => {
+  // Text operations
+  draft.title.insert(0, "📝");
+  draft.title.delete(5, 3);
 
-- Time-travel debugging
-- State change visualization
-- Network synchronization of debug state
-- Audit trails and change history
-- Integration with state management libraries (TEA, Redux, etc.)
+  // Counter operations
+  draft.viewCount.increment(1);
+  draft.viewCount.decrement(2);
 
-**Functional Pattern Benefits:**
+  // List operations
+  draft.tags.push("typescript");
+  draft.tags.insert(0, "loro");
+  draft.tags.delete(1, 1);
 
-- No complex interfaces to implement
-- Direct access to patches when needed
-- Consumers decide how to handle patches
-- Simpler integration with existing state management
+  // Map operations (POJO values)
+  draft.metadata.set("author", "John Doe");
+  draft.metadata.delete("featured");
+
+  // Movable list operations
+  draft.sections.push({
+    heading: "Introduction",
+    content: "Welcome to my blog...",
+    order: 1,
+  });
+  draft.sections.move(0, 1); // Reorder sections
+});
+
+// All changes are committed atomically
+console.log(result); // Updated document state
+```
+
+## Advanced Usage
+
+### Nested Structures
+
+Handle complex nested documents with ease:
+
+```typescript
+const complexSchema = LoroShape.doc({
+  article: LoroShape.map({
+    title: LoroShape.text(),
+    metadata: LoroShape.map({
+      views: LoroShape.counter(),
+      author: LoroShape.map({
+        name: z.string(),
+        email: z.string(),
+      }),
+    }),
+  }),
+});
+
+const emptyState = {
+  article: {
+    title: "",
+    metadata: {
+      views: 0,
+      author: {
+        name: "Anonymous",
+        email: "",
+      },
+    },
+  },
+};
+
+const doc = createTypedDoc(complexSchema, emptyState);
+
+doc.change((draft) => {
+  draft.article.title.insert(0, "Deep Nesting Example");
+  draft.article.metadata.views.increment(5);
+  draft.article.metadata.author.set("name", "Alice");
+  draft.article.metadata.author.set("email", "alice@example.com");
+});
+```
+
+### POJO Mutations with `update()`
+
+For complex object mutations, use the `update()` method:
+
+```typescript
+const schema = LoroShape.doc({
+  settings: LoroShape.map({
+    ui: z.object({
+      theme: z.string(),
+      sidebar: z.object({
+        collapsed: z.boolean(),
+        width: z.number(),
+      }),
+    }),
+  }),
+});
+
+doc.change((draft) => {
+  // Natural object mutation syntax
+  draft.settings.update((settings) => {
+    settings.ui.theme = "dark";
+    settings.ui.sidebar.collapsed = true;
+    settings.ui.sidebar.width = 250;
+  });
+});
+```
+
+Under the hood, `update` is using [mutative](https://github.com/unadlib/mutative)'s `create` function, with type forwarding from the TypedLoroDoc schema.
+
+### Lists with Container Items
+
+Create lists containing CRDT containers for collaborative nested structures:
+
+```typescript
+const collaborativeSchema = LoroShape.doc({
+  articles: LoroShape.list(
+    LoroShape.map({
+      title: LoroShape.text(), // Collaborative title
+      content: LoroShape.text(), // Collaborative content
+      tags: LoroShape.list(z.string()), // Collaborative tag list
+      metadata: z.object({
+        // Static metadata
+        authorId: z.string(),
+        publishedAt: z.date(),
+      }),
+    })
+  ),
+});
+
+doc.change((draft) => {
+  // Push creates and configures nested containers automatically
+  draft.articles.push({
+    title: "Collaborative Article",
+    content: "This content can be edited by multiple users...",
+    tags: ["collaboration", "crdt"],
+    metadata: {
+      authorId: "user123",
+      publishedAt: new Date(),
+    },
+  });
+
+  // Later, edit the collaborative parts
+  // Note: articles[0] returns the actual CRDT containers
+  draft.articles.get(0)?.title.insert(0, "✨ ");
+  draft.articles.get(0)?.tags.push("real-time");
+});
+```
+
+## API Reference
+
+### Core Functions
+
+#### `createTypedDoc<T>(schema, emptyState, existingDoc?)`
+
+Creates a new typed Loro document.
+
+```typescript
+const doc = createTypedDoc(schema, emptyState);
+const docFromExisting = createTypedDoc(schema, emptyState, existingLoroDoc);
+```
+
+#### `change<T>(typedDoc, mutator)`
+
+Applies transactional changes to a document.
+
+```typescript
+const result = doc.change((draft) => {
+  // Make changes to draft
+});
+```
+
+### Schema Builders
+
+#### `LoroShape.doc(shape)`
+
+Creates a document schema.
+
+```typescript
+const schema = LoroShape.doc({
+  field1: LoroShape.text(),
+  field2: LoroShape.counter(),
+});
+```
+
+#### Container Types
+
+- `LoroShape.text()` - Collaborative text editing
+- `LoroShape.counter()` - Increment-only counters
+- `LoroShape.list(itemSchema)` - Ordered lists
+- `LoroShape.movableList(itemSchema)` - Reorderable lists
+- `LoroShape.map(shape)` - Key-value maps
+- `LoroShape.tree()` - Hierarchical tree structures
+
+### TypedLoroDoc Methods
+
+#### `.value`
+
+Returns the current document state with empty state overlay.
+
+```typescript
+const currentState = doc.value;
+```
+
+This is better than using the LoroDoc `toJSON()` method because it forwards inferred type information from the schema you defined.
+
+#### `.rawValue`
+
+Returns raw CRDT state without empty state overlay.
+
+```typescript
+const crdtState = doc.rawValue;
+```
+
+#### `.loroDoc`
+
+Access the underlying LoroDoc for advanced operations.
+
+```typescript
+const loroDoc = doc.loroDoc;
+
+const foods = loroDoc.getMap("foods");
+const drinks = loroDoc.getOrCreateContainer("drinks", new LoroMap());
+// etc.
+```
+
+## CRDT Container Operations
+
+### Text Operations
+
+```typescript
+draft.title.insert(index, content);
+draft.title.delete(index, length);
+draft.title.update(newContent); // Replace entire content
+draft.title.mark(range, key, value); // Add formatting
+draft.title.unmark(range, key); // Remove formatting
+draft.title.toDelta(); // Get Delta format
+draft.title.applyDelta(delta); // Apply Delta operations
+```
+
+### Counter Operations
+
+```typescript
+draft.count.increment(value);
+draft.count.decrement(value);
+const current = draft.count.value;
+```
+
+### List Operations
+
+```typescript
+draft.items.push(item);
+draft.items.insert(index, item);
+draft.items.delete(index, length);
+const item = draft.items.get(index);
+const array = draft.items.toArray();
+const length = draft.items.length;
+```
+
+### Movable List Operations
+
+```typescript
+draft.tasks.push(item);
+draft.tasks.insert(index, item);
+draft.tasks.set(index, item); // Replace item
+draft.tasks.move(fromIndex, toIndex); // Reorder
+draft.tasks.delete(index, length);
+```
+
+### Map Operations
+
+```typescript
+draft.metadata.set(key, value);
+draft.metadata.get(key);
+draft.metadata.delete(key);
+draft.metadata.has(key);
+draft.metadata.keys();
+draft.metadata.values();
+
+// For POJO mutations
+draft.metadata.update((obj) => {
+  obj.nested.property = newValue;
+});
+```
 
 ## Type Safety
 
-This package provides full TypeScript support with compile-time validation:
+Full TypeScript support with compile-time validation. You can define your desired interface and ensure the schema matches:
 
 ```typescript
+import { createTypedDoc, LoroShape, type InferEmptyType } from "@loro-extended/change";
+import { z } from "zod";
+
+// Define your desired interface
 interface TodoDoc {
   title: string;
   todos: Array<{ id: string; text: string; done: boolean }>;
 }
 
-const doc = from<TodoDoc>({
+// Define the schema that matches your interface
+const todoSchema = LoroShape.doc({
+  title: LoroShape.text(),
+  todos: LoroShape.list(z.object({
+    id: z.string(),
+    text: z.string(),
+    done: z.boolean()
+  }))
+});
+
+// Define empty state that matches your interface
+const emptyState: TodoDoc = {
   title: "My Todos",
-  todos: [],
+  todos: []
+};
+
+// TypeScript will ensure the schema produces the correct type
+const doc = createTypedDoc(todoSchema, emptyState);
+
+// The result will be properly typed as TodoDoc
+const result: TodoDoc = doc.change((draft) => {
+  draft.title.insert(0, "Hello"); // ✅ Valid - TypeScript knows this is LoroText
+  draft.todos.push({              // ✅ Valid - TypeScript knows the expected shape
+    id: "1",
+    text: "Learn Loro",
+    done: false,
+  });
+
+  // draft.title.insert(0, 123);         // ❌ TypeScript error
+  // draft.todos.push({ invalid: true }); // ❌ TypeScript error
 });
 
-change(doc, (draft) => {
-  draft.title = "Updated Todos"; // ✅ Valid
-  draft.todos.push({ id: "1", text: "Learn Loro", done: false }); // ✅ Valid
-
-  // draft.title = 123  // ❌ TypeScript error
-  // draft.todos.push({ invalid: "field" })  // ❌ TypeScript error
-});
+// You can also use type assertion to ensure schema compatibility
+type SchemaType = InferEmptyType<typeof todoSchema>;
+const _typeCheck: TodoDoc = {} as SchemaType; // ✅ Will error if types don't match
 ```
 
-**Important Notes:**
+**Note**: Use `string | null` instead of `string | undefined` for optional fields, as Loro treats `null` and `undefined` equivalently.
 
-- Optional properties (`field?: string`) are not supported
-- Use `string | null` instead of `string | undefined`
-- The underlying Loro library treats `null` and `undefined` equivalently
+## Integration with Existing Loro Code
 
-## Interoperability
-
-`ExtendedLoroDoc` is designed to work seamlessly with existing Loro code:
+`TypedLoroDoc` works seamlessly with existing Loro applications:
 
 ```typescript
-import { ExtendedLoroDoc } from "@loro-extended/change";
 import { LoroDoc } from "loro-crdt";
 
 // Wrap existing LoroDoc
 const existingDoc = new LoroDoc();
-const extended = ExtendedLoroDoc.wrap(existingDoc);
+const typedDoc = createTypedDoc(schema, emptyState, existingDoc);
 
-// Unwrap to get original LoroDoc
-const original = ExtendedLoroDoc.unwrap(extended);
+// Access underlying LoroDoc
+const loroDoc = typedDoc.loroDoc;
 
-// Access underlying doc directly
-const underlying = extended.doc;
+// Use with existing Loro APIs
+loroDoc.subscribe((event) => {
+  console.log("Document changed:", event);
+});
 ```
 
-## Architecture Notes
+## Performance Considerations
 
-This package implements a dual-mode architecture that dramatically simplifies CRDT operations:
-
-### Internal Structure
-
-- **Internally**: Documents still use a root `LoroMap` container for compatibility
-- **Externally**: The `toJSON()` method returns clean data without the wrapper
-- **Change Processing**: Mutative handles state transitions, CRDT proxies capture specialized operations
-- **Benefit**: Maintains full Loro compatibility while providing a dramatically simpler implementation
-
-For historical context on the design decisions, see:
-
-- [Change Refactor Post-Mortem](../../docs/change-refactor-post-mortem.md)
-- [Second Refactor Attempt](../../docs/change-refactor-post-mortem2.md)
-- [Dual-Mode Proxy Architecture](../../docs/dual-proxy.md)
-
-## API Reference
-
-### ExtendedLoroDoc Methods
-
-- `toJSON(): T` - Returns clean JSON without internal wrappers
-- `get doc(): LoroDoc` - Access underlying LoroDoc
-- `commit(): void` - Commit pending changes
-- `export(mode?)` - Export as binary snapshot
-- `import(data)` - Import from binary snapshot
-- `getMap(name: string): LoroMap` - Get a map container (for compatibility)
-
-### Static Methods
-
-- `ExtendedLoroDoc.wrap<T>(doc: LoroDoc): ExtendedLoroDoc<T>`
-- `ExtendedLoroDoc.unwrap<T>(extended: ExtendedLoroDoc<T>): LoroDoc`
-- `ExtendedLoroDoc.import<T>(data: Uint8Array): ExtendedLoroDoc<T>`
-
-### Utility Functions
-
-- `from<T>(initialState: T): ExtendedLoroDoc<T>`
-- `change<T>(doc: ExtendedLoroDoc<T>, fn: (draft: T) => void): ExtendedLoroDoc<T>`
-- `change<T>(doc: ExtendedLoroDoc<T>, fn: (draft: T) => void, options: { enablePatches: true }): [ExtendedLoroDoc<T>, CombinedPatch[]]`
-
-### Types
-
-```typescript
-interface ChangeOptions {
-  enablePatches?: boolean;
-}
-
-interface CRDTPatch {
-  op: "crdt";
-  path: string[];
-  method: string;
-  args: unknown[];
-  crdtType: "counter" | "text" | "map" | "list";
-  timestamp: number;
-}
-
-type CombinedPatch = Patch | CRDTPatch; // Patch from JSON Patch
-
-// CRDT wrapper types
-const CRDT = {
-  Text: (initialValue?: string) => LoroTextWrapper,
-  Counter: (initialValue?: number) => LoroCounterWrapper,
-};
-```
+- All changes within a `change()` block are batched into a single transaction
+- Empty state overlay is computed on-demand, not stored
+- Container creation is lazy - containers are only created when accessed
+- Type validation occurs at development time, not runtime
 
 ## Contributing
 
-This package is part of the loro-extended ecosystem. Contributions are welcome!
+This package is part of the loro-extended ecosystem. Contributions welcome!
 
 - **Build**: `pnpm build`
 - **Test**: `pnpm test`

@@ -620,13 +620,8 @@ export class TypedLoroDoc<T extends LoroDocSchema> {
     private emptyState: InferEmptyType<T>,
   ) {
     // Validate emptyState against schema if possible
-    try {
-      const validator = createEmptyStateValidator(schema)
-      validator.parse(emptyState)
-    } catch (error) {
-      console.warn("EmptyState validation failed:", error)
-      // Continue anyway - validation is helpful but not blocking
-    }
+    const validator = createEmptyStateValidator(schema)
+    validator.parse(emptyState)
   }
 
   get value(): InferEmptyType<T> {
