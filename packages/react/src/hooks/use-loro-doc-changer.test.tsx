@@ -1,13 +1,25 @@
+import { LoroShape } from "@loro-extended/change"
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createMockDocHandle } from "../test-utils.js"
 import { useLoroDocChanger } from "./use-loro-doc-changer.js"
 
+// Test schema and empty state
+const testSchema = LoroShape.doc({
+  title: LoroShape.text(),
+  count: LoroShape.counter(),
+})
+
+const testEmptyState = {
+  title: "Test Document",
+  count: 0,
+}
+
 describe("useLoroDocChanger", () => {
   it("should return a change function", () => {
     const mockHandle = createMockDocHandle()
 
-    const { result } = renderHook(() => useLoroDocChanger(mockHandle))
+    const { result } = renderHook(() => useLoroDocChanger(mockHandle, testSchema, testEmptyState))
 
     expect(typeof result.current).toBe("function")
   })
@@ -15,7 +27,7 @@ describe("useLoroDocChanger", () => {
   it("should call handle.change when change function is invoked", () => {
     const mockHandle = createMockDocHandle()
 
-    const { result } = renderHook(() => useLoroDocChanger(mockHandle))
+    const { result } = renderHook(() => useLoroDocChanger(mockHandle, testSchema, testEmptyState))
 
     const changeFn = vi.fn()
     result.current(changeFn)
@@ -26,7 +38,7 @@ describe("useLoroDocChanger", () => {
   it("should warn and return early when handle is null", () => {
     const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
-    const { result } = renderHook(() => useLoroDocChanger(null))
+    const { result } = renderHook(() => useLoroDocChanger(null, testSchema, testEmptyState))
 
     const changeFn = vi.fn()
     result.current(changeFn)
@@ -42,7 +54,7 @@ describe("useLoroDocChanger", () => {
   it("should return stable function reference", () => {
     const mockHandle = createMockDocHandle()
 
-    const { result, rerender } = renderHook(() => useLoroDocChanger(mockHandle))
+    const { result, rerender } = renderHook(() => useLoroDocChanger(mockHandle, testSchema, testEmptyState))
 
     const firstFunction = result.current
     rerender()
@@ -56,7 +68,7 @@ describe("useLoroDocChanger", () => {
     const mockHandle2 = createMockDocHandle()
 
     const { result, rerender } = renderHook(
-      ({ handle }) => useLoroDocChanger(handle),
+      ({ handle }) => useLoroDocChanger(handle, testSchema, testEmptyState),
       { initialProps: { handle: mockHandle1 } },
     )
 

@@ -1,14 +1,26 @@
+import { LoroShape } from "@loro-extended/change"
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 import { useDocument } from "./use-document.js"
+
+// Test schema and empty state
+const testSchema = LoroShape.doc({
+  title: LoroShape.text(),
+  count: LoroShape.counter(),
+})
+
+const testEmptyState = {
+  title: "Test Document",
+  count: 0,
+}
 
 describe("useDocument", () => {
   it("should return the expected tuple structure", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useDocument(documentId), {
+    const { result } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
       wrapper: RepoWrapper,
     })
 
@@ -17,7 +29,7 @@ describe("useDocument", () => {
 
     const [doc, changeDoc, handle] = result.current
 
-    expect(doc).toBeUndefined() // Initially undefined
+    expect(doc).toEqual(testEmptyState) // Always defined due to empty state
     expect(typeof changeDoc).toBe("function")
     expect(handle).toBeNull() // Initially null
   })
@@ -26,7 +38,7 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useDocument(documentId), {
+    const { result } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
       wrapper: RepoWrapper,
     })
 
@@ -49,7 +61,7 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(() => useDocument(documentId), {
+    const { result, rerender } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
       wrapper: RepoWrapper,
     })
 
@@ -67,7 +79,7 @@ describe("useDocument", () => {
     const documentId2 = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(({ docId }) => useDocument(docId), {
+    const { result, rerender } = renderHook(({ docId }) => useDocument(docId, testSchema, testEmptyState), {
       initialProps: { docId: documentId1 },
       wrapper: RepoWrapper,
     })
@@ -78,9 +90,9 @@ describe("useDocument", () => {
 
     const [doc2, changeDoc2, handle2] = result.current
 
-    // Initially both docs should be undefined and handles null
-    expect(doc1).toBeUndefined()
-    expect(doc2).toBeUndefined()
+    // Both docs should show empty state, handles initially null
+    expect(doc1).toEqual(testEmptyState)
+    expect(doc2).toEqual(testEmptyState)
     expect(handle1).toBeNull()
     expect(handle2).toBeNull()
 

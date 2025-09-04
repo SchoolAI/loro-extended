@@ -1,204 +1,302 @@
 # @loro-extended/react
 
-React hooks and utilities for building real-time collaborative applications with [Loro](https://github.com/loro-dev/loro) CRDTs.
+React hooks for building real-time collaborative applications with schema-based [Loro CRDT](https://github.com/loro-dev/loro) documents.
 
-## Overview
+## What This Package Does
 
-This package provides React-specific bindings for Loro, making it easy to build collaborative applications where multiple users can edit the same data simultaneously. Changes automatically sync and merge without conflicts, even when users are offline.
+This package provides React-specific bindings for the schema-based `@loro-extended/change` system, making it easy to build collaborative React applications. It handles:
 
-## Why Use This?
-
-Building collaborative React apps with raw Loro requires:
-
-- Manual subscription to document changes
-- Converting between Loro's internal format and React state
-- Managing document lifecycle and synchronization
-- Handling loading states and error conditions
-
-This package solves these challenges with a simple, reactive hook that feels natural in React.
+- **Document Lifecycle**: Automatic loading, creation, and synchronization of documents
+- **React Integration**: Reactive hooks that re-render when documents change
+- **Empty State Management**: Documents are always available, showing defaults before sync
+- **Type Safety**: Full TypeScript support with schema-driven type inference
+- **Loading States**: Handle sync status separately from data availability
 
 ## Installation
 
 ```bash
-npm install @loro-extended/react
+npm install @loro-extended/react @loro-extended/change loro-crdt zod
 # or
-pnpm add @loro-extended/react
+pnpm add @loro-extended/react @loro-extended/change loro-crdt zod
 ```
 
-## Core Hook: `useDocument`
-
-The `useDocument` hook provides a reactive interface to Loro documents with automatic synchronization.
-
-### Basic Usage
+## Quick Start
 
 ```tsx
-import { useDocument } from "@loro-extended/react";
+import { useDocument, LoroShape } from "@loro-extended/react";
+import { z } from "zod";
 
-interface MyDoc {
-  title: string;
-  items: Array<{ id: string; text: string; done: boolean }>;
-}
+// Define your document schema (see @loro-extended/change for details)
+const todoSchema = LoroShape.doc({
+  title: LoroShape.text(),
+  todos: LoroShape.list(z.object({
+    id: z.string(),
+    text: z.string(),
+    completed: z.boolean()
+  }))
+});
 
-function MyComponent() {
-  const [doc, changeDoc, handle] = useDocument<MyDoc>("document-id");
+// Define empty state (default values)
+const emptyState = {
+  title: "My Todo List",
+  todos: []
+};
 
-  if (handle?.state !== "ready") {
-    return <div>Loading...</div>;
-  }
+function TodoApp() {
+  const [doc, changeDoc, handle] = useDocument("todo-doc", todoSchema, emptyState);
 
+  // doc is ALWAYS defined - no loading check needed!
   return (
     <div>
+      {handle?.state === "loading" && <div>Syncing...</div>}
+      
       <h1>{doc.title}</h1>
-      <button onClick={() => changeDoc((d) => (d.title = "New Title"))}>
-        Change Title
+      
+      <button onClick={() => changeDoc(draft => {
+        draft.title.insert(0, "📝 ");
+      })}>
+        Add Emoji
       </button>
 
-      {doc.items.map((item) => (
-        <div key={item.id}>
+      {doc.todos.map((todo, index) => (
+        <div key={todo.id}>
           <input
             type="checkbox"
-            checked={item.done}
-            onChange={() =>
-              changeDoc((d) => {
-                const found = d.items.find((i) => i.id === item.id);
-                if (found) found.done = !found.done;
-              })
-            }
+            checked={todo.completed}
+            onChange={() => changeDoc(draft => {
+              // Update the specific todo item
+              const todoItem = draft.todos.get(index);
+              if (todoItem) {
+                todoItem.completed = !todo.completed;
+              }
+            })}
           />
-          {item.text}
+          {todo.text}
         </div>
       ))}
+
+      <button onClick={() => changeDoc(draft => {
+        draft.todos.push({
+          id: Date.now().toString(),
+          text: "New Todo",
+          completed: false
+        });
+      })}>
+        Add Todo
+      </button>
     </div>
   );
 }
 ```
 
-### Hook Returns
+## Core Hook: `useDocument`
 
-`useDocument` returns a tuple with three elements:
+The main hook for working with collaborative documents in React.
 
-1. **`doc: T | undefined`** - The current document state
+### Signature
 
-   - Automatically updates when local or remote changes occur
-   - `undefined` when loading or unavailable
+```typescript
+function useDocument<T extends LoroDocSchema>(
+  documentId: string,
+  schema: T,
+  emptyState: InferEmptyType<T>
+): [doc, changeDoc, handle]
+```
 
-2. **`changeDoc: (fn: (doc: T) => void) => void`** - Function to modify the document
+### Parameters
 
-   - Uses an Immer-style API for natural mutations
-   - Changes are automatically converted to CRDT operations
-   - Synchronizes with all connected peers
+- **`documentId`**: Unique identifier for the document
+- **`schema`**: Document schema (see [`@loro-extended/change`](../change/README.md) for schema documentation)
+- **`emptyState`**: Default values shown before/during sync
 
-3. **`handle: DocHandle<DocWrapper> | null`** - The DocHandle instance
-   - Provides access to the underlying document and state
-   - Use `handle.state` to check current state: `"idle" | "loading" | "ready" | "unavailable"`
+### Returns
+
+A tuple with three elements:
+
+1. **`doc: InferEmptyType<T>`** - The current document state
+   - **Always defined** due to empty state overlay
+   - Shows empty state initially, then overlays CRDT data when available
+   - Automatically re-renders when local or remote changes occur
+
+2. **`changeDoc: (fn: ChangeFn<T>) => void`** - Function to modify the document
+   - Uses schema-aware draft operations
+   - All changes are automatically committed and synchronized
+   - See [`@loro-extended/change`](../change/README.md) for operation details
+
+3. **`handle: DocHandle | null`** - The document handle
+   - Provides access to sync state: `"loading" | "ready" | "unavailable"`
    - Emits events for state changes and document updates
+   - `null` initially, then becomes available
+
+## Key Benefits
+
+### 🚀 No Loading States for Data
+
+Unlike traditional approaches, `doc` is **always defined**:
+
+```tsx
+// ❌ Old pattern - not needed!
+if (!doc) {
+  return <div>Loading...</div>;
+}
+
+// ✅ New pattern - doc is always available
+return (
+  <div>
+    {handle?.state === "loading" && <div>Syncing...</div>}
+    <h1>{doc.title}</h1> {/* Always works! */}
+  </div>
+);
+```
+
+### 🔄 Immediate Rendering
+
+Components render immediately with empty state, then seamlessly update when CRDT data arrives:
+
+```tsx
+// Empty state shows immediately: { title: "My Todos", todos: [] }
+// After sync: { title: "📝 My Todos", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
+```
+
+### 🎯 Separate Sync Status
+
+Handle loading/sync status independently from data availability:
+
+```tsx
+const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
+
+return (
+  <div>
+    {/* Show sync status */}
+    {handle?.state === "loading" && <div>Connecting...</div>}
+    {handle?.state === "unavailable" && <div>Offline</div>}
+    
+    {/* Always render content */}
+    <h1>{doc.title}</h1>
+    <TodoList todos={doc.todos} onChange={changeDoc} />
+  </div>
+);
+```
 
 ## Setting Up the Repo Context
 
-Before using `useDocument`, you need to provide a Repo instance via context:
+Wrap your app with `RepoProvider` to provide document synchronization:
 
 ```tsx
 import { RepoProvider } from "@loro-extended/react";
 import { Repo } from "@loro-extended/repo";
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
 
-// Create adapters for network and storage
-const network = new SseClientNetworkAdapter("/api/sync");
-const storage = new IndexedDBStorageAdapter();
-
-// Create the Repo instance
+// Configure your adapters (see @loro-extended/repo docs)
 const repo = new Repo({
-  network: [network],
-  storage,
+  network: [networkAdapter],
+  storage: storageAdapter,
 });
 
-// Wrap your app with the provider
 function App() {
   return (
-    <RepoProvider config={{ network: [network], storage }}>
+    <RepoProvider config={{ network: [networkAdapter], storage: storageAdapter }}>
       <YourComponents />
     </RepoProvider>
   );
 }
 ```
 
-## Features
+## React-Specific Patterns
 
-### 🔄 Real-time Synchronization
+### Multiple Documents
 
-Changes made by any user are instantly synchronized to all connected clients. The hook automatically re-renders your component when remote changes arrive.
-
-### 🔌 Offline Support
-
-Documents are persisted locally and changes are queued when offline. When reconnected, changes automatically sync and merge.
-
-### 🎯 Type Safety
-
-Full TypeScript support with type inference for your document schema:
-
-```typescript
-interface TodoDoc {
-  todos: Array<{
-    id: string;
-    text: string;
-    completed: boolean;
-  }>;
+```tsx
+function MultiDocApp() {
+  const [todos, changeTodos] = useDocument("todos", todoSchema, todoEmptyState);
+  const [notes, changeNotes] = useDocument("notes", noteSchema, noteEmptyState);
+  
+  return (
+    <div>
+      <TodoList doc={todos} onChange={changeTodos} />
+      <NoteEditor doc={notes} onChange={changeNotes} />
+    </div>
+  );
 }
-
-const [doc, changeDoc, handle] = useDocument<TodoDoc>("todos");
-// doc is typed as TodoDoc | undefined
-// changeDoc enforces TodoDoc structure
-// handle provides access to state and events
 ```
 
-### ⚡ Optimized Re-renders
+### Conditional Document Loading
 
-The hook uses React's `useSyncExternalStore` for optimal performance, only re-rendering when the document actually changes.
+```tsx
+function ConditionalDoc({ documentId }: { documentId: string | null }) {
+  const [doc, changeDoc] = useDocument(
+    documentId || "default", 
+    schema, 
+    emptyState
+  );
+  
+  if (!documentId) {
+    return <div>Select a document</div>;
+  }
+  
+  return <DocumentEditor doc={doc} onChange={changeDoc} />;
+}
+```
 
-### 🛠️ Natural API
+### Custom Loading UI
 
-Write mutations using familiar JavaScript syntax:
+```tsx
+function DocumentWithStatus() {
+  const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
+  
+  const syncStatus = {
+    loading: "Connecting to server...",
+    ready: "Connected",
+    unavailable: "Working offline"
+  }[handle?.state || "loading"];
+  
+  return (
+    <div>
+      <div className="status-bar">{syncStatus}</div>
+      <DocumentContent doc={doc} onChange={changeDoc} />
+    </div>
+  );
+}
+```
+
+## Performance
+
+The hook uses React's `useSyncExternalStore` for optimal performance:
+
+- Only re-renders when the document actually changes
+- Efficient subscription management
+- Stable function references to prevent unnecessary re-renders
+
+## Type Safety
+
+Full TypeScript support with automatic type inference:
 
 ```typescript
-changeDoc((d) => {
-  // Array operations
-  d.items.push({ id: "1", text: "New item" });
-  d.items.splice(0, 1);
-
-  // Object mutations
-  d.settings.theme = "dark";
-  delete d.settings.oldProp;
-
-  // Nested updates
-  d.users[0].profile.name = "Alice";
-});
+// Types are automatically inferred from your schema
+const [doc, changeDoc] = useDocument(documentId, schema, emptyState);
+// doc: { title: string; todos: Array<{id: string; text: string; completed: boolean}> }
+// changeDoc: (fn: (draft: DraftType) => void) => void
 ```
 
 ## Complete Example
 
-For a complete example of a collaborative React application using this package, see the [Todo App Example](../../examples/todo-app/README.md) in this repository. It demonstrates:
+For a full collaborative React application, see the [Todo App Example](../../examples/todo-app/README.md) which demonstrates:
 
 - Setting up the Repo with network and storage adapters
 - Using `useDocument` for reactive document state
-- Building a fully collaborative todo list
-- Handling loading states and offline scenarios
-
-## How It Works
-
-Under the hood, this package:
-
-1. **Subscribes to document changes** using Loro's event system
-2. **Converts Loro documents** to plain JavaScript objects for React
-3. **Translates mutations** into CRDT operations using [@loro-extended/change](../change/README.md)
-4. **Manages synchronization** through [@loro-extended/repo](../repo/README.md)
-5. **Optimizes React updates** using `useSyncExternalStore`
+- Building collaborative UI components
+- Handling offline scenarios
 
 ## Requirements
 
 - React 18+
-- TypeScript 5+ (recommended for best experience)
+- TypeScript 5+ (recommended)
 - A Repo instance from `@loro-extended/repo`
+
+## Related Packages
+
+- [`@loro-extended/change`](../change/README.md) - Schema-based CRDT operations
+- [`@loro-extended/repo`](../repo/README.md) - Document synchronization and storage
+- [`@loro-extended/adapters`](../adapters/README.md) - Network and storage adapters
 
 ## License
 

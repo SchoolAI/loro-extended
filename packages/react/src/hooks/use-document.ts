@@ -1,3 +1,4 @@
+import type { InferDraftType, InferEmptyType, LoroDocSchema } from "@loro-extended/change"
 import type { DocHandle, DocumentId } from "@loro-extended/repo"
 import type { ChangeFn } from "./use-loro-doc-changer.js"
 import { useLoroDocChanger } from "./use-loro-doc-changer.js"
@@ -5,9 +6,9 @@ import type { DocWrapper } from "./use-loro-doc-state.js"
 import { useLoroDocState } from "./use-loro-doc-state.js"
 
 /** The return type of the `useDocument` hook. */
-export type UseDocumentReturn<T extends object> = [
-  /** The current state of the document, or undefined if not ready. */
-  doc: T | undefined,
+export type UseDocumentReturn<T extends LoroDocSchema> = [
+  /** The current state of the document (always defined due to empty state overlay). */
+  doc: InferEmptyType<T>,
   /** A function to change the document. */
   changeFn: (fn: ChangeFn<T>) => void,
   /** The DocHandle instance that provides access to the underlying LoroDoc and state. */
@@ -15,35 +16,55 @@ export type UseDocumentReturn<T extends object> = [
 ]
 
 /**
- * A hook that provides a reactive interface to a Loro document handle. You
- * can think of it as similar to `useState`, but for LoroDoc.
+ * A hook that provides a reactive interface to a Loro document handle with schema-based typing.
+ * You can think of it as similar to `useState`, but for schema-aware LoroDoc.
+ *
+ * The document is always available (never undefined) due to empty state overlay - even before
+ * the handle is ready, the hook returns the empty state so components can render immediately.
  *
  * Returns a tuple containing the document's data, a function to modify it,
  * and the current state of the handle (e.g., 'loading', 'ready').
  *
  * @example
  * ```tsx
- * const [doc, changeDoc, handle] = useDocument(documentId)
+ * const schema = LoroShape.doc({
+ *   title: LoroShape.text(),
+ *   todos: LoroShape.list(z.object({
+ *     id: z.string(),
+ *     text: z.string(),
+ *     done: z.boolean()
+ *   }))
+ * })
  *
- * if (!doc) {
- *   return <Loading />
+ * const emptyState = {
+ *   title: "My Todos",
+ *   todos: []
  * }
  *
+ * const [doc, changeDoc, handle] = useDocument(documentId, schema, emptyState)
+ *
+ * // doc is always defined! No loading check needed
  * return (
  *  <div>
+ *    {handle?.state === "loading" && <div>Syncing...</div>}
  *    <p>{doc.title}</p>
- *    <button onClick={() => changeDoc(d => d.title = "New Title")}>
- *      Change Title
+ *    <button onClick={() => changeDoc(draft => {
+ *      draft.title.insert(0, "📝 ")
+ *      draft.todos.push({ id: "1", text: "New Todo", done: false })
+ *    })}>
+ *      Update Document
  *    </button>
  *  </div>
  * )
  * ```
  */
-export function useDocument<T extends object>(
+export function useDocument<T extends LoroDocSchema>(
   documentId: DocumentId,
+  schema: T,
+  emptyState: InferEmptyType<T>
 ): UseDocumentReturn<T> {
-  const { doc, handle } = useLoroDocState<T>(documentId)
-  const changeDoc = useLoroDocChanger<T>(handle)
+  const { doc, handle } = useLoroDocState<T>(documentId, schema, emptyState)
+  const changeDoc = useLoroDocChanger<T>(handle, schema, emptyState)
 
   return [doc, changeDoc, handle]
 }

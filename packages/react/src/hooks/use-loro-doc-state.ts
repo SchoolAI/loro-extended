@@ -1,8 +1,12 @@
 import {
+  createTypedDoc,
+  type InferEmptyType,
+  type LoroDocSchema,
+} from "@loro-extended/change"
+import {
   type DocHandle,
   type DocHandleSimplifiedState,
   type DocumentId,
-  ExtendedLoroDoc,
 } from "@loro-extended/repo"
 import type { LoroMap } from "loro-crdt"
 import {
@@ -23,7 +27,11 @@ export type DocWrapper = {
  * Internal hook that manages Loro document state, including handle lifecycle,
  * event subscriptions, and reactive state synchronization.
  */
-export function useLoroDocState<T extends object>(documentId: DocumentId) {
+export function useLoroDocState<T extends LoroDocSchema>(
+  documentId: DocumentId,
+  schema: T,
+  emptyState: InferEmptyType<T>
+) {
   const repo = useRepo()
   const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
 
@@ -74,19 +82,18 @@ export function useLoroDocState<T extends object>(documentId: DocumentId) {
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
-  // Data transformation from Loro to JSON
+  // Data transformation from Loro to JSON with empty state overlay
   const doc = useMemo(() => {
-    if (snapshot.state !== "ready" || snapshot.version === -1) {
-      return undefined
+    if (snapshot.state !== "ready" || !handle) {
+      // Return empty state immediately - no loading needed!
+      return emptyState
     }
 
-    const loroDoc = handle?.doc()
-    if (!loroDoc) return undefined
+    const loroDoc = handle.doc()
+    // Create typed document and return value with empty state overlay
+    const typedDoc = createTypedDoc(schema, emptyState, loroDoc as any)
+    return typedDoc.value
+  }, [snapshot, handle, schema, emptyState])
 
-    // Wrap and return the plain JSON representation
-    const extendedDoc = ExtendedLoroDoc.wrap<T>(loroDoc)
-    return extendedDoc.toJSON()
-  }, [snapshot, handle])
-
-  return { doc: doc as T | undefined, handle, snapshot }
+  return { doc: doc as InferEmptyType<T>, handle, snapshot }
 }
