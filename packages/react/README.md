@@ -1,26 +1,110 @@
 # @loro-extended/react
 
-React hooks for building real-time collaborative applications with schema-based [Loro CRDT](https://github.com/loro-dev/loro) documents.
+React hooks for building real-time collaborative applications with [Loro CRDT](https://github.com/loro-dev/loro) documents. Offers both **simple untyped** and **schema-based typed** APIs.
 
 ## What This Package Does
 
-This package provides React-specific bindings for the schema-based `@loro-extended/change` system, making it easy to build collaborative React applications. It handles:
+This package provides React-specific bindings for Loro CRDT documents with two approaches:
+
+- **Simple API**: Direct LoroDoc access without schema dependencies
+- **Typed API**: Schema-based documents with type safety and empty state management
+
+### Key Features
 
 - **Document Lifecycle**: Automatic loading, creation, and synchronization of documents
 - **React Integration**: Reactive hooks that re-render when documents change
-- **Empty State Management**: Documents are always available, showing defaults before sync
-- **Type Safety**: Full TypeScript support with schema-driven type inference
+- **Flexible APIs**: Choose between simple or typed approaches based on your needs
+- **Type Safety**: Full TypeScript support (optional schema-driven type inference)
 - **Loading States**: Handle sync status separately from data availability
 
 ## Installation
 
+### For Simple API (no schema dependencies)
 ```bash
-npm install @loro-extended/react @loro-extended/change loro-crdt zod
+npm install @loro-extended/react @loro-extended/repo loro-crdt
 # or
-pnpm add @loro-extended/react @loro-extended/change loro-crdt zod
+pnpm add @loro-extended/react @loro-extended/repo loro-crdt
+```
+
+### For Typed API (with schema support)
+```bash
+npm install @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt zod
+# or
+pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt zod
 ```
 
 ## Quick Start
+
+### Simple API (Untyped)
+
+For direct LoroDoc access without schema dependencies:
+
+```tsx
+import { useSimpleDocument } from "@loro-extended/react";
+
+interface TodoDoc {
+  title: string;
+  todos: Array<{ id: string; text: string; completed: boolean }>;
+}
+
+function SimpleTodoApp() {
+  const [doc, changeDoc, handle] = useSimpleDocument("todo-doc");
+
+  // Check if doc is ready before using
+  if (!doc) {
+    return <div>Loading...</div>;
+  }
+
+  const data = doc.toJSON() as TodoDoc;
+
+  return (
+    <div>
+      {handle?.state === "loading" && <div>Syncing...</div>}
+      
+      <h1>{data.title || "My Todo List"}</h1>
+      
+      <button onClick={() => changeDoc(doc => {
+        const titleText = doc.getText("title");
+        titleText.insert(0, "📝 ");
+      })}>
+        Add Emoji
+      </button>
+
+      {(data.todos || []).map((todo, index) => (
+        <div key={todo.id}>
+          <input
+            type="checkbox"
+            checked={todo.completed}
+            onChange={() => changeDoc(doc => {
+              const todosList = doc.getList("todos");
+              const todoMap = todosList.get(index);
+              if (todoMap) {
+                todoMap.set("completed", !todo.completed);
+              }
+            })}
+          />
+          {todo.text}
+        </div>
+      ))}
+
+      <button onClick={() => changeDoc(doc => {
+        const todosList = doc.getList("todos");
+        todosList.push({
+          id: Date.now().toString(),
+          text: "New Todo",
+          completed: false
+        });
+      })}>
+        Add Todo
+      </button>
+    </div>
+  );
+}
+```
+
+### Typed API (Schema-based)
+
+For schema-aware documents with type safety and empty state management:
 
 ```tsx
 import { useDocument, LoroShape } from "@loro-extended/react";
@@ -42,7 +126,7 @@ const emptyState = {
   todos: []
 };
 
-function TodoApp() {
+function TypedTodoApp() {
   const [doc, changeDoc, handle] = useDocument("todo-doc", todoSchema, emptyState);
 
   // doc is ALWAYS defined - no loading check needed!
@@ -89,29 +173,60 @@ function TodoApp() {
 }
 ```
 
-## Core Hook: `useDocument`
+## Core Hooks
 
-The main hook for working with collaborative documents in React.
+### `useSimpleDocument` - Simple API
 
-### Signature
+For direct LoroDoc access without schema dependencies.
+
+#### Signature
+
+```typescript
+function useSimpleDocument<T = any>(
+  documentId: string
+): [doc: LoroDoc | null, changeDoc: (fn: SimpleChangeFn) => void, handle: DocHandle | null]
+```
+
+#### Parameters
+
+- **`documentId`**: Unique identifier for the document
+
+#### Returns
+
+1. **`doc: LoroDoc | null`** - The raw LoroDoc instance
+   - `null` when not ready (requires loading check)
+   - Direct access to all LoroDoc methods when available
+   - Use `doc.toJSON()` to get plain JavaScript object
+
+2. **`changeDoc: (fn: SimpleChangeFn) => void`** - Function to modify the document
+   - Provides direct access to LoroDoc for mutations
+   - Example: `changeDoc(doc => doc.getText("title").insert(0, "Hello"))`
+
+3. **`handle: DocHandle | null`** - The document handle
+   - Provides access to sync state and events
+   - `null` initially, then becomes available
+
+### `useDocument` - Typed API
+
+For schema-aware documents with type safety and empty state management.
+
+#### Signature
 
 ```typescript
 function useDocument<T extends LoroDocSchema>(
   documentId: string,
   schema: T,
   emptyState: InferEmptyType<T>
-): [doc, changeDoc, handle]
+): [doc: InferEmptyType<T>, changeDoc: (fn: ChangeFn<T>) => void, handle: DocHandle | null]
 ```
 
-### Parameters
+#### Parameters
 
 - **`documentId`**: Unique identifier for the document
 - **`schema`**: Document schema (see [`@loro-extended/change`](../change/README.md) for schema documentation)
 - **`emptyState`**: Default values shown before/during sync
 
-### Returns
-
-A tuple with three elements:
+#### Returns
 
 1. **`doc: InferEmptyType<T>`** - The current document state
    - **Always defined** due to empty state overlay
@@ -128,54 +243,46 @@ A tuple with three elements:
    - Emits events for state changes and document updates
    - `null` initially, then becomes available
 
+## Choosing Between APIs
+
+### Use Simple API When:
+- You want minimal dependencies (no schema package required)
+- You prefer direct control over LoroDoc operations
+- You're building a simple application or prototype
+- You want to integrate with existing Loro code
+
+### Use Typed API When:
+- You want full type safety and IntelliSense support
+- You prefer declarative schema definitions
+- You want empty state management (no loading checks needed)
+- You're building a complex application with structured data
+
 ## Key Benefits
 
-### 🚀 No Loading States for Data
+### Simple API Benefits
 
-Unlike traditional approaches, `doc` is **always defined**:
+- **Minimal Dependencies**: Only requires `@loro-extended/react` and `loro-crdt`
+- **Direct Control**: Full access to LoroDoc methods and operations
+- **Flexibility**: No schema constraints, work with any document structure
+- **Performance**: No schema transformation overhead
 
-```tsx
-// ❌ Old pattern - not needed!
-if (!doc) {
-  return <div>Loading...</div>;
-}
+### Typed API Benefits
 
-// ✅ New pattern - doc is always available
-return (
-  <div>
-    {handle?.state === "loading" && <div>Syncing...</div>}
-    <h1>{doc.title}</h1> {/* Always works! */}
-  </div>
-);
-```
+- **🚀 No Loading States for Data**: `doc` is **always defined** due to empty state overlay
+- **🔄 Immediate Rendering**: Components render immediately with empty state
+- **🎯 Type Safety**: Full TypeScript support with compile-time validation
+- **🛡️ Schema Validation**: Ensures data consistency across your application
 
-### 🔄 Immediate Rendering
-
-Components render immediately with empty state, then seamlessly update when CRDT data arrives:
+#### Example: No Loading States
 
 ```tsx
-// Empty state shows immediately: { title: "My Todos", todos: [] }
-// After sync: { title: "📝 My Todos", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
-```
+// Simple API - requires loading check
+const [doc, changeDoc] = useSimpleDocument("doc-id");
+if (!doc) return <div>Loading...</div>;
 
-### 🎯 Separate Sync Status
-
-Handle loading/sync status independently from data availability:
-
-```tsx
-const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
-
-return (
-  <div>
-    {/* Show sync status */}
-    {handle?.state === "loading" && <div>Connecting...</div>}
-    {handle?.state === "unavailable" && <div>Offline</div>}
-    
-    {/* Always render content */}
-    <h1>{doc.title}</h1>
-    <TodoList todos={doc.todos} onChange={changeDoc} />
-  </div>
-);
+// Typed API - always available
+const [doc, changeDoc] = useDocument("doc-id", schema, emptyState);
+return <h1>{doc.title}</h1>; // Always works!
 ```
 
 ## Setting Up the Repo Context
@@ -206,6 +313,20 @@ function App() {
 ### Multiple Documents
 
 ```tsx
+// Simple API
+function MultiDocApp() {
+  const [todos, changeTodos] = useSimpleDocument<TodoDoc>("todos");
+  const [notes, changeNotes] = useSimpleDocument<NoteDoc>("notes");
+  
+  return (
+    <div>
+      {todos && <TodoList doc={todos.toJSON()} onChange={changeTodos} />}
+      {notes && <NoteEditor doc={notes.toJSON()} onChange={changeNotes} />}
+    </div>
+  );
+}
+
+// Typed API
 function MultiDocApp() {
   const [todos, changeTodos] = useDocument("todos", todoSchema, todoEmptyState);
   const [notes, changeNotes] = useDocument("notes", noteSchema, noteEmptyState);
@@ -222,10 +343,26 @@ function MultiDocApp() {
 ### Conditional Document Loading
 
 ```tsx
+// Simple API
+function ConditionalDoc({ documentId }: { documentId: string | null }) {
+  const [doc, changeDoc] = useSimpleDocument(documentId || "default");
+  
+  if (!documentId) {
+    return <div>Select a document</div>;
+  }
+  
+  if (!doc) {
+    return <div>Loading...</div>;
+  }
+  
+  return <DocumentEditor doc={doc.toJSON()} onChange={changeDoc} />;
+}
+
+// Typed API
 function ConditionalDoc({ documentId }: { documentId: string | null }) {
   const [doc, changeDoc] = useDocument(
-    documentId || "default", 
-    schema, 
+    documentId || "default",
+    schema,
     emptyState
   );
   
@@ -286,15 +423,44 @@ For a full collaborative React application, see the [Todo App Example](../../exa
 - Building collaborative UI components
 - Handling offline scenarios
 
+## Advanced Usage
+
+For advanced use cases, you can access the underlying building blocks:
+
+```tsx
+import {
+  useDocHandleState,
+  useRawLoroDoc,
+  useDocChanger,
+  useTypedDocState,
+  useTypedDocChanger
+} from "@loro-extended/react";
+
+// Custom hook combining base components
+function useCustomDocument(documentId: string) {
+  const { handle } = useDocHandleState(documentId);
+  const changeDoc = useDocChanger(handle);
+  
+  // Your custom logic here
+  
+  return [/* your custom return */];
+}
+```
+
 ## Requirements
 
 - React 18+
 - TypeScript 5+ (recommended)
 - A Repo instance from `@loro-extended/repo`
 
+### Optional Dependencies
+
+- `@loro-extended/change` - Required only for typed API (`useDocument`)
+- `zod` - Required only for typed API schema definitions
+
 ## Related Packages
 
-- [`@loro-extended/change`](../change/README.md) - Schema-based CRDT operations
+- [`@loro-extended/change`](../change/README.md) - Schema-based CRDT operations (optional)
 - [`@loro-extended/repo`](../repo/README.md) - Document synchronization and storage
 - [`@loro-extended/adapters`](../adapters/README.md) - Network and storage adapters
 

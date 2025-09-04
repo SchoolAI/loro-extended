@@ -1,9 +1,9 @@
-import type { InferDraftType, InferEmptyType, LoroDocSchema } from "@loro-extended/change"
+import type { InferEmptyType, LoroDocSchema } from "@loro-extended/change"
 import type { DocHandle, DocumentId } from "@loro-extended/repo"
-import type { ChangeFn } from "./use-loro-doc-changer.js"
-import { useLoroDocChanger } from "./use-loro-doc-changer.js"
-import type { DocWrapper } from "./use-loro-doc-state.js"
-import { useLoroDocState } from "./use-loro-doc-state.js"
+import type { DocWrapper } from "./use-doc-handle-state.js"
+import type { ChangeFn } from "./use-typed-doc-changer.js"
+import { useTypedDocChanger } from "./use-typed-doc-changer.js"
+import { useTypedDocState } from "./use-typed-doc-state.js"
 
 /** The return type of the `useDocument` hook. */
 export type UseDocumentReturn<T extends LoroDocSchema> = [
@@ -63,8 +63,8 @@ export function useDocument<T extends LoroDocSchema>(
   schema: T,
   emptyState: InferEmptyType<T>
 ): UseDocumentReturn<T> {
-  const { doc, handle } = useLoroDocState<T>(documentId, schema, emptyState)
-  const changeDoc = useLoroDocChanger<T>(handle, schema, emptyState)
+  const { doc, handle } = useTypedDocState<T>(documentId, schema, emptyState)
+  const changeDoc = useTypedDocChanger<T>(handle, schema, emptyState)
 
   return [doc, changeDoc, handle]
 }

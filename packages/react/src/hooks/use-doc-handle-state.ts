@@ -1,18 +1,12 @@
 import {
-  createTypedDoc,
-  type InferEmptyType,
-  type LoroDocSchema,
-} from "@loro-extended/change"
-import {
   type DocHandle,
   type DocHandleSimplifiedState,
   type DocumentId,
 } from "@loro-extended/repo"
-import type { LoroMap } from "loro-crdt"
+import type { LoroDoc, LoroMap } from "loro-crdt"
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -24,14 +18,15 @@ export type DocWrapper = {
 }
 
 /**
- * Internal hook that manages Loro document state, including handle lifecycle,
- * event subscriptions, and reactive state synchronization.
+ * Base hook that manages DocHandle lifecycle and state synchronization.
+ * This is the foundation for both simple and typed document hooks.
+ * 
+ * Follows SRP by handling only:
+ * - Handle lifecycle (creation, cleanup)
+ * - Event subscription management
+ * - State synchronization with React
  */
-export function useLoroDocState<T extends LoroDocSchema>(
-  documentId: DocumentId,
-  schema: T,
-  emptyState: InferEmptyType<T>
-) {
+export function useDocHandleState(documentId: DocumentId) {
   const repo = useRepo()
   const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
 
@@ -82,18 +77,18 @@ export function useLoroDocState<T extends LoroDocSchema>(
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
-  // Data transformation from Loro to JSON with empty state overlay
-  const doc = useMemo(() => {
-    if (snapshot.state !== "ready" || !handle) {
-      // Return empty state immediately - no loading needed!
-      return emptyState
-    }
+  return { handle, snapshot }
+}
 
-    const loroDoc = handle.doc()
-    // Create typed document and return value with empty state overlay
-    const typedDoc = createTypedDoc(schema, emptyState, loroDoc as any)
-    return typedDoc.value
-  }, [snapshot, handle, schema, emptyState])
+/**
+ * Hook that provides raw LoroDoc access without any transformation.
+ * Built on top of useDocHandleState following composition over inheritance.
+ */
+export function useRawLoroDoc(documentId: DocumentId) {
+  const { handle, snapshot } = useDocHandleState(documentId)
+  
+  // Return raw LoroDoc when ready, null when not
+  const doc = snapshot.state === "ready" && handle ? handle.doc() as LoroDoc : null
 
-  return { doc: doc as InferEmptyType<T>, handle, snapshot }
+  return { doc, handle, snapshot }
 }
