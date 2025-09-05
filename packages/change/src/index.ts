@@ -6,21 +6,20 @@ export { LoroShape } from "./schema.js"
 export type {
   // Schema node types
   LoroDocShape,
-  LoroMapShape,
-  LoroListShape,
-  LoroMovableListShape,
-  LoroTextShape,
-  LoroCounterShape,
-  LoroTreeShape,
-  LoroLeafShape,
-  LoroRootContainerShape,
-  LoroIntermediateContainerShape,
-  LoroRootContainerType,
+  MapContainerShape,
+  ListContainerShape,
+  MovableListContainerShape,
+  TextContainerShape,
+  CounterContainerShape,
+  TreeContainerShape,
+  ValueShape as LeafShape,
+  ContainerShape as LoroRootContainerShape,
+  ContainerOrValueShape as LoroIntermediateContainerShape,
+  RootContainerType as LoroRootContainerType,
   // Type inference
   InferValueType,
-  InferDraftType,
   InferInputType,
-  LoroAwareDraft,
+  Draft,
 } from "./schema.js"
 
 // Utility exports

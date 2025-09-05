@@ -145,9 +145,6 @@ importers:
 
   packages/change:
     dependencies:
-      immer:
-        specifier: ^10.1.1
-        version: 10.1.1
       loro-crdt:
         specifier: ^1.6.0
         version: 1.6.0
@@ -1398,9 +1395,6 @@ packages:
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
-
-  immer@10.1.1:
-    resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
 
   indent-string@4.0.0:
     resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
@@ -3310,8 +3304,6 @@ snapshots:
   idb@8.0.3: {}
 
   ieee754@1.2.1: {}
-
-  immer@10.1.1: {}
 
   indent-string@4.0.0: {}
 

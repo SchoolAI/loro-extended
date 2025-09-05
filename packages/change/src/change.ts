@@ -12,7 +12,7 @@ import {
 import { create } from "mutative"
 import { convertInputToContainer } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
-import type { InferDraftType, InferInputType, LoroDocShape } from "./schema.js"
+import type { Draft, InferInputType, LoroDocShape } from "./schema.js"
 import { isContainer } from "./utils/type-guards.js"
 import { createEmptyStateValidator } from "./validation.js"
 
@@ -629,10 +629,10 @@ export class TypedLoroDoc<T extends LoroDocShape> {
     return overlayEmptyState(crdtValue, this.schema, this.emptyState)
   }
 
-  change(fn: (draft: InferDraftType<T>) => void): InferInputType<T> {
+  change(fn: (draft: Draft<T>) => void): InferInputType<T> {
     // Reuse existing DocumentDraft system with empty state integration
     const draft = new DocumentDraft(this.doc, this.schema, this.emptyState)
-    fn(draft as unknown as InferDraftType<T>)
+    fn(draft as unknown as Draft<T>)
     this.doc.commit()
     return this.value
   }
@@ -665,7 +665,7 @@ export function createTypedDoc<T extends LoroDocShape>(
 // Main change function - now works with TypedLoroDoc and returns properly typed results
 export function change<T extends LoroDocShape>(
   typedDoc: TypedLoroDoc<T>,
-  mutator: (draft: InferDraftType<T>) => void,
+  mutator: (draft: Draft<T>) => void,
 ): InferInputType<T> {
   return typedDoc.change(mutator)
 }

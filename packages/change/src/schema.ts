@@ -2,7 +2,6 @@ import type {
   ContainerID,
   Delta,
   LoroCounter,
-  LoroDoc,
   LoroList,
   LoroMap,
   LoroMovableList,
@@ -18,34 +17,30 @@ import type {
 import type { z } from "zod"
 
 // Base schema types - leaf schemas (non-recursive)
-export type LoroLeafShape =
-  | LoroTextShape
-  | LoroCounterShape
-  | LoroTreeShape
-  | z.ZodType // Zod schemas represent leaf values
+export type ValueShape = z.ZodType // Zod schemas represent leaf values
 
-export type LoroTextShape = { readonly _type: "text" }
-export type LoroCounterShape = { readonly _type: "counter" }
-export interface LoroTreeShape<T = LoroIntermediateContainerShape> {
+export type TextContainerShape = { readonly _type: "text" }
+export type CounterContainerShape = { readonly _type: "counter" }
+export interface TreeContainerShape<T = ContainerOrValueShape> {
   readonly _type: "tree"
   readonly item: T
 }
 
 // Container schemas using interfaces for recursive references
-export interface LoroListShape<T = LoroIntermediateContainerShape> {
+export interface ListContainerShape<T = ContainerOrValueShape> {
   readonly _type: "list"
   readonly item: T
 }
 
-export interface LoroMovableListShape<T = LoroIntermediateContainerShape> {
+export interface MovableListContainerShape<T = ContainerOrValueShape> {
   readonly _type: "movableList"
   readonly item: T
 }
 
-export interface LoroMapShape<
-  T extends Record<string, LoroIntermediateContainerShape> = Record<
+export interface MapContainerShape<
+  T extends Record<string, ContainerOrValueShape> = Record<
     string,
-    LoroIntermediateContainerShape
+    ContainerOrValueShape
   >,
 > {
   readonly _type: "map"
@@ -53,28 +48,26 @@ export interface LoroMapShape<
 }
 
 export interface LoroDocShape<
-  T extends Record<string, LoroRootContainerShape> = Record<
+  T extends Record<string, ContainerShape> = Record<
     string,
-    LoroRootContainerShape
+    ContainerShape
   >,
 > {
   readonly _type: "doc"
   readonly shape: T
 }
 
-export type LoroRootContainerShape =
-  | LoroCounterShape
-  | LoroListShape
-  | LoroMapShape
-  | LoroMovableListShape
-  | LoroTextShape
-  | LoroTreeShape
+export type ContainerShape =
+  | CounterContainerShape
+  | ListContainerShape
+  | MapContainerShape
+  | MovableListContainerShape
+  | TextContainerShape
+  | TreeContainerShape
 
-export type LoroRootContainerType = LoroRootContainerShape["_type"]
+export type RootContainerType = ContainerShape["_type"]
 
-export type LoroIntermediateContainerShape =
-  | LoroRootContainerShape
-  | LoroLeafShape
+export type ContainerOrValueShape = ContainerShape | ValueShape
 
 /* =============================================================================
  * UNIFIED BASE SCHEMA MAPPER SYSTEM
@@ -92,34 +85,34 @@ type MappingContext = ValueTypeContext | InputTypeContext | DraftTypeContext
 // biome-ignore format: visual
 type BaseSchemaMapper<T, Context extends MappingContext> =
   // Loro container types
-  T extends LoroTextShape
+  T extends TextContainerShape
     ? Context extends "value" ? LoroText
       : Context extends "input" ? string
       : Context extends "draft" ? DraftLoroText
       : never
-  : T extends LoroCounterShape
+  : T extends CounterContainerShape
     ? Context extends "value" ? LoroCounter
       : Context extends "input" ? number
       : Context extends "draft" ? DraftLoroCounter
       : never
-  : T extends LoroListShape<infer U>
+  : T extends ListContainerShape<infer U>
     ? Context extends "value" ? LoroList<U>
-      : Context extends "input" ? BaseSchemaMapper<U, Context>[]
+      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
       : Context extends "draft" ? DraftLoroList<U>
       : never
-  : T extends LoroMovableListShape<infer U>
+  : T extends MovableListContainerShape<infer U>
     ? Context extends "value" ? LoroMovableList<U>
-      : Context extends "input" ? BaseSchemaMapper<U, Context>[]
+      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
       : Context extends "draft" ? DraftLoroMovableList<U>
       : never
-  : T extends LoroMapShape<infer U>
+  : T extends MapContainerShape<infer U>
     ? Context extends "value" ? LoroMap<U>
-      : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], Context> }
+      : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], "input"> }
       : Context extends "draft" ? DraftLoroMap<U>
       : never
-  : T extends LoroTreeShape<infer U>
+  : T extends TreeContainerShape<infer U>
     ? Context extends "value" ? LoroTree
-      : Context extends "input" ? any[]
+      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
       : Context extends "draft" ? DraftLoroTree<U>
       : never
   // Zod types - consistent handling across all contexts
@@ -127,60 +120,48 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
     ? BaseSchemaMapper<U, Context>[]
   : T extends z.ZodType<infer U>
     ? U
-  // Recursive handling for intermediate container types
-  : T extends LoroIntermediateContainerShape
-    ? BaseSchemaMapper<T, Context>
-  // Fallbacks
+  // biome-ignore lint/suspicious/noExplicitAny: required for type system to work
   : any
-
-export type InferValueType<T> = BaseSchemaMapper<T, "value">
-
-// Draft-specific type inference that properly handles the draft context
-export type InferDraftType<
-  T extends LoroDocShape<Record<string, LoroRootContainerShape>>,
-> = T extends LoroDocShape<infer U>
-  ? { [K in keyof U]: LoroAwareDraft<U[K]> }
-  : never
 
 // The LoroShape factory object
 export const LoroShape = {
-  doc: <T extends Record<string, LoroRootContainerShape>>(
+  doc: <T extends Record<string, ContainerShape>>(
     shape: T,
   ): LoroDocShape<T> => ({
     _type: "doc" as const,
     shape,
   }),
 
-  counter: (): LoroCounterShape => ({
+  counter: (): CounterContainerShape => ({
     _type: "counter" as const,
   }),
 
-  list: <T extends LoroIntermediateContainerShape>(
+  list: <T extends ContainerOrValueShape>(
     item: T,
-  ): LoroListShape<T> => ({
+  ): ListContainerShape<T> => ({
     _type: "list" as const,
     item,
   }),
 
-  map: <T extends Record<string, LoroIntermediateContainerShape>>(
+  map: <T extends Record<string, ContainerOrValueShape>>(
     shape: T,
-  ): LoroMapShape<T> => ({
+  ): MapContainerShape<T> => ({
     _type: "map" as const,
     shape,
   }),
 
-  movableList: <T extends LoroIntermediateContainerShape>(
+  movableList: <T extends ContainerOrValueShape>(
     item: T,
-  ): LoroMovableListShape<T> => ({
+  ): MovableListContainerShape<T> => ({
     _type: "movableList" as const,
     item,
   }),
 
-  text: (): LoroTextShape => ({
+  text: (): TextContainerShape => ({
     _type: "text" as const,
   }),
 
-  tree: <T extends LoroIntermediateContainerShape>(item: T): LoroTreeShape => ({
+  tree: <T extends MapContainerShape>(item: T): TreeContainerShape => ({
     _type: "tree" as const,
     item,
   }),
@@ -217,8 +198,12 @@ type DraftLoroCounter = {
 }
 
 type DraftLoroTree<
+  // For LoroTree, the `U` type here is different: it's the metadata for the tree, not the content...
   U,
-  T extends Record<string, unknown> = Record<string, unknown>,
+  // ... so that's why we extend LoroMapShape here
+  T extends Record<string, unknown> = U extends MapContainerShape<infer M>
+    ? { [K in keyof M]: InferInputType<M[K]> }
+    : Record<string, unknown>,
 > = {
   toArray(): TreeNodeValue[]
   createNode(parent?: TreeID, index?: number): LoroTreeNode<T>
@@ -227,9 +212,9 @@ type DraftLoroTree<
   has(target: TreeID): boolean
   isNodeDeleted(target: TreeID): boolean
   getNodeByID(target: TreeID): LoroTreeNode<T> | undefined
-  nodes(): LoroTreeNode[]
+  nodes(): LoroTreeNode<T>[]
   getNodes(options?: { withDeleted?: boolean }): LoroTreeNode<T>[]
-  roots(): LoroTreeNode[]
+  roots(): LoroTreeNode<T>[]
   isDeleted(): boolean
   readonly id: ContainerID
 }
@@ -271,8 +256,8 @@ type DraftLoroMovableList<U, T = InferInputType<U>> = {
   readonly length: number
 }
 
-type DraftLoroMap<U extends Record<string, LoroIntermediateContainerShape>> = {
-  [K in keyof U]: LoroAwareDraft<U[K]>
+type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
+  [K in keyof U]: BaseSchemaMapper<U[K], "draft">
 } & {
   // set<Key extends keyof T, V extends T[Key]>(key: Key, value: Exclude<V, Container>): void
   set<K extends keyof U>(key: K, value: InferValueType<U[K]>): void
@@ -285,8 +270,8 @@ type DraftLoroMap<U extends Record<string, LoroIntermediateContainerShape>> = {
   values(): InferValueType<U[keyof U]>[]
   entries(): [keyof U, U[keyof U]][]
   update(
-    mutator: (draft: InferInputType<LoroMapShape<U>>) => void,
-  ): InferInputType<LoroMapShape<U>>
+    mutator: (draft: InferInputType<MapContainerShape<U>>) => void,
+  ): InferInputType<MapContainerShape<U>>
   clear(): void
   getLastEditor(key: string): PeerID | undefined
   isDeleted(): boolean
@@ -294,15 +279,15 @@ type DraftLoroMap<U extends Record<string, LoroIntermediateContainerShape>> = {
   readonly size: number
 }
 
-type DraftLoroDoc<U extends Record<string, LoroRootContainerShape>> =
-  LoroDoc & {
-    [K in keyof U]: InferValueType<U[K]>
-  }
-
-// Enhanced draft type that includes CRDT containers
-export type LoroAwareDraft<T> = T extends LoroDocShape<infer U>
-  ? DraftLoroDoc<U>
-  : BaseSchemaMapper<T, "draft">
-
 // Input type inference - what developers can pass to push/insert methods
 export type InferInputType<T> = BaseSchemaMapper<T, "input">
+
+// Value type inference
+export type InferValueType<T> = BaseSchemaMapper<T, "value">
+
+// Draft-specific type inference that properly handles the draft context
+export type Draft<
+  T extends LoroDocShape<Record<string, ContainerShape>>,
+> = T extends LoroDocShape<infer U>
+  ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
+  : never
