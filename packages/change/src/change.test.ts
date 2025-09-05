@@ -467,7 +467,7 @@ describe("CRDT Operations", () => {
   describe("Tree Operations", () => {
     it("should handle basic tree operations", () => {
       const schema = loro.doc({
-        tree: loro.tree(),
+        tree: loro.tree(loro.text()),
       })
 
       const emptyState = {
@@ -488,7 +488,7 @@ describe("CRDT Operations", () => {
 
     it("should handle tree node movement and deletion", () => {
       const schema = loro.doc({
-        hierarchy: loro.tree(),
+        hierarchy: loro.tree(loro.text()),
       })
 
       const emptyState = {
@@ -510,7 +510,7 @@ describe("CRDT Operations", () => {
 
     it("should handle tree node lookup by ID", () => {
       const schema = loro.doc({
-        searchableTree: loro.tree(),
+        searchableTree: loro.tree(loro.text()),
       })
 
       const emptyState = {

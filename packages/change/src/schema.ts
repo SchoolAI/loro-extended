@@ -1,4 +1,6 @@
 import type {
+  ContainerID,
+  Delta,
   LoroCounter,
   LoroDoc,
   LoroList,
@@ -6,8 +8,13 @@ import type {
   LoroMovableList,
   LoroText,
   LoroTree,
+  LoroTreeNode,
+  PeerID,
+  TextUpdateOptions,
+  TreeID,
+  TreeNodeValue,
+  Value,
 } from "loro-crdt"
-import type { Draft } from "mutative"
 import type { z } from "zod"
 
 // Base schema types - leaf schemas (non-recursive)
@@ -19,7 +26,10 @@ export type LoroLeafShape =
 
 export type LoroTextShape = { readonly _type: "text" }
 export type LoroCounterShape = { readonly _type: "counter" }
-export type LoroTreeShape = { readonly _type: "tree" }
+export interface LoroTreeShape<T = LoroIntermediateContainerShape> {
+  readonly _type: "tree"
+  readonly item: T
+}
 
 // Container schemas using interfaces for recursive references
 export interface LoroListShape<T = LoroIntermediateContainerShape> {
@@ -107,10 +117,10 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
       : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], Context> }
       : Context extends "draft" ? DraftLoroMap<U>
       : never
-  : T extends LoroTreeShape
+  : T extends LoroTreeShape<infer U>
     ? Context extends "value" ? LoroTree
       : Context extends "input" ? any[]
-      : Context extends "draft" ? DraftLoroTree
+      : Context extends "draft" ? DraftLoroTree<U>
       : never
   // Zod types - consistent handling across all contexts
   : T extends z.ZodArray<infer U>
@@ -121,8 +131,7 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
   : T extends LoroIntermediateContainerShape
     ? BaseSchemaMapper<T, Context>
   // Fallbacks
-  : Context extends "draft" ? Draft<T>
-    : any
+  : any
 
 export type InferValueType<T> = BaseSchemaMapper<T, "value">
 
@@ -171,44 +180,119 @@ export const LoroShape = {
     _type: "text" as const,
   }),
 
-  tree: (): LoroTreeShape => ({
+  tree: <T extends LoroIntermediateContainerShape>(item: T): LoroTreeShape => ({
     _type: "tree" as const,
+    item,
   }),
 }
 
 // Draft-specific interfaces
-type DraftLoroText = LoroText & Draft<LoroText>
-type DraftLoroCounter = LoroCounter & Draft<LoroCounter>
-type DraftLoroTree = LoroTree & Draft<LoroTree>
+type DraftLoroText = {
+  update(text: string, options?: TextUpdateOptions): void
+  updateByLine(text: string, options?: TextUpdateOptions): void
+  iter(callback: (text: string) => boolean): void
+  insert(index: number, content: string): void
+  slice(start_index: number, end_index: number): string
+  charAt(pos: number): string
+  splice(pos: number, len: number, s: string): string
+  insertUtf8(index: number, content: string): void
+  delete(index: number, len: number): void
+  deleteUtf8(index: number, len: number): void
+  mark(range: { start: number; end: number }, key: string, value: any): void
+  unmark(range: { start: number; end: number }, key: string): void
+  toDelta(): Delta<string>[]
+  applyDelta(delta: Delta<string>[]): void
+  push(s: string): void
+  getEditorOf(pos: number): PeerID | undefined
+  toString(): string
+  readonly id: ContainerID
+  readonly length: number
+}
 
-type DraftLoroList<U> = LoroList &
-  Draft<LoroList> & {
-    push(item: InferInputType<U>): void
-    insert(index: number, item: InferInputType<U>): void
-  }
+type DraftLoroCounter = {
+  increment(value: number): void
+  decrement(value: number): void
+  readonly id: ContainerID
+  readonly value: number
+}
 
-type DraftLoroMovableList<U> = LoroMovableList &
-  Draft<LoroMovableList> & {
-    push(item: InferInputType<U>): void
-    insert(index: number, item: InferInputType<U>): void
-    move(from: number, to: number): void
-  }
+type DraftLoroTree<
+  U,
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  toArray(): TreeNodeValue[]
+  createNode(parent?: TreeID, index?: number): LoroTreeNode<T>
+  move(target: TreeID, parent: TreeID | undefined, index?: number | null): void
+  delete(target: TreeID): void
+  has(target: TreeID): boolean
+  isNodeDeleted(target: TreeID): boolean
+  getNodeByID(target: TreeID): LoroTreeNode<T> | undefined
+  nodes(): LoroTreeNode[]
+  getNodes(options?: { withDeleted?: boolean }): LoroTreeNode<T>[]
+  roots(): LoroTreeNode[]
+  isDeleted(): boolean
+  readonly id: ContainerID
+}
 
-type DraftLoroMap<U extends Record<string, LoroIntermediateContainerShape>> =
-  LoroMap &
-    Draft<LoroMap> & {
-      [K in keyof U]: LoroAwareDraft<U[K]>
-    } & {
-      set<K extends keyof U>(key: K, value: InferValueType<U[K]>): void
-      get<K extends keyof U>(key: K): InferValueType<U[K]> | undefined
-      delete(key: keyof U): void
-      has(key: keyof U): boolean
-      keys(): (keyof U)[]
-      values(): InferValueType<U[keyof U]>[]
-      update(
-        mutator: (draft: InferInputType<LoroMapShape<U>>) => void,
-      ): InferInputType<LoroMapShape<U>>
-    }
+type DraftLoroList<U, T = InferInputType<U>> = {
+  toArray(): T[]
+  get(index: number): T
+  set(index: number, item: T): void
+  push(item: T): void
+  insert(index: number, item: T): void
+  delete(pos: number, len: number): void
+  pop(): Value | undefined
+  clear(): void
+  getIdAt(pos: number): { peer: PeerID; counter: number } | undefined
+  isDeleted(): boolean
+  readonly id: ContainerID
+  readonly length: number
+}
+
+type DraftLoroMovableList<U, T = InferInputType<U>> = {
+  toArray(): T[]
+  get(index: number): T
+  // set<V extends T>(pos: number, value: Exclude<V, Container>): void
+  set(index: number, item: T): void
+  // push<V extends T>(value: Exclude<V, Container>): void
+  push(item: T): void
+  // insert<V extends T>(pos: number, value: Exclude<V, Container>): void
+  insert(index: number, item: T): void
+  delete(pos: number, len: number): void
+  pop(): Value | undefined
+  clear(): void
+  isDeleted(): boolean
+
+  move(from: number, to: number): void
+  getCreatorAt(pos: number): PeerID | undefined
+  getLastMoverAt(pos: number): PeerID | undefined
+  getLastEditorAt(pos: number): PeerID | undefined
+  readonly id: ContainerID
+  readonly length: number
+}
+
+type DraftLoroMap<U extends Record<string, LoroIntermediateContainerShape>> = {
+  [K in keyof U]: LoroAwareDraft<U[K]>
+} & {
+  // set<Key extends keyof T, V extends T[Key]>(key: Key, value: Exclude<V, Container>): void
+  set<K extends keyof U>(key: K, value: InferValueType<U[K]>): void
+  // get<Key extends keyof T>(key: Key): T[Key]
+  get<K extends keyof U>(key: K): InferValueType<U[K]> | undefined
+  // delete(key: string): void
+  delete(key: keyof U): void
+  has(key: keyof U): boolean
+  keys(): (keyof U)[]
+  values(): InferValueType<U[keyof U]>[]
+  entries(): [keyof U, U[keyof U]][]
+  update(
+    mutator: (draft: InferInputType<LoroMapShape<U>>) => void,
+  ): InferInputType<LoroMapShape<U>>
+  clear(): void
+  getLastEditor(key: string): PeerID | undefined
+  isDeleted(): boolean
+  readonly id: ContainerID
+  readonly size: number
+}
 
 type DraftLoroDoc<U extends Record<string, LoroRootContainerShape>> =
   LoroDoc & {
