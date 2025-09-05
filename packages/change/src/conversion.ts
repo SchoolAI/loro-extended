@@ -1,6 +1,6 @@
 import {
   LoroCounter,
-  LoroDoc,
+  type LoroDoc,
   LoroList,
   LoroMap,
   LoroMovableList,
@@ -47,13 +47,18 @@ function convertListInput(
   inputValue: any,
   schema: any,
   parentPath: string[],
-  ListClass: typeof LoroList | typeof LoroMovableList
+  ListClass: typeof LoroList | typeof LoroMovableList,
 ): any {
   if (!Array.isArray(inputValue)) return inputValue
-  
+
   const list = new ListClass()
   for (const item of inputValue) {
-    const convertedItem = convertInputToContainer(doc, item, schema.item, parentPath)
+    const convertedItem = convertInputToContainer(
+      doc,
+      item,
+      schema.item,
+      parentPath,
+    )
     if (isContainer(convertedItem)) {
       list.pushContainer(convertedItem)
     } else {
@@ -70,22 +75,24 @@ function convertMapInput(
   doc: LoroDoc,
   inputValue: any,
   schema: any,
-  parentPath: string[]
+  parentPath: string[],
 ): LoroMap | any {
-  if (!inputValue || typeof inputValue !== "object" || Array.isArray(inputValue)) {
+  if (
+    !inputValue ||
+    typeof inputValue !== "object" ||
+    Array.isArray(inputValue)
+  ) {
     return inputValue
   }
-  
+
   const map = new LoroMap()
   for (const [key, value] of Object.entries(inputValue)) {
     const nestedSchema = schema.shape?.[key]
     if (nestedSchema) {
-      const convertedValue = convertInputToContainer(
-        doc,
-        value,
-        nestedSchema,
-        [...parentPath, key]
-      )
+      const convertedValue = convertInputToContainer(doc, value, nestedSchema, [
+        ...parentPath,
+        key,
+      ])
       if (isContainer(convertedValue)) {
         map.setContainer(key, convertedValue)
       } else {
@@ -106,7 +113,7 @@ export function convertInputToContainer(
   doc: LoroDoc,
   inputValue: any,
   schema: any,
-  parentPath: string[]
+  parentPath: string[],
 ): any {
   if (!isLoroSchema(schema)) {
     // It's a Zod schema (POJO) - return the value directly
@@ -121,7 +128,13 @@ export function convertInputToContainer(
     case "list":
       return convertListInput(doc, inputValue, schema, parentPath, LoroList)
     case "movableList":
-      return convertListInput(doc, inputValue, schema, parentPath, LoroMovableList)
+      return convertListInput(
+        doc,
+        inputValue,
+        schema,
+        parentPath,
+        LoroMovableList,
+      )
     case "map":
       return convertMapInput(doc, inputValue, schema, parentPath)
     case "tree":

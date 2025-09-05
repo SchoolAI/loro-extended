@@ -1,5 +1,5 @@
 import type { DocHandle, DocumentId, RepoConfig } from "@loro-extended/repo"
-import { render, type RenderOptions } from "@testing-library/react"
+import { type RenderOptions, render } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { vi } from "vitest"
 import type { DocWrapper } from "./hooks/use-loro-doc-state.js"

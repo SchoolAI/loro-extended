@@ -1,4 +1,4 @@
-import type { LoroDocSchema, InferEmptyType } from "./schema.js"
+import type { InferInputType, LoroDocSchema } from "./schema.js"
 
 /**
  * Overlays CRDT state with empty state defaults
@@ -6,22 +6,22 @@ import type { LoroDocSchema, InferEmptyType } from "./schema.js"
 export function overlayEmptyState<T extends LoroDocSchema>(
   crdtValue: any,
   schema: T,
-  emptyState: InferEmptyType<T>
-): InferEmptyType<T> {
+  emptyState: InferInputType<T>,
+): InferInputType<T> {
   if (!crdtValue) return emptyState
-  
+
   const result = { ...emptyState }
-  
+
   for (const [key, schemaValue] of Object.entries(schema.shape)) {
     if (crdtValue[key] !== undefined) {
       result[key as keyof typeof result] = mergeValue(
         crdtValue[key],
         schemaValue,
-        emptyState[key as keyof typeof emptyState]
+        emptyState[key as keyof typeof emptyState],
       )
     }
   }
-  
+
   return result
 }
 
@@ -49,7 +49,7 @@ export function mergeValue(crdtValue: any, schema: any, emptyValue: any): any {
         result[key] = mergeValue(
           crdtValue[key],
           nestedSchema,
-          emptyValue?.[key]
+          emptyValue?.[key],
         )
       }
       return result

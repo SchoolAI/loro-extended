@@ -12,7 +12,7 @@ import {
 import { create } from "mutative"
 import { convertInputToContainer } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
-import type { InferDraftType, InferEmptyType, LoroDocSchema } from "./schema.js"
+import type { InferDraftType, InferInputType, LoroDocSchema } from "./schema.js"
 import { isContainer } from "./utils/type-guards.js"
 import { createEmptyStateValidator } from "./validation.js"
 
@@ -617,19 +617,19 @@ export class TypedLoroDoc<T extends LoroDocSchema> {
   constructor(
     private doc: LoroDoc,
     private schema: T,
-    private emptyState: InferEmptyType<T>,
+    private emptyState: InferInputType<T>,
   ) {
     // Validate emptyState against schema if possible
     const validator = createEmptyStateValidator(schema)
     validator.parse(emptyState)
   }
 
-  get value(): InferEmptyType<T> {
+  get value(): InferInputType<T> {
     const crdtValue = this.doc.toJSON()
     return overlayEmptyState(crdtValue, this.schema, this.emptyState)
   }
 
-  change(fn: (draft: InferDraftType<T>) => void): InferEmptyType<T> {
+  change(fn: (draft: InferDraftType<T>) => void): InferInputType<T> {
     // Reuse existing DocumentDraft system with empty state integration
     const draft = new DocumentDraft(this.doc, this.schema, this.emptyState)
     fn(draft as unknown as InferDraftType<T>)
@@ -656,7 +656,7 @@ export class TypedLoroDoc<T extends LoroDocSchema> {
 // Factory function for TypedLoroDoc
 export function createTypedDoc<T extends LoroDocSchema>(
   schema: T,
-  emptyState: InferEmptyType<T>,
+  emptyState: InferInputType<T>,
   existingDoc?: LoroDoc,
 ): TypedLoroDoc<T> {
   return new TypedLoroDoc(existingDoc || new LoroDoc(), schema, emptyState)
@@ -666,6 +666,6 @@ export function createTypedDoc<T extends LoroDocSchema>(
 export function change<T extends LoroDocSchema>(
   typedDoc: TypedLoroDoc<T>,
   mutator: (draft: InferDraftType<T>) => void,
-): InferEmptyType<T> {
+): InferInputType<T> {
   return typedDoc.change(mutator)
 }

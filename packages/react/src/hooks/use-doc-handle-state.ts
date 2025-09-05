@@ -1,7 +1,7 @@
-import {
-  type DocHandle,
-  type DocHandleSimplifiedState,
-  type DocumentId,
+import type {
+  DocHandle,
+  DocHandleSimplifiedState,
+  DocumentId,
 } from "@loro-extended/repo"
 import type { LoroDoc, LoroMap } from "loro-crdt"
 import {
@@ -20,7 +20,7 @@ export type DocWrapper = {
 /**
  * Base hook that manages DocHandle lifecycle and state synchronization.
  * This is the foundation for both simple and typed document hooks.
- * 
+ *
  * Follows SRP by handling only:
  * - Handle lifecycle (creation, cleanup)
  * - Event subscription management
@@ -86,9 +86,10 @@ export function useDocHandleState(documentId: DocumentId) {
  */
 export function useRawLoroDoc(documentId: DocumentId) {
   const { handle, snapshot } = useDocHandleState(documentId)
-  
+
   // Return raw LoroDoc when ready, null when not
-  const doc = snapshot.state === "ready" && handle ? handle.doc() as LoroDoc : null
+  const doc =
+    snapshot.state === "ready" && handle ? (handle.doc() as LoroDoc) : null
 
   return { doc, handle, snapshot }
 }

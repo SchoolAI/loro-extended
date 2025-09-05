@@ -155,17 +155,10 @@ type EnhancedLoroTree = LoroTree & {
 
 // Context types for different mapping scenarios
 type ValueTypeContext = "value" // Maps to enhanced Loro interfaces (runtime values)
-type EmptyTypeContext = "empty" // Maps to empty state types
 type InputTypeContext = "input" // Maps to input parameter types
-type PojoTypeContext = "pojo" // Maps to plain object types for mutative
 type DraftTypeContext = "draft" // Maps to draft-aware types
 
-type MappingContext =
-  | ValueTypeContext
-  | EmptyTypeContext
-  | InputTypeContext
-  | PojoTypeContext
-  | DraftTypeContext
+type MappingContext = ValueTypeContext | InputTypeContext | DraftTypeContext
 
 // Unified base mapper that handles all schema type matching
 // biome-ignore format: visual
@@ -173,44 +166,32 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
   // Loro container types
   T extends LoroTextSchemaNode
     ? Context extends "value" ? EnhancedLoroText
-      : Context extends "empty" ? string
       : Context extends "input" ? string
-      : Context extends "pojo" ? string
       : Context extends "draft" ? DraftLoroText
       : never
   : T extends LoroCounterSchemaNode
     ? Context extends "value" ? EnhancedLoroCounter
-      : Context extends "empty" ? number
       : Context extends "input" ? number
-      : Context extends "pojo" ? number
       : Context extends "draft" ? DraftLoroCounter
       : never
   : T extends LoroListSchemaNode<infer U>
     ? Context extends "value" ? EnhancedLoroList<U>
-      : Context extends "empty" ? BaseSchemaMapper<U, Context>[]
       : Context extends "input" ? BaseSchemaMapper<U, Context>[]
-      : Context extends "pojo" ? BaseSchemaMapper<U, Context>[]
       : Context extends "draft" ? DraftLoroList<U>
       : never
   : T extends LoroMovableListSchemaNode<infer U>
     ? Context extends "value" ? EnhancedLoroMovableList<U>
-      : Context extends "empty" ? BaseSchemaMapper<U, Context>[]
       : Context extends "input" ? BaseSchemaMapper<U, Context>[]
-      : Context extends "pojo" ? BaseSchemaMapper<U, Context>[]
       : Context extends "draft" ? DraftLoroMovableList<U>
       : never
   : T extends LoroMapSchemaNode<infer U>
     ? Context extends "value" ? EnhancedLoroMap<U>
-      : Context extends "empty" ? { [K in keyof U]: BaseSchemaMapper<U[K], Context> }
       : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], Context> }
-      : Context extends "pojo" ? { [K in keyof U]: BaseSchemaMapper<U[K], Context> }
       : Context extends "draft" ? DraftLoroMap<U>
       : never
   : T extends LoroTreeSchemaNode
     ? Context extends "value" ? EnhancedLoroTree
-      : Context extends "empty" ? any[]
       : Context extends "input" ? any[]
-      : Context extends "pojo" ? any[]
       : Context extends "draft" ? DraftLoroTree
       : never
   // Zod types - consistent handling across all contexts
@@ -324,8 +305,8 @@ type DraftLoroMap<
     keys(): (keyof U)[]
     values(): InferValueType<U[keyof U]>[]
     update(
-      mutator: (draft: InferMapPojoType<LoroMapSchemaNode<U>>) => void,
-    ): InferMapPojoType<LoroMapSchemaNode<U>>
+      mutator: (draft: InferInputType<LoroMapSchemaNode<U>>) => void,
+    ): InferInputType<LoroMapSchemaNode<U>>
   }
 
 type DraftLoroDoc<U extends Record<string, LoroRootContainerSchemaNode>> =
@@ -339,13 +320,13 @@ export type LoroAwareDraft<T> = T extends LoroDocSchema<infer U>
   : BaseSchemaMapper<T, "draft">
 
 // Empty state type inference
-export type InferEmptyType<T extends LoroDocSchema> = T extends LoroDocSchema<
-  infer U
->
-  ? { [K in keyof U]: InferEmptyValue<U[K]> }
-  : never
+// export type InferEmptyType<T extends LoroDocSchema> = T extends LoroDocSchema<
+//   infer U
+// >
+//   ? { [K in keyof U]: InferEmptyValue<U[K]> }
+//   : never
 
-export type InferEmptyValue<T> = BaseSchemaMapper<T, "empty">
+// export type InferEmptyValue<T> = BaseSchemaMapper<T, "empty">
 
 // Re-export validation function for convenience
 export { createEmptyStateValidator } from "./validation.js"
@@ -355,9 +336,9 @@ export type InferInputType<T> = BaseSchemaMapper<T, "input">
 
 // Type utility to extract POJO structure from a map schema
 // This converts Loro schema types to their corresponding TypeScript types for mutative
-export type InferMapPojoType<T> = T extends LoroMapSchemaNode<infer U>
-  ? { [K in keyof U]: InferPojoValueType<U[K]> }
-  : never
+// export type InferMapPojoType<T> = T extends LoroMapSchemaNode<infer U>
+//   ? { [K in keyof U]: InferPojoValueType<U[K]> }
+//   : never
 
 // Helper type to convert schema nodes to their POJO equivalents
-export type InferPojoValueType<T> = BaseSchemaMapper<T, "pojo">
+// export type InferPojoValueType<T> = BaseSchemaMapper<T, "pojo">

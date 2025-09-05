@@ -20,8 +20,6 @@ export type {
   // Type inference
   InferValueType,
   InferDraftType,
-  InferEmptyType,
-  InferEmptyValue,
   InferInputType,
   LoroAwareDraft,
   // Rich text types

@@ -1,6 +1,6 @@
 import {
   createTypedDoc,
-  type InferEmptyType,
+  type InferInputType,
   type LoroDocSchema,
 } from "@loro-extended/change"
 import type { DocumentId } from "@loro-extended/repo"
@@ -18,7 +18,7 @@ import { useDocHandleState } from "./use-doc-handle-state.js"
 export function useTypedDocState<T extends LoroDocSchema>(
   documentId: DocumentId,
   schema: T,
-  emptyState: InferEmptyType<T>,
+  emptyState: InferInputType<T>,
 ) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
@@ -35,5 +35,5 @@ export function useTypedDocState<T extends LoroDocSchema>(
     return typedDoc.value
   }, [snapshot, handle, schema, emptyState])
 
-  return { doc: doc as InferEmptyType<T>, handle, snapshot }
+  return { doc: doc as InferInputType<T>, handle, snapshot }
 }

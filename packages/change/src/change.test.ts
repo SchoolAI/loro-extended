@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { z } from "zod"
 import { createTypedDoc } from "./change.js"
 import { LoroShape as loro } from "./schema.js"
@@ -914,29 +914,20 @@ describe("TypedLoroDoc", () => {
       }).not.toThrow()
     })
 
-    it("should warn but not throw on invalid empty state", () => {
+    it("should throw on invalid empty state", () => {
       const schema = loro.doc({
         title: loro.text(),
         count: loro.counter(),
       })
 
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-
       const invalidEmptyState = {
         title: 123, // Should be string
         count: "invalid", // Should be number
-      } as any
+      }
 
       expect(() => {
         createTypedDoc(schema, invalidEmptyState)
-      }).not.toThrow()
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "EmptyState validation failed:",
-        expect.any(Object),
-      )
-
-      consoleSpy.mockRestore()
+      }).toThrow()
     })
   })
 
