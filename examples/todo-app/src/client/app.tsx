@@ -1,15 +1,15 @@
-import { useDocument } from "@loro-extended/react"
+import { LoroShape, useDocument } from "@loro-extended/react"
 import type { DocumentId } from "@loro-extended/repo"
 import { useEffect } from "react"
-import type { Todo } from "../shared/types"
+import { TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
 import { TodoList } from "./components/todo-list"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
-interface TodoDoc {
-  todos: Todo[]
-}
+const schema = LoroShape.doc({
+  todos: LoroShape.list(TodoSchema),
+})
 
 // A known, constant ID for our single todo list document
 const DEFAULT_TODO_DOC_ID: DocumentId = "todos-example-document"
@@ -19,7 +19,9 @@ function App() {
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
   // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useDocument<TodoDoc>(docId)
+  const [doc, changeDoc, handle] = useDocument(docId, schema, {
+    todos: [],
+  })
 
   useEffect(() => {
     console.log("doc state", doc)
@@ -27,10 +29,6 @@ function App() {
 
   const addTodo = (text: string) => {
     changeDoc(d => {
-      // If the todos array doesn't exist yet, create it.
-      if (!d.todos) {
-        d.todos = []
-      }
       d.todos.push({
         id: crypto.randomUUID(),
         text,
@@ -52,7 +50,7 @@ function App() {
     changeDoc(d => {
       const index = d.todos.findIndex(t => t.id === id)
       if (index > -1) {
-        d.todos.splice(index, 1)
+        d.todos.delete(index, 1)
       }
     })
   }

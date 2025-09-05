@@ -44,6 +44,9 @@ importers:
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
+      zod:
+        specifier: ^4.1.4
+        version: 4.1.4
     devDependencies:
       '@playwright/test':
         specifier: ^1.54.2
@@ -122,7 +125,7 @@ importers:
         version: 8.0.3
       loro-crdt:
         specifier: ^1.5.9
-        version: 1.5.9
+        version: 1.6.0
       reconnecting-eventsource:
         specifier: ^1.6.4
         version: 1.6.4
@@ -170,15 +173,12 @@ importers:
 
   packages/react:
     dependencies:
-      '@loro-extended/change':
-        specifier: workspace:^
-        version: link:../change
       '@loro-extended/repo':
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
         specifier: ^1.5.9
-        version: 1.5.9
+        version: 1.6.0
       react:
         specifier: '>=18'
         version: 19.1.1
@@ -204,6 +204,10 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)(tsx@4.20.3)
+    optionalDependencies:
+      '@loro-extended/change':
+        specifier: workspace:^
+        version: link:../change
 
   packages/repo:
     dependencies:
@@ -215,7 +219,7 @@ importers:
         version: 1.2.0
       loro-crdt:
         specifier: ^1.5.9
-        version: 1.5.9
+        version: 1.6.0
       mutative:
         specifier: ^1.2.0
         version: 1.2.0
@@ -1483,9 +1487,6 @@ packages:
 
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
-
-  loro-crdt@1.5.9:
-    resolution: {integrity: sha512-edkfCYh5W42O7EmNVCx6iPrI0yTAhn0DRbEAk6tmiKaL42IpUoqyDREvtFDmdVVgofxKNgceDBQx8fIIjMdr2Q==}
 
   loro-crdt@1.6.0:
     resolution: {integrity: sha512-Jdtjo3GITCncKxFU9LbK1ykGwZ4zOmlhPtJFA1vzRYuy3tYpuu/gU6rXx0nZ3pSuDNv0ZklS+7mm1cSEjouOqQ==}
@@ -3389,8 +3390,6 @@ snapshots:
   lodash.sortby@4.7.0: {}
 
   lodash@4.17.21: {}
-
-  loro-crdt@1.5.9: {}
 
   loro-crdt@1.6.0: {}
 
