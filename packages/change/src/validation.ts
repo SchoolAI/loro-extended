@@ -1,10 +1,10 @@
 import { z } from "zod"
-import type { InferInputType, LoroDocSchema } from "./schema.js"
+import type { InferInputType, LoroDocShape } from "./schema.js"
 
 /**
  * Creates a Zod validator for empty state based on schema structure
  */
-export function createEmptyStateValidator<T extends LoroDocSchema>(
+export function createEmptyStateValidator<T extends LoroDocShape>(
   schema: T,
 ): z.ZodType<InferInputType<T>> {
   const objectSchema = z.object(

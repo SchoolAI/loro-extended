@@ -5,29 +5,22 @@ export { change, createTypedDoc, TypedLoroDoc } from "./change.js"
 export { LoroShape } from "./schema.js"
 export type {
   // Schema node types
-  LoroDocSchema,
-  LoroMapSchemaNode,
-  LoroListSchemaNode,
-  LoroMovableListSchemaNode,
-  LoroTextSchemaNode,
-  LoroCounterSchemaNode,
-  LoroTreeSchemaNode,
-  LoroLeafSchemaNode,
-  LoroRootContainerSchemaNode,
-  LoroIntermediateContainerSchemaNode,
+  LoroDocShape,
+  LoroMapShape,
+  LoroListShape,
+  LoroMovableListShape,
+  LoroTextShape,
+  LoroCounterShape,
+  LoroTreeShape,
+  LoroLeafShape,
+  LoroRootContainerShape,
+  LoroIntermediateContainerShape,
   LoroRootContainerType,
-  LoroSchemaType,
   // Type inference
   InferValueType,
   InferDraftType,
   InferInputType,
   LoroAwareDraft,
-  // Rich text types
-  TextRange,
-  StyleValue,
-  // Tree types
-  TreeNodeID,
-  TreeNode,
 } from "./schema.js"
 
 // Utility exports

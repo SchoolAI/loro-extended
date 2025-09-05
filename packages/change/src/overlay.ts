@@ -1,9 +1,9 @@
-import type { InferInputType, LoroDocSchema } from "./schema.js"
+import type { InferInputType, LoroDocShape } from "./schema.js"
 
 /**
  * Overlays CRDT state with empty state defaults
  */
-export function overlayEmptyState<T extends LoroDocSchema>(
+export function overlayEmptyState<T extends LoroDocShape>(
   crdtValue: any,
   schema: T,
   emptyState: InferInputType<T>,

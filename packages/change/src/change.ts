@@ -12,7 +12,7 @@ import {
 import { create } from "mutative"
 import { convertInputToContainer } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
-import type { InferDraftType, InferInputType, LoroDocSchema } from "./schema.js"
+import type { InferDraftType, InferInputType, LoroDocShape } from "./schema.js"
 import { isContainer } from "./utils/type-guards.js"
 import { createEmptyStateValidator } from "./validation.js"
 
@@ -586,7 +586,7 @@ function createDraftNode(doc: LoroDoc, path: string[], schema: any): DraftNode {
 class DocumentDraft {
   constructor(
     private doc: LoroDoc,
-    private schema: LoroDocSchema,
+    private schema: LoroDocShape,
     private emptyState?: any,
   ) {
     this.createTopLevelProperties()
@@ -613,7 +613,7 @@ class DocumentDraft {
 // Overlay functions are now imported from overlay.js module
 
 // Core TypedLoroDoc abstraction
-export class TypedLoroDoc<T extends LoroDocSchema> {
+export class TypedLoroDoc<T extends LoroDocShape> {
   constructor(
     private doc: LoroDoc,
     private schema: T,
@@ -654,7 +654,7 @@ export class TypedLoroDoc<T extends LoroDocSchema> {
 }
 
 // Factory function for TypedLoroDoc
-export function createTypedDoc<T extends LoroDocSchema>(
+export function createTypedDoc<T extends LoroDocShape>(
   schema: T,
   emptyState: InferInputType<T>,
   existingDoc?: LoroDoc,
@@ -663,7 +663,7 @@ export function createTypedDoc<T extends LoroDocSchema>(
 }
 
 // Main change function - now works with TypedLoroDoc and returns properly typed results
-export function change<T extends LoroDocSchema>(
+export function change<T extends LoroDocShape>(
   typedDoc: TypedLoroDoc<T>,
   mutator: (draft: InferDraftType<T>) => void,
 ): InferInputType<T> {
