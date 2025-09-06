@@ -12,9 +12,9 @@ import {
 import { create } from "mutative"
 import { convertInputToContainer } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
-import type { Draft, InferInputType, DocumentShape } from "./schema.js"
+import type { DocShape, Draft, InferInputType } from "./schema.js"
 import { isContainer } from "./utils/type-guards.js"
-import { createEmptyStateValidator } from "./validation.js"
+import { validateEmptyState } from "./validation.js"
 
 // Helper functions for POJO mutation support
 /**
@@ -586,7 +586,7 @@ function createDraftNode(doc: LoroDoc, path: string[], schema: any): DraftNode {
 class DocumentDraft {
   constructor(
     private doc: LoroDoc,
-    private schema: DocumentShape,
+    private schema: DocShape,
     private emptyState?: any,
   ) {
     this.createTopLevelProperties()
@@ -610,18 +610,14 @@ class DocumentDraft {
   }
 }
 
-// Overlay functions are now imported from overlay.js module
-
-// Core TypedLoroDoc abstraction
-export class TypedLoroDoc<T extends DocumentShape> {
+// Core TypedDoc abstraction around LoroDoc
+export class TypedDoc<T extends DocShape> {
   constructor(
-    private doc: LoroDoc,
     private schema: T,
     private emptyState: InferInputType<T>,
+    private doc: LoroDoc = new LoroDoc(),
   ) {
-    // Validate emptyState against schema if possible
-    const validator = createEmptyStateValidator(schema)
-    validator.parse(emptyState)
+    validateEmptyState(emptyState, schema)
   }
 
   get value(): InferInputType<T> {
@@ -654,18 +650,10 @@ export class TypedLoroDoc<T extends DocumentShape> {
 }
 
 // Factory function for TypedLoroDoc
-export function createTypedDoc<T extends DocumentShape>(
+export function createTypedDoc<T extends DocShape>(
   schema: T,
   emptyState: InferInputType<T>,
   existingDoc?: LoroDoc,
-): TypedLoroDoc<T> {
-  return new TypedLoroDoc(existingDoc || new LoroDoc(), schema, emptyState)
-}
-
-// Main change function - now works with TypedLoroDoc and returns properly typed results
-export function change<T extends DocumentShape>(
-  typedDoc: TypedLoroDoc<T>,
-  mutator: (draft: Draft<T>) => void,
-): InferInputType<T> {
-  return typedDoc.change(mutator)
+): TypedDoc<T> {
+  return new TypedDoc<T>(schema, emptyState, existingDoc || new LoroDoc())
 }

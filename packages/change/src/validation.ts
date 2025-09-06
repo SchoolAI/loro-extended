@@ -1,7 +1,7 @@
 import type {
   ArrayValueShape,
   ContainerOrValueShape,
-  DocumentShape,
+  DocShape,
   InferInputType,
   ListContainerShape,
   MapContainerShape,
@@ -14,7 +14,7 @@ import type {
 /**
  * Validates a value against a ContainerShape or ValueShape schema
  */
-function validateValue(
+export function validateValue(
   value: unknown,
   schema: ContainerOrValueShape,
   path: string = "",
@@ -199,9 +199,9 @@ function validateValue(
  * Validates empty state against schema structure without using Zod
  * Combines the functionality of createEmptyStateValidator and createValueValidator
  */
-export function validateEmptyState<T extends DocumentShape>(
-  schema: T,
+export function validateEmptyState<T extends DocShape>(
   emptyState: unknown,
+  schema: T,
 ): InferInputType<T> {
   if (
     !emptyState ||
@@ -220,16 +220,4 @@ export function validateEmptyState<T extends DocumentShape>(
   }
 
   return result as InferInputType<T>
-}
-
-/**
- * Creates a validator object with a parse method for API compatibility
- * This maintains the same interface as the original Zod-based implementation
- */
-export function createEmptyStateValidator<T extends DocumentShape>(
-  schema: T,
-): { parse: (emptyState: unknown) => InferInputType<T> } {
-  return {
-    parse: (emptyState: unknown) => validateEmptyState(schema, emptyState),
-  }
 }

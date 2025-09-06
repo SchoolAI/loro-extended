@@ -15,7 +15,7 @@ import type {
   Value,
 } from "loro-crdt"
 
-export interface DocumentShape<
+export interface DocShape<
   T extends Record<string, ContainerShape> = Record<string, ContainerShape>,
 > {
   readonly _type: "doc"
@@ -224,9 +224,7 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
  * `ListContainerShape<TextContainerShape>`.
  */
 export const Shape = {
-  doc: <T extends Record<string, ContainerShape>>(
-    shape: T,
-  ): DocumentShape<T> => ({
+  doc: <T extends Record<string, ContainerShape>>(shape: T): DocShape<T> => ({
     _type: "doc" as const,
     shape,
   }),
@@ -432,7 +430,7 @@ export type InferInputType<T> = BaseSchemaMapper<T, "input">
 export type InferValueType<T> = BaseSchemaMapper<T, "value">
 
 // Draft-specific type inference that properly handles the draft context
-export type Draft<T extends DocumentShape<Record<string, ContainerShape>>> =
-  T extends DocumentShape<infer U>
+export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
+  T extends DocShape<infer U>
     ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
     : never

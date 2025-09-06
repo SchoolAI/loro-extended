@@ -1,9 +1,9 @@
-import type { InferInputType, DocumentShape } from "./schema.js"
+import type { InferInputType, DocShape } from "./schema.js"
 
 /**
  * Overlays CRDT state with empty state defaults
  */
-export function overlayEmptyState<T extends DocumentShape>(
+export function overlayEmptyState<T extends DocShape>(
   crdtValue: any,
   schema: T,
   emptyState: InferInputType<T>,
