@@ -14,7 +14,6 @@ import type {
   TreeNodeValue,
   Value,
 } from "loro-crdt"
-import type { z } from "zod"
 
 export interface DocumentShape<
   T extends Record<string, ContainerShape> = Record<string, ContainerShape>,
@@ -61,8 +60,63 @@ export type ContainerShape =
 
 export type RootContainerType = ContainerShape["_type"]
 
-// Base schema types - leaf schemas (non-recursive)
-export type ValueShape = z.ZodType // Zod schemas represent leaf values
+// LoroValue shape types - these represent Loro's Value types
+export type StringValueShape = {
+  readonly _type: "value"
+  readonly valueType: "string"
+}
+export type NumberValueShape = {
+  readonly _type: "value"
+  readonly valueType: "number"
+}
+export type BooleanValueShape = {
+  readonly _type: "value"
+  readonly valueType: "boolean"
+}
+export type NullValueShape = {
+  readonly _type: "value"
+  readonly valueType: "null"
+}
+export type UndefinedValueShape = {
+  readonly _type: "value"
+  readonly valueType: "undefined"
+}
+export type Uint8ArrayValueShape = {
+  readonly _type: "value"
+  readonly valueType: "uint8array"
+}
+
+export interface ObjectValueShape<
+  T extends Record<string, ValueShape> = Record<string, ValueShape>,
+> {
+  readonly _type: "value"
+  readonly valueType: "object"
+  readonly shape: T
+}
+
+export interface ArrayValueShape<T extends ValueShape = ValueShape> {
+  readonly _type: "value"
+  readonly valueType: "array"
+  readonly shape: T
+}
+
+export interface UnionValueShape<T extends ValueShape[] = ValueShape[]> {
+  readonly _type: "value"
+  readonly valueType: "union"
+  readonly shapes: T
+}
+
+// Union of all LoroValue shapes - these can only contain other LoroValue shapes
+export type ValueShape =
+  | StringValueShape
+  | NumberValueShape
+  | BooleanValueShape
+  | NullValueShape
+  | UndefinedValueShape
+  | Uint8ArrayValueShape
+  | ObjectValueShape
+  | ArrayValueShape
+  | UnionValueShape
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
@@ -107,16 +161,58 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
       : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], "input"> }
       : Context extends "draft" ? DraftLoroMap<U>
       : never
-  : T extends TreeContainerShape<infer U>
-    ? Context extends "value" ? LoroTree
-      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
-      : Context extends "draft" ? DraftLoroTree<U>
+  // : T extends TreeContainerShape<infer U>
+  //   ? Context extends "value" ? LoroTree
+  //     : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+  //     : Context extends "draft" ? DraftLoroTree<U>
+  //     : never
+  : T extends StringValueShape
+    ? Context extends "value" ? string
+      : Context extends "input" ? string
+      : Context extends "draft" ? string
       : never
-  // Zod types - consistent handling across all contexts
-  : T extends z.ZodArray<infer U>
-    ? BaseSchemaMapper<U, Context>[]
-  : T extends z.ZodType<infer U>
-    ? U
+  : T extends NumberValueShape
+    ? Context extends "value" ? number
+      : Context extends "input" ? number
+      : Context extends "draft" ? number
+      : never
+  : T extends BooleanValueShape
+    ? Context extends "value" ? boolean
+      : Context extends "input" ? boolean
+      : Context extends "draft" ? boolean
+      : never
+  : T extends NullValueShape
+    ? Context extends "value" ? null
+      : Context extends "input" ? null
+      : Context extends "draft" ? null
+      : never
+  : T extends UndefinedValueShape
+    ? Context extends "value" ? undefined
+      : Context extends "input" ? undefined
+      : Context extends "draft" ? undefined
+      : never
+  : T extends Uint8ArrayValueShape
+    ? Context extends "value" ? Uint8Array
+      : Context extends "input" ? Uint8Array
+      : Context extends "draft" ? Uint8Array
+      : never
+  : T extends ObjectValueShape<infer U>
+    ? Context extends "value" ? { [K in keyof U]: BaseSchemaMapper<U[K], "value"> }
+      : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], "input"> }
+      : Context extends "draft" ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
+      : never
+  : T extends ArrayValueShape<infer U>
+    ? Context extends "value" ? BaseSchemaMapper<U, "value">[]
+      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+      : Context extends "draft" ? BaseSchemaMapper<U, "draft">[]
+      : never
+  : T extends UnionValueShape<infer U>
+    ? U extends readonly ValueShape[]
+      ? Context extends "value" ? BaseSchemaMapper<U[number], "value">
+        : Context extends "input" ? BaseSchemaMapper<U[number], "input">
+        : Context extends "draft" ? BaseSchemaMapper<U[number], "draft">
+        : never
+      : never
   // biome-ignore lint/suspicious/noExplicitAny: required for type system to work
   : any
 
@@ -170,7 +266,57 @@ export const Shape = {
       shape,
     }),
   },
-  value: {},
+  value: {
+    string: (): StringValueShape => ({
+      _type: "value" as const,
+      valueType: "string" as const,
+    }),
+
+    number: (): NumberValueShape => ({
+      _type: "value" as const,
+      valueType: "number" as const,
+    }),
+
+    boolean: (): BooleanValueShape => ({
+      _type: "value" as const,
+      valueType: "boolean" as const,
+    }),
+
+    null: (): NullValueShape => ({
+      _type: "value" as const,
+      valueType: "null" as const,
+    }),
+
+    undefined: (): UndefinedValueShape => ({
+      _type: "value" as const,
+      valueType: "undefined" as const,
+    }),
+
+    uint8Array: (): Uint8ArrayValueShape => ({
+      _type: "value" as const,
+      valueType: "uint8array" as const,
+    }),
+
+    object: <T extends Record<string, ValueShape>>(
+      shape: T,
+    ): ObjectValueShape<T> => ({
+      _type: "value" as const,
+      valueType: "object" as const,
+      shape,
+    }),
+
+    array: <T extends ValueShape>(shape: T): ArrayValueShape<T> => ({
+      _type: "value" as const,
+      valueType: "array" as const,
+      shape,
+    }),
+
+    union: <T extends ValueShape[]>(shapes: T): UnionValueShape<T> => ({
+      _type: "value" as const,
+      valueType: "union" as const,
+      shapes,
+    }),
+  },
 }
 
 // Draft-specific interfaces
@@ -203,27 +349,27 @@ type DraftLoroCounter = {
   readonly value: number
 }
 
-type DraftLoroTree<
-  // For LoroTree, the `U` type here is different: it's the metadata for the tree, not the content...
-  U,
-  // ... so that's why we extend LoroMapShape here
-  T extends Record<string, unknown> = U extends MapContainerShape<infer M>
-    ? { [K in keyof M]: InferInputType<M[K]> }
-    : Record<string, unknown>,
-> = {
-  toArray(): TreeNodeValue[]
-  createNode(parent?: TreeID, index?: number): LoroTreeNode<T>
-  move(target: TreeID, parent: TreeID | undefined, index?: number | null): void
-  delete(target: TreeID): void
-  has(target: TreeID): boolean
-  isNodeDeleted(target: TreeID): boolean
-  getNodeByID(target: TreeID): LoroTreeNode<T> | undefined
-  nodes(): LoroTreeNode<T>[]
-  getNodes(options?: { withDeleted?: boolean }): LoroTreeNode<T>[]
-  roots(): LoroTreeNode<T>[]
-  isDeleted(): boolean
-  readonly id: ContainerID
-}
+// type DraftLoroTree<
+//   // For LoroTree, the `U` type here is different: it's the metadata for the tree, not the content...
+//   U,
+//   // ... so that's why we extend LoroMapShape here
+//   T extends Record<string, unknown> = U extends MapContainerShape<infer M>
+//     ? { [K in keyof M]: InferInputType<M[K]> }
+//     : Record<string, unknown>,
+// > = {
+//   toArray(): TreeNodeValue[]
+//   createNode(parent?: TreeID, index?: number): LoroTreeNode<T>
+//   move(target: TreeID, parent: TreeID | undefined, index?: number | null): void
+//   delete(target: TreeID): void
+//   has(target: TreeID): boolean
+//   isNodeDeleted(target: TreeID): boolean
+//   getNodeByID(target: TreeID): LoroTreeNode<T> | undefined
+//   nodes(): LoroTreeNode<T>[]
+//   getNodes(options?: { withDeleted?: boolean }): LoroTreeNode<T>[]
+//   roots(): LoroTreeNode<T>[]
+//   isDeleted(): boolean
+//   readonly id: ContainerID
+// }
 
 type DraftLoroList<U, T = InferInputType<U>> = {
   toArray(): T[]
@@ -243,11 +389,8 @@ type DraftLoroList<U, T = InferInputType<U>> = {
 type DraftLoroMovableList<U, T = InferInputType<U>> = {
   toArray(): T[]
   get(index: number): T
-  // set<V extends T>(pos: number, value: Exclude<V, Container>): void
   set(index: number, item: T): void
-  // push<V extends T>(value: Exclude<V, Container>): void
   push(item: T): void
-  // insert<V extends T>(pos: number, value: Exclude<V, Container>): void
   insert(index: number, item: T): void
   delete(pos: number, len: number): void
   pop(): Value | undefined
@@ -265,15 +408,12 @@ type DraftLoroMovableList<U, T = InferInputType<U>> = {
 type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
   [K in keyof U]: BaseSchemaMapper<U[K], "draft">
 } & {
-  // set<Key extends keyof T, V extends T[Key]>(key: Key, value: Exclude<V, Container>): void
-  set<K extends keyof U>(key: K, value: InferValueType<U[K]>): void
-  // get<Key extends keyof T>(key: Key): T[Key]
-  get<K extends keyof U>(key: K): InferValueType<U[K]> | undefined
-  // delete(key: string): void
+  set<K extends keyof U>(key: K, value: InferInputType<U[K]>): void
+  get<K extends keyof U>(key: K): InferInputType<U[K]> | undefined
   delete(key: keyof U): void
   has(key: keyof U): boolean
   keys(): (keyof U)[]
-  values(): InferValueType<U[keyof U]>[]
+  values(): InferInputType<U[keyof U]>[]
   entries(): [keyof U, U[keyof U]][]
   update(
     mutator: (draft: InferInputType<MapContainerShape<U>>) => void,

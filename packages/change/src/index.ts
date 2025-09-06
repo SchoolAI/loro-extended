@@ -6,16 +6,20 @@ export { Shape } from "./schema.js"
 export type {
   // Schema node types
   DocumentShape,
-  MapContainerShape,
-  ListContainerShape,
-  MovableListContainerShape,
-  TextContainerShape,
-  CounterContainerShape,
-  TreeContainerShape,
-  ValueShape,
   ContainerShape,
   ContainerOrValueShape,
   RootContainerType,
+  // Container shapes
+  CounterContainerShape,
+  ListContainerShape,
+  MapContainerShape,
+  MovableListContainerShape,
+  TextContainerShape,
+  TreeContainerShape,
+  // Value shapes
+  ValueShape,
+  ArrayValueShape,
+  // ...
   // Type inference
   InferValueType,
   InferInputType,

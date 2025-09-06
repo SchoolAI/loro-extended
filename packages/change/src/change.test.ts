@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { z } from "zod"
 import { createTypedDoc } from "./change.js"
 import { Shape } from "./schema.js"
 
@@ -175,7 +174,7 @@ describe("CRDT Operations", () => {
   describe("List Operations", () => {
     it("should handle push, insert, and delete operations", () => {
       const schema = Shape.doc({
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -196,7 +195,7 @@ describe("CRDT Operations", () => {
 
     it("should handle list with number items", () => {
       const schema = Shape.doc({
-        numbers: crdt.list(z.number()),
+        numbers: crdt.list(value.number()),
       })
 
       const emptyState = {
@@ -216,7 +215,7 @@ describe("CRDT Operations", () => {
 
     it("should handle list with boolean items", () => {
       const schema = Shape.doc({
-        flags: crdt.list(z.boolean()),
+        flags: crdt.list(value.boolean()),
       })
 
       const emptyState = {
@@ -236,7 +235,7 @@ describe("CRDT Operations", () => {
 
     it("should provide list length and array conversion", () => {
       const schema = Shape.doc({
-        testList: crdt.list(z.string()),
+        testList: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -282,9 +281,9 @@ describe("CRDT Operations", () => {
     it("should handle push, insert, delete, and move operations", () => {
       const schema = Shape.doc({
         tasks: crdt.movableList(
-          z.object({
-            id: z.string(),
-            title: z.string(),
+          value.object({
+            id: value.string(),
+            title: value.string(),
           }),
         ),
       })
@@ -310,7 +309,7 @@ describe("CRDT Operations", () => {
 
     it("should handle set operation", () => {
       const schema = Shape.doc({
-        editableList: crdt.movableList(z.string()),
+        editableList: crdt.movableList(value.string()),
       })
 
       const emptyState = {
@@ -329,7 +328,7 @@ describe("CRDT Operations", () => {
 
     it("should provide movable list properties and methods", () => {
       const schema = Shape.doc({
-        movableItems: crdt.movableList(z.number()),
+        movableItems: crdt.movableList(value.number()),
       })
 
       const emptyState = {
@@ -353,9 +352,9 @@ describe("CRDT Operations", () => {
     it("should handle set, get, and delete operations", () => {
       const schema = Shape.doc({
         metadata: crdt.map({
-          title: z.string(),
-          count: z.number(),
-          enabled: z.boolean(),
+          title: value.string(),
+          count: value.number(),
+          enabled: value.boolean(),
         }),
       })
 
@@ -384,8 +383,8 @@ describe("CRDT Operations", () => {
     it("should handle array values in maps", () => {
       const schema = Shape.doc({
         config: crdt.map({
-          tags: z.array(z.string()),
-          numbers: z.array(z.number()),
+          tags: value.array(value.string()),
+          numbers: value.array(value.number()),
         }),
       })
 
@@ -410,8 +409,8 @@ describe("CRDT Operations", () => {
     it("should provide map utility methods", () => {
       const schema = Shape.doc({
         testMap: crdt.map({
-          key1: z.string(),
-          key2: z.number(),
+          key1: value.string(),
+          key2: value.number(),
         }),
       })
 
@@ -541,8 +540,8 @@ describe("Nested Operations", () => {
           metadata: crdt.map({
             views: crdt.counter(),
             author: crdt.map({
-              name: z.string(),
-              email: z.string(),
+              name: value.string(),
+              email: value.string(),
             }),
           }),
         }),
@@ -579,8 +578,8 @@ describe("Nested Operations", () => {
     it("should handle maps with mixed Zod and Loro schemas", () => {
       const schema = Shape.doc({
         mixed: crdt.map({
-          plainString: z.string(),
-          plainArray: z.array(z.number()),
+          plainString: value.string(),
+          plainArray: value.array(value.number()),
           loroText: crdt.text(),
           loroCounter: crdt.counter(),
         }),
@@ -617,10 +616,10 @@ describe("Nested Operations", () => {
         articles: crdt.list(
           crdt.map({
             title: crdt.text(),
-            tags: crdt.list(z.string()),
+            tags: crdt.list(value.string()),
             metadata: crdt.map({
               views: crdt.counter(),
-              published: z.boolean(),
+              published: value.boolean(),
             }),
           }),
         ),
@@ -663,9 +662,9 @@ describe("Nested Operations", () => {
     it("should handle nested POJO maps", () => {
       const schema = Shape.doc({
         articles: crdt.map({
-          metadata: z.object({
-            views: z.object({
-              published: z.boolean(),
+          metadata: value.object({
+            views: value.object({
+              published: value.boolean(),
             }),
           }),
         }),
@@ -697,7 +696,7 @@ describe("Nested Operations", () => {
 
     it("should handle lists of lists", () => {
       const schema = Shape.doc({
-        matrix: crdt.list(crdt.list(z.number())),
+        matrix: crdt.list(crdt.list(value.number())),
       })
 
       const emptyState = {
@@ -721,8 +720,8 @@ describe("Nested Operations", () => {
     it("should handle maps containing lists", () => {
       const schema = Shape.doc({
         categories: crdt.map({
-          tech: crdt.list(z.string()),
-          design: crdt.list(z.string()),
+          tech: crdt.list(value.string()),
+          design: crdt.list(value.string()),
         }),
       })
 
@@ -753,7 +752,7 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         title: crdt.text(),
         count: crdt.counter(),
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -775,7 +774,7 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         title: crdt.text(),
         count: crdt.counter(),
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -802,8 +801,8 @@ describe("TypedLoroDoc", () => {
           title: crdt.text(),
           metadata: crdt.map({
             views: crdt.counter(),
-            tags: z.array(z.string()),
-            author: z.string(),
+            tags: value.array(value.string()),
+            author: value.string(),
           }),
         }),
       })
@@ -838,9 +837,9 @@ describe("TypedLoroDoc", () => {
     it("should handle empty state with optional fields", () => {
       const schema = Shape.doc({
         profile: crdt.map({
-          name: z.string(),
-          email: z.string().optional(),
-          age: z.number().optional(),
+          name: value.string(),
+          email: value.union([value.string(), value.undefined()]),
+          age: value.union([value.number(), value.undefined()]),
         }),
       })
 
@@ -870,7 +869,7 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         title: crdt.text(),
         metadata: crdt.map({
-          optional: z.string(),
+          optional: value.string(),
         }),
       })
 
@@ -938,7 +937,7 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         title: crdt.text(),
         count: crdt.counter(),
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -979,7 +978,7 @@ describe("TypedLoroDoc", () => {
         articles: crdt.list(
           crdt.map({
             title: crdt.text(),
-            tags: crdt.list(z.string()),
+            tags: crdt.list(value.string()),
           }),
         ),
       })
@@ -1007,8 +1006,8 @@ describe("TypedLoroDoc", () => {
         tasks: crdt.movableList(
           crdt.map({
             title: crdt.text(),
-            completed: z.boolean(),
-            subtasks: crdt.list(z.string()),
+            completed: value.boolean(),
+            subtasks: crdt.list(value.string()),
           }),
         ),
       })
@@ -1040,7 +1039,7 @@ describe("TypedLoroDoc", () => {
             title: crdt.text(),
             metadata: crdt.map({
               views: crdt.counter(),
-              tags: z.array(z.string()),
+              tags: value.array(value.string()),
             }),
           }),
         ),
@@ -1076,8 +1075,8 @@ describe("Edge Cases and Error Handling", () => {
       const schema = Shape.doc({
         title: crdt.text(),
         metadata: crdt.map({
-          author: z.string(),
-          publishedAt: z.string(),
+          author: value.string(),
+          publishedAt: value.string(),
         }),
       })
 
@@ -1119,7 +1118,7 @@ describe("Edge Cases and Error Handling", () => {
         todos: crdt.list(
           crdt.map({
             text: crdt.text(),
-            completed: z.boolean(),
+            completed: value.boolean(),
           }),
         ),
       })
@@ -1147,7 +1146,7 @@ describe("Edge Cases and Error Handling", () => {
   describe("Performance and Memory", () => {
     it("should handle large numbers of operations efficiently", () => {
       const schema = Shape.doc({
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
         counter: crdt.counter(),
       })
 
@@ -1178,7 +1177,7 @@ describe("Edge Cases and Error Handling", () => {
       const schema = Shape.doc({
         text: crdt.text(),
         count: crdt.counter(),
-        items: crdt.list(z.string()),
+        items: crdt.list(value.string()),
       })
 
       const emptyState = {
@@ -1203,7 +1202,7 @@ describe("Edge Cases and Error Handling", () => {
     it("should handle special characters and unicode", () => {
       const schema = Shape.doc({
         unicode: crdt.text(),
-        emoji: crdt.list(z.string()),
+        emoji: crdt.list(value.string()),
       })
 
       const emptyState = {

@@ -1,18 +1,17 @@
-import { z } from "zod"
 import { Shape } from "./schema.js"
 
 const { crdt, value } = Shape
 
 // Pattern 1: List with POJO objects (leaf nodes)
-export const simpleList = crdt.list(z.object({ title: z.string() }))
+export const simpleList = crdt.list(value.object({ title: value.string() }))
 
 // Pattern 2: List with LoroMap containers
 export const containerListDoc = Shape.doc({
   title: crdt.text(),
   list: crdt.list(
     crdt.map({
-      title: z.string(),
-      tags: z.array(z.string()),
+      title: value.string(),
+      tags: value.array(value.string()),
     }),
   ),
 })
@@ -20,8 +19,8 @@ export const containerListDoc = Shape.doc({
 // Pattern 3: Fully nested containers
 export const deeplyNested = crdt.list(
   crdt.map({
-    title: z.string(),
-    tags: crdt.list(z.string()), // LoroList of strings, not array
+    title: value.string(),
+    tags: crdt.list(value.string()), // LoroList of strings, not array
   }),
 )
 
@@ -33,26 +32,26 @@ export const complexDocSchema = Shape.doc({
 
   // Mixed content: LoroList containing POJO objects
   articles: crdt.list(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      publishedAt: z.date(),
-      tags: z.array(z.string()), // POJO array (leaf node)
-      metadata: z.object({
-        wordCount: z.number(),
-        readingTime: z.number(),
-        featured: z.boolean(),
+    value.object({
+      id: value.string(),
+      title: value.string(),
+      publishedAt: value.string(),
+      tags: value.array(value.string()), // POJO array (leaf node)
+      metadata: value.object({
+        wordCount: value.number(),
+        readingTime: value.number(),
+        featured: value.boolean(),
       }),
     }),
   ),
 
   // LoroMovableList for reorderable content
   priorityTasks: crdt.movableList(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      priority: z.number(),
-      completed: z.boolean(),
+    value.object({
+      id: value.string(),
+      title: value.string(),
+      priority: value.number(),
+      completed: value.boolean(),
     }),
   ),
 
@@ -64,27 +63,27 @@ export const complexDocSchema = Shape.doc({
       content: crdt.text(), // Collaborative content editing
 
       // POJO metadata (leaf nodes)
-      publishedAt: z.date(),
-      authorId: z.string(),
+      publishedAt: value.string(),
+      authorId: value.string(),
 
       // Nested LoroMovableList for reorderable collaborative tag management
-      tags: crdt.movableList(z.string()),
+      tags: crdt.movableList(value.string()),
 
       // Even deeper nesting: LoroList of LoroMap for comments
       comments: crdt.list(
         crdt.map({
-          id: z.string(), // POJO leaf
-          authorId: z.string(), // POJO leaf
+          id: value.string(), // POJO leaf
+          authorId: value.string(), // POJO leaf
           content: crdt.text(), // Collaborative comment editing
-          timestamp: z.date(), // POJO leaf
+          timestamp: value.string(), // POJO leaf
 
           // Nested replies as LoroMovableList of POJO objects
           replies: crdt.movableList(
-            z.object({
-              id: z.string(),
-              authorId: z.string(),
-              content: z.string(), // Non-collaborative reply content
-              timestamp: z.date(),
+            value.object({
+              id: value.string(),
+              authorId: value.string(),
+              content: value.string(), // Non-collaborative reply content
+              timestamp: value.string(),
             }),
           ),
         }),
@@ -95,10 +94,10 @@ export const complexDocSchema = Shape.doc({
   // Complex metadata structure
   siteMetadata: crdt.map({
     // POJO configuration
-    config: z.object({
-      siteName: z.string(),
-      baseUrl: z.string(),
-      theme: z.enum(["light", "dark", "auto"]),
+    config: value.object({
+      siteName: value.string(),
+      baseUrl: value.string(),
+      theme: value.string(),
     }),
 
     // Collaborative analytics
@@ -108,28 +107,28 @@ export const complexDocSchema = Shape.doc({
 
       // Daily stats as LoroMovableList of POJO objects (reorderable by date)
       dailyStats: crdt.movableList(
-        z.object({
-          date: z.string(),
-          views: z.number(),
-          visitors: z.number(),
-          bounceRate: z.number(),
+        value.object({
+          date: value.string(),
+          views: value.number(),
+          visitors: value.number(),
+          bounceRate: value.number(),
         }),
       ),
     }),
 
     // Collaborative feature flags
     features: crdt.map({
-      commentsEnabled: z.boolean(),
-      darkModeEnabled: z.boolean(),
+      commentsEnabled: value.boolean(),
+      darkModeEnabled: value.boolean(),
 
       // Nested collaborative settings
       moderationSettings: crdt.map({
-        autoModeration: z.boolean(),
-        bannedWords: crdt.movableList(z.string()), // Reorderable banned words
+        autoModeration: value.boolean(),
+        bannedWords: crdt.movableList(value.string()), // Reorderable banned words
         moderators: crdt.list(
-          z.object({
-            userId: z.string(),
-            permissions: z.array(z.enum(["delete", "edit", "ban"])),
+          value.object({
+            userId: value.string(),
+            permissions: value.array(value.string()),
           }),
         ),
       }),
