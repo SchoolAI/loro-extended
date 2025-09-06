@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 import { createTypedDoc } from "./change.js"
-import { LoroShape as loro } from "./schema.js"
+import { Shape } from "./schema.js"
+
+const { crdt, value } = Shape
 
 describe("CRDT Operations", () => {
   describe("Text Operations", () => {
     it("should handle basic text insertion and deletion", () => {
-      const schema = loro.doc({
-        title: loro.text(),
+      const schema = Shape.doc({
+        title: crdt.text(),
       })
 
       const emptyState = {
@@ -26,8 +28,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle text update (replacement)", () => {
-      const schema = loro.doc({
-        content: loro.text(),
+      const schema = Shape.doc({
+        content: crdt.text(),
       })
 
       const emptyState = {
@@ -45,8 +47,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle text marking and unmarking", () => {
-      const schema = loro.doc({
-        richText: loro.text(),
+      const schema = Shape.doc({
+        richText: crdt.text(),
       })
 
       const emptyState = {
@@ -65,8 +67,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle delta operations", () => {
-      const schema = loro.doc({
-        deltaText: loro.text(),
+      const schema = Shape.doc({
+        deltaText: crdt.text(),
       })
 
       const emptyState = {
@@ -89,8 +91,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should provide text length property", () => {
-      const schema = loro.doc({
-        measuredText: loro.text(),
+      const schema = Shape.doc({
+        measuredText: crdt.text(),
       })
 
       const emptyState = {
@@ -111,8 +113,8 @@ describe("CRDT Operations", () => {
 
   describe("Counter Operations", () => {
     it("should handle increment and decrement operations", () => {
-      const schema = loro.doc({
-        count: loro.counter(),
+      const schema = Shape.doc({
+        count: crdt.counter(),
       })
 
       const emptyState = {
@@ -131,8 +133,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should provide counter value property", () => {
-      const schema = loro.doc({
-        counter: loro.counter(),
+      const schema = Shape.doc({
+        counter: crdt.counter(),
       })
 
       const emptyState = {
@@ -151,8 +153,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle negative increments and decrements", () => {
-      const schema = loro.doc({
-        negativeCounter: loro.counter(),
+      const schema = Shape.doc({
+        negativeCounter: crdt.counter(),
       })
 
       const emptyState = {
@@ -172,8 +174,8 @@ describe("CRDT Operations", () => {
 
   describe("List Operations", () => {
     it("should handle push, insert, and delete operations", () => {
-      const schema = loro.doc({
-        items: loro.list(z.string()),
+      const schema = Shape.doc({
+        items: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -193,8 +195,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle list with number items", () => {
-      const schema = loro.doc({
-        numbers: loro.list(z.number()),
+      const schema = Shape.doc({
+        numbers: crdt.list(z.number()),
       })
 
       const emptyState = {
@@ -213,8 +215,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle list with boolean items", () => {
-      const schema = loro.doc({
-        flags: loro.list(z.boolean()),
+      const schema = Shape.doc({
+        flags: crdt.list(z.boolean()),
       })
 
       const emptyState = {
@@ -233,8 +235,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should provide list length and array conversion", () => {
-      const schema = loro.doc({
-        testList: loro.list(z.string()),
+      const schema = Shape.doc({
+        testList: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -255,8 +257,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle container insertion", () => {
-      const schema = loro.doc({
-        containerList: loro.list(loro.text()),
+      const schema = Shape.doc({
+        containerList: crdt.list(crdt.text()),
       })
 
       const emptyState = {
@@ -278,8 +280,8 @@ describe("CRDT Operations", () => {
 
   describe("Movable List Operations", () => {
     it("should handle push, insert, delete, and move operations", () => {
-      const schema = loro.doc({
-        tasks: loro.movableList(
+      const schema = Shape.doc({
+        tasks: crdt.movableList(
           z.object({
             id: z.string(),
             title: z.string(),
@@ -307,8 +309,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle set operation", () => {
-      const schema = loro.doc({
-        editableList: loro.movableList(z.string()),
+      const schema = Shape.doc({
+        editableList: crdt.movableList(z.string()),
       })
 
       const emptyState = {
@@ -326,8 +328,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should provide movable list properties and methods", () => {
-      const schema = loro.doc({
-        movableItems: loro.movableList(z.number()),
+      const schema = Shape.doc({
+        movableItems: crdt.movableList(z.number()),
       })
 
       const emptyState = {
@@ -349,8 +351,8 @@ describe("CRDT Operations", () => {
 
   describe("Map Operations", () => {
     it("should handle set, get, and delete operations", () => {
-      const schema = loro.doc({
-        metadata: loro.map({
+      const schema = Shape.doc({
+        metadata: crdt.map({
           title: z.string(),
           count: z.number(),
           enabled: z.boolean(),
@@ -380,8 +382,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle array values in maps", () => {
-      const schema = loro.doc({
-        config: loro.map({
+      const schema = Shape.doc({
+        config: crdt.map({
           tags: z.array(z.string()),
           numbers: z.array(z.number()),
         }),
@@ -406,8 +408,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should provide map utility methods", () => {
-      const schema = loro.doc({
-        testMap: loro.map({
+      const schema = Shape.doc({
+        testMap: crdt.map({
           key1: z.string(),
           key2: z.number(),
         }),
@@ -438,9 +440,9 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle container insertion in maps", () => {
-      const schema = loro.doc({
-        containerMap: loro.map({
-          textField: loro.text(),
+      const schema = Shape.doc({
+        containerMap: crdt.map({
+          textField: crdt.text(),
         }),
       })
 
@@ -466,8 +468,8 @@ describe("CRDT Operations", () => {
 
   describe("Tree Operations", () => {
     it("should handle basic tree operations", () => {
-      const schema = loro.doc({
-        tree: loro.tree(loro.map({ name: loro.text() })),
+      const schema = Shape.doc({
+        tree: crdt.tree(crdt.map({ name: crdt.text() })),
       })
 
       const emptyState = {
@@ -487,8 +489,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle tree node movement and deletion", () => {
-      const schema = loro.doc({
-        hierarchy: loro.tree(loro.map({ name: loro.text() })),
+      const schema = Shape.doc({
+        hierarchy: crdt.tree(crdt.map({ name: crdt.text() })),
       })
 
       const emptyState = {
@@ -509,8 +511,8 @@ describe("CRDT Operations", () => {
     })
 
     it("should handle tree node lookup by ID", () => {
-      const schema = loro.doc({
-        searchableTree: loro.tree(loro.map({ name: loro.text() })),
+      const schema = Shape.doc({
+        searchableTree: crdt.tree(crdt.map({ name: crdt.text() })),
       })
 
       const emptyState = {
@@ -533,12 +535,12 @@ describe("CRDT Operations", () => {
 describe("Nested Operations", () => {
   describe("Nested Maps", () => {
     it("should handle deeply nested map structures", () => {
-      const schema = loro.doc({
-        article: loro.map({
-          title: loro.text(),
-          metadata: loro.map({
-            views: loro.counter(),
-            author: loro.map({
+      const schema = Shape.doc({
+        article: crdt.map({
+          title: crdt.text(),
+          metadata: crdt.map({
+            views: crdt.counter(),
+            author: crdt.map({
               name: z.string(),
               email: z.string(),
             }),
@@ -575,12 +577,12 @@ describe("Nested Operations", () => {
     })
 
     it("should handle maps with mixed Zod and Loro schemas", () => {
-      const schema = loro.doc({
-        mixed: loro.map({
+      const schema = Shape.doc({
+        mixed: crdt.map({
           plainString: z.string(),
           plainArray: z.array(z.number()),
-          loroText: loro.text(),
-          loroCounter: loro.counter(),
+          loroText: crdt.text(),
+          loroCounter: crdt.counter(),
         }),
       })
 
@@ -611,13 +613,13 @@ describe("Nested Operations", () => {
 
   describe("Lists with Complex Items", () => {
     it("should handle lists of maps with nested structures", () => {
-      const schema = loro.doc({
-        articles: loro.list(
-          loro.map({
-            title: loro.text(),
-            tags: loro.list(z.string()),
-            metadata: loro.map({
-              views: loro.counter(),
+      const schema = Shape.doc({
+        articles: crdt.list(
+          crdt.map({
+            title: crdt.text(),
+            tags: crdt.list(z.string()),
+            metadata: crdt.map({
+              views: crdt.counter(),
               published: z.boolean(),
             }),
           }),
@@ -659,8 +661,8 @@ describe("Nested Operations", () => {
     })
 
     it("should handle nested POJO maps", () => {
-      const schema = loro.doc({
-        articles: loro.map({
+      const schema = Shape.doc({
+        articles: crdt.map({
           metadata: z.object({
             views: z.object({
               published: z.boolean(),
@@ -694,8 +696,8 @@ describe("Nested Operations", () => {
     })
 
     it("should handle lists of lists", () => {
-      const schema = loro.doc({
-        matrix: loro.list(loro.list(z.number())),
+      const schema = Shape.doc({
+        matrix: crdt.list(crdt.list(z.number())),
       })
 
       const emptyState = {
@@ -717,10 +719,10 @@ describe("Nested Operations", () => {
 
   describe("Maps with List Values", () => {
     it("should handle maps containing lists", () => {
-      const schema = loro.doc({
-        categories: loro.map({
-          tech: loro.list(z.string()),
-          design: loro.list(z.string()),
+      const schema = Shape.doc({
+        categories: crdt.map({
+          tech: crdt.list(z.string()),
+          design: crdt.list(z.string()),
         }),
       })
 
@@ -748,10 +750,10 @@ describe("Nested Operations", () => {
 describe("TypedLoroDoc", () => {
   describe("Empty State Overlay", () => {
     it("should return empty state when document is empty", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        count: loro.counter(),
-        items: loro.list(z.string()),
+      const schema = Shape.doc({
+        title: crdt.text(),
+        count: crdt.counter(),
+        items: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -770,10 +772,10 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should overlay CRDT values over empty state", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        count: loro.counter(),
-        items: loro.list(z.string()),
+      const schema = Shape.doc({
+        title: crdt.text(),
+        count: crdt.counter(),
+        items: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -795,11 +797,11 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should handle nested empty state structures", () => {
-      const schema = loro.doc({
-        article: loro.map({
-          title: loro.text(),
-          metadata: loro.map({
-            views: loro.counter(),
+      const schema = Shape.doc({
+        article: crdt.map({
+          title: crdt.text(),
+          metadata: crdt.map({
+            views: crdt.counter(),
             tags: z.array(z.string()),
             author: z.string(),
           }),
@@ -834,8 +836,8 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should handle empty state with optional fields", () => {
-      const schema = loro.doc({
-        profile: loro.map({
+      const schema = Shape.doc({
+        profile: crdt.map({
           name: z.string(),
           email: z.string().optional(),
           age: z.number().optional(),
@@ -865,9 +867,9 @@ describe("TypedLoroDoc", () => {
 
   describe("Raw vs Overlaid Values", () => {
     it("should distinguish between raw CRDT and overlaid values", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        metadata: loro.map({
+      const schema = Shape.doc({
+        title: crdt.text(),
+        metadata: crdt.map({
           optional: z.string(),
         }),
       })
@@ -899,9 +901,9 @@ describe("TypedLoroDoc", () => {
 
   describe("Validation", () => {
     it("should validate empty state against schema", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        count: loro.counter(),
+      const schema = Shape.doc({
+        title: crdt.text(),
+        count: crdt.counter(),
       })
 
       const validEmptyState = {
@@ -915,9 +917,9 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should throw on invalid empty state", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        count: loro.counter(),
+      const schema = Shape.doc({
+        title: crdt.text(),
+        count: crdt.counter(),
       })
 
       const invalidEmptyState = {
@@ -933,10 +935,10 @@ describe("TypedLoroDoc", () => {
 
   describe("Multiple Changes", () => {
     it("should persist state across multiple change calls", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        count: loro.counter(),
-        items: loro.list(z.string()),
+      const schema = Shape.doc({
+        title: crdt.text(),
+        count: crdt.counter(),
+        items: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -973,11 +975,11 @@ describe("TypedLoroDoc", () => {
 
   describe("Schema-Aware Input Conversion", () => {
     it("should convert plain objects to map containers in lists", () => {
-      const schema = loro.doc({
-        articles: loro.list(
-          loro.map({
-            title: loro.text(),
-            tags: loro.list(z.string()),
+      const schema = Shape.doc({
+        articles: crdt.list(
+          crdt.map({
+            title: crdt.text(),
+            tags: crdt.list(z.string()),
           }),
         ),
       })
@@ -1001,12 +1003,12 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should handle nested conversion in movable lists", () => {
-      const schema = loro.doc({
-        tasks: loro.movableList(
-          loro.map({
-            title: loro.text(),
+      const schema = Shape.doc({
+        tasks: crdt.movableList(
+          crdt.map({
+            title: crdt.text(),
             completed: z.boolean(),
-            subtasks: loro.list(z.string()),
+            subtasks: crdt.list(z.string()),
           }),
         ),
       })
@@ -1032,12 +1034,12 @@ describe("TypedLoroDoc", () => {
     })
 
     it("should handle deeply nested conversion", () => {
-      const schema = loro.doc({
-        posts: loro.list(
-          loro.map({
-            title: loro.text(),
-            metadata: loro.map({
-              views: loro.counter(),
+      const schema = Shape.doc({
+        posts: crdt.list(
+          crdt.map({
+            title: crdt.text(),
+            metadata: crdt.map({
+              views: crdt.counter(),
               tags: z.array(z.string()),
             }),
           }),
@@ -1071,9 +1073,9 @@ describe("TypedLoroDoc", () => {
 describe("Edge Cases and Error Handling", () => {
   describe("Type Safety", () => {
     it("should maintain type safety with complex schemas", () => {
-      const schema = loro.doc({
-        title: loro.text(),
-        metadata: loro.map({
+      const schema = Shape.doc({
+        title: crdt.text(),
+        metadata: crdt.map({
           author: z.string(),
           publishedAt: z.string(),
         }),
@@ -1113,10 +1115,10 @@ describe("Edge Cases and Error Handling", () => {
     })
 
     it("should handle empty containers gracefully", () => {
-      const schema = loro.doc({
-        todos: loro.list(
-          loro.map({
-            text: loro.text(),
+      const schema = Shape.doc({
+        todos: crdt.list(
+          crdt.map({
+            text: crdt.text(),
             completed: z.boolean(),
           }),
         ),
@@ -1144,9 +1146,9 @@ describe("Edge Cases and Error Handling", () => {
 
   describe("Performance and Memory", () => {
     it("should handle large numbers of operations efficiently", () => {
-      const schema = loro.doc({
-        items: loro.list(z.string()),
-        counter: loro.counter(),
+      const schema = Shape.doc({
+        items: crdt.list(z.string()),
+        counter: crdt.counter(),
       })
 
       const emptyState = {
@@ -1173,10 +1175,10 @@ describe("Edge Cases and Error Handling", () => {
 
   describe("Boundary Conditions", () => {
     it("should handle empty strings and zero values", () => {
-      const schema = loro.doc({
-        text: loro.text(),
-        count: loro.counter(),
-        items: loro.list(z.string()),
+      const schema = Shape.doc({
+        text: crdt.text(),
+        count: crdt.counter(),
+        items: crdt.list(z.string()),
       })
 
       const emptyState = {
@@ -1199,9 +1201,9 @@ describe("Edge Cases and Error Handling", () => {
     })
 
     it("should handle special characters and unicode", () => {
-      const schema = loro.doc({
-        unicode: loro.text(),
-        emoji: loro.list(z.string()),
+      const schema = Shape.doc({
+        unicode: crdt.text(),
+        emoji: crdt.list(z.string()),
       })
 
       const emptyState = {

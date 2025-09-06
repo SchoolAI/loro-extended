@@ -16,25 +16,29 @@ import type {
 } from "loro-crdt"
 import type { z } from "zod"
 
-// Base schema types - leaf schemas (non-recursive)
-export type ValueShape = z.ZodType // Zod schemas represent leaf values
+export interface DocumentShape<
+  T extends Record<string, ContainerShape> = Record<string, ContainerShape>,
+> {
+  readonly _type: "doc"
+  readonly shape: T
+}
 
 export type TextContainerShape = { readonly _type: "text" }
 export type CounterContainerShape = { readonly _type: "counter" }
 export interface TreeContainerShape<T = ContainerOrValueShape> {
   readonly _type: "tree"
-  readonly item: T
+  readonly shape: T
 }
 
 // Container schemas using interfaces for recursive references
 export interface ListContainerShape<T = ContainerOrValueShape> {
   readonly _type: "list"
-  readonly item: T
+  readonly shape: T
 }
 
 export interface MovableListContainerShape<T = ContainerOrValueShape> {
   readonly _type: "movableList"
-  readonly item: T
+  readonly shape: T
 }
 
 export interface MapContainerShape<
@@ -47,16 +51,6 @@ export interface MapContainerShape<
   readonly shape: T
 }
 
-export interface LoroDocShape<
-  T extends Record<string, ContainerShape> = Record<
-    string,
-    ContainerShape
-  >,
-> {
-  readonly _type: "doc"
-  readonly shape: T
-}
-
 export type ContainerShape =
   | CounterContainerShape
   | ListContainerShape
@@ -66,6 +60,9 @@ export type ContainerShape =
   | TreeContainerShape
 
 export type RootContainerType = ContainerShape["_type"]
+
+// Base schema types - leaf schemas (non-recursive)
+export type ValueShape = z.ZodType // Zod schemas represent leaf values
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
@@ -123,48 +120,57 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
   // biome-ignore lint/suspicious/noExplicitAny: required for type system to work
   : any
 
-// The LoroShape factory object
-export const LoroShape = {
+/**
+ * The LoroShape factory object
+ *
+ * If a container has a `shape` type variable, it refers the the shape it contains--
+ * so for example, a `LoroShape.list(LoroShape.text())` would return a value of type
+ * `ListContainerShape<TextContainerShape>`.
+ */
+export const Shape = {
   doc: <T extends Record<string, ContainerShape>>(
     shape: T,
-  ): LoroDocShape<T> => ({
+  ): DocumentShape<T> => ({
     _type: "doc" as const,
     shape,
   }),
 
-  counter: (): CounterContainerShape => ({
-    _type: "counter" as const,
-  }),
+  crdt: {
+    counter: (): CounterContainerShape => ({
+      _type: "counter" as const,
+    }),
 
-  list: <T extends ContainerOrValueShape>(
-    item: T,
-  ): ListContainerShape<T> => ({
-    _type: "list" as const,
-    item,
-  }),
+    list: <T extends ContainerOrValueShape>(
+      shape: T,
+    ): ListContainerShape<T> => ({
+      _type: "list" as const,
+      shape,
+    }),
 
-  map: <T extends Record<string, ContainerOrValueShape>>(
-    shape: T,
-  ): MapContainerShape<T> => ({
-    _type: "map" as const,
-    shape,
-  }),
+    map: <T extends Record<string, ContainerOrValueShape>>(
+      shape: T,
+    ): MapContainerShape<T> => ({
+      _type: "map" as const,
+      shape,
+    }),
 
-  movableList: <T extends ContainerOrValueShape>(
-    item: T,
-  ): MovableListContainerShape<T> => ({
-    _type: "movableList" as const,
-    item,
-  }),
+    movableList: <T extends ContainerOrValueShape>(
+      shape: T,
+    ): MovableListContainerShape<T> => ({
+      _type: "movableList" as const,
+      shape,
+    }),
 
-  text: (): TextContainerShape => ({
-    _type: "text" as const,
-  }),
+    text: (): TextContainerShape => ({
+      _type: "text" as const,
+    }),
 
-  tree: <T extends MapContainerShape>(item: T): TreeContainerShape => ({
-    _type: "tree" as const,
-    item,
-  }),
+    tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
+      _type: "tree" as const,
+      shape,
+    }),
+  },
+  value: {},
 }
 
 // Draft-specific interfaces
@@ -286,8 +292,7 @@ export type InferInputType<T> = BaseSchemaMapper<T, "input">
 export type InferValueType<T> = BaseSchemaMapper<T, "value">
 
 // Draft-specific type inference that properly handles the draft context
-export type Draft<
-  T extends LoroDocShape<Record<string, ContainerShape>>,
-> = T extends LoroDocShape<infer U>
-  ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
-  : never
+export type Draft<T extends DocumentShape<Record<string, ContainerShape>>> =
+  T extends DocumentShape<infer U>
+    ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
+    : never

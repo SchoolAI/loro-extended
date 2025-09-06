@@ -2,20 +2,20 @@
 export { change, createTypedDoc, TypedLoroDoc } from "./change.js"
 
 // Schema and type exports
-export { LoroShape } from "./schema.js"
+export { Shape } from "./schema.js"
 export type {
   // Schema node types
-  LoroDocShape,
+  DocumentShape,
   MapContainerShape,
   ListContainerShape,
   MovableListContainerShape,
   TextContainerShape,
   CounterContainerShape,
   TreeContainerShape,
-  ValueShape as LeafShape,
-  ContainerShape as LoroRootContainerShape,
-  ContainerOrValueShape as LoroIntermediateContainerShape,
-  RootContainerType as LoroRootContainerType,
+  ValueShape,
+  ContainerShape,
+  ContainerOrValueShape,
+  RootContainerType,
   // Type inference
   InferValueType,
   InferInputType,
