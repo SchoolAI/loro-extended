@@ -53,7 +53,7 @@ const doc = new TypedDoc(schema, emptyState);
 
 // Make changes with natural syntax
 const result = doc.change((draft) => {
-  draft.title.insert(0, "📝 ");
+  draft.title.insert(0, "📝 Todo");
   draft.todos.push({
     id: "1",
     text: "Learn Loro",
@@ -62,7 +62,7 @@ const result = doc.change((draft) => {
 });
 
 console.log(result);
-// { title: "📝 My Todo List", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
+// { title: "📝 Todo", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
 ```
 
 Note that this is even more useful in combination with `@loro-extended/react` (if your app uses React) and `@loro-extended/repo` for syncing between client/server or among peers.
@@ -134,8 +134,8 @@ doc.change((draft) => {
 });
 
 console.log(doc.value);
-// { title: "My Blog Post", viewCount: 10, tags: [], ... }
-//   ↑ CRDT value    ↑ CRDT value    ↑ empty state preserved
+// { title: "My Blog Post",  viewCount: 10,  tags: [], ... }
+//   ↑ CRDT value            ↑ CRDT value    ↑ empty state preserved
 ```
 
 ### The `change()` Function
@@ -212,8 +212,8 @@ const doc = new TypedDoc(complexSchema, emptyState);
 doc.change((draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
-  draft.article.metadata.author.set("name", "Alice");
-  draft.article.metadata.author.set("email", "alice@example.com");
+  draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
+  draft.article.metadata.author.email = "alice@example.com"; // same here
 });
 ```
 
@@ -232,9 +232,9 @@ const schema = Shape.doc({
 
 doc.change((draft) => {
   // Set individual values
-  draft.settings.set("theme", "dark");
-  draft.settings.set("collapsed", true);
-  draft.settings.set("width", 250);
+  draft.settings.theme = "dark";
+  draft.settings.collapsed = true;
+  draft.settings.width = 250;
 });
 ```
 
