@@ -106,7 +106,7 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]> {
   readonly shapes: T
 }
 
-// Union of all LoroValue shapes - these can only contain other LoroValue shapes
+// Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
 export type ValueShape =
   | StringValueShape
   | NumberValueShape
@@ -208,9 +208,9 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
       : never
   : T extends UnionValueShape<infer U>
     ? U extends readonly ValueShape[]
-      ? Context extends "value" ? BaseSchemaMapper<U[number], "value">
-        : Context extends "input" ? BaseSchemaMapper<U[number], "input">
-        : Context extends "draft" ? BaseSchemaMapper<U[number], "draft">
+      ? Context extends "value" ? BaseSchemaMapper<U, "value">
+        : Context extends "input" ? BaseSchemaMapper<U, "input">
+        : Context extends "draft" ? BaseSchemaMapper<U, "draft">
         : never
       : never
   // biome-ignore lint/suspicious/noExplicitAny: required for type system to work
