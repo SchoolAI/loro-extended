@@ -1,7 +1,7 @@
 {
   "name": "@loro-extended/change",
   "version": "0.1.0",
-  "description": "Simple change method for LoroDoc and plain JSON objects, similar to Automerge",
+  "description": "A schema-driven, type-safe wrapper for Loro CRDT that provides natural JavaScript syntax for collaborative data mutations",
   "author": "Duane Johnson",
   "license": "MIT",
   "type": "module",

@@ -15,30 +15,29 @@ Working with Loro directly involves somewhat verbose container operations and co
 - **Empty State Overlay**: Seamlessly blend default values with CRDT state
 - **Full Type Safety**: Complete TypeScript support with compile-time validation
 - **Transactional Changes**: All mutations within a `change()` block are atomic
-- **Loro Compatible**: Works seamlessly with existing Loro code
+- **Loro Compatible**: Works seamlessly with existing Loro code (`typedDoc.loroDoc` is a familiar `LoroDoc`)
 
 ## Installation
 
 ```bash
-npm install @loro-extended/change loro-crdt zod
+npm install @loro-extended/change loro-crdt
 # or
-pnpm add @loro-extended/change loro-crdt zod
+pnpm add @loro-extended/change loro-crdt
 ```
 
 ## Quick Start
 
 ```typescript
-import { createTypedDoc, change, LoroShape } from "@loro-extended/change";
-import { z } from "zod";
+import { TypedDoc, Shape } from "@loro-extended/change";
 
 // Define your document schema
-const schema = LoroShape.doc({
-  title: LoroShape.text(),
-  todos: LoroShape.list(
-    z.object({
-      id: z.string(),
-      text: z.string(),
-      completed: z.boolean(),
+const schema = Shape.doc({
+  title: Shape.text(),
+  todos: Shape.list(
+    Shape.plain.object({
+      id: Shape.plain.string(),
+      text: Shape.plain.string(),
+      completed: Shape.plain.boolean(),
     })
   ),
 });
@@ -50,7 +49,7 @@ const emptyState = {
 };
 
 // Create a typed document
-const doc = createTypedDoc(schema, emptyState);
+const doc = new TypedDoc(schema, emptyState);
 
 // Make changes with natural syntax
 const result = doc.change((draft) => {
@@ -70,45 +69,44 @@ Note that this is even more useful in combination with `@loro-extended/react` (i
 
 ## Core Concepts
 
-### Schema Definition with `LoroShape`
+### Schema Definition with `Shape`
 
-Define your document structure using `LoroShape` builders (and optionally, zod):
+Define your document structure using `Shape` builders:
 
 ```typescript
-import { LoroShape } from "@loro-extended/change";
-import { z } from "zod";
+import { Shape } from "@loro-extended/change";
 
-const blogSchema = LoroShape.doc({
+const blogSchema = Shape.doc({
   // CRDT containers for collaborative editing
-  title: LoroShape.text(), // Collaborative text
-  viewCount: LoroShape.counter(), // Increment-only counter
+  title: Shape.text(), // Collaborative text
+  viewCount: Shape.counter(), // Increment-only counter
 
   // Lists for ordered data
-  tags: LoroShape.list(z.string()), // List of strings
+  tags: Shape.list(Shape.plain.string()), // List of strings
 
   // Maps for structured data
-  metadata: LoroShape.map({
-    author: z.string(), // Plain values (POJOs)
-    publishedAt: z.date(),
-    featured: z.boolean(),
+  metadata: Shape.map({
+    author: Shape.plain.string(), // Plain values (POJOs)
+    publishedAt: Shape.plain.string(), // ISO date string
+    featured: Shape.plain.boolean(),
   }),
 
   // Movable lists for reorderable content
-  sections: LoroShape.movableList(
-    LoroShape.map({
-      heading: LoroShape.text(), // Collaborative headings
-      content: LoroShape.text(), // Collaborative content
-      order: z.number(), // Plain metadata
+  sections: Shape.movableList(
+    Shape.map({
+      heading: Shape.text(), // Collaborative headings
+      content: Shape.text(), // Collaborative content
+      order: Shape.plain.number(), // Plain metadata
     })
   ),
 });
 ```
 
-NOTE: Only put plain values inside Loro containers. A Loro container inside a plain js list or map won't work.
+**NOTE:** Use `Shape.*` for collaborative containers and `Shape.plain.*` for plain values. Only put plain values inside Loro containers - a Loro container inside a plain JS object or array won't work.
 
 ### Empty State Overlay
 
-Empty state provides default values that appear when CRDT containers are empty:
+Empty state provides default values that are merged when CRDT containers are empty, keeping the whole document typesafe:
 
 ```typescript
 const emptyState = {
@@ -117,19 +115,19 @@ const emptyState = {
   tags: [],
   metadata: {
     author: "Anonymous",
-    publishedAt: new Date(),
+    publishedAt: "",
     featured: false,
   },
   sections: [],
 };
 
-const doc = createTypedDoc(blogSchema, emptyState);
+const doc = new TypedDoc(blogSchema, emptyState);
 
 // Initially returns empty state
 console.log(doc.value);
 // { title: "Untitled Document", viewCount: 0, ... }
 
-// After changes, CRDT values overlay empty state
+// After changes, CRDT values take priority over empty state
 doc.change((draft) => {
   draft.title.insert(0, "My Blog Post");
   draft.viewCount.increment(10);
@@ -183,14 +181,14 @@ console.log(result); // Updated document state
 Handle complex nested documents with ease:
 
 ```typescript
-const complexSchema = LoroShape.doc({
-  article: LoroShape.map({
-    title: LoroShape.text(),
-    metadata: LoroShape.map({
-      views: LoroShape.counter(),
-      author: LoroShape.map({
-        name: z.string(),
-        email: z.string(),
+const complexSchema = Shape.doc({
+  article: Shape.map({
+    title: Shape.text(),
+    metadata: Shape.map({
+      views: Shape.counter(),
+      author: Shape.map({
+        name: Shape.plain.string(),
+        email: Shape.plain.string(),
       }),
     }),
   }),
@@ -209,7 +207,7 @@ const emptyState = {
   },
 };
 
-const doc = createTypedDoc(complexSchema, emptyState);
+const doc = new TypedDoc(complexSchema, emptyState);
 
 doc.change((draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
@@ -219,50 +217,42 @@ doc.change((draft) => {
 });
 ```
 
-### POJO Mutations with `update()`
+### Map Operations
 
-For complex object mutations, use the `update()` method:
+For map containers, use the standard map methods:
 
 ```typescript
-const schema = LoroShape.doc({
-  settings: LoroShape.map({
-    ui: z.object({
-      theme: z.string(),
-      sidebar: z.object({
-        collapsed: z.boolean(),
-        width: z.number(),
-      }),
-    }),
+const schema = Shape.doc({
+  settings: Shape.map({
+    theme: Shape.plain.string(),
+    collapsed: Shape.plain.boolean(),
+    width: Shape.plain.number(),
   }),
 });
 
 doc.change((draft) => {
-  // Natural object mutation syntax
-  draft.settings.update((settings) => {
-    settings.ui.theme = "dark";
-    settings.ui.sidebar.collapsed = true;
-    settings.ui.sidebar.width = 250;
-  });
+  // Set individual values
+  draft.settings.set("theme", "dark");
+  draft.settings.set("collapsed", true);
+  draft.settings.set("width", 250);
 });
 ```
-
-Under the hood, `update` is using [mutative](https://github.com/unadlib/mutative)'s `create` function, with type forwarding from the TypedLoroDoc schema.
 
 ### Lists with Container Items
 
 Create lists containing CRDT containers for collaborative nested structures:
 
 ```typescript
-const collaborativeSchema = LoroShape.doc({
-  articles: LoroShape.list(
-    LoroShape.map({
-      title: LoroShape.text(), // Collaborative title
-      content: LoroShape.text(), // Collaborative content
-      tags: LoroShape.list(z.string()), // Collaborative tag list
-      metadata: z.object({
+const collaborativeSchema = Shape.doc({
+  articles: Shape.list(
+    Shape.map({
+      title: Shape.text(), // Collaborative title
+      content: Shape.text(), // Collaborative content
+      tags: Shape.list(Shape.plain.string()), // Collaborative tag list
+      metadata: Shape.plain.object({
         // Static metadata
-        authorId: z.string(),
-        publishedAt: z.date(),
+        authorId: Shape.plain.string(),
+        publishedAt: Shape.plain.string(),
       }),
     })
   ),
@@ -276,7 +266,7 @@ doc.change((draft) => {
     tags: ["collaboration", "crdt"],
     metadata: {
       authorId: "user123",
-      publishedAt: new Date(),
+      publishedAt: new Date().toISOString(),
     },
   });
 
@@ -291,16 +281,16 @@ doc.change((draft) => {
 
 ### Core Functions
 
-#### `createTypedDoc<T>(schema, emptyState, existingDoc?)`
+#### `new TypedDoc<T>(schema, emptyState, existingDoc?)`
 
 Creates a new typed Loro document.
 
 ```typescript
-const doc = createTypedDoc(schema, emptyState);
-const docFromExisting = createTypedDoc(schema, emptyState, existingLoroDoc);
+const doc = new TypedDoc(schema, emptyState);
+const docFromExisting = new TypedDoc(schema, emptyState, existingLoroDoc);
 ```
 
-#### `change<T>(typedDoc, mutator)`
+#### `doc.change(mutator)`
 
 Applies transactional changes to a document.
 
@@ -312,27 +302,36 @@ const result = doc.change((draft) => {
 
 ### Schema Builders
 
-#### `LoroShape.doc(shape)`
+#### `Shape.doc(shape)`
 
 Creates a document schema.
 
 ```typescript
-const schema = LoroShape.doc({
-  field1: LoroShape.text(),
-  field2: LoroShape.counter(),
+const schema = Shape.doc({
+  field1: Shape.text(),
+  field2: Shape.counter(),
 });
 ```
 
 #### Container Types
 
-- `LoroShape.text()` - Collaborative text editing
-- `LoroShape.counter()` - Increment-only counters
-- `LoroShape.list(itemSchema)` - Ordered lists
-- `LoroShape.movableList(itemSchema)` - Reorderable lists
-- `LoroShape.map(shape)` - Key-value maps
-- `LoroShape.tree()` - Hierarchical tree structures
+- `Shape.text()` - Collaborative text editing
+- `Shape.counter()` - Collaborative increment/decrement counters
+- `Shape.list(itemSchema)` - Collaborative ordered lists
+- `Shape.movableList(itemSchema)` - Collaborative Reorderable lists
+- `Shape.map(shape)` - Collaborative key-value maps
+- `Shape.tree(shape)` - Collaborative hierarchical tree structures (Note: incomplete implementation)
 
-### TypedLoroDoc Methods
+#### Value Types
+
+- `Shape.plain.string()` - String values
+- `Shape.plain.number()` - Number values
+- `Shape.plain.boolean()` - Boolean values
+- `Shape.plain.null()` - Null values
+- `Shape.plain.object(shape)` - Object values
+- `Shape.plain.array(itemShape)` - Array values
+
+### TypedDoc Methods
 
 #### `.value`
 
@@ -342,7 +341,7 @@ Returns the current document state with empty state overlay.
 const currentState = doc.value;
 ```
 
-This is better than using the LoroDoc `toJSON()` method because it forwards inferred type information from the schema you defined.
+This overlays "empty state" defaults with CRDT values, returning a JSON object with full type information (from your schema).
 
 #### `.rawValue`
 
@@ -363,6 +362,8 @@ const foods = loroDoc.getMap("foods");
 const drinks = loroDoc.getOrCreateContainer("drinks", new LoroMap());
 // etc.
 ```
+
+You may need this when interfacing with other libraries, such as `loro-dev/loro-prosemirror`.
 
 ## CRDT Container Operations
 
@@ -417,19 +418,16 @@ draft.metadata.has(key);
 draft.metadata.keys();
 draft.metadata.values();
 
-// For POJO mutations
-draft.metadata.update((obj) => {
-  obj.nested.property = newValue;
-});
+// Access nested values
+const value = draft.metadata.get("key");
 ```
 
 ## Type Safety
 
-Full TypeScript support with compile-time validation. You can define your desired interface and ensure the schema matches:
+Full TypeScript support with compile-time validation:
 
 ```typescript
-import { createTypedDoc, LoroShape, type InferEmptyType } from "@loro-extended/change";
-import { z } from "zod";
+import { TypedDoc, Shape, type InferPlainType } from "@loro-extended/change";
 
 // Define your desired interface
 interface TodoDoc {
@@ -438,28 +436,31 @@ interface TodoDoc {
 }
 
 // Define the schema that matches your interface
-const todoSchema = LoroShape.doc({
-  title: LoroShape.text(),
-  todos: LoroShape.list(z.object({
-    id: z.string(),
-    text: z.string(),
-    done: z.boolean()
-  }))
+const todoSchema = Shape.doc({
+  title: Shape.text(),
+  todos: Shape.list(
+    Shape.plain.object({
+      id: Shape.plain.string(),
+      text: Shape.plain.string(),
+      done: Shape.plain.boolean(),
+    })
+  ),
 });
 
 // Define empty state that matches your interface
 const emptyState: TodoDoc = {
   title: "My Todos",
-  todos: []
+  todos: [],
 };
 
 // TypeScript will ensure the schema produces the correct type
-const doc = createTypedDoc(todoSchema, emptyState);
+const doc = new TypedDoc(todoSchema, emptyState);
 
 // The result will be properly typed as TodoDoc
 const result: TodoDoc = doc.change((draft) => {
   draft.title.insert(0, "Hello"); // ✅ Valid - TypeScript knows this is LoroText
-  draft.todos.push({              // ✅ Valid - TypeScript knows the expected shape
+  draft.todos.push({
+    // ✅ Valid - TypeScript knows the expected shape
     id: "1",
     text: "Learn Loro",
     done: false,
@@ -470,22 +471,22 @@ const result: TodoDoc = doc.change((draft) => {
 });
 
 // You can also use type assertion to ensure schema compatibility
-type SchemaType = InferEmptyType<typeof todoSchema>;
+type SchemaType = InferPlainType<typeof todoSchema>;
 const _typeCheck: TodoDoc = {} as SchemaType; // ✅ Will error if types don't match
 ```
 
-**Note**: Use `string | null` instead of `string | undefined` for optional fields, as Loro treats `null` and `undefined` equivalently.
+**Note**: Use `Shape.plain.null()` for nullable fields, as Loro treats `null` and `undefined` equivalently.
 
 ## Integration with Existing Loro Code
 
-`TypedLoroDoc` works seamlessly with existing Loro applications:
+`TypedDoc` works seamlessly with existing Loro applications:
 
 ```typescript
 import { LoroDoc } from "loro-crdt";
 
 // Wrap existing LoroDoc
 const existingDoc = new LoroDoc();
-const typedDoc = createTypedDoc(schema, emptyState, existingDoc);
+const typedDoc = new TypedDoc(schema, emptyState, existingDoc);
 
 // Access underlying LoroDoc
 const loroDoc = typedDoc.loroDoc;

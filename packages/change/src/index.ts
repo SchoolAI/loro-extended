@@ -1,5 +1,5 @@
 // Main API exports
-export { TypedDoc } from "./change.js"
+export { createTypedDoc, TypedDoc } from "./change.js"
 
 // Schema and type exports
 export { Shape } from "./schema.js"

@@ -212,47 +212,43 @@ export const Shape = {
 
   // CRDTs are represented by Loro Containers--they converge on state using Loro's
   // various CRDT algorithms
-  crdt: {
-    counter: (): CounterContainerShape => ({
-      _type: "counter" as const,
-    }),
+  counter: (): CounterContainerShape => ({
+    _type: "counter" as const,
+  }),
 
-    list: <T extends ContainerOrValueShape>(
-      shape: T,
-    ): ListContainerShape<T> => ({
-      _type: "list" as const,
-      shape,
-    }),
+  list: <T extends ContainerOrValueShape>(shape: T): ListContainerShape<T> => ({
+    _type: "list" as const,
+    shape,
+  }),
 
-    map: <T extends Record<string, ContainerOrValueShape>>(
-      shape: T,
-    ): MapContainerShape<T> => ({
-      _type: "map" as const,
-      shape,
-    }),
+  map: <T extends Record<string, ContainerOrValueShape>>(
+    shape: T,
+  ): MapContainerShape<T> => ({
+    _type: "map" as const,
+    shape,
+  }),
 
-    movableList: <T extends ContainerOrValueShape>(
-      shape: T,
-    ): MovableListContainerShape<T> => ({
-      _type: "movableList" as const,
-      shape,
-    }),
+  movableList: <T extends ContainerOrValueShape>(
+    shape: T,
+  ): MovableListContainerShape<T> => ({
+    _type: "movableList" as const,
+    shape,
+  }),
 
-    text: (): TextContainerShape => ({
-      _type: "text" as const,
-    }),
+  text: (): TextContainerShape => ({
+    _type: "text" as const,
+  }),
 
-    tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
-      _type: "tree" as const,
-      shape,
-    }),
-  },
+  tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
+    _type: "tree" as const,
+    shape,
+  }),
 
   // Values are represented as plain JS objects, with the limitation that they MUST be
   // representable as a Loro "Value"--basically JSON. The behavior of a Value is basically
   // "Last Write Wins", meaning there is no subtle convergent behavior here, just taking
   // the most recent value based on the current available information.
-  value: {
+  plain: {
     string: (): StringValueShape => ({
       _type: "value" as const,
       valueType: "string" as const,
