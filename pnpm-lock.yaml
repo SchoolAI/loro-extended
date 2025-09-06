@@ -148,12 +148,6 @@ importers:
       loro-crdt:
         specifier: ^1.6.0
         version: 1.6.0
-      mutative:
-        specifier: ^1.2.0
-        version: 1.2.0
-      zod:
-        specifier: '>3.0.0'
-        version: 4.1.4
     devDependencies:
       tsup:
         specifier: ^8.5.0

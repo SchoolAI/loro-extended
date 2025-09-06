@@ -26,9 +26,7 @@
     "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
-    "loro-crdt": "^1.6.0",
-    "mutative": "^1.2.0",
-    "zod": ">3.0.0"
+    "loro-crdt": "^1.6.0"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
