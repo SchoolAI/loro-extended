@@ -659,12 +659,12 @@ describe("Nested Operations", () => {
       expect(result.articles[1].title).toBe("Second Article")
     })
 
-    it("should handle nested POJO maps", () => {
+    it("should handle nested plain value maps", () => {
       const schema = Shape.doc({
         articles: crdt.map({
           metadata: value.object({
             views: value.object({
-              published: value.boolean(),
+              page: value.number(),
             }),
           }),
         }),
@@ -674,7 +674,7 @@ describe("Nested Operations", () => {
         articles: {
           metadata: {
             views: {
-              published: false,
+              page: 0,
             },
           },
         },
@@ -682,15 +682,26 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema, emptyState)
 
-      const result = typedDoc.change(draft => {
-        // Use cleaner mutative integration with natural object access
-        draft.articles.update(articles => {
-          articles.metadata.views.published = true
-        })
+      const result1 = typedDoc.change(draft => {
+        // natural object access & assignment for Value nodes
+        draft.articles.metadata.views.page = 1
       })
 
-      expect(result).toEqual({
-        articles: { metadata: { views: { published: true } } },
+      expect(result1).toEqual({
+        articles: { metadata: { views: { page: 1 } } },
+      })
+
+      const result2 = typedDoc.change(draft => {
+        // natural object access & assignment for Value nodes
+        draft.articles.metadata = { views: { page: 2 } }
+      })
+
+      expect(result2).toEqual({
+        articles: { metadata: { views: { page: 2 } } },
+      })
+
+      expect(typedDoc.rawValue).toEqual({
+        articles: { metadata: { views: { page: 2 } } },
       })
     })
 
@@ -710,9 +721,15 @@ describe("Nested Operations", () => {
         draft.matrix.push([4, 5, 6])
       })
 
-      expect(result.matrix).toHaveLength(2)
-      expect(result.matrix[0]).toEqual([1, 2, 3])
-      expect(result.matrix[1]).toEqual([4, 5, 6])
+      const correctResult = {
+        matrix: [
+          [1, 2, 3],
+          [4, 5, 6],
+        ],
+      }
+
+      expect(result).toEqual(correctResult)
+      expect(typedDoc.rawValue).toEqual(correctResult)
     })
   })
 
@@ -927,7 +944,8 @@ describe("TypedLoroDoc", () => {
       }
 
       expect(() => {
-        createTypedDoc(schema, invalidEmptyState)
+        // biome-ignore lint/suspicious/noExplicitAny: intentional erroneous type
+        createTypedDoc(schema, invalidEmptyState as any)
       }).toThrow()
     })
   })

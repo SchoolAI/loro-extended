@@ -1,17 +1,8 @@
 import type {
   ContainerID,
   Delta,
-  LoroCounter,
-  LoroList,
-  LoroMap,
-  LoroMovableList,
-  LoroText,
-  LoroTree,
-  LoroTreeNode,
   PeerID,
   TextUpdateOptions,
-  TreeID,
-  TreeNodeValue,
   Value,
 } from "loro-crdt"
 
@@ -58,7 +49,7 @@ export type ContainerShape =
   | TextContainerShape
   | TreeContainerShape
 
-export type RootContainerType = ContainerShape["_type"]
+export type ContainerType = ContainerShape["_type"]
 
 // LoroValue shape types - these represent Loro's Value types
 export type StringValueShape = {
@@ -126,90 +117,80 @@ export type ContainerOrValueShape = ContainerShape | ValueShape
  */
 
 // Context types for different mapping scenarios
-type ValueTypeContext = "value" // Maps to Loro interfaces (runtime values)
-type InputTypeContext = "input" // Maps to input parameter types
+type PlainTypeContext = "plain" // Maps to input parameter types
 type DraftTypeContext = "draft" // Maps to draft-aware types
 
-type MappingContext = ValueTypeContext | InputTypeContext | DraftTypeContext
+type MappingContext = PlainTypeContext | DraftTypeContext
 
 // Unified base mapper that handles all schema type matching
 // biome-ignore format: visual
 type BaseSchemaMapper<T, Context extends MappingContext> =
+  // LoroDoc is at the root
+  T extends DocShape<infer U>
+    ? Context extends "plain" ? { [K in keyof U]: BaseSchemaMapper<U[K], "plain"> }
+      : Context extends "draft" ? object
+      : never
   // Loro container types
-  T extends TextContainerShape
-    ? Context extends "value" ? LoroText
-      : Context extends "input" ? string
+  : T extends TextContainerShape
+    ? Context extends "plain" ? string
       : Context extends "draft" ? DraftLoroText
       : never
   : T extends CounterContainerShape
-    ? Context extends "value" ? LoroCounter
-      : Context extends "input" ? number
+    ? Context extends "plain" ? number
       : Context extends "draft" ? DraftLoroCounter
       : never
   : T extends ListContainerShape<infer U>
-    ? Context extends "value" ? LoroList<U>
-      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+    ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
       : Context extends "draft" ? DraftLoroList<U>
       : never
   : T extends MovableListContainerShape<infer U>
-    ? Context extends "value" ? LoroMovableList<U>
-      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+    ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
       : Context extends "draft" ? DraftLoroMovableList<U>
       : never
   : T extends MapContainerShape<infer U>
-    ? Context extends "value" ? LoroMap<U>
-      : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], "input"> }
+    ? Context extends "plain" ? { [K in keyof U]: BaseSchemaMapper<U[K], "plain"> }
       : Context extends "draft" ? DraftLoroMap<U>
       : never
   // : T extends TreeContainerShape<infer U>
-  //   ? Context extends "value" ? LoroTree
-  //     : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+  //   ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
   //     : Context extends "draft" ? DraftLoroTree<U>
   //     : never
+  // Values
   : T extends StringValueShape
-    ? Context extends "value" ? string
-      : Context extends "input" ? string
+    ? Context extends "plain" ? string
       : Context extends "draft" ? string
       : never
   : T extends NumberValueShape
-    ? Context extends "value" ? number
-      : Context extends "input" ? number
+    ? Context extends "plain" ? number
       : Context extends "draft" ? number
       : never
   : T extends BooleanValueShape
-    ? Context extends "value" ? boolean
-      : Context extends "input" ? boolean
+    ? Context extends "plain" ? boolean
       : Context extends "draft" ? boolean
       : never
   : T extends NullValueShape
-    ? Context extends "value" ? null
-      : Context extends "input" ? null
+    ? Context extends "plain" ? null
       : Context extends "draft" ? null
       : never
   : T extends UndefinedValueShape
-    ? Context extends "value" ? undefined
-      : Context extends "input" ? undefined
+    ? Context extends "plain" ? undefined
       : Context extends "draft" ? undefined
       : never
   : T extends Uint8ArrayValueShape
-    ? Context extends "value" ? Uint8Array
-      : Context extends "input" ? Uint8Array
+    ? Context extends "plain" ? Uint8Array
       : Context extends "draft" ? Uint8Array
       : never
   : T extends ObjectValueShape<infer U>
-    ? Context extends "value" ? { [K in keyof U]: BaseSchemaMapper<U[K], "value"> }
-      : Context extends "input" ? { [K in keyof U]: BaseSchemaMapper<U[K], "input"> }
+    ? Context extends "plain" ? { [K in keyof U]: BaseSchemaMapper<U[K], "plain"> }
       : Context extends "draft" ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
       : never
   : T extends ArrayValueShape<infer U>
-    ? Context extends "value" ? BaseSchemaMapper<U, "value">[]
-      : Context extends "input" ? BaseSchemaMapper<U, "input">[]
+    ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
       : Context extends "draft" ? BaseSchemaMapper<U, "draft">[]
       : never
   : T extends UnionValueShape<infer U>
     ? U extends readonly ValueShape[]
-      ? Context extends "value" ? BaseSchemaMapper<U, "value">
-        : Context extends "input" ? BaseSchemaMapper<U, "input">
+      ? Context extends "plain" ? BaseSchemaMapper<U, "plain">
         : Context extends "draft" ? BaseSchemaMapper<U, "draft">
         : never
       : never
@@ -219,7 +200,7 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
 /**
  * The LoroShape factory object
  *
- * If a container has a `shape` type variable, it refers the the shape it contains--
+ * If a container has a `shape` type variable, it refers to the shape it contains--
  * so for example, a `LoroShape.list(LoroShape.text())` would return a value of type
  * `ListContainerShape<TextContainerShape>`.
  */
@@ -229,6 +210,8 @@ export const Shape = {
     shape,
   }),
 
+  // CRDTs are represented by Loro Containers--they converge on state using Loro's
+  // various CRDT algorithms
   crdt: {
     counter: (): CounterContainerShape => ({
       _type: "counter" as const,
@@ -264,6 +247,11 @@ export const Shape = {
       shape,
     }),
   },
+
+  // Values are represented as plain JS objects, with the limitation that they MUST be
+  // representable as a Loro "Value"--basically JSON. The behavior of a Value is basically
+  // "Last Write Wins", meaning there is no subtle convergent behavior here, just taking
+  // the most recent value based on the current available information.
   value: {
     string: (): StringValueShape => ({
       _type: "value" as const,
@@ -309,6 +297,7 @@ export const Shape = {
       shape,
     }),
 
+    // Special value type that helps make things like `string | null` representable
     union: <T extends ValueShape[]>(shapes: T): UnionValueShape<T> => ({
       _type: "value" as const,
       valueType: "union" as const,
@@ -369,7 +358,7 @@ type DraftLoroCounter = {
 //   readonly id: ContainerID
 // }
 
-type DraftLoroList<U, T = InferInputType<U>> = {
+type DraftLoroList<U, T = InferPlainType<U>> = {
   toArray(): T[]
   get(index: number): T
   set(index: number, item: T): void
@@ -384,7 +373,7 @@ type DraftLoroList<U, T = InferInputType<U>> = {
   readonly length: number
 }
 
-type DraftLoroMovableList<U, T = InferInputType<U>> = {
+type DraftLoroMovableList<U, T = InferPlainType<U>> = {
   toArray(): T[]
   get(index: number): T
   set(index: number, item: T): void
@@ -406,16 +395,13 @@ type DraftLoroMovableList<U, T = InferInputType<U>> = {
 type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
   [K in keyof U]: BaseSchemaMapper<U[K], "draft">
 } & {
-  set<K extends keyof U>(key: K, value: InferInputType<U[K]>): void
-  get<K extends keyof U>(key: K): InferInputType<U[K]> | undefined
+  set<K extends keyof U>(key: K, value: InferPlainType<U[K]>): void
+  get<K extends keyof U>(key: K): InferPlainType<U[K]> | undefined
   delete(key: keyof U): void
   has(key: keyof U): boolean
   keys(): (keyof U)[]
-  values(): InferInputType<U[keyof U]>[]
+  values(): InferPlainType<U[keyof U]>[]
   entries(): [keyof U, U[keyof U]][]
-  update(
-    mutator: (draft: InferInputType<MapContainerShape<U>>) => void,
-  ): InferInputType<MapContainerShape<U>>
   clear(): void
   getLastEditor(key: string): PeerID | undefined
   isDeleted(): boolean
@@ -424,10 +410,7 @@ type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
 }
 
 // Input type inference - what developers can pass to push/insert methods
-export type InferInputType<T> = BaseSchemaMapper<T, "input">
-
-// Value type inference
-export type InferValueType<T> = BaseSchemaMapper<T, "value">
+export type InferPlainType<T> = BaseSchemaMapper<T, "plain">
 
 // Draft-specific type inference that properly handles the draft context
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =

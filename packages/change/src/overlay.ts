@@ -1,4 +1,4 @@
-import type { InferInputType, DocShape } from "./schema.js"
+import type { InferPlainType, DocShape } from "./schema.js"
 
 /**
  * Overlays CRDT state with empty state defaults
@@ -6,8 +6,8 @@ import type { InferInputType, DocShape } from "./schema.js"
 export function overlayEmptyState<T extends DocShape>(
   crdtValue: any,
   schema: T,
-  emptyState: InferInputType<T>,
-): InferInputType<T> {
+  emptyState: InferPlainType<T>,
+): InferPlainType<T> {
   if (!crdtValue) return emptyState
 
   const result = { ...emptyState }

@@ -8,7 +8,7 @@ export type {
   DocShape,
   ContainerShape,
   ContainerOrValueShape,
-  RootContainerType,
+  ContainerType as RootContainerType,
   // Container shapes
   CounterContainerShape,
   ListContainerShape,
@@ -21,8 +21,7 @@ export type {
   ArrayValueShape,
   // ...
   // Type inference
-  InferValueType,
-  InferInputType,
+  InferPlainType,
   Draft,
 } from "./schema.js"
 

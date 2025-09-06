@@ -2,7 +2,7 @@ import type {
   ArrayValueShape,
   ContainerOrValueShape,
   DocShape,
-  InferInputType,
+  InferPlainType,
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
@@ -202,7 +202,7 @@ export function validateValue(
 export function validateEmptyState<T extends DocShape>(
   emptyState: unknown,
   schema: T,
-): InferInputType<T> {
+): InferPlainType<T> {
   if (
     !emptyState ||
     typeof emptyState !== "object" ||
@@ -219,5 +219,5 @@ export function validateEmptyState<T extends DocShape>(
     result[key] = validateValue(value, schemaValue, key)
   }
 
-  return result as InferInputType<T>
+  return result as InferPlainType<T>
 }

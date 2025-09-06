@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
 import {
+  Container,
   LoroCounter,
   LoroDoc,
   LoroList,
@@ -8,48 +9,87 @@ import {
   LoroMovableList,
   LoroText,
   LoroTree,
+  type Value,
 } from "loro-crdt"
-import { create } from "mutative"
 import { convertInputToContainer } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
-import type { DocShape, Draft, InferInputType } from "./schema.js"
-import { isContainer } from "./utils/type-guards.js"
+import type {
+  ContainerOrValueShape,
+  ContainerShape,
+  CounterContainerShape,
+  DocShape,
+  Draft,
+  InferPlainType,
+  ListContainerShape,
+  MapContainerShape,
+  MovableListContainerShape,
+  TextContainerShape,
+  TreeContainerShape,
+} from "./schema.js"
+import {
+  isContainer,
+  isCounterShape,
+  isListShape,
+  isMapShape,
+  isMovableListShape,
+  isTextShape,
+  isTreeShape,
+  isValueShape,
+} from "./utils/type-guards.js"
 import { validateEmptyState } from "./validation.js"
 
-// Helper functions for POJO mutation support
-/**
- * Extracts the initial value for a POJO property from the empty state
- * by traversing the path to find the corresponding value
- */
-function getEmptyStateValueForPath(
-  emptyState: any,
-  path: string[],
-  key: string,
-): any {
-  let current = emptyState
+// Draft Document class -- the actual object passed to the change `mutation` function
+class DraftDoc<T extends DocShape> {
+  topLevel!: { [K in keyof T["shape"]]: T["shape"][K] }
 
-  // Navigate through the path to find the parent object
-  for (const segment of path) {
-    if (current && typeof current === "object" && segment in current) {
-      current = current[segment]
-    } else {
-      return undefined
+  constructor(
+    private schema: T,
+    private emptyState: InferPlainType<T>,
+    private doc: LoroDoc,
+  ) {
+    this.createTopLevelProperties()
+  }
+
+  private createTopLevelProperties(): void {
+    // Use a more direct approach that preserves type information
+    for (const key in this.schema.shape) {
+      const schemaValue = this.schema.shape[key]
+
+      if (!(key in this.emptyState)) {
+        throw new Error(`expected ${key} in emptyState`)
+      }
+
+      const node = createDraftNode(
+        this.doc,
+        [key],
+        schemaValue,
+        this.emptyState[key], // as InferPlainType<T["shape"][typeof key]>
+      )
+
+      ;(this as any)[key] = node
     }
   }
 
-  // Return the value for the specific key
-  return current && typeof current === "object" ? current[key] : undefined
+  absorbPlainValues(): void {
+    for (const key in this.schema.shape) {
+      const node = (this as any)[key] as DraftNode<any>
+      node.absorbPlainValues()
+    }
+  }
 }
 
 // Base class for all draft nodes
-abstract class DraftNode {
+abstract class DraftNode<T extends ContainerShape> {
   constructor(
+    protected schema: T,
+    protected emptyState: InferPlainType<T>,
     protected doc: LoroDoc,
     protected path: string[],
-    protected schema: any,
   ) {}
 
   abstract getContainer(): any
+
+  abstract absorbPlainValues(): void
 
   protected getParentContainer(parentPath: string[]): LoroMap {
     if (parentPath.length === 1) {
@@ -64,12 +104,14 @@ abstract class DraftNode {
 }
 
 // Shared logic for list operations
-abstract class ListDraftNodeBase extends DraftNode {
+abstract class ListDraftNodeBase<
+  T extends ListContainerShape | MovableListContainerShape,
+> extends DraftNode<T> {
   protected insertWithConversion(index: number, item: any): void {
     const convertedItem = convertInputToContainer(
       this.doc,
       item,
-      this.schema.item,
+      this.schema.shape,
       this.path,
     )
     if (isContainer(convertedItem)) {
@@ -83,7 +125,7 @@ abstract class ListDraftNodeBase extends DraftNode {
     const convertedItem = convertInputToContainer(
       this.doc,
       item,
-      this.schema.item,
+      this.schema.shape,
       this.path,
     )
     if (isContainer(convertedItem)) {
@@ -95,7 +137,7 @@ abstract class ListDraftNodeBase extends DraftNode {
 }
 
 // Text draft node
-class TextDraftNode extends DraftNode {
+class TextDraftNode extends DraftNode<TextContainerShape> {
   private container: LoroText | null = null
 
   getContainer(): LoroText {
@@ -103,6 +145,10 @@ class TextDraftNode extends DraftNode {
       this.container = this.getOrCreateContainer() as LoroText
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    // no plain values contained within
   }
 
   private getOrCreateContainer(): LoroText {
@@ -157,7 +203,7 @@ class TextDraftNode extends DraftNode {
 }
 
 // Counter draft node
-class CounterDraftNode extends DraftNode {
+class CounterDraftNode extends DraftNode<CounterContainerShape> {
   private container: LoroCounter | null = null
 
   getContainer(): LoroCounter {
@@ -165,6 +211,10 @@ class CounterDraftNode extends DraftNode {
       this.container = this.getOrCreateContainer() as LoroCounter
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    // no plain values contained within
   }
 
   private getOrCreateContainer(): LoroCounter {
@@ -194,7 +244,7 @@ class CounterDraftNode extends DraftNode {
 }
 
 // List draft node
-class ListDraftNode extends ListDraftNodeBase {
+class ListDraftNode<T extends ListContainerShape> extends ListDraftNodeBase<T> {
   private container: LoroList | null = null
 
   getContainer(): LoroList {
@@ -202,6 +252,11 @@ class ListDraftNode extends ListDraftNodeBase {
       this.container = this.getOrCreateContainer()
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    // TODO(duane): absorb array values
+    // this.schema.shape
   }
 
   private getOrCreateContainer(): LoroList {
@@ -249,7 +304,9 @@ class ListDraftNode extends ListDraftNodeBase {
 }
 
 // MovableList draft node
-class MovableListDraftNode extends ListDraftNodeBase {
+class MovableListDraftNode<
+  T extends MovableListContainerShape,
+> extends ListDraftNodeBase<T> {
   private container: LoroMovableList | null = null
 
   getContainer(): LoroMovableList {
@@ -257,6 +314,11 @@ class MovableListDraftNode extends ListDraftNodeBase {
       this.container = this.getOrCreateContainer()
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    // TODO(duane): absorb array values
+    // this.schema.shape
   }
 
   private getOrCreateContainer(): LoroMovableList {
@@ -304,31 +366,38 @@ class MovableListDraftNode extends ListDraftNodeBase {
 }
 
 // Map draft node
-class MapDraftNode extends DraftNode {
+class MapDraftNode<T extends MapContainerShape> extends DraftNode<T> {
   private container: LoroMap | null = null
-  private propertyCache = new Map<string, any>()
+  private propertyCache = new Map<string, DraftNode<T> | Value>()
 
-  /**
-   * Sets the empty state context for this map node
-   * This allows the update method to access empty state values
-   */
-  setEmptyStateContext(emptyState: any): void {
-    // Store empty state value for this specific path
-    const emptyStateForPath = getEmptyStateValueForPath(
-      emptyState,
-      this.path.slice(0, -1),
-      this.path[this.path.length - 1],
-    )
-    this.emptyStateForPath = emptyStateForPath
+  constructor(
+    protected schema: T,
+    protected emptyState: InferPlainType<T>,
+    protected doc: LoroDoc,
+    protected path: string[],
+  ) {
+    super(schema, emptyState, doc, path)
+    this.createPropertyAccessors()
   }
-
-  private emptyStateForPath: any = undefined
 
   getContainer(): LoroMap {
     if (!this.container) {
-      this.container = this.getOrCreateContainer() as LoroMap
+      this.container = this.getOrCreateContainer()
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    for (const [key, node] of this.propertyCache.entries()) {
+      if (node instanceof DraftNode) {
+        // Contains a DraftNode, not a plain Value: keep recursing
+        node.absorbPlainValues()
+        continue
+      }
+
+      // Plain value!
+      this.getContainer().set(key, node)
+    }
   }
 
   private getOrCreateContainer(): LoroMap {
@@ -337,7 +406,7 @@ class MapDraftNode extends DraftNode {
     } else {
       const parentPath = this.path.slice(0, -1)
       const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
+      const parent = this.getParentContainer(parentPath)
 
       // Use getOrCreateContainer to get a stable reference directly
       return parent.getOrCreateContainer(key, new LoroMap())
@@ -346,134 +415,45 @@ class MapDraftNode extends DraftNode {
 
   // Create property accessors for schema-defined keys
   createPropertyAccessors(): void {
-    if (!this.schema.shape) return
-
     for (const [key, nestedSchema] of Object.entries(this.schema.shape)) {
       Object.defineProperty(this, key, {
         get: () => this.getNestedProperty(key, nestedSchema),
+        set: isValueShape(nestedSchema)
+          ? value => this.getContainer().set(key, value)
+          : undefined,
         enumerable: true,
         configurable: true,
       })
     }
   }
 
-  private getNestedProperty(key: string, nestedSchema: any): any {
+  private getNestedProperty(
+    key: string,
+    nestedSchema: ContainerOrValueShape,
+  ): DraftNode<T> | Value {
     if (this.propertyCache.has(key)) {
       return this.propertyCache.get(key)
     }
 
     const nestedPath = [...this.path, key]
-    let result: any
 
-    if (
-      nestedSchema &&
-      typeof nestedSchema === "object" &&
-      "_type" in nestedSchema
-    ) {
-      // It's a Loro container schema
-      result = createDraftNode(this.doc, nestedPath, nestedSchema)
-    } else {
-      // It's a Zod schema (POJO) - return a getter/setter object
-      // But we need to make this work with direct property assignment
-      const container = this.getContainer()
-      result = {
-        get value() {
-          return container.get(key)
-        },
-        set value(val: any) {
-          container.set(key, val)
-        },
-        // Make it work with direct assignment by overriding valueOf
-        valueOf() {
-          return container.get(key)
-        },
-        toString() {
-          return String(container.get(key))
-        },
-      }
-    }
+    // It's a Loro container schema
+    const result = createDraftNode(
+      this.doc,
+      nestedPath,
+      nestedSchema,
+      this.emptyState[key],
+    )
 
     this.propertyCache.set(key, result)
     return result
   }
 
-  /**
-   * Update the entire map using mutative for type-safe nested mutations
-   * This provides natural object access: draft.articles.update(draft => { draft.metadata.views.published = true })
-   *
-   * @param mutator - Function that receives the current map state and can mutate it
-   * @returns The updated map state
-   */
-  update<T = any>(mutator: (draft: T) => void): T {
-    // Get current state of the entire map, with empty state fallback
-    const currentState = this.getCurrentMapState()
-
-    // Use mutative to create a new version with the mutations applied
-    const updatedState = create(currentState, draft => {
-      mutator(draft as T)
-    })
-
-    // Apply changes back to the CRDT by comparing old vs new state
-    this.applyChangesToCrdt(currentState, updatedState)
-
-    return updatedState as T
-  }
-
-  /**
-   * Gets the current state of the entire map, including values from all keys
-   * Falls back to empty state values for missing keys
-   */
-  private getCurrentMapState(): any {
-    const container = this.getContainer()
-    const result: any = {}
-
-    // Start with empty state if available
-    if (this.emptyStateForPath && typeof this.emptyStateForPath === "object") {
-      Object.assign(result, this.emptyStateForPath)
-    }
-
-    // Override with actual CRDT values
-    const keys = container.keys()
-    for (const key of keys) {
-      result[key] = container.get(key)
-    }
-
-    return result
-  }
-
-  /**
-   * Applies changes from the mutative result back to the CRDT
-   * Only updates keys that have actually changed
-   */
-  private applyChangesToCrdt(oldState: any, newState: any): void {
-    const container = this.getContainer()
-
-    // Find all keys in the new state
-    const allKeys = new Set([
-      ...Object.keys(oldState || {}),
-      ...Object.keys(newState || {}),
-    ])
-
-    // Update each key that has changed
-    for (const key of allKeys) {
-      const oldValue = oldState?.[key]
-      const newValue = newState?.[key]
-
-      if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
-        if (newValue === undefined) {
-          container.delete(key)
-        } else {
-          container.set(key, newValue)
-        }
-      }
-    }
-  }
-
-  set(key: string, value: any): void {
+  set(key: string, value: Value): void {
     this.getContainer().set(key, value)
   }
 
-  setContainer(key: string, container: any): any {
+  setContainer<C extends Container>(key: string, container: C): C {
     return this.getContainer().setContainer(key, container)
   }
 
@@ -504,7 +484,7 @@ class MapDraftNode extends DraftNode {
 }
 
 // Tree draft node
-class TreeDraftNode extends DraftNode {
+class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
   private container: LoroTree | null = null
 
   getContainer(): LoroTree {
@@ -512,6 +492,10 @@ class TreeDraftNode extends DraftNode {
       this.container = this.getOrCreateContainer() as LoroTree
     }
     return this.container
+  }
+
+  absorbPlainValues() {
+    // TODO(duane): implement for trees
   }
 
   private getOrCreateContainer(): LoroTree {
@@ -551,84 +535,65 @@ class TreeDraftNode extends DraftNode {
 }
 
 // Factory function to create appropriate draft node
-function createDraftNode(doc: LoroDoc, path: string[], schema: any): DraftNode {
-  if (!schema || typeof schema !== "object" || !("_type" in schema)) {
-    throw new Error(
-      `Invalid schema for path ${path.join(".")}: ${JSON.stringify(schema)}`,
-    )
+function createDraftNode(
+  doc: LoroDoc,
+  path: string[],
+  schema: ContainerOrValueShape,
+  emptyState: any,
+): DraftNode<ContainerShape> | any {
+  if (isTextShape(schema)) {
+    return new TextDraftNode(schema, emptyState, doc, path)
   }
 
-  switch (schema._type) {
-    case "text":
-      return new TextDraftNode(doc, path, schema)
-    case "counter":
-      return new CounterDraftNode(doc, path, schema)
-    case "list":
-      return new ListDraftNode(doc, path, schema)
-    case "movableList":
-      return new MovableListDraftNode(doc, path, schema)
-    case "map": {
-      const node = new MapDraftNode(doc, path, schema)
-      // Create property accessors for map nodes
-      if (node instanceof MapDraftNode) {
-        node.createPropertyAccessors()
-      }
-      return node
-    }
-    case "tree":
-      return new TreeDraftNode(doc, path, schema)
-    default:
-      throw new Error(`Unknown schema type: ${schema._type}`)
-  }
-}
-
-// Document draft class
-class DocumentDraft {
-  constructor(
-    private doc: LoroDoc,
-    private schema: DocShape,
-    private emptyState?: any,
-  ) {
-    this.createTopLevelProperties()
+  if (isCounterShape(schema)) {
+    return new CounterDraftNode(schema, emptyState, doc, path)
   }
 
-  private createTopLevelProperties(): void {
-    for (const [key, schemaValue] of Object.entries(this.schema.shape)) {
-      Object.defineProperty(this, key, {
-        get: () => {
-          const node = createDraftNode(this.doc, [key], schemaValue)
-          // Set empty state context for MapDraftNode instances
-          if (node instanceof MapDraftNode && this.emptyState) {
-            node.setEmptyStateContext(this.emptyState)
-          }
-          return node
-        },
-        enumerable: true,
-        configurable: true,
-      })
-    }
+  if (isListShape(schema)) {
+    return new ListDraftNode(schema, emptyState, doc, path)
   }
+
+  if (isMovableListShape(schema)) {
+    return new MovableListDraftNode(schema, emptyState, doc, path)
+  }
+
+  if (isMapShape(schema)) {
+    return new MapDraftNode(schema, emptyState, doc, path)
+  }
+
+  if (isTreeShape(schema)) {
+    return new TreeDraftNode(schema, emptyState, doc, path)
+  }
+
+  if (isValueShape(schema)) {
+    return emptyState
+  }
+
+  throw new Error(
+    `Unknown schema type: ${(schema as ContainerOrValueShape)._type}`,
+  )
 }
 
 // Core TypedDoc abstraction around LoroDoc
 export class TypedDoc<T extends DocShape> {
   constructor(
     private schema: T,
-    private emptyState: InferInputType<T>,
+    private emptyState: InferPlainType<T>,
     private doc: LoroDoc = new LoroDoc(),
   ) {
     validateEmptyState(emptyState, schema)
   }
 
-  get value(): InferInputType<T> {
+  get value(): InferPlainType<T> {
     const crdtValue = this.doc.toJSON()
     return overlayEmptyState(crdtValue, this.schema, this.emptyState)
   }
 
-  change(fn: (draft: Draft<T>) => void): InferInputType<T> {
+  change(fn: (draft: Draft<T>) => void): InferPlainType<T> {
     // Reuse existing DocumentDraft system with empty state integration
-    const draft = new DocumentDraft(this.doc, this.schema, this.emptyState)
+    const draft = new DraftDoc(this.schema, this.emptyState, this.doc)
     fn(draft as unknown as Draft<T>)
+    draft.absorbPlainValues()
     this.doc.commit()
     return this.value
   }
@@ -652,7 +617,7 @@ export class TypedDoc<T extends DocShape> {
 // Factory function for TypedLoroDoc
 export function createTypedDoc<T extends DocShape>(
   schema: T,
-  emptyState: InferInputType<T>,
+  emptyState: InferPlainType<T>,
   existingDoc?: LoroDoc,
 ): TypedDoc<T> {
   return new TypedDoc<T>(schema, emptyState, existingDoc || new LoroDoc())

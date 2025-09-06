@@ -8,6 +8,17 @@ import type {
   LoroTree,
   LoroTreeNode,
 } from "loro-crdt"
+import type {
+  ContainerOrValueShape,
+  ContainerShape,
+  CounterContainerShape,
+  ListContainerShape,
+  MapContainerShape,
+  MovableListContainerShape,
+  TextContainerShape,
+  TreeContainerShape,
+  ValueShape,
+} from "../schema.js"
 
 export { isContainer, isContainerId } from "loro-crdt"
 
@@ -60,12 +71,15 @@ export function isLoroTree(container: Container): container is LoroTree {
  * Note: LoroTreeNode is not a Container, so we check for its specific properties
  */
 export function isLoroTreeNode(obj: any): obj is LoroTreeNode {
-  return obj && typeof obj === "object" &&
-         typeof obj.id === "string" &&
-         typeof obj.data === "object" &&
-         typeof obj.parent === "function" &&
-         typeof obj.children === "function" &&
-         typeof obj.createNode === "function"
+  return (
+    obj &&
+    typeof obj === "object" &&
+    typeof obj.id === "string" &&
+    typeof obj.data === "object" &&
+    typeof obj.parent === "function" &&
+    typeof obj.children === "function" &&
+    typeof obj.createNode === "function"
+  )
 }
 
 /**
@@ -91,4 +105,73 @@ export function assertContainerType<T extends Container>(
         `cached ID '${cached.id}' does not match expected ID '${expected.id}'`,
     )
   }
+}
+
+/**
+ * Type guard to check if a schema is for TextDraftNode
+ */
+export function isTextShape(
+  schema: ContainerOrValueShape,
+): schema is TextContainerShape {
+  return schema && typeof schema === "object" && schema._type === "text"
+}
+
+/**
+ * Type guard to check if a schema is for CounterDraftNode
+ */
+export function isCounterShape(
+  schema: ContainerOrValueShape,
+): schema is CounterContainerShape {
+  return schema && typeof schema === "object" && schema._type === "counter"
+}
+
+/**
+ * Type guard to check if a schema is for ListDraftNode
+ */
+export function isListShape(
+  schema: ContainerOrValueShape,
+): schema is ListContainerShape {
+  return schema && typeof schema === "object" && schema._type === "list"
+}
+
+/**
+ * Type guard to check if a schema is for MovableListDraftNode
+ */
+export function isMovableListShape(
+  schema: ContainerOrValueShape,
+): schema is MovableListContainerShape {
+  return schema && typeof schema === "object" && schema._type === "movableList"
+}
+
+/**
+ * Type guard to check if a schema is for MapDraftNode
+ */
+export function isMapShape(
+  schema: ContainerOrValueShape,
+): schema is MapContainerShape {
+  return schema && typeof schema === "object" && schema._type === "map"
+}
+
+/**
+ * Type guard to check if a schema is for TreeDraftNode
+ */
+export function isTreeShape(
+  schema: ContainerOrValueShape,
+): schema is TreeContainerShape {
+  return schema && typeof schema === "object" && schema._type === "tree"
+}
+
+export function isContainerShape(
+  schema: ContainerOrValueShape,
+): schema is ContainerShape {
+  return schema._type && schema._type !== "value"
+}
+
+/**
+ * Type guard to check if a schema is any of the Value shapes
+ */
+export function isValueShape(
+  schema: ContainerOrValueShape,
+): schema is ValueShape {
+  return schema._type === "value"
 }
