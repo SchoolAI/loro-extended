@@ -1,13 +1,13 @@
-import { LoroShape } from "@loro-extended/change"
+import { Shape } from "@loro-extended/change"
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 import { useDocument } from "./use-document.js"
 
 // Test schema and empty state
-const testSchema = LoroShape.doc({
-  title: LoroShape.text(),
-  count: LoroShape.counter(),
+const testSchema = Shape.doc({
+  title: Shape.text(),
+  count: Shape.counter(),
 })
 
 const testEmptyState = {

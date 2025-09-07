@@ -1,4 +1,4 @@
-import type { InferInputType, LoroDocSchema } from "@loro-extended/change"
+import type { DocShape, InferPlainType } from "@loro-extended/change"
 import type { DocHandle, DocumentId } from "@loro-extended/repo"
 import type { DocWrapper } from "./use-doc-handle-state.js"
 import type { ChangeFn } from "./use-typed-doc-changer.js"
@@ -6,9 +6,9 @@ import { useTypedDocChanger } from "./use-typed-doc-changer.js"
 import { useTypedDocState } from "./use-typed-doc-state.js"
 
 /** The return type of the `useDocument` hook. */
-export type UseDocumentReturn<T extends LoroDocSchema> = [
+export type UseDocumentReturn<T extends DocShape> = [
   /** The current state of the document (always defined due to empty state overlay). */
-  doc: InferInputType<T>,
+  doc: InferPlainType<T>,
   /** A function to change the document. */
   changeFn: (fn: ChangeFn<T>) => void,
   /** The DocHandle instance that provides access to the underlying LoroDoc and state. */
@@ -27,12 +27,12 @@ export type UseDocumentReturn<T extends LoroDocSchema> = [
  *
  * @example
  * ```tsx
- * const schema = LoroShape.doc({
- *   title: LoroShape.text(),
- *   todos: LoroShape.list(z.object({
- *     id: z.string(),
- *     text: z.string(),
- *     done: z.boolean()
+ * const schema = Shape.doc({
+ *   title: Shape.text(),
+ *   todos: Shape.list(Shape.plain.object({
+ *     id: Shape.plain.string(),
+ *     text: Shape.plain.string(),
+ *     done: Shape.plain.boolean()
  *   }))
  * })
  *
@@ -58,10 +58,10 @@ export type UseDocumentReturn<T extends LoroDocSchema> = [
  * )
  * ```
  */
-export function useDocument<T extends LoroDocSchema>(
+export function useDocument<T extends DocShape>(
   documentId: DocumentId,
   schema: T,
-  emptyState: InferInputType<T>,
+  emptyState: InferPlainType<T>,
 ): UseDocumentReturn<T> {
   const { doc, handle } = useTypedDocState<T>(documentId, schema, emptyState)
   const changeDoc = useTypedDocChanger<T>(handle, schema, emptyState)

@@ -28,9 +28,9 @@ pnpm add @loro-extended/react @loro-extended/repo loro-crdt
 
 ### For Typed API (with schema support)
 ```bash
-npm install @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt zod
+npm install @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt
 # or
-pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt zod
+pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt
 ```
 
 ## Quick Start
@@ -107,16 +107,15 @@ function SimpleTodoApp() {
 For schema-aware documents with type safety and empty state management:
 
 ```tsx
-import { useDocument, LoroShape } from "@loro-extended/react";
-import { z } from "zod";
+import { useDocument, Shape } from "@loro-extended/react";
 
 // Define your document schema (see @loro-extended/change for details)
-const todoSchema = LoroShape.doc({
-  title: LoroShape.text(),
-  todos: LoroShape.list(z.object({
-    id: z.string(),
-    text: z.string(),
-    completed: z.boolean()
+const todoSchema = Shape.doc({
+  title: Shape.text(),
+  todos: Shape.list(Shape.plain.object({
+    id: Shape.plain.string(),
+    text: Shape.plain.string(),
+    completed: Shape.plain.boolean()
   }))
 });
 
@@ -213,11 +212,11 @@ For schema-aware documents with type safety and empty state management.
 #### Signature
 
 ```typescript
-function useDocument<T extends LoroDocSchema>(
+function useDocument<T extends DocShape>(
   documentId: string,
   schema: T,
-  emptyState: InferEmptyType<T>
-): [doc: InferEmptyType<T>, changeDoc: (fn: ChangeFn<T>) => void, handle: DocHandle | null]
+  emptyState: InferPlainType<T>
+): [doc: InferPlainType<T>, changeDoc: (fn: ChangeFn<T>) => void, handle: DocHandle | null]
 ```
 
 #### Parameters
@@ -228,7 +227,7 @@ function useDocument<T extends LoroDocSchema>(
 
 #### Returns
 
-1. **`doc: InferEmptyType<T>`** - The current document state
+1. **`doc: InferPlainType<T>`** - The current document state
    - **Always defined** due to empty state overlay
    - Shows empty state initially, then overlays CRDT data when available
    - Automatically re-renders when local or remote changes occur
@@ -456,7 +455,6 @@ function useCustomDocument(documentId: string) {
 ### Optional Dependencies
 
 - `@loro-extended/change` - Required only for typed API (`useDocument`)
-- `zod` - Required only for typed API schema definitions
 
 ## Related Packages
 

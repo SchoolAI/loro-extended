@@ -1,9 +1,10 @@
 // Re-export schema-related types from @loro-extended/change for convenience
 export type {
-  InferDraftType,
-  LoroDocSchema,
+  Draft,
+  DocShape,
+  InferPlainType,
 } from "@loro-extended/change"
-export { LoroShape } from "@loro-extended/change"
+export { Shape } from "@loro-extended/change"
 export type { SimpleChangeFn } from "./hooks/use-doc-changer.js"
 
 // Base hooks for advanced usage

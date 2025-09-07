@@ -1,7 +1,7 @@
 import {
-  createTypedDoc,
-  type InferInputType,
-  type LoroDocSchema,
+  TypedDoc,
+  type DocShape,
+  type InferPlainType,
 } from "@loro-extended/change"
 import type { DocumentId } from "@loro-extended/repo"
 import { useMemo } from "react"
@@ -12,13 +12,13 @@ import { useDocHandleState } from "./use-doc-handle-state.js"
  * Built on top of useDocHandleState following composition over inheritance.
  *
  * Follows SRP by handling only:
- * - Schema-based data transformation
+ * - TypedDoc integration with DocHandle
  * - Empty state overlay logic
  */
-export function useTypedDocState<T extends LoroDocSchema>(
+export function useTypedDocState<T extends DocShape>(
   documentId: DocumentId,
   schema: T,
-  emptyState: InferInputType<T>,
+  emptyState: InferPlainType<T>,
 ) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
@@ -29,11 +29,12 @@ export function useTypedDocState<T extends LoroDocSchema>(
       return emptyState
     }
 
+    // Update the TypedDoc's underlying LoroDoc with the handle's doc
     const loroDoc = handle.doc()
-    // Create typed document and return value with empty state overlay
-    const typedDoc = createTypedDoc(schema, emptyState, loroDoc as any)
-    return typedDoc.value
+    // Create a new TypedDoc with the same schema/emptyState but updated LoroDoc
+    const updatedTypedDoc = new TypedDoc(schema, emptyState, loroDoc)
+    return updatedTypedDoc.value
   }, [snapshot, handle, schema, emptyState])
 
-  return { doc: doc as InferInputType<T>, handle, snapshot }
+  return { doc, handle, snapshot }
 }

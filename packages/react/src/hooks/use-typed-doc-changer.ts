@@ -1,8 +1,8 @@
 import {
-  createTypedDoc,
-  type InferDraftType,
-  type InferInputType,
-  type LoroDocSchema,
+  TypedDoc,
+  type DocShape,
+  type Draft,
+  type InferPlainType,
 } from "@loro-extended/change"
 import type { DocHandle } from "@loro-extended/repo"
 import type { LoroDoc } from "loro-crdt"
@@ -11,9 +11,7 @@ import { useDocChanger } from "./use-doc-changer.js"
 import type { DocWrapper } from "./use-doc-handle-state.js"
 
 /** A function that mutates a Loro document using schema-aware drafts. */
-export type ChangeFn<T extends LoroDocSchema> = (
-  draft: InferDraftType<T>,
-) => void
+export type ChangeFn<T extends DocShape> = (draft: Draft<T>) => void
 
 /**
  * Hook that provides schema-aware document mutation capabilities.
@@ -23,15 +21,15 @@ export type ChangeFn<T extends LoroDocSchema> = (
  * - Schema-aware document transformation
  * - Typed draft creation and mutation
  */
-export function useTypedDocChanger<T extends LoroDocSchema>(
+export function useTypedDocChanger<T extends DocShape>(
   handle: DocHandle<DocWrapper> | null,
   schema: T,
-  emptyState: InferInputType<T>,
+  emptyState: InferPlainType<T>,
 ) {
   // Create a transformer that converts LoroDoc to typed draft
   const transformer = useCallback(
     (loroDoc: LoroDoc) => {
-      const typedDoc = createTypedDoc(schema, emptyState, loroDoc)
+      const typedDoc = new TypedDoc(schema, emptyState, loroDoc)
       return typedDoc
     },
     [schema, emptyState],
