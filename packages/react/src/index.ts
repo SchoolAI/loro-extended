@@ -1,7 +1,7 @@
 // Re-export schema-related types from @loro-extended/change for convenience
 export type {
-  Draft,
   DocShape,
+  Draft,
   InferPlainType,
 } from "@loro-extended/change"
 export { Shape } from "@loro-extended/change"

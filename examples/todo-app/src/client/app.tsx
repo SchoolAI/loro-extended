@@ -1,4 +1,4 @@
-import { LoroShape, useDocument } from "@loro-extended/react"
+import { Shape, useDocument } from "@loro-extended/react"
 import type { DocumentId } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
@@ -7,8 +7,8 @@ import { TodoList } from "./components/todo-list"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
-const schema = LoroShape.doc({
-  todos: LoroShape.list(TodoSchema),
+const schema = Shape.doc({
+  todos: Shape.list(TodoSchema),
 })
 
 // A known, constant ID for our single todo list document
@@ -67,15 +67,13 @@ function App() {
       </header>
       <div className="todo-app">
         <TodoInput onAdd={addTodo} />
-        {state === "ready" && doc?.todos && (
-          <TodoList
-            todos={doc.todos}
-            onToggle={toggleTodo}
-            onDelete={deleteTodo}
-          />
-        )}
-        {state === "loading" && <p>Loading...</p>}
-        {state === "unavailable" && <p>Document not available.</p>}
+        <TodoList
+          todos={doc.todos}
+          onToggle={toggleTodo}
+          onDelete={deleteTodo}
+        />
+        {state === "loading" && <p>Syncing...</p>}
+        {state === "unavailable" && <p>Working offline</p>}
       </div>
     </div>
   )

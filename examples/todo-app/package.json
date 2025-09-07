@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@loro-extended/adapters": "workspace:^",
+    "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",
     "classic-level": "^1.2.0",

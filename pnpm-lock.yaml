@@ -17,6 +17,9 @@ importers:
       '@loro-extended/adapters':
         specifier: workspace:^
         version: link:../../packages/adapters
+      '@loro-extended/change':
+        specifier: workspace:^
+        version: link:../../packages/change
       '@loro-extended/react':
         specifier: workspace:^
         version: link:../../packages/react

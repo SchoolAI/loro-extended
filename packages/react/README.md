@@ -20,6 +20,7 @@ This package provides React-specific bindings for Loro CRDT documents with two a
 ## Installation
 
 ### For Simple API (no schema dependencies)
+
 ```bash
 npm install @loro-extended/react @loro-extended/repo loro-crdt
 # or
@@ -27,6 +28,7 @@ pnpm add @loro-extended/react @loro-extended/repo loro-crdt
 ```
 
 ### For Typed API (with schema support)
+
 ```bash
 npm install @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt
 # or
@@ -60,13 +62,17 @@ function SimpleTodoApp() {
   return (
     <div>
       {handle?.state === "loading" && <div>Syncing...</div>}
-      
+
       <h1>{data.title || "My Todo List"}</h1>
-      
-      <button onClick={() => changeDoc(doc => {
-        const titleText = doc.getText("title");
-        titleText.insert(0, "📝 ");
-      })}>
+
+      <button
+        onClick={() =>
+          changeDoc((doc) => {
+            const titleText = doc.getText("title");
+            titleText.insert(0, "📝 ");
+          })
+        }
+      >
         Add Emoji
       </button>
 
@@ -75,26 +81,32 @@ function SimpleTodoApp() {
           <input
             type="checkbox"
             checked={todo.completed}
-            onChange={() => changeDoc(doc => {
-              const todosList = doc.getList("todos");
-              const todoMap = todosList.get(index);
-              if (todoMap) {
-                todoMap.set("completed", !todo.completed);
-              }
-            })}
+            onChange={() =>
+              changeDoc((doc) => {
+                const todosList = doc.getList("todos");
+                const todoMap = todosList.get(index);
+                if (todoMap) {
+                  todoMap.set("completed", !todo.completed);
+                }
+              })
+            }
           />
           {todo.text}
         </div>
       ))}
 
-      <button onClick={() => changeDoc(doc => {
-        const todosList = doc.getList("todos");
-        todosList.push({
-          id: Date.now().toString(),
-          text: "New Todo",
-          completed: false
-        });
-      })}>
+      <button
+        onClick={() =>
+          changeDoc((doc) => {
+            const todosList = doc.getList("todos");
+            todosList.push({
+              id: Date.now().toString(),
+              text: "New Todo",
+              completed: false,
+            });
+          })
+        }
+      >
         Add Todo
       </button>
     </div>
@@ -112,32 +124,42 @@ import { useDocument, Shape } from "@loro-extended/react";
 // Define your document schema (see @loro-extended/change for details)
 const todoSchema = Shape.doc({
   title: Shape.text(),
-  todos: Shape.list(Shape.plain.object({
-    id: Shape.plain.string(),
-    text: Shape.plain.string(),
-    completed: Shape.plain.boolean()
-  }))
+  todos: Shape.list(
+    Shape.plain.object({
+      id: Shape.plain.string(),
+      text: Shape.plain.string(),
+      completed: Shape.plain.boolean(),
+    })
+  ),
 });
 
 // Define empty state (default values)
 const emptyState = {
   title: "My Todo List",
-  todos: []
+  todos: [],
 };
 
 function TypedTodoApp() {
-  const [doc, changeDoc, handle] = useDocument("todo-doc", todoSchema, emptyState);
+  const [doc, changeDoc, handle] = useDocument(
+    "todo-doc",
+    todoSchema,
+    emptyState
+  );
 
   // doc is ALWAYS defined - no loading check needed!
   return (
     <div>
       {handle?.state === "loading" && <div>Syncing...</div>}
-      
+
       <h1>{doc.title}</h1>
-      
-      <button onClick={() => changeDoc(draft => {
-        draft.title.insert(0, "📝 ");
-      })}>
+
+      <button
+        onClick={() =>
+          changeDoc((draft) => {
+            draft.title.insert(0, "📝 ");
+          })
+        }
+      >
         Add Emoji
       </button>
 
@@ -146,25 +168,31 @@ function TypedTodoApp() {
           <input
             type="checkbox"
             checked={todo.completed}
-            onChange={() => changeDoc(draft => {
-              // Update the specific todo item
-              const todoItem = draft.todos.get(index);
-              if (todoItem) {
-                todoItem.completed = !todo.completed;
-              }
-            })}
+            onChange={() =>
+              changeDoc((draft) => {
+                // Update the specific todo item
+                const todoItem = draft.todos.get(index);
+                if (todoItem) {
+                  todoItem.completed = !todo.completed;
+                }
+              })
+            }
           />
           {todo.text}
         </div>
       ))}
 
-      <button onClick={() => changeDoc(draft => {
-        draft.todos.push({
-          id: Date.now().toString(),
-          text: "New Todo",
-          completed: false
-        });
-      })}>
+      <button
+        onClick={() =>
+          changeDoc((draft) => {
+            draft.todos.push({
+              id: Date.now().toString(),
+              text: "New Todo",
+              completed: false,
+            });
+          })
+        }
+      >
         Add Todo
       </button>
     </div>
@@ -183,7 +211,11 @@ For direct LoroDoc access without schema dependencies.
 ```typescript
 function useSimpleDocument<T = any>(
   documentId: string
-): [doc: LoroDoc | null, changeDoc: (fn: SimpleChangeFn) => void, handle: DocHandle | null]
+): [
+  doc: LoroDoc | null,
+  changeDoc: (fn: SimpleChangeFn) => void,
+  handle: DocHandle | null
+];
 ```
 
 #### Parameters
@@ -193,11 +225,13 @@ function useSimpleDocument<T = any>(
 #### Returns
 
 1. **`doc: LoroDoc | null`** - The raw LoroDoc instance
+
    - `null` when not ready (requires loading check)
    - Direct access to all LoroDoc methods when available
    - Use `doc.toJSON()` to get plain JavaScript object
 
 2. **`changeDoc: (fn: SimpleChangeFn) => void`** - Function to modify the document
+
    - Provides direct access to LoroDoc for mutations
    - Example: `changeDoc(doc => doc.getText("title").insert(0, "Hello"))`
 
@@ -216,7 +250,11 @@ function useDocument<T extends DocShape>(
   documentId: string,
   schema: T,
   emptyState: InferPlainType<T>
-): [doc: InferPlainType<T>, changeDoc: (fn: ChangeFn<T>) => void, handle: DocHandle | null]
+): [
+  doc: InferPlainType<T>,
+  changeDoc: (fn: ChangeFn<T>) => void,
+  handle: DocHandle | null
+];
 ```
 
 #### Parameters
@@ -228,11 +266,13 @@ function useDocument<T extends DocShape>(
 #### Returns
 
 1. **`doc: InferPlainType<T>`** - The current document state
+
    - **Always defined** due to empty state overlay
    - Shows empty state initially, then overlays CRDT data when available
    - Automatically re-renders when local or remote changes occur
 
 2. **`changeDoc: (fn: ChangeFn<T>) => void`** - Function to modify the document
+
    - Uses schema-aware draft operations
    - All changes are automatically committed and synchronized
    - See [`@loro-extended/change`](../change/README.md) for operation details
@@ -245,12 +285,14 @@ function useDocument<T extends DocShape>(
 ## Choosing Between APIs
 
 ### Use Simple API When:
+
 - You want minimal dependencies (no schema package required)
 - You prefer direct control over LoroDoc operations
 - You're building a simple application or prototype
 - You want to integrate with existing Loro code
 
 ### Use Typed API When:
+
 - You want full type safety and IntelliSense support
 - You prefer declarative schema definitions
 - You want empty state management (no loading checks needed)
@@ -300,7 +342,9 @@ const repo = new Repo({
 
 function App() {
   return (
-    <RepoProvider config={{ network: [networkAdapter], storage: storageAdapter }}>
+    <RepoProvider
+      config={{ network: [networkAdapter], storage: storageAdapter }}
+    >
       <YourComponents />
     </RepoProvider>
   );
@@ -316,7 +360,7 @@ function App() {
 function MultiDocApp() {
   const [todos, changeTodos] = useSimpleDocument<TodoDoc>("todos");
   const [notes, changeNotes] = useSimpleDocument<NoteDoc>("notes");
-  
+
   return (
     <div>
       {todos && <TodoList doc={todos.toJSON()} onChange={changeTodos} />}
@@ -329,7 +373,7 @@ function MultiDocApp() {
 function MultiDocApp() {
   const [todos, changeTodos] = useDocument("todos", todoSchema, todoEmptyState);
   const [notes, changeNotes] = useDocument("notes", noteSchema, noteEmptyState);
-  
+
   return (
     <div>
       <TodoList doc={todos} onChange={changeTodos} />
@@ -345,15 +389,15 @@ function MultiDocApp() {
 // Simple API
 function ConditionalDoc({ documentId }: { documentId: string | null }) {
   const [doc, changeDoc] = useSimpleDocument(documentId || "default");
-  
+
   if (!documentId) {
     return <div>Select a document</div>;
   }
-  
+
   if (!doc) {
     return <div>Loading...</div>;
   }
-  
+
   return <DocumentEditor doc={doc.toJSON()} onChange={changeDoc} />;
 }
 
@@ -364,11 +408,11 @@ function ConditionalDoc({ documentId }: { documentId: string | null }) {
     schema,
     emptyState
   );
-  
+
   if (!documentId) {
     return <div>Select a document</div>;
   }
-  
+
   return <DocumentEditor doc={doc} onChange={changeDoc} />;
 }
 ```
@@ -378,13 +422,13 @@ function ConditionalDoc({ documentId }: { documentId: string | null }) {
 ```tsx
 function DocumentWithStatus() {
   const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
-  
+
   const syncStatus = {
     loading: "Connecting to server...",
     ready: "Connected",
-    unavailable: "Working offline"
+    unavailable: "Working offline",
   }[handle?.state || "loading"];
-  
+
   return (
     <div>
       <div className="status-bar">{syncStatus}</div>
@@ -432,17 +476,19 @@ import {
   useRawLoroDoc,
   useDocChanger,
   useTypedDocState,
-  useTypedDocChanger
+  useTypedDocChanger,
 } from "@loro-extended/react";
 
 // Custom hook combining base components
 function useCustomDocument(documentId: string) {
   const { handle } = useDocHandleState(documentId);
   const changeDoc = useDocChanger(handle);
-  
+
   // Your custom logic here
-  
-  return [/* your custom return */];
+
+  return [
+    /* your custom return */
+  ];
 }
 ```
 
