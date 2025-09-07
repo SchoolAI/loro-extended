@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
 import {
-  Container,
+  type Container,
   LoroCounter,
   LoroDoc,
   LoroList,
@@ -59,12 +59,12 @@ class DraftDoc<T extends DocShape> {
         throw new Error(`expected ${key} in emptyState`)
       }
 
-      const node = createDraftNode(
-        this.doc,
-        [key],
-        schemaValue,
-        this.emptyState[key], // as InferPlainType<T["shape"][typeof key]>
-      )
+      const node = createDraftNode({
+        doc: this.doc,
+        schema: schemaValue,
+        path: [key],
+        emptyState: this.emptyState[key], // as InferPlainType<T["shape"][typeof key]>
+      })
 
       ;(this as any)[key] = node
     }
@@ -80,12 +80,27 @@ class DraftDoc<T extends DocShape> {
 
 // Base class for all draft nodes
 abstract class DraftNode<T extends ContainerShape> {
-  constructor(
-    protected schema: T,
-    protected emptyState: InferPlainType<T>,
-    protected doc: LoroDoc,
-    protected path: string[],
-  ) {}
+  protected doc: LoroDoc
+  protected schema: T
+  protected path: string[]
+  protected emptyState?: InferPlainType<T>
+
+  constructor({
+    doc,
+    schema,
+    path,
+    emptyState,
+  }: {
+    doc: LoroDoc
+    schema: T
+    path: string[]
+    emptyState?: InferPlainType<T>
+  }) {
+    this.doc = doc
+    this.schema = schema
+    this.path = path
+    this.emptyState = emptyState
+  }
 
   abstract getContainer(): any
 
@@ -134,6 +149,110 @@ abstract class ListDraftNodeBase<
       this.getContainer().push(convertedItem)
     }
   }
+
+  // Array-like methods for better developer experience
+  find<ItemType = any>(
+    predicate: (item: ItemType, index: number) => boolean,
+  ): ItemType | undefined {
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      if (predicate(item, i)) {
+        return item
+      }
+    }
+    return undefined
+  }
+
+  findIndex<ItemType = any>(
+    predicate: (item: ItemType, index: number) => boolean,
+  ): number {
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      if (predicate(item, i)) {
+        return i
+      }
+    }
+    return -1
+  }
+
+  map<ItemType = any, ReturnType = any>(
+    callback: (item: ItemType, index: number) => ReturnType,
+  ): ReturnType[] {
+    const result: ReturnType[] = []
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      result.push(callback(item, i))
+    }
+    return result
+  }
+
+  filter<ItemType = any>(
+    predicate: (item: ItemType, index: number) => boolean,
+  ): ItemType[] {
+    const result: ItemType[] = []
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      if (predicate(item, i)) {
+        result.push(item)
+      }
+    }
+    return result
+  }
+
+  forEach<ItemType = any>(
+    callback: (item: ItemType, index: number) => void,
+  ): void {
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      callback(item, i)
+    }
+  }
+
+  some<ItemType = any>(
+    predicate: (item: ItemType, index: number) => boolean,
+  ): boolean {
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      if (predicate(item, i)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  every<ItemType = any>(
+    predicate: (item: ItemType, index: number) => boolean,
+  ): boolean {
+    for (let i = 0; i < this.length; i++) {
+      const item = this.getDraftItem(i)
+      if (!predicate(item, i)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Get the appropriate item for array methods - either draft container or plain value
+  protected getDraftItem(index: number): any {
+    // For container shapes, we need to return the draft container object
+    // For value shapes, we return the plain value
+    if (isValueShape(this.schema.shape)) {
+      return this.get(index) // Plain value
+    } else {
+      // Container shape - create/get the draft node
+      const itemPath = [...this.path, index.toString()]
+      return createDraftNode({
+        doc: this.doc,
+        schema: this.schema.shape,
+        path: itemPath,
+        // No empty state for individual list items, they must be fully specified
+      })
+    }
+  }
+
+  // Abstract methods that subclasses must implement
+  abstract get(index: number): any
+  abstract get length(): number
 }
 
 // Text draft node
@@ -370,13 +489,18 @@ class MapDraftNode<T extends MapContainerShape> extends DraftNode<T> {
   private container: LoroMap | null = null
   private propertyCache = new Map<string, DraftNode<T> | Value>()
 
-  constructor(
-    protected schema: T,
-    protected emptyState: InferPlainType<T>,
-    protected doc: LoroDoc,
-    protected path: string[],
-  ) {
-    super(schema, emptyState, doc, path)
+  constructor({
+    doc,
+    schema,
+    path,
+    emptyState,
+  }: {
+    doc: LoroDoc
+    schema: T
+    path: string[]
+    emptyState?: InferPlainType<T>
+  }) {
+    super({ doc, schema, path, emptyState })
     this.createPropertyAccessors()
   }
 
@@ -436,14 +560,26 @@ class MapDraftNode<T extends MapContainerShape> extends DraftNode<T> {
     }
 
     const nestedPath = [...this.path, key]
+    const emptyState = this.emptyState?.[key]
 
-    // It's a Loro container schema
-    const result = createDraftNode(
-      this.doc,
-      nestedPath,
-      nestedSchema,
-      this.emptyState[key],
-    )
+    // Check if we're accessing existing state vs creating new state
+    // If the container already has this key, we don't need emptyState
+    const containerHasKey = this.getContainer().get(key) !== undefined
+
+    // Only require emptyState when creating new state for container shapes
+    if (!containerHasKey && !emptyState && !isValueShape(nestedSchema)) {
+      throw new Error(
+        `Map property '${key}' requires emptyState when container doesn't exist`,
+      )
+    }
+
+    // Create the draft node - emptyState can be undefined for existing containers
+    const result = createDraftNode({
+      doc: this.doc,
+      schema: nestedSchema,
+      path: nestedPath,
+      emptyState,
+    })
 
     this.propertyCache.set(key, result)
     return result
@@ -535,34 +671,39 @@ class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
 }
 
 // Factory function to create appropriate draft node
-function createDraftNode(
-  doc: LoroDoc,
-  path: string[],
-  schema: ContainerOrValueShape,
-  emptyState: any,
-): DraftNode<ContainerShape> | any {
+function createDraftNode<T extends ContainerOrValueShape>({
+  doc,
+  path,
+  schema,
+  emptyState,
+}: {
+  doc: LoroDoc
+  path: string[]
+  schema: T
+  emptyState?: InferPlainType<T>
+}): DraftNode<ContainerShape> | any {
   if (isTextShape(schema)) {
-    return new TextDraftNode(schema, emptyState, doc, path)
+    return new TextDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isCounterShape(schema)) {
-    return new CounterDraftNode(schema, emptyState, doc, path)
+    return new CounterDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isListShape(schema)) {
-    return new ListDraftNode(schema, emptyState, doc, path)
+    return new ListDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isMovableListShape(schema)) {
-    return new MovableListDraftNode(schema, emptyState, doc, path)
+    return new MovableListDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isMapShape(schema)) {
-    return new MapDraftNode(schema, emptyState, doc, path)
+    return new MapDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isTreeShape(schema)) {
-    return new TreeDraftNode(schema, emptyState, doc, path)
+    return new TreeDraftNode({ doc, schema, path, emptyState })
   }
 
   if (isValueShape(schema)) {

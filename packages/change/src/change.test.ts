@@ -1244,4 +1244,741 @@ describe("Edge Cases and Error Handling", () => {
       expect(result.emoji).toEqual(["🚀", "⭐"])
     })
   })
+
+  describe("Array-like Methods for Lists", () => {
+    describe("Basic Array Methods", () => {
+      it("should support find() method on lists", () => {
+        const schema = Shape.doc({
+          items: Shape.list(Shape.plain.string()),
+        })
+
+        const emptyState = {
+          items: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.items.push("apple")
+          draft.items.push("banana")
+          draft.items.push("cherry")
+
+          // Test find method
+          const found = draft.items.find(item => item.startsWith("b"))
+          expect(found).toBe("banana")
+
+          const notFound = draft.items.find(item => item.startsWith("z"))
+          expect(notFound).toBeUndefined()
+        })
+      })
+
+      it("should support findIndex() method on lists", () => {
+        const schema = Shape.doc({
+          numbers: Shape.list(Shape.plain.number()),
+        })
+
+        const emptyState = {
+          numbers: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.numbers.push(10)
+          draft.numbers.push(20)
+          draft.numbers.push(30)
+
+          // Test findIndex method
+          const foundIndex = draft.numbers.findIndex(num => num > 15)
+          expect(foundIndex).toBe(1) // Should find 20 at index 1
+
+          const notFoundIndex = draft.numbers.findIndex(num => num > 100)
+          expect(notFoundIndex).toBe(-1)
+        })
+      })
+
+      it("should support map() method on lists", () => {
+        const schema = Shape.doc({
+          words: Shape.list(Shape.plain.string()),
+        })
+
+        const emptyState = {
+          words: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.words.push("hello")
+          draft.words.push("world")
+
+          // Test map method
+          const uppercased = draft.words.map(word => word.toUpperCase())
+          expect(uppercased).toEqual(["HELLO", "WORLD"])
+
+          const lengths = draft.words.map((word, index) => ({
+            word,
+            index,
+            length: word.length,
+          }))
+          expect(lengths).toEqual([
+            { word: "hello", index: 0, length: 5 },
+            { word: "world", index: 1, length: 5 },
+          ])
+        })
+      })
+
+      it("should support filter() method on lists", () => {
+        const schema = Shape.doc({
+          numbers: Shape.list(Shape.plain.number()),
+        })
+
+        const emptyState = {
+          numbers: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.numbers.push(1)
+          draft.numbers.push(2)
+          draft.numbers.push(3)
+          draft.numbers.push(4)
+          draft.numbers.push(5)
+
+          // Test filter method
+          const evens = draft.numbers.filter(num => num % 2 === 0)
+          expect(evens).toEqual([2, 4])
+
+          const withIndex = draft.numbers.filter((num, index) => index > 2)
+          expect(withIndex).toEqual([4, 5])
+        })
+      })
+
+      it("should support forEach() method on lists", () => {
+        const schema = Shape.doc({
+          items: Shape.list(Shape.plain.string()),
+        })
+
+        const emptyState = {
+          items: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.items.push("a")
+          draft.items.push("b")
+          draft.items.push("c")
+
+          // Test forEach method
+          const collected: Array<{ item: string; index: number }> = []
+          draft.items.forEach((item, index) => {
+            collected.push({ item, index })
+          })
+
+          expect(collected).toEqual([
+            { item: "a", index: 0 },
+            { item: "b", index: 1 },
+            { item: "c", index: 2 },
+          ])
+        })
+      })
+
+      it("should support some() method on lists", () => {
+        const schema = Shape.doc({
+          numbers: Shape.list(Shape.plain.number()),
+        })
+
+        const emptyState = {
+          numbers: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.numbers.push(1)
+          draft.numbers.push(3)
+          draft.numbers.push(5)
+
+          // Test some method
+          const hasEven = draft.numbers.some(num => num % 2 === 0)
+          expect(hasEven).toBe(false)
+
+          const hasOdd = draft.numbers.some(num => num % 2 === 1)
+          expect(hasOdd).toBe(true)
+
+          const hasLargeNumber = draft.numbers.some(
+            (num, index) => num > index * 2,
+          )
+          expect(hasLargeNumber).toBe(true)
+        })
+      })
+
+      it("should support every() method on lists", () => {
+        const schema = Shape.doc({
+          numbers: Shape.list(Shape.plain.number()),
+        })
+
+        const emptyState = {
+          numbers: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.numbers.push(2)
+          draft.numbers.push(4)
+          draft.numbers.push(6)
+
+          // Test every method
+          const allEven = draft.numbers.every(num => num % 2 === 0)
+          expect(allEven).toBe(true)
+
+          const allOdd = draft.numbers.every(num => num % 2 === 1)
+          expect(allOdd).toBe(false)
+
+          const allPositive = draft.numbers.every((num, index) => num > 0)
+          expect(allPositive).toBe(true)
+        })
+      })
+    })
+
+    describe("Array Methods with Complex Objects", () => {
+      it("should work with lists of plain objects", () => {
+        const schema = Shape.doc({
+          todos: Shape.list(
+            Shape.plain.object({
+              id: Shape.plain.string(),
+              text: Shape.plain.string(),
+              completed: Shape.plain.boolean(),
+            }),
+          ),
+        })
+
+        const emptyState = {
+          todos: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.todos.push({ id: "1", text: "Buy milk", completed: false })
+          draft.todos.push({ id: "2", text: "Walk dog", completed: true })
+          draft.todos.push({ id: "3", text: "Write code", completed: false })
+
+          // Test find with objects
+          const foundTodo = draft.todos.find(todo => todo.id === "2")
+          expect(foundTodo).toEqual({
+            id: "2",
+            text: "Walk dog",
+            completed: true,
+          })
+
+          // Test findIndex with objects
+          const completedIndex = draft.todos.findIndex(todo => todo.completed)
+          expect(completedIndex).toBe(1)
+
+          // Test filter with objects
+          const incompleteTodos = draft.todos.filter(todo => !todo.completed)
+          expect(incompleteTodos).toHaveLength(2)
+          expect(incompleteTodos[0].text).toBe("Buy milk")
+          expect(incompleteTodos[1].text).toBe("Write code")
+
+          // Test map with objects
+          const todoTexts = draft.todos.map(todo => todo.text)
+          expect(todoTexts).toEqual(["Buy milk", "Walk dog", "Write code"])
+
+          // Test some with objects
+          const hasCompleted = draft.todos.some(todo => todo.completed)
+          expect(hasCompleted).toBe(true)
+
+          // Test every with objects
+          const allCompleted = draft.todos.every(todo => todo.completed)
+          expect(allCompleted).toBe(false)
+        })
+      })
+
+      it("should work with lists of maps (nested containers)", () => {
+        const schema = Shape.doc({
+          articles: Shape.list(
+            Shape.map({
+              title: Shape.text(),
+              published: Shape.plain.boolean(),
+            }),
+          ),
+        })
+
+        const emptyState = {
+          articles: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.articles.push({
+            title: "First Article",
+            published: true,
+          })
+          draft.articles.push({
+            title: "Second Article",
+            published: false,
+          })
+
+          // Test find with nested containers
+          const publishedArticle = draft.articles.find(
+            article => article.published,
+          )
+          expect(publishedArticle?.published).toBe(true)
+
+          // Test map with nested containers
+          const titles = draft.articles.map(article => article.title)
+          expect(titles).toEqual(["First Article", "Second Article"])
+
+          // Test filter with nested containers
+          const unpublished = draft.articles.filter(
+            article => !article.published,
+          )
+          expect(unpublished).toHaveLength(1)
+        })
+      })
+    })
+
+    describe("Array Methods with MovableList", () => {
+      it("should support all array methods on movable lists", () => {
+        const schema = Shape.doc({
+          tasks: Shape.movableList(
+            Shape.plain.object({
+              id: Shape.plain.string(),
+              priority: Shape.plain.number(),
+            }),
+          ),
+        })
+
+        const emptyState = {
+          tasks: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.tasks.push({ id: "1", priority: 1 })
+          draft.tasks.push({ id: "2", priority: 3 })
+          draft.tasks.push({ id: "3", priority: 2 })
+
+          // Test find
+          const highPriorityTask = draft.tasks.find(task => task.priority === 3)
+          expect(highPriorityTask?.id).toBe("2")
+
+          // Test findIndex
+          const mediumPriorityIndex = draft.tasks.findIndex(
+            task => task.priority === 2,
+          )
+          expect(mediumPriorityIndex).toBe(2)
+
+          // Test filter
+          const lowPriorityTasks = draft.tasks.filter(
+            task => task.priority <= 2,
+          )
+          expect(lowPriorityTasks).toHaveLength(2)
+
+          // Test map
+          const priorities = draft.tasks.map(task => task.priority)
+          expect(priorities).toEqual([1, 3, 2])
+
+          // Test some
+          const hasHighPriority = draft.tasks.some(task => task.priority > 2)
+          expect(hasHighPriority).toBe(true)
+
+          // Test every
+          const allHavePriority = draft.tasks.every(task => task.priority > 0)
+          expect(allHavePriority).toBe(true)
+        })
+      })
+    })
+
+    describe("Edge Cases", () => {
+      it("should handle empty lists correctly", () => {
+        const schema = Shape.doc({
+          items: Shape.list(Shape.plain.string()),
+        })
+
+        const emptyState = {
+          items: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          // Test all methods on empty list
+          expect(draft.items.find(item => true)).toBeUndefined()
+          expect(draft.items.findIndex(item => true)).toBe(-1)
+          expect(draft.items.map(item => item)).toEqual([])
+          expect(draft.items.filter(item => true)).toEqual([])
+          expect(draft.items.some(item => true)).toBe(false)
+          expect(draft.items.every(item => true)).toBe(true) // vacuous truth
+
+          let forEachCalled = false
+          draft.items.forEach(() => {
+            forEachCalled = true
+          })
+          expect(forEachCalled).toBe(false)
+        })
+      })
+
+      it("should handle single item lists correctly", () => {
+        const schema = Shape.doc({
+          items: Shape.list(Shape.plain.number()),
+        })
+
+        const emptyState = {
+          items: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.items.push(42)
+
+          // Test all methods on single item list
+          expect(draft.items.find(item => item === 42)).toBe(42)
+          expect(draft.items.find(item => item === 99)).toBeUndefined()
+          expect(draft.items.findIndex(item => item === 42)).toBe(0)
+          expect(draft.items.findIndex(item => item === 99)).toBe(-1)
+          expect(draft.items.map(item => item * 2)).toEqual([84])
+          expect(draft.items.filter(item => item > 0)).toEqual([42])
+          expect(draft.items.filter(item => item < 0)).toEqual([])
+          expect(draft.items.some(item => item === 42)).toBe(true)
+          expect(draft.items.some(item => item === 99)).toBe(false)
+          expect(draft.items.every(item => item === 42)).toBe(true)
+          expect(draft.items.every(item => item > 0)).toBe(true)
+          expect(draft.items.every(item => item < 0)).toBe(false)
+
+          const collected: number[] = []
+          draft.items.forEach(item => collected.push(item))
+          expect(collected).toEqual([42])
+        })
+      })
+
+      it("should provide correct index parameter in callbacks", () => {
+        const schema = Shape.doc({
+          items: Shape.list(Shape.plain.string()),
+        })
+
+        const emptyState = {
+          items: [],
+        }
+
+        const typedDoc = createTypedDoc(schema, emptyState)
+
+        typedDoc.change(draft => {
+          draft.items.push("a")
+          draft.items.push("b")
+          draft.items.push("c")
+
+          // Test that index parameter is correct in all methods
+          const findResult = draft.items.find((item, index) => index === 1)
+          expect(findResult).toBe("b")
+
+          const findIndexResult = draft.items.findIndex(
+            (item, index) => index === 2,
+          )
+          expect(findIndexResult).toBe(2)
+
+          const mapResult = draft.items.map((item, index) => `${index}:${item}`)
+          expect(mapResult).toEqual(["0:a", "1:b", "2:c"])
+
+          const filterResult = draft.items.filter(
+            (item, index) => index % 2 === 0,
+          )
+          expect(filterResult).toEqual(["a", "c"])
+
+          const someResult = draft.items.some(
+            (item, index) => index === 1 && item === "b",
+          )
+          expect(someResult).toBe(true)
+
+          const everyResult = draft.items.every((item, index) => index < 3)
+          expect(everyResult).toBe(true)
+
+          const forEachResults: Array<{ item: string; index: number }> = []
+          draft.items.forEach((item, index) => {
+            forEachResults.push({ item, index })
+          })
+          expect(forEachResults).toEqual([
+            { item: "a", index: 0 },
+            { item: "b", index: 1 },
+            { item: "c", index: 2 },
+          ])
+        })
+      })
+
+      describe("Find-and-Mutate Patterns", () => {
+        it("should allow mutation of items found via array methods", () => {
+          const schema = Shape.doc({
+            todos: Shape.list(
+              Shape.plain.object({
+                id: Shape.plain.string(),
+                text: Shape.plain.string(),
+                completed: Shape.plain.boolean(),
+              }),
+            ),
+          })
+
+          const emptyState = {
+            todos: [],
+          }
+
+          const typedDoc = createTypedDoc(schema, emptyState)
+
+          // Add initial todos
+          typedDoc.change(draft => {
+            draft.todos.push({ id: "1", text: "Buy milk", completed: false })
+            draft.todos.push({ id: "2", text: "Walk dog", completed: false })
+            draft.todos.push({ id: "3", text: "Write code", completed: true })
+          })
+
+          // Test the key developer expectation: find + mutate
+          const result = typedDoc.change(draft => {
+            // Find a todo and toggle its completion status
+            const todo = draft.todos.find(t => t.id === "2")
+            if (todo) {
+              todo.completed = !todo.completed // This should work and persist!
+            }
+
+            // Find another todo and change its text
+            const codeTodo = draft.todos.find(t => t.text === "Write code")
+            if (codeTodo) {
+              codeTodo.text = "Write better code"
+            }
+          })
+
+          // Verify the mutations persisted to the document state
+          expect(result.todos[0]).toEqual({
+            id: "1",
+            text: "Buy milk",
+            completed: false,
+          })
+          expect(result.todos[1]).toEqual({
+            id: "2",
+            text: "Walk dog",
+            completed: true,
+          }) // Should be toggled
+          expect(result.todos[2]).toEqual({
+            id: "3",
+            text: "Write better code",
+            completed: true,
+          }) // Text should be changed
+
+          // Also verify via typedDoc.value
+          const finalState = typedDoc.value
+          expect(finalState.todos[1].completed).toBe(true)
+          expect(finalState.todos[2].text).toBe("Write better code")
+        })
+
+        it("should allow mutation of nested container items found via array methods", () => {
+          const schema = Shape.doc({
+            articles: Shape.list(
+              Shape.map({
+                title: Shape.text(),
+                viewCount: Shape.counter(),
+                metadata: Shape.plain.object({
+                  author: Shape.plain.string(),
+                  published: Shape.plain.boolean(),
+                }),
+              }),
+            ),
+          })
+
+          const emptyState = {
+            articles: [],
+          }
+
+          const typedDoc = createTypedDoc(schema, emptyState)
+
+          // Add initial articles
+          typedDoc.change(draft => {
+            draft.articles.push({
+              title: "First Article",
+              viewCount: 0,
+              metadata: { author: "Alice", published: false },
+            })
+            draft.articles.push({
+              title: "Second Article",
+              viewCount: 5,
+              metadata: { author: "Bob", published: true },
+            })
+          })
+
+          // Test mutation of nested containers found via array methods
+          const result = typedDoc.change(draft => {
+            // Find article by author and modify its nested properties
+            const aliceArticle = draft.articles.find(
+              article => article.metadata.author === "Alice",
+            )
+            if (aliceArticle) {
+              // Mutate text container
+              aliceArticle.title.insert(0, "📝 ")
+              // Mutate counter container
+              aliceArticle.viewCount.increment(10)
+              // Mutate plain object property
+              aliceArticle.metadata.published = true
+            }
+
+            // Find article by publication status and modify it
+            const publishedArticle = draft.articles.find(
+              article =>
+                article.metadata.published === true &&
+                article.metadata.author === "Bob",
+            )
+            if (publishedArticle) {
+              publishedArticle.title.update("Updated Second Article")
+              publishedArticle.viewCount.increment(3)
+            }
+          })
+
+          // Verify all mutations persisted correctly
+          expect(result.articles[0].title).toBe("📝 First Article")
+          expect(result.articles[0].viewCount).toBe(10)
+          expect(result.articles[0].metadata.published).toBe(true)
+          expect(result.articles[1].title).toBe("Updated Second Article")
+          expect(result.articles[1].viewCount).toBe(8) // 5 + 3
+
+          // Verify via typedDoc.value as well
+          const finalState = typedDoc.value
+          expect(finalState.articles[0].title).toBe("📝 First Article")
+          expect(finalState.articles[0].viewCount).toBe(10)
+          expect(finalState.articles[1].viewCount).toBe(8)
+        })
+
+        it("should support common developer patterns with array methods", () => {
+          const schema = Shape.doc({
+            users: Shape.list(
+              Shape.plain.object({
+                id: Shape.plain.string(),
+                name: Shape.plain.string(),
+                active: Shape.plain.boolean(),
+                score: Shape.plain.number(),
+              }),
+            ),
+          })
+
+          const emptyState = {
+            users: [],
+          }
+
+          const typedDoc = createTypedDoc(schema, emptyState)
+
+          // Add initial users
+          typedDoc.change(draft => {
+            draft.users.push({
+              id: "1",
+              name: "Alice",
+              active: true,
+              score: 100,
+            })
+            draft.users.push({ id: "2", name: "Bob", active: false, score: 85 })
+            draft.users.push({
+              id: "3",
+              name: "Charlie",
+              active: true,
+              score: 120,
+            })
+          })
+
+          const result = typedDoc.change(draft => {
+            // Pattern 1: Find and toggle boolean
+            const inactiveUser = draft.users.find(user => !user.active)
+            if (inactiveUser) {
+              inactiveUser.active = true
+            }
+
+            // Pattern 2: Find by condition and update multiple properties
+            const highScorer = draft.users.find(user => user.score > 110)
+            if (highScorer) {
+              highScorer.name = highScorer.name + " (VIP)"
+              highScorer.score += 50
+            }
+
+            // Pattern 3: Filter and modify multiple items
+            const activeUsers = draft.users.filter(user => user.active)
+            activeUsers.forEach(user => {
+              user.score += 10 // Bonus points for active users
+            })
+
+            // Pattern 4: Find by index-based condition
+            const firstUser = draft.users.find((user, index) => index === 0)
+            if (firstUser) {
+              firstUser.name = "👑 " + firstUser.name
+            }
+          })
+
+          // Verify all patterns worked
+          expect(result.users[0].name).toBe("👑 Alice")
+          expect(result.users[0].score).toBe(110) // 100 + 10 bonus
+          expect(result.users[1].active).toBe(true) // Was toggled from false
+          expect(result.users[1].score).toBe(95) // 85 + 10 bonus
+          expect(result.users[2].name).toBe("Charlie (VIP)")
+          expect(result.users[2].score).toBe(180) // 120 + 50 VIP + 10 bonus
+
+          // Verify persistence
+          const finalState = typedDoc.value
+          expect(finalState.users.every(user => user.active)).toBe(true)
+          expect(finalState.users[2].name).toContain("VIP")
+        })
+
+        it("should handle edge cases in find-and-mutate patterns", () => {
+          const schema = Shape.doc({
+            items: Shape.list(
+              Shape.plain.object({
+                id: Shape.plain.string(),
+                value: Shape.plain.number(),
+              }),
+            ),
+          })
+
+          const emptyState = {
+            items: [],
+          }
+
+          const typedDoc = createTypedDoc(schema, emptyState)
+
+          const result = typedDoc.change(draft => {
+            // Add some items
+            draft.items.push({ id: "1", value: 10 })
+            draft.items.push({ id: "2", value: 20 })
+
+            // Try to find non-existent item - should not crash
+            const nonExistent = draft.items.find(item => item.id === "999")
+            if (nonExistent) {
+              nonExistent.value = 999 // This shouldn't execute
+            }
+
+            // Find existing item and mutate
+            const existing = draft.items.find(item => item.id === "1")
+            if (existing) {
+              existing.value *= 2
+            }
+
+            // Use findIndex to locate and mutate
+            const index = draft.items.findIndex(item => item.value === 20)
+            if (index !== -1) {
+              const item = draft.items.get(index)
+              if (item) {
+                item.value += 5
+              }
+            }
+          })
+
+          // Verify mutations worked correctly
+          expect(result.items).toHaveLength(2)
+          expect(result.items[0].value).toBe(20) // 10 * 2
+          expect(result.items[1].value).toBe(25) // 20 + 5
+
+          // Verify no phantom items were created
+          expect(result.items.find(item => item.id === "999")).toBeUndefined()
+        })
+      })
+    })
+  })
 })

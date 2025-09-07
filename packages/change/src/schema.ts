@@ -367,6 +367,17 @@ type DraftLoroList<U, T = InferPlainType<U>> = {
   isDeleted(): boolean
   readonly id: ContainerID
   readonly length: number
+
+  // Array-like methods
+  find(predicate: (item: T, index: number) => boolean): T | undefined
+  findIndex(predicate: (item: T, index: number) => boolean): number
+  map<ReturnType>(
+    callback: (item: T, index: number) => ReturnType,
+  ): ReturnType[]
+  filter(predicate: (item: T, index: number) => boolean): T[]
+  forEach(callback: (item: T, index: number) => void): void
+  some(predicate: (item: T, index: number) => boolean): boolean
+  every(predicate: (item: T, index: number) => boolean): boolean
 }
 
 type DraftLoroMovableList<U, T = InferPlainType<U>> = {
@@ -386,6 +397,17 @@ type DraftLoroMovableList<U, T = InferPlainType<U>> = {
   getLastEditorAt(pos: number): PeerID | undefined
   readonly id: ContainerID
   readonly length: number
+
+  // Array-like methods
+  find(predicate: (item: T, index: number) => boolean): T | undefined
+  findIndex(predicate: (item: T, index: number) => boolean): number
+  map<ReturnType>(
+    callback: (item: T, index: number) => ReturnType,
+  ): ReturnType[]
+  filter(predicate: (item: T, index: number) => boolean): T[]
+  forEach(callback: (item: T, index: number) => void): void
+  some(predicate: (item: T, index: number) => boolean): boolean
+  every(predicate: (item: T, index: number) => boolean): boolean
 }
 
 type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
