@@ -25,7 +25,7 @@ import type {
   MovableListContainerShape,
   TextContainerShape,
   TreeContainerShape,
-} from "./schema.js"
+} from "./shape.js"
 import {
   isContainer,
   isCounterShape,
@@ -38,16 +38,16 @@ import {
 } from "./utils/type-guards.js"
 import { validateEmptyState } from "./validation.js"
 
-interface DraftNodeParams<Schema extends DocShape | ContainerShape> {
+interface DraftNodeParams<Shape extends DocShape | ContainerShape> {
   doc: LoroDoc
-  schema: Schema
-  emptyState?: InferPlainType<Schema>
+  shape: Shape
+  emptyState?: InferPlainType<Shape>
   path: string[]
 }
 
 // Base class for all draft nodes
-abstract class DraftNode<Schema extends DocShape | ContainerShape> {
-  constructor(protected _params: DraftNodeParams<Schema>) {}
+abstract class DraftNode<Shape extends DocShape | ContainerShape> {
+  constructor(protected _params: DraftNodeParams<Shape>) {}
 
   abstract getContainer(): any
 
@@ -68,11 +68,11 @@ abstract class DraftNode<Schema extends DocShape | ContainerShape> {
     return this._params.doc
   }
 
-  protected get schema(): Schema {
-    return this._params.schema
+  protected get shape(): Shape {
+    return this._params.shape
   }
 
-  protected get emptyState(): InferPlainType<Schema> | undefined {
+  protected get emptyState(): InferPlainType<Shape> | undefined {
     return this._params.emptyState
   }
 
@@ -82,11 +82,11 @@ abstract class DraftNode<Schema extends DocShape | ContainerShape> {
 }
 
 // Draft Document class -- the actual object passed to the change `mutation` function
-class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
-  private propertyCache = new Map<string, DraftNode<Schema>>()
-  private requiredEmptyState!: InferPlainType<Schema>
+class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
+  private propertyCache = new Map<string, DraftNode<Shape>>()
+  private requiredEmptyState!: InferPlainType<Shape>
 
-  constructor(_params: DraftNodeParams<Schema>) {
+  constructor(_params: DraftNodeParams<Shape>) {
     super(_params)
     if (!_params.emptyState) throw new Error("emptyState required")
     this.requiredEmptyState = _params.emptyState
@@ -97,12 +97,12 @@ class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
     throw new Error("not implemented")
   }
 
-  getOrCreateContainer(key: string, schema: ContainerShape) {
+  getOrCreateContainer(key: string, shape: ContainerShape) {
     let container = this.propertyCache.get(key)
     if (!container) {
       container = createDraftNode({
         doc: this.doc,
-        schema,
+        shape,
         emptyState: this.requiredEmptyState[key],
         path: [key],
       })
@@ -114,10 +114,10 @@ class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
   }
 
   private createLazyProperties(): void {
-    for (const key in this.schema.shape) {
-      const schema = this.schema.shape[key]
+    for (const key in this.shape.shape) {
+      const shape = this.shape.shape[key]
       Object.defineProperty(this, key, {
-        get: () => this.getOrCreateContainer(key, schema),
+        get: () => this.getOrCreateContainer(key, shape),
       })
     }
   }
@@ -133,13 +133,13 @@ class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
 
 // Shared logic for list operations
 abstract class ListDraftNodeBase<
-  T extends ListContainerShape | MovableListContainerShape,
-> extends DraftNode<T> {
+  Shape extends ListContainerShape | MovableListContainerShape,
+> extends DraftNode<Shape> {
   protected insertWithConversion(index: number, item: any): void {
     const convertedItem = convertInputToContainer(
       this.doc,
       item,
-      this.schema.shape,
+      this.shape.shape,
       this.path,
     )
     if (isContainer(convertedItem)) {
@@ -153,7 +153,7 @@ abstract class ListDraftNodeBase<
     const convertedItem = convertInputToContainer(
       this.doc,
       item,
-      this.schema.shape,
+      this.shape.shape,
       this.path,
     )
     if (isContainer(convertedItem)) {
@@ -249,14 +249,14 @@ abstract class ListDraftNodeBase<
   protected getDraftItem(index: number): any {
     // For container shapes, we need to return the draft container object
     // For value shapes, we return the plain value
-    if (isValueShape(this.schema.shape)) {
+    if (isValueShape(this.shape.shape)) {
       return this.get(index) // Plain value
     } else {
       // Container shape - create/get the draft node
       const itemPath = [...this.path, index.toString()]
       return createDraftNode({
         doc: this.doc,
-        schema: this.schema.shape,
+        shape: this.shape.shape,
         path: itemPath,
         // No empty state for individual list items, they must be fully specified
       })
@@ -498,11 +498,11 @@ class MovableListDraftNode<
 }
 
 // Map draft node
-class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
+class MapDraftNode<Shape extends MapContainerShape> extends DraftNode<Shape> {
   private container: LoroMap | null = null
-  private propertyCache = new Map<string, DraftNode<Schema> | Value>()
+  private propertyCache = new Map<string, DraftNode<Shape> | Value>()
 
-  constructor(params: DraftNodeParams<Schema>) {
+  constructor(params: DraftNodeParams<Shape>) {
     super(params)
     this.createPropertyAccessors()
   }
@@ -540,12 +540,12 @@ class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
     }
   }
 
-  // Create property accessors for schema-defined keys
+  // Create property accessors for shape-defined keys
   createPropertyAccessors(): void {
-    for (const [key, nestedSchema] of Object.entries(this.schema.shape)) {
+    for (const [key, nestedShape] of Object.entries(this.shape.shape)) {
       Object.defineProperty(this, key, {
-        get: () => this.getNestedProperty(key, nestedSchema),
-        set: isValueShape(nestedSchema)
+        get: () => this.getNestedProperty(key, nestedShape),
+        set: isValueShape(nestedShape)
           ? value => this.getContainer().set(key, value)
           : undefined,
         enumerable: true,
@@ -556,8 +556,8 @@ class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
 
   private getNestedProperty(
     key: string,
-    nestedSchema: ContainerOrValueShape,
-  ): DraftNode<Schema> | Value {
+    nestedShape: ContainerOrValueShape,
+  ): DraftNode<Shape> | Value {
     if (this.propertyCache.has(key)) {
       return this.propertyCache.get(key)
     }
@@ -570,7 +570,7 @@ class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
     const containerHasKey = this.getContainer().get(key) !== undefined
 
     // Only require emptyState when creating new state for container shapes
-    if (!containerHasKey && !emptyState && !isValueShape(nestedSchema)) {
+    if (!containerHasKey && !emptyState && !isValueShape(nestedShape)) {
       throw new Error(
         `Map property '${key}' requires emptyState when container doesn't exist`,
       )
@@ -579,7 +579,7 @@ class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
     // Create the draft node - emptyState can be undefined for existing containers
     const result = createDraftNode({
       doc: this.doc,
-      schema: nestedSchema,
+      shape: nestedShape,
       path: nestedPath,
       emptyState,
     })
@@ -674,75 +674,74 @@ class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
 }
 
 // Factory function to create appropriate draft node
-function createDraftNode<Schema extends ContainerOrValueShape>({
+function createDraftNode<Shape extends ContainerOrValueShape>({
   doc,
   path,
-  schema,
+  shape,
   emptyState,
 }: {
   doc: LoroDoc
   path: string[]
-  schema: Schema
-  emptyState?: InferPlainType<Schema>
-}): DraftNode<ContainerShape> | InferPlainType<Schema> | undefined {
-  if (isTextShape(schema)) {
-    return new TextDraftNode({ doc, schema, path, emptyState })
+  shape: Shape
+  emptyState?: InferPlainType<Shape>
+}): DraftNode<ContainerShape> | InferPlainType<Shape> | undefined {
+  if (isTextShape(shape)) {
+    return new TextDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isCounterShape(schema)) {
-    return new CounterDraftNode({ doc, schema, path, emptyState })
+  if (isCounterShape(shape)) {
+    return new CounterDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isListShape(schema)) {
-    return new ListDraftNode({ doc, schema, path, emptyState })
+  if (isListShape(shape)) {
+    return new ListDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isMovableListShape(schema)) {
-    return new MovableListDraftNode({ doc, schema, path, emptyState })
+  if (isMovableListShape(shape)) {
+    return new MovableListDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isMapShape(schema)) {
-    return new MapDraftNode({ doc, schema, path, emptyState })
+  if (isMapShape(shape)) {
+    return new MapDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isTreeShape(schema)) {
-    return new TreeDraftNode({ doc, schema, path, emptyState })
+  if (isTreeShape(shape)) {
+    return new TreeDraftNode({ doc, shape, path, emptyState })
   }
 
-  if (isValueShape(schema)) {
-    console.log("Yup, value", emptyState)
+  if (isValueShape(shape)) {
     return emptyState
   }
 
   throw new Error(
-    `Unknown schema type: ${(schema as ContainerOrValueShape)._type}`,
+    `Unknown shape type: ${(shape as ContainerOrValueShape)._type}`,
   )
 }
 
 // Core TypedDoc abstraction around LoroDoc
-export class TypedDoc<T extends DocShape> {
+export class TypedDoc<Shape extends DocShape> {
   constructor(
-    private schema: T,
-    private emptyState: InferPlainType<T>,
+    private shape: Shape,
+    private emptyState: InferPlainType<Shape>,
     private doc: LoroDoc = new LoroDoc(),
   ) {
-    validateEmptyState(emptyState, schema)
+    validateEmptyState(emptyState, shape)
   }
 
-  get value(): InferPlainType<T> {
+  get value(): InferPlainType<Shape> {
     const crdtValue = this.doc.toJSON()
-    return overlayEmptyState(crdtValue, this.schema, this.emptyState)
+    return overlayEmptyState(crdtValue, this.shape, this.emptyState)
   }
 
-  change(fn: (draft: Draft<T>) => void): InferPlainType<T> {
+  change(fn: (draft: Draft<Shape>) => void): InferPlainType<Shape> {
     // Reuse existing DocumentDraft system with empty state integration
     const draft = new DraftDoc({
-      schema: this.schema,
+      shape: this.shape,
       emptyState: this.emptyState,
       doc: this.doc,
       path: [],
     })
-    fn(draft as unknown as Draft<T>)
+    fn(draft as unknown as Draft<Shape>)
     draft.absorbPlainValues()
     this.doc.commit()
     return this.value
@@ -753,9 +752,9 @@ export class TypedDoc<T extends DocShape> {
     return this.doc
   }
 
-  // Expose schema for internal use
-  get docSchema(): T {
-    return this.schema
+  // Expose shape for internal use
+  get docShape(): Shape {
+    return this.shape
   }
 
   // Get raw CRDT value without overlay
@@ -765,10 +764,10 @@ export class TypedDoc<T extends DocShape> {
 }
 
 // Factory function for TypedLoroDoc
-export function createTypedDoc<T extends DocShape>(
-  schema: T,
-  emptyState: InferPlainType<T>,
+export function createTypedDoc<Shape extends DocShape>(
+  shape: Shape,
+  emptyState: InferPlainType<Shape>,
   existingDoc?: LoroDoc,
-): TypedDoc<T> {
-  return new TypedDoc<T>(schema, emptyState, existingDoc || new LoroDoc())
+): TypedDoc<Shape> {
+  return new TypedDoc<Shape>(shape, emptyState, existingDoc || new LoroDoc())
 }

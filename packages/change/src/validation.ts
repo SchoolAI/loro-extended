@@ -9,7 +9,7 @@ import type {
   ObjectValueShape,
   UnionValueShape,
   ValueShape,
-} from "./schema.js"
+} from "./shape.js"
 
 /**
  * Validates a value against a ContainerShape or ValueShape schema

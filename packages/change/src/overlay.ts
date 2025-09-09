@@ -1,4 +1,4 @@
-import type { InferPlainType, DocShape } from "./schema.js"
+import type { InferPlainType, DocShape } from "./shape.js"
 
 /**
  * Overlays CRDT state with empty state defaults

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createTypedDoc } from "./change.js"
-import { Shape } from "./schema.js"
+import { Shape } from "./shape.js"
 
 describe("CRDT Operations", () => {
   describe("Text Operations", () => {

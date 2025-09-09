@@ -2,7 +2,7 @@
 export { createTypedDoc, TypedDoc } from "./change.js"
 
 // Schema and type exports
-export { Shape } from "./schema.js"
+export { Shape } from "./shape.js"
 export type {
   // Schema node types
   DocShape,
@@ -23,7 +23,7 @@ export type {
   // Type inference
   InferPlainType,
   Draft,
-} from "./schema.js"
+} from "./shape.js"
 
 // Utility exports
 export { validateEmptyState } from "./validation.js"

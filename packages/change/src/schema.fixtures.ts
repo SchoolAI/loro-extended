@@ -1,4 +1,4 @@
-import { Shape } from "./schema.js"
+import { Shape } from "./shape.js"
 
 const { crdt, value } = Shape
 
