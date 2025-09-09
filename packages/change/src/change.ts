@@ -38,19 +38,63 @@ import {
 } from "./utils/type-guards.js"
 import { validateEmptyState } from "./validation.js"
 
-// Draft Document class -- the actual object passed to the change `mutation` function
-class DraftDoc<T extends DocShape> {
-  topLevel!: { [K in keyof T["shape"]]: T["shape"][K] }
+interface DraftNodeParams<Schema extends DocShape | ContainerShape> {
+  doc: LoroDoc
+  schema: Schema
+  emptyState?: InferPlainType<Schema>
+  path: string[]
+}
 
-  constructor(
-    private schema: T,
-    private emptyState: InferPlainType<T>,
-    private doc: LoroDoc,
-  ) {
+// Base class for all draft nodes
+abstract class DraftNode<Schema extends DocShape | ContainerShape> {
+  constructor(protected _params: DraftNodeParams<Schema>) {}
+
+  abstract getContainer(): any
+
+  abstract absorbPlainValues(): void
+
+  protected getParentContainer(parentPath: string[]): LoroMap {
+    if (parentPath.length === 1) {
+      return this.doc.getMap(parentPath[0])
+    } else {
+      const grandParentPath = parentPath.slice(0, -1)
+      const parentKey = parentPath[parentPath.length - 1]
+      const grandParent = this.getParentContainer(grandParentPath)
+      return grandParent.getOrCreateContainer(parentKey, new LoroMap())
+    }
+  }
+
+  protected get doc(): LoroDoc {
+    return this._params.doc
+  }
+
+  protected get schema(): Schema {
+    return this._params.schema
+  }
+
+  protected get emptyState(): InferPlainType<Schema> | undefined {
+    return this._params.emptyState
+  }
+
+  protected get path(): string[] {
+    return this._params.path
+  }
+}
+
+// Draft Document class -- the actual object passed to the change `mutation` function
+class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
+  constructor(_params: DraftNodeParams<Schema>) {
+    super(_params)
     this.createTopLevelProperties()
   }
 
+  getContainer() {
+    throw new Error("not implemented")
+  }
+
   private createTopLevelProperties(): void {
+    if (!this.emptyState) throw new Error("emptyState required")
+
     // Use a more direct approach that preserves type information
     for (const key in this.schema.shape) {
       const schemaValue = this.schema.shape[key]
@@ -74,46 +118,6 @@ class DraftDoc<T extends DocShape> {
     for (const key in this.schema.shape) {
       const node = (this as any)[key] as DraftNode<any>
       node.absorbPlainValues()
-    }
-  }
-}
-
-// Base class for all draft nodes
-abstract class DraftNode<T extends ContainerShape> {
-  protected doc: LoroDoc
-  protected schema: T
-  protected path: string[]
-  protected emptyState?: InferPlainType<T>
-
-  constructor({
-    doc,
-    schema,
-    path,
-    emptyState,
-  }: {
-    doc: LoroDoc
-    schema: T
-    path: string[]
-    emptyState?: InferPlainType<T>
-  }) {
-    this.doc = doc
-    this.schema = schema
-    this.path = path
-    this.emptyState = emptyState
-  }
-
-  abstract getContainer(): any
-
-  abstract absorbPlainValues(): void
-
-  protected getParentContainer(parentPath: string[]): LoroMap {
-    if (parentPath.length === 1) {
-      return this.doc.getMap(parentPath[0])
-    } else {
-      const grandParentPath = parentPath.slice(0, -1)
-      const parentKey = parentPath[parentPath.length - 1]
-      const grandParent = this.getParentContainer(grandParentPath)
-      return grandParent.getOrCreateContainer(parentKey, new LoroMap())
     }
   }
 }
@@ -485,22 +489,12 @@ class MovableListDraftNode<
 }
 
 // Map draft node
-class MapDraftNode<T extends MapContainerShape> extends DraftNode<T> {
+class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
   private container: LoroMap | null = null
-  private propertyCache = new Map<string, DraftNode<T> | Value>()
+  private propertyCache = new Map<string, DraftNode<Schema> | Value>()
 
-  constructor({
-    doc,
-    schema,
-    path,
-    emptyState,
-  }: {
-    doc: LoroDoc
-    schema: T
-    path: string[]
-    emptyState?: InferPlainType<T>
-  }) {
-    super({ doc, schema, path, emptyState })
+  constructor(params: DraftNodeParams<Schema>) {
+    super(params)
     this.createPropertyAccessors()
   }
 
@@ -554,7 +548,7 @@ class MapDraftNode<T extends MapContainerShape> extends DraftNode<T> {
   private getNestedProperty(
     key: string,
     nestedSchema: ContainerOrValueShape,
-  ): DraftNode<T> | Value {
+  ): DraftNode<Schema> | Value {
     if (this.propertyCache.has(key)) {
       return this.propertyCache.get(key)
     }
@@ -732,7 +726,12 @@ export class TypedDoc<T extends DocShape> {
 
   change(fn: (draft: Draft<T>) => void): InferPlainType<T> {
     // Reuse existing DocumentDraft system with empty state integration
-    const draft = new DraftDoc(this.schema, this.emptyState, this.doc)
+    const draft = new DraftDoc({
+      schema: this.schema,
+      emptyState: this.emptyState,
+      doc: this.doc,
+      path: [],
+    })
     fn(draft as unknown as Draft<T>)
     draft.absorbPlainValues()
     this.doc.commit()
