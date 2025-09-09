@@ -83,40 +83,49 @@ abstract class DraftNode<Schema extends DocShape | ContainerShape> {
 
 // Draft Document class -- the actual object passed to the change `mutation` function
 class DraftDoc<Schema extends DocShape> extends DraftNode<Schema> {
+  private propertyCache = new Map<string, DraftNode<Schema>>()
+  private requiredEmptyState!: InferPlainType<Schema>
+
   constructor(_params: DraftNodeParams<Schema>) {
     super(_params)
-    this.createTopLevelProperties()
+    if (!_params.emptyState) throw new Error("emptyState required")
+    this.requiredEmptyState = _params.emptyState
+    this.createLazyProperties()
   }
 
   getContainer() {
     throw new Error("not implemented")
   }
 
-  private createTopLevelProperties(): void {
-    if (!this.emptyState) throw new Error("emptyState required")
-
-    // Use a more direct approach that preserves type information
-    for (const key in this.schema.shape) {
-      const schemaValue = this.schema.shape[key]
-
-      if (!(key in this.emptyState)) {
-        throw new Error(`expected ${key} in emptyState`)
-      }
-
-      const node = createDraftNode({
+  getOrCreateContainer(key: string, schema: ContainerShape) {
+    let container = this.propertyCache.get(key)
+    if (!container) {
+      container = createDraftNode({
         doc: this.doc,
-        schema: schemaValue,
+        schema,
+        emptyState: this.requiredEmptyState[key],
         path: [key],
-        emptyState: this.emptyState[key], // as InferPlainType<T["shape"][typeof key]>
       })
+      if (!container) throw new Error("no container made")
+      this.propertyCache.set(key, container)
+    }
 
-      ;(this as any)[key] = node
+    return container
+  }
+
+  private createLazyProperties(): void {
+    for (const key in this.schema.shape) {
+      const schema = this.schema.shape[key]
+      Object.defineProperty(this, key, {
+        get: () => this.getOrCreateContainer(key, schema),
+      })
     }
   }
 
   absorbPlainValues(): void {
-    for (const key in this.schema.shape) {
-      const node = (this as any)[key] as DraftNode<any>
+    // By iterating over the propertyCache, we achieve a small optimization
+    // by only absorbing values that have been 'touched' in some way
+    for (const node of this.propertyCache.values()) {
       node.absorbPlainValues()
     }
   }
@@ -579,16 +588,16 @@ class MapDraftNode<Schema extends MapContainerShape> extends DraftNode<Schema> {
     return result
   }
 
+  get(key: string): any {
+    return this.getContainer().get(key)
+  }
+
   set(key: string, value: Value): void {
     this.getContainer().set(key, value)
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
     return this.getContainer().setContainer(key, container)
-  }
-
-  get(key: string): any {
-    return this.getContainer().get(key)
   }
 
   delete(key: string): void {
@@ -665,7 +674,7 @@ class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
 }
 
 // Factory function to create appropriate draft node
-function createDraftNode<T extends ContainerOrValueShape>({
+function createDraftNode<Schema extends ContainerOrValueShape>({
   doc,
   path,
   schema,
@@ -673,9 +682,9 @@ function createDraftNode<T extends ContainerOrValueShape>({
 }: {
   doc: LoroDoc
   path: string[]
-  schema: T
-  emptyState?: InferPlainType<T>
-}): DraftNode<ContainerShape> | any {
+  schema: Schema
+  emptyState?: InferPlainType<Schema>
+}): DraftNode<ContainerShape> | InferPlainType<Schema> | undefined {
   if (isTextShape(schema)) {
     return new TextDraftNode({ doc, schema, path, emptyState })
   }
@@ -701,6 +710,7 @@ function createDraftNode<T extends ContainerOrValueShape>({
   }
 
   if (isValueShape(schema)) {
+    console.log("Yup, value", emptyState)
     return emptyState
   }
 
