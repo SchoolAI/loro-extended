@@ -1,70 +1,94 @@
 import {
+  type Container,
   LoroCounter,
-  type LoroDoc,
   LoroList,
   LoroMap,
   LoroMovableList,
   LoroText,
+  type Value,
 } from "loro-crdt"
-import { isContainer } from "./utils/type-guards.js"
-
-/**
- * Schema type checking utilities
- */
-export function isLoroSchema(schema: any): boolean {
-  return schema && typeof schema === "object" && "_type" in schema
-}
+import type {
+  ArrayValueShape,
+  ContainerOrValueShape,
+  ListContainerShape,
+  MapContainerShape,
+  MovableListContainerShape,
+  ObjectValueShape,
+} from "./shape.js"
+import {
+  isContainer,
+  isContainerShape,
+  isObjectValue,
+  isValueShape,
+} from "./utils/type-guards.js"
 
 /**
  * Converts string input to LoroText container
  */
-function convertTextInput(inputValue: any): LoroText | any {
-  if (typeof inputValue === "string") {
-    const text = new LoroText()
-    text.insert(0, inputValue)
-    return text
-  }
-  return inputValue
+function convertTextInput(value: string): LoroText {
+  const text = new LoroText()
+  text.insert(0, value)
+  return text
 }
 
 /**
  * Converts number input to LoroCounter container
  */
-function convertCounterInput(inputValue: any): LoroCounter | any {
-  if (typeof inputValue === "number") {
-    const counter = new LoroCounter()
-    counter.increment(inputValue)
-    return counter
-  }
-  return inputValue
+function convertCounterInput(value: number): LoroCounter {
+  const counter = new LoroCounter()
+  counter.increment(value)
+  return counter
 }
 
 /**
- * Converts array input to LoroList or LoroMovableList container
+ * Converts array input to LoroList container
  */
 function convertListInput(
-  doc: LoroDoc,
-  inputValue: any,
-  schema: any,
-  parentPath: string[],
-  ListClass: typeof LoroList | typeof LoroMovableList,
-): any {
-  if (!Array.isArray(inputValue)) return inputValue
+  value: Value[],
+  shape: ListContainerShape | ArrayValueShape,
+  // parentPath: string[],
+): LoroList | Value[] {
+  if (!isContainerShape(shape)) {
+    return value
+  }
 
-  const list = new ListClass()
-  for (const item of inputValue) {
-    const convertedItem = convertInputToContainer(
-      doc,
-      item,
-      schema.item,
-      parentPath,
-    )
+  const list = new LoroList()
+
+  for (const item of value) {
+    const convertedItem = convertInputToNode(item, shape.shape)
     if (isContainer(convertedItem)) {
       list.pushContainer(convertedItem)
     } else {
       list.push(convertedItem)
     }
   }
+
+  return list
+}
+
+/**
+ * Converts array input to LoroMovableList container
+ */
+function convertMovableListInput(
+  value: Value[],
+  shape: MovableListContainerShape | ArrayValueShape,
+  // parentPath: string[],
+): LoroMovableList | Value[] {
+  if (!isContainerShape(shape)) {
+    return value
+  }
+
+  const list = new LoroMovableList()
+
+  for (const item of value) {
+    const convertedItem = convertInputToNode(item, shape.shape)
+    if (isContainer(convertedItem)) {
+      list.pushContainer(convertedItem)
+    } else {
+      list.push(convertedItem)
+    }
+  }
+
   return list
 }
 
@@ -72,36 +96,28 @@ function convertListInput(
  * Converts object input to LoroMap container
  */
 function convertMapInput(
-  doc: LoroDoc,
-  inputValue: any,
-  schema: any,
-  parentPath: string[],
-): LoroMap | any {
-  if (
-    !inputValue ||
-    typeof inputValue !== "object" ||
-    Array.isArray(inputValue)
-  ) {
-    return inputValue
+  value: { [key: string]: Value },
+  shape: MapContainerShape | ObjectValueShape,
+): LoroMap | { [key: string]: Value } {
+  if (!isContainerShape(shape)) {
+    return value
   }
 
   const map = new LoroMap()
-  for (const [key, value] of Object.entries(inputValue)) {
-    const nestedSchema = schema.shape?.[key]
+  for (const [k, v] of Object.entries(value)) {
+    const nestedSchema = shape.shapes[k]
     if (nestedSchema) {
-      const convertedValue = convertInputToContainer(doc, value, nestedSchema, [
-        ...parentPath,
-        key,
-      ])
+      const convertedValue = convertInputToNode(v, nestedSchema)
       if (isContainer(convertedValue)) {
-        map.setContainer(key, convertedValue)
+        map.setContainer(k, convertedValue)
       } else {
-        map.set(key, convertedValue)
+        map.set(k, convertedValue)
       }
     } else {
-      map.set(key, value)
+      map.set(k, value)
     }
   }
+
   return map
 }
 
@@ -109,38 +125,58 @@ function convertMapInput(
  * Main conversion function that transforms input values to appropriate CRDT containers
  * based on schema definitions
  */
-export function convertInputToContainer(
-  doc: LoroDoc,
-  inputValue: any,
-  schema: any,
-  parentPath: string[],
-): any {
-  if (!isLoroSchema(schema)) {
-    // It's a Zod schema (POJO) - return the value directly
-    return inputValue
-  }
+export function convertInputToNode<Shape extends ContainerOrValueShape>(
+  value: Value,
+  shape: Shape,
+): Container | Value {
+  switch (shape._type) {
+    case "text": {
+      if (typeof value !== "string") {
+        throw new Error("string expected")
+      }
 
-  switch (schema._type) {
-    case "text":
-      return convertTextInput(inputValue)
-    case "counter":
-      return convertCounterInput(inputValue)
-    case "list":
-      return convertListInput(doc, inputValue, schema, parentPath, LoroList)
-    case "movableList":
-      return convertListInput(
-        doc,
-        inputValue,
-        schema,
-        parentPath,
-        LoroMovableList,
-      )
-    case "map":
-      return convertMapInput(doc, inputValue, schema, parentPath)
+      return convertTextInput(value)
+    }
+    case "counter": {
+      if (typeof value !== "number") {
+        throw new Error("number expected")
+      }
+
+      return convertCounterInput(value)
+    }
+    case "list": {
+      if (!Array.isArray(value)) {
+        throw new Error("array expected")
+      }
+
+      return convertListInput(value, shape)
+    }
+    case "movableList": {
+      if (!Array.isArray(value)) {
+        throw new Error("array expected")
+      }
+
+      return convertMovableListInput(value, shape)
+    }
+    case "map": {
+      if (!isObjectValue(value)) {
+        throw new Error("object expected")
+      }
+
+      return convertMapInput(value, shape)
+    }
+    case "value": {
+      if (!isValueShape(shape)) {
+        throw new Error("value expected")
+      }
+
+      return value
+    }
+
     case "tree":
-      // Tree conversion is complex, return as-is for now
-      return inputValue
+      throw new Error("tree type unimplemented")
+
     default:
-      return inputValue
+      throw new Error(`unexpected type: ${(shape as Shape)._type}`)
   }
 }
