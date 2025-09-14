@@ -1,11 +1,6 @@
-import { Value } from "loro-crdt"
-import type {
-  InferPlainType,
-  DocShape,
-  ContainerShape,
-  ValueShape,
-} from "./shape.js"
-import { isContainerShape, isObjectValue } from "./utils/type-guards.js"
+import type { Value } from "loro-crdt"
+import type { ContainerShape, DocShape, ValueShape } from "./shape.js"
+import { isObjectValue } from "./utils/type-guards.js"
 
 /**
  * Overlays CRDT state with empty state defaults
@@ -49,7 +44,6 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
   emptyValue: Value,
 ): Value {
   if (crdtValue === undefined && emptyValue === undefined) {
-    console.log("shape", shape)
     throw new Error("either crdt or empty value must be defined")
   }
 

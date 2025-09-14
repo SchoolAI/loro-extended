@@ -2,7 +2,6 @@ import type {
   ArrayValueShape,
   ContainerOrValueShape,
   DocShape,
-  InferPlainType,
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
@@ -10,6 +9,7 @@ import type {
   UnionValueShape,
   ValueShape,
 } from "./shape.js"
+import { InferPlainType } from "./types.js"
 
 /**
  * Validates a value against a ContainerShape or ValueShape schema
