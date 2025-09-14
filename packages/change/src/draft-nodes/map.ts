@@ -11,11 +11,16 @@ import {
 import type { ContainerShape, MapContainerShape, ValueShape } from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
-import { CounterDraftNode } from "./counter.js"
-import { ListDraftNode } from "./list.js"
-import { MovableListDraftNode } from "./movable-list.js"
-import { TextDraftNode } from "./text.js"
-import { TreeDraftNode } from "./tree.js"
+import { createContainerDraftNode } from "./utils.js"
+
+const containerConstructor = {
+  counter: LoroCounter,
+  list: LoroList,
+  map: LoroMap,
+  movableList: LoroMovableList,
+  text: LoroText,
+  tree: LoroTree,
+} as const
 
 // Map draft node
 export class MapDraftNode<
@@ -41,55 +46,20 @@ export class MapDraftNode<
     }
   }
 
-  createContainerDraftNode<Shape extends ContainerShape>(
+  getDraftNodeParams<S extends ContainerShape>(
     key: string,
-    nestedShape: Shape,
-  ): DraftNode<ContainerShape> {
+    shape: S,
+  ): DraftNodeParams<ContainerShape> {
     const emptyState = this.emptyState?.[key]
 
-    switch (nestedShape._type) {
-      case "counter":
-        return new CounterDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroCounter()),
-        })
-      case "list":
-        return new ListDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroList()),
-        })
-      case "map":
-        return new MapDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroMap()),
-        })
-      case "movableList":
-        return new MovableListDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroMovableList()),
-        })
-      case "text":
-        return new TextDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroText()),
-        })
-      case "tree":
-        return new TreeDraftNode({
-          shape: nestedShape,
-          emptyState,
-          getContainer: () =>
-            this.container.getOrCreateContainer(key, new LoroTree()),
-        })
+    const LoroContainer = containerConstructor[shape._type]
+
+    return {
+      shape,
+      emptyState,
+      getContainer: () =>
+        // biome-ignore lint/suspicious/noExplicitAny: override
+        this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
     }
   }
 
@@ -100,7 +70,7 @@ export class MapDraftNode<
     let node = this.propertyCache.get(key)
     if (!node) {
       if (isContainerShape(shape)) {
-        node = this.createContainerDraftNode(key, shape)
+        node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
       } else {
         const emptyState = this.emptyState?.[key]
         if (!emptyState) throw new Error("empty state required")
