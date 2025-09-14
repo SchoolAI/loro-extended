@@ -1,18 +1,22 @@
-import { LoroDoc } from "loro-crdt"
+import type { LoroDoc } from "loro-crdt"
 import type { InferPlainType } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
-import { CounterDraftNode } from "./counter.js"
-import { ListDraftNode } from "./list.js"
-import { MapDraftNode } from "./map.js"
-import { MovableListDraftNode } from "./movable-list.js"
-import { TextDraftNode } from "./text.js"
-import { TreeDraftNode } from "./tree.js"
+import { createContainerDraftNode } from "./utils.js"
+
+const containerGetter = {
+  counter: "getCounter",
+  list: "getList",
+  map: "getMap",
+  movableList: "getMovableList",
+  text: "getText",
+  tree: "getTree",
+} as const
 
 // Draft Document class -- the actual object passed to the change `mutation` function
 export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
   private doc: LoroDoc
-  private propertyCache = new Map<string, DraftNode<Shape>>()
+  private propertyCache = new Map<string, DraftNode<ContainerShape>>()
   private requiredEmptyState!: InferPlainType<Shape>
 
   constructor(
@@ -30,57 +34,27 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     this.createLazyProperties()
   }
 
-  createDraftNode<S extends ContainerShape>(
+  getDraftNodeParams<S extends ContainerShape>(
     key: string,
-    nestedShape: S,
-  ): DraftNode<any> {
-    const doc = this.doc
+    shape: S,
+  ): DraftNodeParams<ContainerShape> {
+    const getter = this.doc[containerGetter[shape._type]].bind(this.doc)
 
-    switch (nestedShape._type) {
-      case "counter":
-        return new CounterDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getCounter.bind(doc, key),
-        })
-      case "list":
-        return new ListDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getList.bind(doc, key),
-        })
-      case "map":
-        return new MapDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getMap.bind(doc, key),
-        })
-      case "movableList":
-        return new MovableListDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getMovableList.bind(doc, key),
-        })
-      case "text":
-        return new TextDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getText.bind(doc, key),
-        })
-      case "tree":
-        return new TreeDraftNode({
-          shape: nestedShape,
-          emptyState: this.requiredEmptyState[key],
-          getContainer: doc.getTree.bind(doc, key),
-        })
+    return {
+      shape,
+      emptyState: this.requiredEmptyState[key],
+      getContainer: () => getter(key),
     }
   }
 
-  getOrCreateNode(key: string, shape: ContainerShape): DraftNode<Shape> {
+  getOrCreateDraftNode(
+    key: string,
+    shape: ContainerShape,
+  ): DraftNode<ContainerShape> {
     let node = this.propertyCache.get(key)
+
     if (!node) {
-      node = this.createDraftNode(key, shape)
-      if (!node) throw new Error("no container made")
+      node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
       this.propertyCache.set(key, node)
     }
 
@@ -91,7 +65,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     for (const key in this.shape.shapes) {
       const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
-        get: () => this.getOrCreateNode(key, shape),
+        get: () => this.getOrCreateDraftNode(key, shape),
       })
     }
   }
@@ -99,7 +73,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
   absorbPlainValues(): void {
     // By iterating over the propertyCache, we achieve a small optimization
     // by only absorbing values that have been 'touched' in some way
-    for (const node of this.propertyCache.values()) {
+    for (const node of Object.values(this.propertyCache)) {
       node.absorbPlainValues()
     }
   }

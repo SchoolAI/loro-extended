@@ -1,4 +1,3 @@
-import type { LoroDoc } from "loro-crdt"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { InferPlainType } from "../types.js"
 

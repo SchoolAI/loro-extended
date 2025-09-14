@@ -19,8 +19,6 @@ export class TypedDoc<Shape extends DocShape> {
 
   get value(): InferPlainType<Shape> {
     const crdtValue = this.doc.toJSON()
-    console.log("crdtValue", crdtValue)
-    console.log("emptyState", this.emptyState)
     return overlayEmptyState(
       this.shape,
       crdtValue,
