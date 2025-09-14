@@ -7,6 +7,7 @@ import type {
   LoroText,
   LoroTree,
   LoroTreeNode,
+  Value,
 } from "loro-crdt"
 import type {
   ContainerOrValueShape,
@@ -18,7 +19,7 @@ import type {
   TextContainerShape,
   TreeContainerShape,
   ValueShape,
-} from "../schema.js"
+} from "../shape.js"
 
 export { isContainer, isContainerId } from "loro-crdt"
 
@@ -173,5 +174,26 @@ export function isContainerShape(
 export function isValueShape(
   schema: ContainerOrValueShape,
 ): schema is ValueShape {
-  return schema._type === "value"
+  return (
+    schema._type === "value" &&
+    [
+      "string",
+      "number",
+      "boolean",
+      "null",
+      "undefined",
+      "uint8array",
+      "object",
+      "array",
+    ].includes(schema.valueType)
+  )
+}
+
+export function isObjectValue(value: Value): value is { [key: string]: Value } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Uint8Array)
+  )
 }

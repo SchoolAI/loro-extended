@@ -1,6 +1,12 @@
 import type {
   ContainerID,
   Delta,
+  LoroCounter,
+  LoroList,
+  LoroMap,
+  LoroMovableList,
+  LoroText,
+  LoroTree,
   PeerID,
   TextUpdateOptions,
   Value,
@@ -15,30 +21,32 @@ export interface DocShape<
 
 export type TextContainerShape = { readonly _type: "text" }
 export type CounterContainerShape = { readonly _type: "counter" }
-export interface TreeContainerShape<T = ContainerOrValueShape> {
+export interface TreeContainerShape<NestedShape = ContainerOrValueShape> {
   readonly _type: "tree"
-  readonly shape: T
+  readonly shape: NestedShape
 }
 
 // Container schemas using interfaces for recursive references
-export interface ListContainerShape<T = ContainerOrValueShape> {
+export interface ListContainerShape<NestedShape = ContainerOrValueShape> {
   readonly _type: "list"
-  readonly shape: T
+  readonly shape: NestedShape
 }
 
-export interface MovableListContainerShape<T = ContainerOrValueShape> {
+export interface MovableListContainerShape<
+  NestedShape = ContainerOrValueShape,
+> {
   readonly _type: "movableList"
-  readonly shape: T
+  readonly shape: NestedShape
 }
 
 export interface MapContainerShape<
-  T extends Record<string, ContainerOrValueShape> = Record<
+  NestedShapes extends Record<string, ContainerOrValueShape> = Record<
     string,
     ContainerOrValueShape
   >,
 > {
   readonly _type: "map"
-  readonly shape: T
+  readonly shapes: NestedShapes
 }
 
 export type ContainerShape =
@@ -225,7 +233,7 @@ export const Shape = {
     shape: T,
   ): MapContainerShape<T> => ({
     _type: "map" as const,
-    shape,
+    shapes: shape,
   }),
 
   movableList: <T extends ContainerOrValueShape>(
@@ -435,3 +443,19 @@ export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
   T extends DocShape<infer U>
     ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
     : never
+
+// Add this type mapping near the top of your file, after the imports
+export type ShapeToContainer<T extends DocShape | ContainerShape> =
+  T extends TextContainerShape
+    ? LoroText
+    : T extends CounterContainerShape
+      ? LoroCounter
+      : T extends ListContainerShape
+        ? LoroList
+        : T extends MovableListContainerShape
+          ? LoroMovableList
+          : T extends MapContainerShape
+            ? LoroMap
+            : T extends TreeContainerShape
+              ? LoroTree
+              : never // not a container

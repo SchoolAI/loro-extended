@@ -1,25 +1,40 @@
-import type { InferPlainType, DocShape } from "./shape.js"
+import { Value } from "loro-crdt"
+import type {
+  InferPlainType,
+  DocShape,
+  ContainerShape,
+  ValueShape,
+} from "./shape.js"
+import { isContainerShape, isObjectValue } from "./utils/type-guards.js"
 
 /**
  * Overlays CRDT state with empty state defaults
  */
-export function overlayEmptyState<T extends DocShape>(
-  crdtValue: any,
-  schema: T,
-  emptyState: InferPlainType<T>,
-): InferPlainType<T> {
-  if (!crdtValue) return emptyState
+export function overlayEmptyState<Shape extends DocShape>(
+  shape: Shape,
+  crdtValue: { [key: string]: Value },
+  emptyValue: { [key: string]: Value },
+): { [key: string]: Value } {
+  if (typeof crdtValue !== "object") {
+    throw new Error("crdt object is required")
+  }
 
-  const result = { ...emptyState }
+  if (typeof emptyValue !== "object") {
+    throw new Error("empty object is required")
+  }
 
-  for (const [key, schemaValue] of Object.entries(schema.shape)) {
-    if (crdtValue[key] !== undefined) {
-      result[key as keyof typeof result] = mergeValue(
-        crdtValue[key],
-        schemaValue,
-        emptyState[key as keyof typeof emptyState],
-      )
-    }
+  const result = { ...emptyValue }
+
+  for (const [key, propShape] of Object.entries(shape.shape)) {
+    const propCrdtValue = crdtValue[key]
+
+    const propEmptyValue = emptyValue[key as keyof typeof emptyValue]
+
+    result[key as keyof typeof result] = mergeValue(
+      propShape,
+      propCrdtValue,
+      propEmptyValue,
+    )
   }
 
   return result
@@ -28,35 +43,54 @@ export function overlayEmptyState<T extends DocShape>(
 /**
  * Merges individual CRDT values with empty state defaults
  */
-export function mergeValue(crdtValue: any, schema: any, emptyValue: any): any {
-  if (!schema || typeof schema !== "object" || !("_type" in schema)) {
-    // It's a Zod schema (POJO) - prefer CRDT value if it exists
-    return crdtValue !== undefined ? crdtValue : emptyValue
+export function mergeValue<Shape extends ContainerShape | ValueShape>(
+  shape: Shape,
+  crdtValue: Value,
+  emptyValue: Value,
+): Value {
+  if (crdtValue === undefined && emptyValue === undefined) {
+    console.log("shape", shape)
+    throw new Error("either crdt or empty value must be defined")
   }
 
-  switch (schema._type) {
+  switch (shape._type) {
     case "text":
-      return crdtValue || emptyValue || ""
+      return crdtValue ?? emptyValue ?? ""
     case "counter":
-      return crdtValue !== undefined ? crdtValue : emptyValue || 0
+      return crdtValue ?? emptyValue ?? 0
     case "list":
     case "movableList":
-      return crdtValue || emptyValue || []
+      return crdtValue ?? emptyValue ?? []
     case "map": {
-      if (!crdtValue) return emptyValue || {}
-      const result = { ...emptyValue }
-      for (const [key, nestedSchema] of Object.entries(schema.shape || {})) {
-        result[key] = mergeValue(
-          crdtValue[key],
-          nestedSchema,
-          emptyValue?.[key],
+      if (!isObjectValue(crdtValue) && crdtValue !== undefined) {
+        throw new Error("map crdt must be object")
+      }
+
+      const crdtMapValue = crdtValue ?? {}
+
+      if (!isObjectValue(emptyValue) && emptyValue !== undefined) {
+        throw new Error("map empty state must be object")
+      }
+
+      const emptyMapValue = emptyValue ?? {}
+
+      const result = { ...emptyMapValue }
+      for (const [key, nestedShape] of Object.entries(shape.shapes)) {
+        const nestedCrdtValue = crdtMapValue[key]
+        const nestedEmptyValue = emptyMapValue[key]
+
+        result[key as keyof typeof result] = mergeValue(
+          nestedShape,
+          nestedCrdtValue,
+          nestedEmptyValue,
         )
       }
+
       return result
     }
     case "tree":
-      return crdtValue || emptyValue || []
+      return crdtValue ?? emptyValue ?? []
     default:
-      return crdtValue !== undefined ? crdtValue : emptyValue
+      return crdtValue ?? emptyValue
   }
 }

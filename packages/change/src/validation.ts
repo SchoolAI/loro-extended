@@ -66,7 +66,7 @@ export function validateValue(
     const result: Record<string, unknown> = {}
 
     // Validate each property in the map shape
-    for (const [key, nestedSchema] of Object.entries(mapSchema.shape)) {
+    for (const [key, nestedSchema] of Object.entries(mapSchema.shapes)) {
       const nestedPath = `${currentPath}.${key}`
       const nestedValue = (value as Record<string, unknown>)[key]
       result[key] = validateValue(nestedValue, nestedSchema, nestedPath)

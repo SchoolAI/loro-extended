@@ -11,10 +11,9 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
-import { convertInputToContainer } from "./conversion.js"
+import { convertInputToNode } from "./conversion.js"
 import { overlayEmptyState } from "./overlay.js"
 import type {
-  ContainerOrValueShape,
   ContainerShape,
   CounterContainerShape,
   DocShape,
@@ -23,33 +22,30 @@ import type {
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
+  ShapeToContainer,
   TextContainerShape,
   TreeContainerShape,
+  ValueShape,
 } from "./shape.js"
 import {
   isContainer,
-  isCounterShape,
-  isListShape,
-  isMapShape,
-  isMovableListShape,
-  isTextShape,
-  isTreeShape,
+  isContainerShape,
   isValueShape,
 } from "./utils/type-guards.js"
 import { validateEmptyState } from "./validation.js"
 
-interface DraftNodeParams<Shape extends DocShape | ContainerShape> {
+type DraftNodeParams<Shape extends DocShape | ContainerShape> = {
   doc: LoroDoc
   shape: Shape
   emptyState?: InferPlainType<Shape>
-  path: string[]
+  getContainer: () => ShapeToContainer<Shape>
 }
 
 // Base class for all draft nodes
 abstract class DraftNode<Shape extends DocShape | ContainerShape> {
-  constructor(protected _params: DraftNodeParams<Shape>) {}
+  protected _cachedContainer?: ShapeToContainer<Shape>
 
-  abstract getContainer(): any
+  constructor(protected _params: DraftNodeParams<Shape>) {}
 
   abstract absorbPlainValues(): void
 
@@ -76,8 +72,13 @@ abstract class DraftNode<Shape extends DocShape | ContainerShape> {
     return this._params.emptyState
   }
 
-  protected get path(): string[] {
-    return this._params.path
+  protected get container(): ShapeToContainer<Shape> {
+    if (!this._cachedContainer) {
+      const container = this._params.getContainer()
+      this._cachedContainer = container
+      return container
+    }
+    return this._cachedContainer
   }
 }
 
@@ -86,38 +87,86 @@ class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
   private propertyCache = new Map<string, DraftNode<Shape>>()
   private requiredEmptyState!: InferPlainType<Shape>
 
-  constructor(_params: DraftNodeParams<Shape>) {
-    super(_params)
+  constructor(_params: Omit<DraftNodeParams<Shape>, "getContainer">) {
+    super({
+      ..._params,
+      getContainer: () => {
+        throw new Error("can't get container on DraftDoc")
+      },
+    })
     if (!_params.emptyState) throw new Error("emptyState required")
     this.requiredEmptyState = _params.emptyState
     this.createLazyProperties()
   }
 
-  getContainer() {
-    throw new Error("not implemented")
+  createDraftNode<S extends ContainerShape>(
+    key: string,
+    nestedShape: S,
+  ): DraftNode<any> {
+    const doc = this.doc
+
+    switch (nestedShape._type) {
+      case "counter":
+        return new CounterDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getCounter.bind(doc, key),
+        })
+      case "list":
+        return new ListDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getList.bind(doc, key),
+        })
+      case "map":
+        return new MapDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getMap.bind(doc, key),
+        })
+      case "movableList":
+        return new MovableListDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getMovableList.bind(doc, key),
+        })
+      case "text":
+        return new TextDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getText.bind(doc, key),
+        })
+      case "tree":
+        return new TreeDraftNode({
+          doc,
+          shape: nestedShape,
+          emptyState: this.requiredEmptyState[key],
+          getContainer: doc.getTree.bind(doc, key),
+        })
+    }
   }
 
-  getOrCreateContainer(key: string, shape: ContainerShape) {
-    let container = this.propertyCache.get(key)
-    if (!container) {
-      container = createDraftNode({
-        doc: this.doc,
-        shape,
-        emptyState: this.requiredEmptyState[key],
-        path: [key],
-      })
-      if (!container) throw new Error("no container made")
-      this.propertyCache.set(key, container)
+  getOrCreateNode(key: string, shape: ContainerShape): DraftNode<Shape> {
+    let node = this.propertyCache.get(key)
+    if (!node) {
+      node = this.createDraftNode(key, shape)
+      if (!node) throw new Error("no container made")
+      this.propertyCache.set(key, node)
     }
 
-    return container
+    return node
   }
 
   private createLazyProperties(): void {
     for (const key in this.shape.shape) {
       const shape = this.shape.shape[key]
       Object.defineProperty(this, key, {
-        get: () => this.getOrCreateContainer(key, shape),
+        get: () => this.getOrCreateNode(key, shape),
       })
     }
   }
@@ -136,37 +185,43 @@ abstract class ListDraftNodeBase<
   Shape extends ListContainerShape | MovableListContainerShape,
 > extends DraftNode<Shape> {
   protected insertWithConversion(index: number, item: any): void {
-    const convertedItem = convertInputToContainer(
-      this.doc,
-      item,
-      this.shape.shape,
-      this.path,
-    )
+    const convertedItem = convertInputToNode(item, this.shape.shape)
     if (isContainer(convertedItem)) {
-      this.getContainer().insertContainer(index, convertedItem)
+      this.container.insertContainer(index, convertedItem)
     } else {
-      this.getContainer().insert(index, convertedItem)
+      this.container.insert(index, convertedItem)
     }
   }
 
   protected pushWithConversion(item: any): void {
-    const convertedItem = convertInputToContainer(
-      this.doc,
-      item,
-      this.shape.shape,
-      this.path,
-    )
+    const convertedItem = convertInputToNode(item, this.shape.shape)
     if (isContainer(convertedItem)) {
-      this.getContainer().pushContainer(convertedItem)
+      this.container.pushContainer(convertedItem)
     } else {
-      this.getContainer().push(convertedItem)
+      this.container.push(convertedItem)
+    }
+  }
+
+  // Get the appropriate item for array methods - either draft container or plain value
+  protected getDraftItem(index: number): any {
+    // For container shapes, we need to return the draft container object
+    // For value shapes, we return the plain value
+    if (isValueShape(this.shape.shape)) {
+      return this.get(index) // Plain value
+    } else {
+      // Container shape - create/get the draft node
+      const itemPath = [...this.path, index.toString()]
+      return createDraftNode({
+        doc: this.doc,
+        shape: this.shape.shape,
+        path: itemPath,
+        // No empty state for individual list items, they must be fully specified
+      })
     }
   }
 
   // Array-like methods for better developer experience
-  find<ItemType = any>(
-    predicate: (item: ItemType, index: number) => boolean,
-  ): ItemType | undefined {
+  find(predicate: (item: Shape, index: number) => boolean): Shape | undefined {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -245,24 +300,6 @@ abstract class ListDraftNodeBase<
     return true
   }
 
-  // Get the appropriate item for array methods - either draft container or plain value
-  protected getDraftItem(index: number): any {
-    // For container shapes, we need to return the draft container object
-    // For value shapes, we return the plain value
-    if (isValueShape(this.shape.shape)) {
-      return this.get(index) // Plain value
-    } else {
-      // Container shape - create/get the draft node
-      const itemPath = [...this.path, index.toString()]
-      return createDraftNode({
-        doc: this.doc,
-        shape: this.shape.shape,
-        path: itemPath,
-        // No empty state for individual list items, they must be fully specified
-      })
-    }
-  }
-
   // Abstract methods that subclasses must implement
   abstract get(index: number): any
   abstract get length(): number
@@ -270,198 +307,116 @@ abstract class ListDraftNodeBase<
 
 // Text draft node
 class TextDraftNode extends DraftNode<TextContainerShape> {
-  private container: LoroText | null = null
-
-  getContainer(): LoroText {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer() as LoroText
-    }
-    return this.container
-  }
-
   absorbPlainValues() {
     // no plain values contained within
   }
 
-  private getOrCreateContainer(): LoroText {
-    if (this.path.length === 1) {
-      return this.doc.getText(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
-
-      // Use getOrCreateContainer to get a stable reference directly
-      return parent.getOrCreateContainer(key, new LoroText())
-    }
-  }
-
   // Text methods
   insert(index: number, content: string): void {
-    this.getContainer().insert(index, content)
+    this.container.insert(index, content)
   }
 
   delete(index: number, len: number): void {
-    this.getContainer().delete(index, len)
+    this.container.delete(index, len)
   }
 
   toString(): string {
-    return this.getContainer().toString()
+    return this.container.toString()
   }
 
   update(text: string): void {
-    this.getContainer().update(text)
+    this.container.update(text)
   }
 
   mark(range: { start: number; end: number }, key: string, value: any): void {
-    this.getContainer().mark(range, key, value)
+    this.container.mark(range, key, value)
   }
 
   unmark(range: { start: number; end: number }, key: string): void {
-    this.getContainer().unmark(range, key)
+    this.container.unmark(range, key)
   }
 
   toDelta(): any[] {
-    return this.getContainer().toDelta()
+    return this.container.toDelta()
   }
 
   applyDelta(delta: any[]): void {
-    this.getContainer().applyDelta(delta)
+    this.container.applyDelta(delta)
   }
 
   get length(): number {
-    return this.getContainer().length
+    return this.container.length
   }
 }
 
 // Counter draft node
 class CounterDraftNode extends DraftNode<CounterContainerShape> {
-  private container: LoroCounter | null = null
-
-  getContainer(): LoroCounter {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer() as LoroCounter
-    }
-    return this.container
-  }
-
   absorbPlainValues() {
     // no plain values contained within
   }
 
-  private getOrCreateContainer(): LoroCounter {
-    if (this.path.length === 1) {
-      return this.doc.getCounter(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
-
-      // Use getOrCreateContainer to get a stable reference directly
-      return parent.getOrCreateContainer(key, new LoroCounter())
-    }
-  }
-
   increment(value: number): void {
-    this.getContainer().increment(value)
+    this.container.increment(value)
   }
 
   decrement(value: number): void {
-    this.getContainer().decrement(value)
+    this.container.decrement(value)
   }
 
   get value(): number {
-    return this.getContainer().value
+    return this.container.value
   }
 }
 
 // List draft node
-class ListDraftNode<T extends ListContainerShape> extends ListDraftNodeBase<T> {
-  private container: LoroList | null = null
-
-  getContainer(): LoroList {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer()
-    }
-    return this.container
-  }
-
+class ListDraftNode<
+  Shape extends ListContainerShape,
+> extends ListDraftNodeBase<Shape> {
   absorbPlainValues() {
     // TODO(duane): absorb array values
     // this.schema.shape
   }
 
-  private getOrCreateContainer(): LoroList {
-    if (this.path.length === 1) {
-      return this.doc.getList(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
-      return parent.getOrCreateContainer(key, new LoroList())
-    }
-  }
-
-  insert(index: number, item: any): void {
+  insert(index: number, item: InferPlainType<Shape>): void {
     this.insertWithConversion(index, item)
   }
 
   delete(index: number, len: number): void {
-    this.getContainer().delete(index, len)
+    this.container.delete(index, len)
   }
 
-  push(item: any): void {
+  push(item: InferPlainType<Shape>): void {
     this.pushWithConversion(item)
   }
 
-  pushContainer(container: any): any {
-    return this.getContainer().pushContainer(container)
+  pushContainer(container: Container): Container {
+    return this.container.pushContainer(container)
   }
 
-  insertContainer(index: number, container: any): any {
-    return this.getContainer().insertContainer(index, container)
+  insertContainer(index: number, container: Container): Container {
+    return this.container.insertContainer(index, container)
   }
 
   get(index: number): any {
-    return this.getContainer().get(index)
+    return this.container.get(index)
   }
 
   get length(): number {
-    return this.getContainer().length
+    return this.container.length
   }
 
   toArray(): any[] {
-    return this.getContainer().toArray()
+    return this.container.toArray()
   }
 }
 
 // MovableList draft node
 class MovableListDraftNode<
-  T extends MovableListContainerShape,
-> extends ListDraftNodeBase<T> {
-  private container: LoroMovableList | null = null
-
-  getContainer(): LoroMovableList {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer()
-    }
-    return this.container
-  }
-
+  Shape extends MovableListContainerShape,
+> extends ListDraftNodeBase<Shape> {
   absorbPlainValues() {
     // TODO(duane): absorb array values
     // this.schema.shape
-  }
-
-  private getOrCreateContainer(): LoroMovableList {
-    if (this.path.length === 1) {
-      return this.doc.getMovableList(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
-      return parent.getOrCreateContainer(key, new LoroMovableList())
-    }
   }
 
   insert(index: number, item: any): void {
@@ -469,7 +424,7 @@ class MovableListDraftNode<
   }
 
   delete(index: number, len: number): void {
-    this.getContainer().delete(index, len)
+    this.container.delete(index, len)
   }
 
   push(item: any): void {
@@ -477,41 +432,33 @@ class MovableListDraftNode<
   }
 
   set(index: number, item: any): void {
-    this.getContainer().set(index, item)
+    this.container.set(index, item)
   }
 
   move(from: number, to: number): void {
-    this.getContainer().move(from, to)
+    this.container.move(from, to)
   }
 
   get(index: number): any {
-    return this.getContainer().get(index)
+    return this.container.get(index)
   }
 
   get length(): number {
-    return this.getContainer().length
+    return this.container.length
   }
 
   toArray(): any[] {
-    return this.getContainer().toArray()
+    return this.container.toArray()
   }
 }
 
 // Map draft node
-class MapDraftNode<Shape extends MapContainerShape> extends DraftNode<Shape> {
-  private container: LoroMap | null = null
-  private propertyCache = new Map<string, DraftNode<Shape> | Value>()
+class MapDraftNode extends DraftNode<MapContainerShape> {
+  private propertyCache = new Map<string, DraftNode<ContainerShape> | Value>()
 
-  constructor(params: DraftNodeParams<Shape>) {
+  constructor(params: DraftNodeParams<MapContainerShape>) {
     super(params)
-    this.createPropertyAccessors()
-  }
-
-  getContainer(): LoroMap {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer()
-    }
-    return this.container
+    this.createLazyProperties()
   }
 
   absorbPlainValues() {
@@ -523,199 +470,164 @@ class MapDraftNode<Shape extends MapContainerShape> extends DraftNode<Shape> {
       }
 
       // Plain value!
-      this.getContainer().set(key, node)
+      this.container.set(key, node)
     }
   }
 
-  private getOrCreateContainer(): LoroMap {
-    if (this.path.length === 1) {
-      return this.doc.getMap(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath)
+  createContainerDraftNode<Shape extends ContainerShape>(
+    key: string,
+    nestedShape: Shape,
+  ): DraftNode<ContainerShape> {
+    const emptyState = this.emptyState?.[key]
 
-      // Use getOrCreateContainer to get a stable reference directly
-      return parent.getOrCreateContainer(key, new LoroMap())
+    switch (nestedShape._type) {
+      case "counter":
+        return new CounterDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroCounter()),
+        })
+      case "list":
+        return new ListDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroList()),
+        })
+      case "map":
+        return new MapDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroMap()),
+        })
+      case "movableList":
+        return new MovableListDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroMovableList()),
+        })
+      case "text":
+        return new TextDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroText()),
+        })
+      case "tree":
+        return new TreeDraftNode({
+          doc: this.doc,
+          shape: nestedShape,
+          emptyState,
+          getContainer: () =>
+            this.container.getOrCreateContainer(key, new LoroTree()),
+        })
     }
   }
 
-  // Create property accessors for shape-defined keys
-  createPropertyAccessors(): void {
-    for (const [key, nestedShape] of Object.entries(this.shape.shape)) {
+  getOrCreateNode<Shape extends ContainerShape | ValueShape>(
+    key: string,
+    shape: Shape,
+  ): Shape extends ContainerShape ? DraftNode<Shape> : Value {
+    let node = this.propertyCache.get(key)
+    if (!node) {
+      if (isContainerShape(shape)) {
+        node = this.createContainerDraftNode(key, shape)
+      } else {
+        const emptyState = this.emptyState?.[key]
+        if (!emptyState) throw new Error("empty state required")
+        node = emptyState
+      }
+      if (!node) throw new Error("no container made")
+      this.propertyCache.set(key, node)
+    }
+
+    return node as Shape extends ContainerShape ? DraftNode<Shape> : Value
+  }
+
+  private createLazyProperties(): void {
+    for (const key in this.shape.shapes) {
+      const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
-        get: () => this.getNestedProperty(key, nestedShape),
-        set: isValueShape(nestedShape)
-          ? value => this.getContainer().set(key, value)
+        get: () => this.getOrCreateNode(key, shape),
+        set: isValueShape(shape)
+          ? value => {
+              console.log("set value", value)
+              this.container.set(key, value)
+            }
           : undefined,
-        enumerable: true,
-        configurable: true,
       })
     }
   }
 
-  private getNestedProperty(
-    key: string,
-    nestedShape: ContainerOrValueShape,
-  ): DraftNode<Shape> | Value {
-    if (this.propertyCache.has(key)) {
-      return this.propertyCache.get(key)
-    }
-
-    const nestedPath = [...this.path, key]
-    const emptyState = this.emptyState?.[key]
-
-    // Check if we're accessing existing state vs creating new state
-    // If the container already has this key, we don't need emptyState
-    const containerHasKey = this.getContainer().get(key) !== undefined
-
-    // Only require emptyState when creating new state for container shapes
-    if (!containerHasKey && !emptyState && !isValueShape(nestedShape)) {
-      throw new Error(
-        `Map property '${key}' requires emptyState when container doesn't exist`,
-      )
-    }
-
-    // Create the draft node - emptyState can be undefined for existing containers
-    const result = createDraftNode({
-      doc: this.doc,
-      shape: nestedShape,
-      path: nestedPath,
-      emptyState,
-    })
-
-    this.propertyCache.set(key, result)
-    return result
-  }
-
   get(key: string): any {
-    return this.getContainer().get(key)
+    return this.container.get(key)
   }
 
   set(key: string, value: Value): void {
-    this.getContainer().set(key, value)
+    this.container.set(key, value)
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    return this.getContainer().setContainer(key, container)
+    return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
-    this.getContainer().delete(key)
+    this.container.delete(key)
   }
 
   has(key: string): boolean {
     // LoroMap doesn't have a has method, so we check if get returns undefined
-    return this.getContainer().get(key) !== undefined
+    return this.container.get(key) !== undefined
   }
 
   keys(): string[] {
-    return this.getContainer().keys()
+    return this.container.keys()
   }
 
   values(): any[] {
-    return this.getContainer().values()
+    return this.container.values()
   }
 
   get size(): number {
-    return this.getContainer().size
+    return this.container.size
   }
 }
 
 // Tree draft node
 class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
-  private container: LoroTree | null = null
-
-  getContainer(): LoroTree {
-    if (!this.container) {
-      this.container = this.getOrCreateContainer() as LoroTree
-    }
-    return this.container
-  }
-
   absorbPlainValues() {
     // TODO(duane): implement for trees
   }
 
-  private getOrCreateContainer(): LoroTree {
-    if (this.path.length === 1) {
-      return this.doc.getTree(this.path[0])
-    } else {
-      const parentPath = this.path.slice(0, -1)
-      const key = this.path[this.path.length - 1]
-      const parent = this.getParentContainer(parentPath) as LoroMap
-
-      // Use getOrCreateContainer to get a stable reference directly
-      return parent.getOrCreateContainer(key, new LoroTree())
-    }
-  }
-
   createNode(parent?: any, index?: number): any {
-    return this.getContainer().createNode(parent, index)
+    return this.container.createNode(parent, index)
   }
 
   move(target: any, parent?: any, index?: number): void {
-    this.getContainer().move(target, parent, index)
+    this.container.move(target, parent, index)
   }
 
   delete(target: any): void {
-    this.getContainer().delete(target)
+    this.container.delete(target)
   }
 
   has(target: any): boolean {
-    return this.getContainer().has(target)
+    return this.container.has(target)
   }
 
   getNodeByID(id: any): any {
-    return this.getContainer().getNodeByID
-      ? this.getContainer().getNodeByID(id)
+    return this.container.getNodeByID
+      ? this.container.getNodeByID(id)
       : undefined
   }
-}
-
-// Factory function to create appropriate draft node
-function createDraftNode<Shape extends ContainerOrValueShape>({
-  doc,
-  path,
-  shape,
-  emptyState,
-}: {
-  doc: LoroDoc
-  path: string[]
-  shape: Shape
-  emptyState?: InferPlainType<Shape>
-}): DraftNode<ContainerShape> | InferPlainType<Shape> | undefined {
-  if (isTextShape(shape)) {
-    return new TextDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isCounterShape(shape)) {
-    return new CounterDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isListShape(shape)) {
-    return new ListDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isMovableListShape(shape)) {
-    return new MovableListDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isMapShape(shape)) {
-    return new MapDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isTreeShape(shape)) {
-    return new TreeDraftNode({ doc, shape, path, emptyState })
-  }
-
-  if (isValueShape(shape)) {
-    return emptyState
-  }
-
-  throw new Error(
-    `Unknown shape type: ${(shape as ContainerOrValueShape)._type}`,
-  )
 }
 
 // Core TypedDoc abstraction around LoroDoc
@@ -730,7 +642,13 @@ export class TypedDoc<Shape extends DocShape> {
 
   get value(): InferPlainType<Shape> {
     const crdtValue = this.doc.toJSON()
-    return overlayEmptyState(crdtValue, this.shape, this.emptyState)
+    console.log("crdtValue", crdtValue)
+    console.log("emptyState", this.emptyState)
+    return overlayEmptyState(
+      this.shape,
+      crdtValue,
+      this.emptyState,
+    ) as InferPlainType<Shape>
   }
 
   change(fn: (draft: Draft<Shape>) => void): InferPlainType<Shape> {
@@ -739,7 +657,6 @@ export class TypedDoc<Shape extends DocShape> {
       shape: this.shape,
       emptyState: this.emptyState,
       doc: this.doc,
-      path: [],
     })
     fn(draft as unknown as Draft<Shape>)
     draft.absorbPlainValues()

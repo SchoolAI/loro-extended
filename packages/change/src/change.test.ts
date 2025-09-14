@@ -853,22 +853,16 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         profile: Shape.map({
           name: Shape.plain.string(),
-          email: Shape.plain.union([
-            Shape.plain.string(),
-            Shape.plain.undefined(),
-          ]),
-          age: Shape.plain.union([
-            Shape.plain.number(),
-            Shape.plain.undefined(),
-          ]),
+          email: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
+          age: Shape.plain.union([Shape.plain.number(), Shape.plain.null()]),
         }),
       })
 
       const emptyState = {
         profile: {
           name: "Anonymous",
-          email: undefined,
-          age: undefined,
+          email: null,
+          age: null,
         },
       }
 
@@ -881,7 +875,7 @@ describe("TypedLoroDoc", () => {
 
       expect(result.profile.name).toBe("John Doe")
       expect(result.profile.email).toBe("john@example.com")
-      expect(result.profile.age).toBeUndefined()
+      expect(result.profile.age).toBeNull()
     })
   })
 
@@ -1957,6 +1951,7 @@ describe("Edge Cases and Error Handling", () => {
             // Find existing item and mutate
             const existing = draft.items.find(item => item.id === "1")
             if (existing) {
+              console.log("existing found, mult by 2")
               existing.value *= 2
             }
 
@@ -1969,6 +1964,8 @@ describe("Edge Cases and Error Handling", () => {
               }
             }
           })
+
+          console.log("result", result)
 
           // Verify mutations worked correctly
           expect(result.items).toHaveLength(2)
