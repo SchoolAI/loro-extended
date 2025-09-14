@@ -398,6 +398,54 @@ const array = draft.items.toArray();
 const length = draft.items.length;
 ```
 
+#### Array-like Methods
+
+Lists support familiar JavaScript array methods for filtering and finding items:
+
+```typescript
+// Find items (returns mutable draft objects)
+const foundItem = draft.todos.find(todo => todo.completed);
+const foundIndex = draft.todos.findIndex(todo => todo.id === "123");
+
+// Filter items (returns array of mutable draft objects)
+const completedTodos = draft.todos.filter(todo => todo.completed);
+const activeTodos = draft.todos.filter(todo => !todo.completed);
+
+// Transform items (returns plain array, not mutable)
+const todoTexts = draft.todos.map(todo => todo.text);
+const todoIds = draft.todos.map(todo => todo.id);
+
+// Check conditions
+const hasCompleted = draft.todos.some(todo => todo.completed);
+const allCompleted = draft.todos.every(todo => todo.completed);
+
+// Iterate over items
+draft.todos.forEach((todo, index) => {
+  console.log(`Todo ${index}: ${todo.text}`);
+});
+```
+
+**Important**: Methods like `find()` and `filter()` return **mutable draft objects** that you can modify directly:
+
+```typescript
+doc.change((draft) => {
+  // Find and mutate pattern - very common!
+  const todo = draft.todos.find(t => t.id === "123");
+  if (todo) {
+    todo.completed = true; // ✅ This mutation will persist!
+    todo.text = "Updated text"; // ✅ This too!
+  }
+
+  // Filter and modify multiple items
+  const activeTodos = draft.todos.filter(t => !t.completed);
+  activeTodos.forEach(todo => {
+    todo.priority = "high"; // ✅ All mutations persist!
+  });
+});
+```
+
+This dual interface ensures predicates work with current data (including previous mutations in the same `change()` block) while returned objects remain mutable.
+
 ### Movable List Operations
 
 ```typescript
