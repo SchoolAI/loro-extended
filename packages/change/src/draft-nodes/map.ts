@@ -8,7 +8,12 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
-import type { ContainerShape, MapContainerShape, ValueShape } from "../shape.js"
+import type {
+  ContainerShape,
+  MapContainerShape,
+  ValueShape,
+  ContainerOrValueShape,
+} from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { CounterDraftNode } from "./counter.js"
@@ -18,10 +23,12 @@ import { TextDraftNode } from "./text.js"
 import { TreeDraftNode } from "./tree.js"
 
 // Map draft node
-export class MapDraftNode extends DraftNode<MapContainerShape> {
+export class MapDraftNode<
+  Shape extends MapContainerShape,
+> extends DraftNode<Shape> {
   private propertyCache = new Map<string, DraftNode<ContainerShape> | Value>()
 
-  constructor(params: DraftNodeParams<MapContainerShape>) {
+  constructor(params: DraftNodeParams<Shape>) {
     super(params)
     this.createLazyProperties()
   }
@@ -124,7 +131,7 @@ export class MapDraftNode extends DraftNode<MapContainerShape> {
         get: () => this.getOrCreateNode(key, shape),
         set: isValueShape(shape)
           ? value => {
-              console.log("set value", value)
+              // console.log("set value", value)
               this.container.set(key, value)
             }
           : undefined,
@@ -132,6 +139,7 @@ export class MapDraftNode extends DraftNode<MapContainerShape> {
     }
   }
 
+  // TOOD(duane): return correct type here
   get(key: string): any {
     return this.container.get(key)
   }
@@ -157,6 +165,7 @@ export class MapDraftNode extends DraftNode<MapContainerShape> {
     return this.container.keys()
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: an array of values merges all value types
   values(): any[] {
     return this.container.values()
   }

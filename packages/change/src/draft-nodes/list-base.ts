@@ -8,13 +8,14 @@ import { DraftNode } from "./base.js"
 // Shared logic for list operations
 export abstract class ListDraftNodeBase<
   Shape extends ListContainerShape | MovableListContainerShape,
+  Item = InferPlainType<Shape["shape"]>,
 > extends DraftNode<Shape> {
   absorbPlainValues() {
     // TODO(duane): absorb array values
     // this.schema.shape
   }
 
-  protected insertWithConversion(index: number, item: any): void {
+  protected insertWithConversion(index: number, item: Item): void {
     const convertedItem = convertInputToNode(item, this.shape.shape)
     if (isContainer(convertedItem)) {
       this.container.insertContainer(index, convertedItem)
@@ -23,7 +24,7 @@ export abstract class ListDraftNodeBase<
     }
   }
 
-  protected pushWithConversion(item: any): void {
+  protected pushWithConversion(item: Item): void {
     const convertedItem = convertInputToNode(item, this.shape.shape)
     if (isContainer(convertedItem)) {
       this.container.pushContainer(convertedItem)
@@ -51,7 +52,7 @@ export abstract class ListDraftNodeBase<
   }
 
   // Array-like methods for better developer experience
-  find(predicate: (item: Shape, index: number) => boolean): Shape | undefined {
+  find(predicate: (item: Item, index: number) => boolean): Item | undefined {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -61,9 +62,7 @@ export abstract class ListDraftNodeBase<
     return undefined
   }
 
-  findIndex<ItemType = any>(
-    predicate: (item: ItemType, index: number) => boolean,
-  ): number {
+  findIndex(predicate: (item: Item, index: number) => boolean): number {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -73,8 +72,8 @@ export abstract class ListDraftNodeBase<
     return -1
   }
 
-  map<ItemType = any, ReturnType = any>(
-    callback: (item: ItemType, index: number) => ReturnType,
+  map<ReturnType>(
+    callback: (item: Item, index: number) => ReturnType,
   ): ReturnType[] {
     const result: ReturnType[] = []
     for (let i = 0; i < this.length; i++) {
@@ -84,10 +83,8 @@ export abstract class ListDraftNodeBase<
     return result
   }
 
-  filter<ItemType = any>(
-    predicate: (item: ItemType, index: number) => boolean,
-  ): ItemType[] {
-    const result: ItemType[] = []
+  filter(predicate: (item: Item, index: number) => boolean): Item[] {
+    const result: Item[] = []
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -97,18 +94,14 @@ export abstract class ListDraftNodeBase<
     return result
   }
 
-  forEach<ItemType = any>(
-    callback: (item: ItemType, index: number) => void,
-  ): void {
+  forEach(callback: (item: Item, index: number) => void): void {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       callback(item, i)
     }
   }
 
-  some<ItemType = any>(
-    predicate: (item: ItemType, index: number) => boolean,
-  ): boolean {
+  some(predicate: (item: Item, index: number) => boolean): boolean {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -118,9 +111,7 @@ export abstract class ListDraftNodeBase<
     return false
   }
 
-  every<ItemType = any>(
-    predicate: (item: ItemType, index: number) => boolean,
-  ): boolean {
+  every(predicate: (item: Item, index: number) => boolean): boolean {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (!predicate(item, i)) {
@@ -130,7 +121,7 @@ export abstract class ListDraftNodeBase<
     return true
   }
 
-  insert(index: number, item: InferPlainType<Shape>): void {
+  insert(index: number, item: Item): void {
     this.insertWithConversion(index, item)
   }
 
@@ -138,7 +129,7 @@ export abstract class ListDraftNodeBase<
     this.container.delete(index, len)
   }
 
-  push(item: InferPlainType<Shape>): void {
+  push(item: Item): void {
     this.pushWithConversion(item)
   }
 
@@ -150,12 +141,12 @@ export abstract class ListDraftNodeBase<
     return this.container.insertContainer(index, container)
   }
 
-  get(index: number): any {
-    return this.container.get(index)
+  get(index: number): Item {
+    return this.container.get(index) as Item
   }
 
-  toArray(): any[] {
-    return this.container.toArray()
+  toArray(): Item[] {
+    return this.container.toArray() as Item[]
   }
 
   get length(): number {

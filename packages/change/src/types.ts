@@ -3,7 +3,13 @@
  * =============================================================================
  */
 
-import type { ContainerID, Delta, PeerID, TextUpdateOptions, Value } from "loro-crdt"
+import type {
+  ContainerID,
+  Delta,
+  PeerID,
+  TextUpdateOptions,
+  Value,
+} from "loro-crdt"
 import type {
   ArrayValueShape,
   BooleanValueShape,
@@ -21,9 +27,14 @@ import type {
   TextContainerShape,
   Uint8ArrayValueShape,
   UndefinedValueShape,
-  UnionValueShape,
+  // UnionValueShape,
   ValueShape,
 } from "./shape.js"
+import { TextDraftNode } from "./draft-nodes/text.js"
+import { CounterDraftNode } from "./draft-nodes/counter.js"
+import { ListDraftNode } from "./draft-nodes/list.js"
+import { MovableListDraftNode } from "./draft-nodes/movable-list.js"
+import { MapDraftNode } from "./draft-nodes/map.js"
 
 // Context types for different mapping scenarios
 type PlainTypeContext = "plain" // Maps to input parameter types
@@ -42,23 +53,23 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
   // Loro container types
   : T extends TextContainerShape
     ? Context extends "plain" ? string
-      : Context extends "draft" ? DraftLoroText
+      : Context extends "draft" ? TextDraftNode
       : never
   : T extends CounterContainerShape
     ? Context extends "plain" ? number
-      : Context extends "draft" ? DraftLoroCounter
+      : Context extends "draft" ? CounterDraftNode
       : never
   : T extends ListContainerShape<infer U>
     ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
-      : Context extends "draft" ? DraftLoroList<U>
+      : Context extends "draft" ? ListDraftNode<T>
       : never
   : T extends MovableListContainerShape<infer U>
     ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
-      : Context extends "draft" ? DraftLoroMovableList<U>
+      : Context extends "draft" ? MovableListDraftNode<T>
       : never
   : T extends MapContainerShape<infer U>
     ? Context extends "plain" ? { [K in keyof U]: BaseSchemaMapper<U[K], "plain"> }
-      : Context extends "draft" ? DraftLoroMap<U>
+      : Context extends "draft" ? MapDraftNode<T> & { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
       : never
   // : T extends TreeContainerShape<infer U>
   //   ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
@@ -97,17 +108,19 @@ type BaseSchemaMapper<T, Context extends MappingContext> =
     ? Context extends "plain" ? BaseSchemaMapper<U, "plain">[]
       : Context extends "draft" ? BaseSchemaMapper<U, "draft">[]
       : never
-  : T extends UnionValueShape<infer U>
-    ? U extends readonly ValueShape[]
-      ? Context extends "plain" ? BaseSchemaMapper<U, "plain">
-        : Context extends "draft" ? BaseSchemaMapper<U, "draft">
-        : never
-      : never
+  // : T extends UnionValueShape<infer U>
+  //   ? U extends readonly ValueShape[]
+  //     ? Context extends "plain" ? BaseSchemaMapper<U, "plain">
+  //       : Context extends "draft" ? BaseSchemaMapper<U, "draft">
+  //       : never
+  //     : never
   // biome-ignore lint/suspicious/noExplicitAny: required for type system to work
   : any
 
 // Input type inference - what developers can pass to push/insert methods
 export type InferPlainType<T> = BaseSchemaMapper<T, "plain">
+
+export type InferDraftType<T> = BaseSchemaMapper<T, "draft">
 
 // Draft-specific type inference that properly handles the draft context
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
@@ -115,6 +128,7 @@ export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
     ? { [K in keyof U]: BaseSchemaMapper<U[K], "draft"> }
     : never
 
+/*
 // Draft-specific interfaces
 type DraftLoroText = {
   update(text: string, options?: TextUpdateOptions): void
@@ -239,3 +253,4 @@ type DraftLoroMap<U extends Record<string, ContainerOrValueShape>> = {
   readonly id: ContainerID
   readonly size: number
 }
+*/

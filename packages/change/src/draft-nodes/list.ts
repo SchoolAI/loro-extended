@@ -1,3 +1,4 @@
+import type { InferPlainType } from "src/index.js"
 import type { ListContainerShape } from "../shape.js"
 import { ListDraftNodeBase } from "./list-base.js"
 
