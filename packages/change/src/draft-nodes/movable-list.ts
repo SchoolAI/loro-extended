@@ -8,6 +8,11 @@ export class MovableListDraftNode<
   Shape extends MovableListContainerShape,
   Item = InferPlainType<Shape["shape"]>,
 > extends ListDraftNodeBase<Shape> {
+  protected absorbValueAtIndex(index: number, value: any): void {
+    // LoroMovableList has set method
+    this.container.set(index, value)
+  }
+
   move(from: number, to: number): void {
     this.container.move(from, to)
   }

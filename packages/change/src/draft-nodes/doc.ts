@@ -73,7 +73,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
   absorbPlainValues(): void {
     // By iterating over the propertyCache, we achieve a small optimization
     // by only absorbing values that have been 'touched' in some way
-    for (const node of Object.values(this.propertyCache)) {
+    for (const [, node] of this.propertyCache.entries()) {
       node.absorbPlainValues()
     }
   }

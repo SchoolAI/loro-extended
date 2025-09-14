@@ -1951,11 +1951,12 @@ describe("Edge Cases and Error Handling", () => {
             // Find existing item and mutate
             const existing = draft.items.find(item => item.id === "1")
             if (existing) {
-              console.log("existing found, mult by 2")
               existing.value *= 2
             }
 
             // Use findIndex to locate and mutate
+            // Note: After the first mutation, item with id "1" now has value 20,
+            // so findIndex will find that item (index 0), not the original item with id "2"
             const index = draft.items.findIndex(item => item.value === 20)
             if (index !== -1) {
               const item = draft.items.get(index)
@@ -1965,12 +1966,10 @@ describe("Edge Cases and Error Handling", () => {
             }
           })
 
-          console.log("result", result)
-
           // Verify mutations worked correctly
           expect(result.items).toHaveLength(2)
-          expect(result.items[0].value).toBe(20) // 10 * 2
-          expect(result.items[1].value).toBe(25) // 20 + 5
+          expect(result.items[0].value).toBe(25) // 10 * 2 + 5 (found by findIndex)
+          expect(result.items[1].value).toBe(20) // 20 (unchanged)
 
           // Verify no phantom items were created
           expect(result.items.find(item => item.id === "999")).toBeUndefined()

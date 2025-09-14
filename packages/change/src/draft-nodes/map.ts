@@ -72,9 +72,18 @@ export class MapDraftNode<
       if (isContainerShape(shape)) {
         node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
       } else {
-        const emptyState = this.emptyState?.[key]
-        if (!emptyState) throw new Error("empty state required")
-        node = emptyState
+        // For value shapes, first try to get the value from the container
+        const containerValue = this.container.get(key)
+        if (containerValue !== undefined) {
+          node = containerValue as Value
+        } else {
+          // Only fall back to empty state if the container doesn't have the value
+          const emptyState = this.emptyState?.[key]
+          if (!emptyState) {
+            throw new Error("empty state required")
+          }
+          node = emptyState
+        }
       }
       if (!node) throw new Error("no container made")
       this.propertyCache.set(key, node)
