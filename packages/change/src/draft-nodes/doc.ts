@@ -1,3 +1,4 @@
+import { LoroDoc } from "loro-crdt"
 import type { InferPlainType } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
@@ -10,10 +11,13 @@ import { TreeDraftNode } from "./tree.js"
 
 // Draft Document class -- the actual object passed to the change `mutation` function
 export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
+  private doc: LoroDoc
   private propertyCache = new Map<string, DraftNode<Shape>>()
   private requiredEmptyState!: InferPlainType<Shape>
 
-  constructor(_params: Omit<DraftNodeParams<Shape>, "getContainer">) {
+  constructor(
+    _params: Omit<DraftNodeParams<Shape>, "getContainer"> & { doc: LoroDoc },
+  ) {
     super({
       ..._params,
       getContainer: () => {
@@ -21,6 +25,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
       },
     })
     if (!_params.emptyState) throw new Error("emptyState required")
+    this.doc = _params.doc
     this.requiredEmptyState = _params.emptyState
     this.createLazyProperties()
   }
@@ -34,42 +39,36 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     switch (nestedShape._type) {
       case "counter":
         return new CounterDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getCounter.bind(doc, key),
         })
       case "list":
         return new ListDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getList.bind(doc, key),
         })
       case "map":
         return new MapDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getMap.bind(doc, key),
         })
       case "movableList":
         return new MovableListDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getMovableList.bind(doc, key),
         })
       case "text":
         return new TextDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getText.bind(doc, key),
         })
       case "tree":
         return new TreeDraftNode({
-          doc,
           shape: nestedShape,
           emptyState: this.requiredEmptyState[key],
           getContainer: doc.getTree.bind(doc, key),

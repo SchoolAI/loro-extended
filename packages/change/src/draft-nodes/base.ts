@@ -3,7 +3,6 @@ import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { InferPlainType } from "../types.js"
 
 export type DraftNodeParams<Shape extends DocShape | ContainerShape> = {
-  doc: LoroDoc
   shape: Shape
   emptyState?: InferPlainType<Shape>
   getContainer: () => ShapeToContainer<Shape>
@@ -16,21 +15,6 @@ export abstract class DraftNode<Shape extends DocShape | ContainerShape> {
   constructor(protected _params: DraftNodeParams<Shape>) {}
 
   abstract absorbPlainValues(): void
-
-  // protected getParentContainer(parentPath: string[]): LoroMap {
-  //   if (parentPath.length === 1) {
-  //     return this.doc.getMap(parentPath[0])
-  //   } else {
-  //     const grandParentPath = parentPath.slice(0, -1)
-  //     const parentKey = parentPath[parentPath.length - 1]
-  //     const grandParent = this.getParentContainer(grandParentPath)
-  //     return grandParent.getOrCreateContainer(parentKey, new LoroMap())
-  //   }
-  // }
-
-  protected get doc(): LoroDoc {
-    return this._params.doc
-  }
 
   protected get shape(): Shape {
     return this._params.shape

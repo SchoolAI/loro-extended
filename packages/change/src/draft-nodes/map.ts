@@ -8,12 +8,7 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
-import type {
-  ContainerShape,
-  MapContainerShape,
-  ValueShape,
-  ContainerOrValueShape,
-} from "../shape.js"
+import type { ContainerShape, MapContainerShape, ValueShape } from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { CounterDraftNode } from "./counter.js"
@@ -55,7 +50,6 @@ export class MapDraftNode<
     switch (nestedShape._type) {
       case "counter":
         return new CounterDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>
@@ -63,7 +57,6 @@ export class MapDraftNode<
         })
       case "list":
         return new ListDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>
@@ -71,7 +64,6 @@ export class MapDraftNode<
         })
       case "map":
         return new MapDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>
@@ -79,7 +71,6 @@ export class MapDraftNode<
         })
       case "movableList":
         return new MovableListDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>
@@ -87,7 +78,6 @@ export class MapDraftNode<
         })
       case "text":
         return new TextDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>
@@ -95,7 +85,6 @@ export class MapDraftNode<
         })
       case "tree":
         return new TreeDraftNode({
-          doc: this.doc,
           shape: nestedShape,
           emptyState,
           getContainer: () =>

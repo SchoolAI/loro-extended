@@ -44,7 +44,6 @@ export abstract class ListDraftNodeBase<
       // Container shape - create/get the draft node
       const itemPath = [...this.path, index.toString()]
       return createDraftNode({
-        doc: this.doc,
         shape: this.shape.shape,
         path: itemPath,
         // No empty state for individual list items, they must be fully specified
