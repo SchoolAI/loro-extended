@@ -1,15 +1,10 @@
 import type {
-  ContainerID,
-  Delta,
   LoroCounter,
   LoroList,
   LoroMap,
   LoroMovableList,
   LoroText,
   LoroTree,
-  PeerID,
-  TextUpdateOptions,
-  Value,
 } from "loro-crdt"
 
 export interface DocShape<
@@ -109,11 +104,11 @@ export interface ArrayValueShape<T extends ValueShape = ValueShape> {
   readonly shape: T
 }
 
-// export interface UnionValueShape<T extends ValueShape[] = ValueShape[]> {
-//   readonly _type: "value"
-//   readonly valueType: "union"
-//   readonly shapes: T
-// }
+export interface UnionValueShape<T extends ValueShape[] = ValueShape[]> {
+  readonly _type: "value"
+  readonly valueType: "union"
+  readonly shapes: T
+}
 
 // Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
 export type ValueShape =
@@ -125,7 +120,7 @@ export type ValueShape =
   | Uint8ArrayValueShape
   | ObjectValueShape
   | ArrayValueShape
-// | UnionValueShape
+  | UnionValueShape
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
@@ -225,12 +220,13 @@ export const Shape = {
       shape,
     }),
 
-    // // Special value type that helps make things like `string | null` representable
-    // union: <T extends ValueShape[]>(shapes: T): UnionValueShape<T> => ({
-    //   _type: "value" as const,
-    //   valueType: "union" as const,
-    //   shapes,
-    // }),
+    // Special value type that helps make things like `string | null` representable
+    // TODO(duane): should this be a more general type for containers too?
+    union: <T extends ValueShape[]>(shapes: T): UnionValueShape<T> => ({
+      _type: "value" as const,
+      valueType: "union" as const,
+      shapes,
+    }),
   },
 }
 

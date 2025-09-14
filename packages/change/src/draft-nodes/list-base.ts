@@ -1,7 +1,7 @@
 import type { Container } from "loro-crdt"
 import { convertInputToNode } from "../conversion.js"
 import type { ListContainerShape, MovableListContainerShape } from "../shape.js"
-import type { InferPlainType } from "../types.js"
+import type { InferDraftType, InferPlainType } from "../types.js"
 import { isContainer, isValueShape } from "../utils/type-guards.js"
 import { DraftNode } from "./base.js"
 
@@ -9,6 +9,7 @@ import { DraftNode } from "./base.js"
 export abstract class ListDraftNodeBase<
   Shape extends ListContainerShape | MovableListContainerShape,
   Item = InferPlainType<Shape["shape"]>,
+  DraftItem = InferDraftType<Shape["shape"]>,
 > extends DraftNode<Shape> {
   absorbPlainValues() {
     // TODO(duane): absorb array values
@@ -52,7 +53,9 @@ export abstract class ListDraftNodeBase<
   }
 
   // Array-like methods for better developer experience
-  find(predicate: (item: Item, index: number) => boolean): Item | undefined {
+  find(
+    predicate: (item: Item, index: number) => boolean,
+  ): DraftItem | undefined {
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -83,8 +86,8 @@ export abstract class ListDraftNodeBase<
     return result
   }
 
-  filter(predicate: (item: Item, index: number) => boolean): Item[] {
-    const result: Item[] = []
+  filter(predicate: (item: Item, index: number) => boolean): DraftItem[] {
+    const result: DraftItem[] = []
     for (let i = 0; i < this.length; i++) {
       const item = this.getDraftItem(i)
       if (predicate(item, i)) {
@@ -141,8 +144,8 @@ export abstract class ListDraftNodeBase<
     return this.container.insertContainer(index, container)
   }
 
-  get(index: number): Item {
-    return this.container.get(index) as Item
+  get(index: number): DraftItem {
+    return this.container.get(index) as DraftItem
   }
 
   toArray(): Item[] {
