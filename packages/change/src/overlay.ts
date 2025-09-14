@@ -25,7 +25,7 @@ export function overlayEmptyState<Shape extends DocShape>(
 
   const result = { ...emptyValue }
 
-  for (const [key, propShape] of Object.entries(shape.shape)) {
+  for (const [key, propShape] of Object.entries(shape.shapes)) {
     const propCrdtValue = crdtValue[key]
 
     const propEmptyValue = emptyValue[key as keyof typeof emptyValue]

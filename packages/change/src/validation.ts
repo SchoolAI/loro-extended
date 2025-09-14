@@ -214,7 +214,7 @@ export function validateEmptyState<T extends DocShape>(
   const result: Record<string, unknown> = {}
 
   // Validate each property in the document schema
-  for (const [key, schemaValue] of Object.entries(schema.shape)) {
+  for (const [key, schemaValue] of Object.entries(schema.shapes)) {
     const value = (emptyState as Record<string, unknown>)[key]
     result[key] = validateValue(value, schemaValue, key)
   }
