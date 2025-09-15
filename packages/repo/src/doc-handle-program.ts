@@ -446,8 +446,33 @@ export function update<T extends DocContent>(
       }
 
     case "unavailable":
+      // Allow find operations to restart from unavailable state
+      // This handles the case where a document becomes available after initially being unavailable
+      switch (msg.type) {
+        case "msg-find":
+          return [
+            {
+              state: "storage-loading",
+              operation: "find",
+              requestId: msg.requestId,
+            },
+            { type: "cmd-load-from-storage", documentId },
+          ]
+        case "msg-find-or-create":
+          return [
+            {
+              state: "storage-loading",
+              operation: "find-or-create",
+              requestId: msg.requestId,
+              timeout: msg.timeout,
+            },
+            { type: "cmd-load-from-storage", documentId },
+          ]
+        default:
+          return [state]
+      }
     case "deleted":
-      // These are terminal states, no messages should change them, except for 'delete' which is handled at the top.
+      // Deleted is truly terminal
       return [state]
   }
 }

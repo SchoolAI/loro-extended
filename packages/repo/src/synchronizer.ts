@@ -156,8 +156,19 @@ export class Synchronizer {
     switch (command.type) {
       case "cmd-notify-docs-available":
         for (const documentId of command.documentIds) {
-          // Effectful getDoc: registers documentId in its cache
-          this.#services.getDoc(documentId)
+          // Get the handle and trigger a find operation if it's not already ready
+          const handle = this.#services.getDoc(documentId)
+
+          // If the handle is ready, nothing to do
+          if (handle.fullState === "ready") {
+            continue
+          }
+
+          // For any non-ready handle, try to start a find operation
+          // Even if it's unavailable, we should try - the queryNetwork will work
+          handle.find().catch(error => {
+            console.log(`[Synchronizer] Find failed for ${documentId}:`, error)
+          })
         }
         break
       case "cmd-send-message": {
