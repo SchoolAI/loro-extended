@@ -273,6 +273,34 @@ describe("CRDT Operations", () => {
       const result = typedDoc.value
       expect(result.containerList).toHaveLength(0) // No containers were actually added
     })
+
+    it("should handle move operations on lists", () => {
+      const schema = Shape.doc({
+        items: Shape.list(Shape.plain.string()),
+      })
+
+      const emptyState = {
+        items: [],
+      }
+
+      const typedDoc = createTypedDoc(schema, emptyState)
+
+      // Add initial items
+      typedDoc.change(draft => {
+        draft.items.push("first")
+        draft.items.push("second")
+        draft.items.push("third")
+      })
+
+      // Test move operation: move first item to the end
+      const result = typedDoc.change(draft => {
+        const valueToMove = draft.items.get(0)
+        draft.items.delete(0, 1)
+        draft.items.insert(2, valueToMove)
+      })
+
+      expect(result.items).toEqual(["second", "third", "first"])
+    })
   })
 
   describe("Movable List Operations", () => {
