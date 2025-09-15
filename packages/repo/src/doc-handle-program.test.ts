@@ -1,8 +1,9 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
 import { LoroDoc, type LoroMap } from "loro-crdt"
+import type { Patch } from "mutative"
 import { describe, expect, it } from "vitest"
-import { init, update } from "./doc-handle-program.js"
+import { createDocHandleUpdate, init, update } from "./doc-handle-program.js"
 import type { RequestId } from "./request-tracker.js"
 import type { DocumentId } from "./types.js"
 
@@ -287,6 +288,132 @@ describe("DocHandle program", () => {
         expect(newState.state).toBe("deleted")
         expect(command).toBeUndefined()
       }
+    })
+  })
+
+  describe("patch debugging (new pattern)", () => {
+    it("should capture patches when using createDocHandleUpdate with onPatch callback", () => {
+      const docId = "test-doc" as DocumentId
+      const reqId: RequestId = 0
+      const patches: Patch[] = []
+
+      // Create update function with patch debugging enabled
+      const updateWithPatches = createDocHandleUpdate<TestSchema>(
+        docId,
+        newPatches => {
+          patches.push(...newPatches)
+        },
+      )
+
+      // Start with idle state
+      const [initialState] = init<TestSchema>()
+
+      // Trigger a state transition that should generate patches
+      const [newState, command] = updateWithPatches(
+        { type: "msg-find", requestId: reqId },
+        initialState,
+      )
+
+      // Verify the state transition worked correctly
+      expect(newState).toEqual({
+        state: "storage-loading",
+        operation: "find",
+        requestId: reqId,
+      })
+      expect(command).toEqual({
+        type: "cmd-load-from-storage",
+        documentId: docId,
+      })
+
+      // Verify that patches were captured
+      expect(patches.length).toBeGreaterThan(0)
+
+      // Check that patches contain the expected state changes
+      const statePatch = patches.find(p => p.path[0] === "state")
+      const operationPatch = patches.find(p => p.path[0] === "operation")
+      const requestIdPatch = patches.find(p => p.path[0] === "requestId")
+
+      expect(statePatch).toBeDefined()
+      expect(statePatch?.value).toBe("storage-loading")
+      expect(operationPatch).toBeDefined()
+      expect(operationPatch?.value).toBe("find")
+      expect(requestIdPatch).toBeDefined()
+      expect(requestIdPatch?.value).toBe(reqId)
+    })
+
+    it("should work without patch callback (backward compatibility)", () => {
+      const docId = "test-doc" as DocumentId
+      const reqId: RequestId = 0
+
+      // Create update function without patch debugging
+      const updateWithoutPatches = createDocHandleUpdate<TestSchema>(docId)
+
+      // Start with idle state
+      const [initialState] = init<TestSchema>()
+
+      // Trigger a state transition
+      const [newState, command] = updateWithoutPatches(
+        { type: "msg-find", requestId: reqId },
+        initialState,
+      )
+
+      // Verify the state transition worked correctly (same as with patches)
+      expect(newState).toEqual({
+        state: "storage-loading",
+        operation: "find",
+        requestId: reqId,
+      })
+      expect(command).toEqual({
+        type: "cmd-load-from-storage",
+        documentId: docId,
+      })
+    })
+
+    it("should demonstrate patch capture for complex state transitions", () => {
+      const docId = "test-doc" as DocumentId
+      const reqId: RequestId = 0
+      const patches: Patch[] = []
+
+      const updateWithPatches = createDocHandleUpdate<TestSchema>(
+        docId,
+        newPatches => {
+          patches.push(...newPatches)
+        },
+      )
+
+      // Start with storage-loading state
+      const storageLoadingState = {
+        state: "storage-loading",
+        operation: "find",
+        requestId: reqId,
+      } as const
+
+      const doc = new LoroDoc<TestSchema>()
+
+      // Clear any existing patches
+      patches.length = 0
+
+      // Trigger transition to ready state
+      const [newState, _command] = updateWithPatches(
+        { type: "msg-storage-load-success", doc },
+        storageLoadingState,
+      )
+
+      // Verify the transition
+      expect(newState.state).toBe("ready")
+      expect((newState as any).doc).toBe(doc)
+
+      // Verify patches were captured for this more complex transition
+      expect(patches.length).toBeGreaterThan(0)
+
+      // Should have patches for state change and doc addition
+      const statePatch = patches.find(p => p.path[0] === "state")
+      const docPatch = patches.find(p => p.path[0] === "doc")
+
+      expect(statePatch).toBeDefined()
+      expect(statePatch?.value).toBe("ready")
+      expect(docPatch).toBeDefined()
+      expect(docPatch?.value).toBe(doc)
     })
   })
 })

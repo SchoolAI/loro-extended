@@ -1,3 +1,4 @@
+import type { Patch } from "mutative"
 import {
   addPeersAwareOfDocuments,
   addPeersWithDocuments,
@@ -499,7 +500,7 @@ function createSynchronizerLogic(permissions: PermissionAdapter) {
  */
 export function createSynchronizerUpdate(
   permissions: PermissionAdapter,
-  onPatch?: (patches: import("mutative").Patch[]) => void,
+  onPatch?: (patches: Patch[]) => void,
 ) {
   return makeImmutableUpdate(createSynchronizerLogic(permissions), onPatch)
 }

@@ -1,7 +1,9 @@
 import type { LoroDoc, LoroEventBatch } from "loro-crdt"
+import type { Patch } from "mutative"
 import type { Effect as RajEffect } from "raj-ts"
 import type { RequestId } from "./request-tracker.js"
 import type { DocContent, DocumentId, LoroDocMutator } from "./types.js"
+import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
 export const FIND_OR_CREATE_DEFAULT_TIMEOUT = 1000
 
@@ -228,251 +230,315 @@ export const init = <T extends DocContent>(): [HandleState<T>, Command<T>?] => [
   },
 ]
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//  MUTATIVE UPDATE LOGIC (NEW PATTERN)
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+function transition<T extends DocContent>(
+  state: HandleState<T>,
+  to: HandleState<T>,
+) {
+  Object.assign<HandleState<T>, HandleState<T>>(state, to)
+}
+
+/**
+ * Creates a mutative update function for doc handle logic.
+ * This function directly mutates the state and returns only commands.
+ * It follows the same pattern as synchronizer-program.ts for consistency.
+ */
+function createDocHandleLogic<T extends DocContent>(documentId: DocumentId) {
+  // A mutating update function is easier to read and write, because we need only concern ourselves
+  // with what needs to change, using standard assignment and JS operations. But the machinery
+  // around this function turns it back into an immutable `update` function like raj/TEA expects.
+  return function mutatingUpdate(
+    msg: Message<T>,
+    state: HandleState<T>,
+  ): Command<T> | undefined {
+    // All states can be deleted
+    if (msg.type === "msg-delete") {
+      // TODO: Should this report failure on any pending requests?
+      transition(state, {
+        state: "deleted",
+      })
+      return
+    }
+
+    switch (state.state) {
+      case "idle":
+        switch (msg.type) {
+          case "msg-find":
+            transition(state, {
+              state: "storage-loading",
+              operation: "find",
+              requestId: msg.requestId,
+            })
+            return { type: "cmd-load-from-storage", documentId }
+
+          case "msg-find-in-storage":
+            transition(state, {
+              state: "storage-loading",
+              operation: "find-in-storage",
+              requestId: msg.requestId,
+            })
+            return { type: "cmd-load-from-storage", documentId }
+
+          case "msg-find-or-create":
+            transition(state, {
+              state: "storage-loading",
+              operation: "find-or-create",
+              requestId: msg.requestId,
+              timeout: msg.timeout,
+            })
+            return { type: "cmd-load-from-storage", documentId }
+
+          case "msg-create":
+            transition(state, {
+              state: "creating",
+              requestId: msg.requestId,
+            })
+            return {
+              type: "cmd-create-doc",
+              documentId,
+              initialize: msg.initialize,
+            }
+
+          case "msg-remote-change":
+            // A remote sync message arrived for a document we don't have yet.
+            // This implicitly creates it and marks it as ready. This does not
+            // correspond to a specific request, so it doesn't need to report success.
+            if (!msg.doc) return
+            transition(state, {
+              state: "ready",
+              doc: msg.doc,
+            })
+            // We need to subscribe to the newly created doc to generate sync messages
+            return { type: "cmd-subscribe-to-doc", doc: msg.doc }
+
+          default:
+            return
+        }
+
+      case "storage-loading":
+        switch (msg.type) {
+          case "msg-storage-load-success":
+            transition(state, {
+              state: "ready",
+              doc: msg.doc,
+            })
+            return {
+              type: "cmd-batch",
+              commands: [
+                { type: "cmd-subscribe-to-doc", doc: msg.doc },
+                {
+                  type: "cmd-report-success",
+                  requestId: state.requestId,
+                  payload: msg.doc,
+                },
+              ],
+            }
+
+          case "msg-storage-load-failure":
+            // Determine next step based on the original operation
+            if (state.operation === "find") {
+              // For find: try network, but don't create if not found
+              transition(state, {
+                state: "network-loading",
+                requestId: state.requestId,
+                timeout: 5000,
+                createOnTimeout: false,
+              })
+              return { type: "cmd-query-network", documentId, timeout: 5000 }
+            } else if (state.operation === "find-or-create") {
+              // For find-or-create: try network, create if not found
+              const timeout = state.timeout || FIND_OR_CREATE_DEFAULT_TIMEOUT
+              transition(state, {
+                state: "network-loading",
+                requestId: state.requestId,
+                timeout: timeout,
+                createOnTimeout: true,
+              })
+              return { type: "cmd-query-network", documentId, timeout }
+            } else {
+              // For find-in-storage: go directly to unavailable (don't try network)
+              transition(state, { state: "unavailable" })
+              return
+            }
+
+          default:
+            return
+        }
+
+      case "creating":
+        switch (msg.type) {
+          // Successful creation is modeled as a successful storage load
+          case "msg-storage-load-success":
+            transition(state, {
+              state: "ready",
+              doc: msg.doc,
+            })
+            return {
+              type: "cmd-batch",
+              commands: [
+                { type: "cmd-subscribe-to-doc", doc: msg.doc },
+                {
+                  type: "cmd-report-success",
+                  requestId: state.requestId,
+                  payload: msg.doc,
+                },
+              ],
+            }
+
+          default:
+            return
+        }
+
+      case "network-loading":
+        switch (msg.type) {
+          case "msg-network-load-success":
+            transition(state, {
+              state: "ready",
+              doc: msg.doc,
+            })
+            return {
+              type: "cmd-batch",
+              commands: [
+                { type: "cmd-subscribe-to-doc", doc: msg.doc },
+                {
+                  type: "cmd-report-success",
+                  requestId: state.requestId,
+                  payload: msg.doc,
+                },
+              ],
+            }
+
+          case "msg-network-timeout":
+            if (state.createOnTimeout) {
+              transition(state, {
+                state: "creating",
+                requestId: state.requestId,
+              })
+              return { type: "cmd-create-doc", documentId }
+            } else {
+              transition(state, { state: "unavailable" })
+              return
+            }
+
+          case "msg-remote-change":
+            if (!msg.doc) return
+
+            // If we get the document from a peer while we're waiting for the network,
+            // we can move to the ready state.
+            transition(state, {
+              state: "ready",
+              doc: msg.doc,
+            })
+            return {
+              type: "cmd-batch",
+              commands: [
+                { type: "cmd-subscribe-to-doc", doc: msg.doc },
+                {
+                  type: "cmd-report-success",
+                  requestId: state.requestId,
+                  payload: msg.doc,
+                },
+              ],
+            }
+
+          default:
+            return
+        }
+
+      case "ready":
+        switch (msg.type) {
+          // If we get a request for a doc that's already ready, just report success immediately.
+          case "msg-find":
+          case "msg-find-in-storage":
+          case "msg-find-or-create":
+          case "msg-create":
+            return {
+              type: "cmd-report-success",
+              requestId: msg.requestId,
+              payload: state.doc,
+            }
+
+          case "msg-local-change":
+            // Apply the mutation directly to the document
+            msg.mutator(state.doc)
+            // Commit the changes to trigger subscriptions
+            state.doc.commit()
+            // The doc subscriptions set up via cmd-subscribe-to-doc will handle emitting events
+            return
+
+          case "msg-remote-change":
+            return {
+              type: "cmd-apply-remote-change",
+              doc: state.doc,
+              message: msg.message,
+            }
+
+          default:
+            return
+        }
+
+      case "unavailable":
+        // Allow find operations to restart from unavailable state
+        // This handles the case where a document becomes available after initially being unavailable
+        switch (msg.type) {
+          case "msg-find":
+            transition(state, {
+              state: "storage-loading",
+              operation: "find",
+              requestId: msg.requestId,
+            })
+            return { type: "cmd-load-from-storage", documentId }
+
+          case "msg-find-or-create":
+            transition(state, {
+              state: "storage-loading",
+              operation: "find-or-create",
+              requestId: msg.requestId,
+              timeout: msg.timeout,
+            })
+            return { type: "cmd-load-from-storage", documentId }
+
+          default:
+            return
+        }
+
+      case "deleted":
+        // Deleted is truly terminal
+        return
+    }
+  }
+}
+
+/**
+ * Creates a standard raj-compatible update function with optional patch debugging.
+ * Uses the transformer to provide immutability while keeping the logic clean.
+ *
+ * This follows the same pattern as synchronizer-program.ts and enables patch capture
+ * for debugging purposes (e.g., applying patches to TypedDoc's applyPatch).
+ *
+ * @param documentId - The document ID for this handle
+ * @param onPatch - Optional debug callback that receives a list of changes at each update cycle
+ */
+export function createDocHandleUpdate<T extends DocContent>(
+  documentId: DocumentId,
+  onPatch?: (patches: Patch[]) => void,
+) {
+  return makeImmutableUpdate(createDocHandleLogic<T>(documentId), onPatch)
+}
+
+/**
+ * Legacy update function - now implemented using the new pattern.
+ * Maintains 100% backward compatibility while leveraging the new mutative approach internally.
+ */
 export function update<T extends DocContent>(
   msg: Message<T>,
   state: HandleState<T>,
   documentId: DocumentId,
 ): [HandleState<T>, Command<T>?] {
-  // All states can be deleted
-  if (msg.type === "msg-delete") {
-    // TODO: Should this report failure on any pending requests?
-    return [{ state: "deleted" }]
-  }
-
-  switch (state.state) {
-    case "idle":
-      switch (msg.type) {
-        case "msg-find":
-          return [
-            {
-              state: "storage-loading",
-              operation: "find",
-              requestId: msg.requestId,
-            },
-            { type: "cmd-load-from-storage", documentId },
-          ]
-        case "msg-find-in-storage":
-          return [
-            {
-              state: "storage-loading",
-              operation: "find-in-storage",
-              requestId: msg.requestId,
-            },
-            { type: "cmd-load-from-storage", documentId },
-          ]
-        case "msg-find-or-create":
-          return [
-            {
-              state: "storage-loading",
-              operation: "find-or-create",
-              requestId: msg.requestId,
-              timeout: msg.timeout,
-            },
-            { type: "cmd-load-from-storage", documentId },
-          ]
-        case "msg-create":
-          return [
-            { state: "creating", requestId: msg.requestId },
-            {
-              type: "cmd-create-doc",
-              documentId,
-              initialize: msg.initialize,
-            },
-          ]
-        case "msg-remote-change":
-          // A remote sync message arrived for a document we don't have yet.
-          // This implicitly creates it and marks it as ready. This does not
-          // correspond to a specific request, so it doesn't need to report success.
-          if (!msg.doc) return [state]
-          return [
-            { state: "ready", doc: msg.doc },
-            // We need to subscribe to the newly created doc to generate sync messages
-            { type: "cmd-subscribe-to-doc", doc: msg.doc },
-          ]
-        default:
-          return [state]
-      }
-
-    case "storage-loading":
-      switch (msg.type) {
-        case "msg-storage-load-success": {
-          const command: Command<T> = {
-            type: "cmd-batch",
-            commands: [
-              { type: "cmd-subscribe-to-doc", doc: msg.doc },
-              {
-                type: "cmd-report-success",
-                requestId: state.requestId,
-                payload: msg.doc,
-              },
-            ],
-          }
-          return [{ state: "ready", doc: msg.doc }, command]
-        }
-        case "msg-storage-load-failure":
-          // Determine next step based on the original operation
-          if (state.operation === "find") {
-            // For find: try network, but don't create if not found
-            return [
-              {
-                state: "network-loading",
-                requestId: state.requestId,
-                timeout: 5000,
-                createOnTimeout: false,
-              },
-              { type: "cmd-query-network", documentId, timeout: 5000 },
-            ]
-          } else if (state.operation === "find-or-create") {
-            // For find-or-create: try network, create if not found
-            const timeout = state.timeout || FIND_OR_CREATE_DEFAULT_TIMEOUT
-            return [
-              {
-                state: "network-loading",
-                requestId: state.requestId,
-                timeout: timeout,
-                createOnTimeout: true,
-              },
-              { type: "cmd-query-network", documentId, timeout: timeout },
-            ]
-          } else {
-            // For find-in-storage: go directly to unavailable (don't try network)
-            return [{ state: "unavailable" }]
-          }
-        default:
-          return [state]
-      }
-
-    case "creating":
-      switch (msg.type) {
-        // Successful creation is modeled as a successful storage load
-        case "msg-storage-load-success": {
-          const command: Command<T> = {
-            type: "cmd-batch",
-            commands: [
-              { type: "cmd-subscribe-to-doc", doc: msg.doc },
-              {
-                type: "cmd-report-success",
-                requestId: state.requestId,
-                payload: msg.doc,
-              },
-            ],
-          }
-          return [{ state: "ready", doc: msg.doc }, command]
-        }
-        default:
-          return [state]
-      }
-
-    case "network-loading":
-      switch (msg.type) {
-        case "msg-network-load-success": {
-          const command: Command<T> = {
-            type: "cmd-batch",
-            commands: [
-              { type: "cmd-subscribe-to-doc", doc: msg.doc },
-              {
-                type: "cmd-report-success",
-                requestId: state.requestId,
-                payload: msg.doc,
-              },
-            ],
-          }
-          return [{ state: "ready", doc: msg.doc }, command]
-        }
-        case "msg-network-timeout":
-          if (state.createOnTimeout) {
-            return [
-              { state: "creating", requestId: state.requestId },
-              { type: "cmd-create-doc", documentId },
-            ]
-          } else {
-            return [{ state: "unavailable" }]
-          }
-        case "msg-remote-change": {
-          if (!msg.doc) return [state]
-
-          // If we get the document from a peer while we're waiting for the network,
-          // we can move to the ready state.
-          const command: Command<T> = {
-            type: "cmd-batch",
-            commands: [
-              { type: "cmd-subscribe-to-doc", doc: msg.doc },
-              {
-                type: "cmd-report-success",
-                requestId: state.requestId,
-                payload: msg.doc,
-              },
-            ],
-          }
-          return [{ state: "ready", doc: msg.doc }, command]
-        }
-        default:
-          return [state]
-      }
-
-    case "ready":
-      switch (msg.type) {
-        // If we get a request for a doc that's already ready, just report success immediately.
-        case "msg-find":
-        case "msg-find-in-storage":
-        case "msg-find-or-create":
-        case "msg-create":
-          return [
-            state,
-            {
-              type: "cmd-report-success",
-              requestId: msg.requestId,
-              payload: state.doc,
-            },
-          ]
-        case "msg-local-change":
-          // Apply the mutation directly to the document
-          msg.mutator(state.doc)
-          // Commit the changes to trigger subscriptions
-          state.doc.commit()
-          // The doc subscriptions set up via cmd-subscribe-to-doc will handle emitting events
-          return [state]
-        case "msg-remote-change":
-          return [
-            state,
-            {
-              type: "cmd-apply-remote-change",
-              doc: state.doc,
-              message: msg.message,
-            },
-          ]
-        default:
-          return [state]
-      }
-
-    case "unavailable":
-      // Allow find operations to restart from unavailable state
-      // This handles the case where a document becomes available after initially being unavailable
-      switch (msg.type) {
-        case "msg-find":
-          return [
-            {
-              state: "storage-loading",
-              operation: "find",
-              requestId: msg.requestId,
-            },
-            { type: "cmd-load-from-storage", documentId },
-          ]
-        case "msg-find-or-create":
-          return [
-            {
-              state: "storage-loading",
-              operation: "find-or-create",
-              requestId: msg.requestId,
-              timeout: msg.timeout,
-            },
-            { type: "cmd-load-from-storage", documentId },
-          ]
-        default:
-          return [state]
-      }
-    case "deleted":
-      // Deleted is truly terminal
-      return [state]
-  }
+  // Use the new pattern internally
+  const updateFn = createDocHandleUpdate<T>(documentId)
+  return updateFn(msg, state)
 }

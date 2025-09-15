@@ -295,7 +295,12 @@ describe("JSON Patch Integration", () => {
         {
           op: "add",
           path: "/todos/1",
-          value: { id: "2", text: "Walk dog", completed: true },
+          value: { id: "2", text: "Walk dog", completed: false },
+        },
+        {
+          op: "replace",
+          path: "/todos/1/completed",
+          value: true,
         },
       ]
 
