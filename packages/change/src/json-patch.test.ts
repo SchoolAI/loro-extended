@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createTypedDoc } from "./change.js"
-import { Shape } from "./shape.js"
 import type { JsonPatch } from "./json-patch.js"
+import { Shape } from "./shape.js"
 
 describe("JSON Patch Integration", () => {
   describe("Basic Operations", () => {
@@ -56,9 +56,7 @@ describe("JSON Patch Integration", () => {
         draft.config.set("debug", false)
       })
 
-      const patch: JsonPatch = [
-        { op: "remove", path: "/config/debug" },
-      ]
+      const patch: JsonPatch = [{ op: "remove", path: "/config/debug" }]
 
       const result = typedDoc.applyPatch(patch)
 
@@ -196,7 +194,7 @@ describe("JSON Patch Integration", () => {
       // Note: For text containers, we can't directly patch the text content
       // since it's a CRDT container. This test verifies the path navigation works
       // but the actual text manipulation should be done through text methods
-      
+
       // This should work for setting up the structure
       const result = typedDoc.value
       expect(result.title).toBe("")
@@ -219,7 +217,7 @@ describe("JSON Patch Integration", () => {
       // Note: Similar to text, counters are CRDT containers
       // The path navigation should work, but actual counter operations
       // should use increment/decrement methods
-      
+
       const result = typedDoc.value
       expect(result.views).toBe(0)
       expect(result.likes).toBe(0)
@@ -257,7 +255,11 @@ describe("JSON Patch Integration", () => {
       const patch: JsonPatch = [
         { op: "add", path: "/user/profile/name", value: "Alice" },
         { op: "replace", path: "/user/profile/settings/theme", value: "dark" },
-        { op: "replace", path: "/user/profile/settings/notifications", value: false },
+        {
+          op: "replace",
+          path: "/user/profile/settings/notifications",
+          value: false,
+        },
       ]
 
       const result = typedDoc.applyPatch(patch)
@@ -274,7 +276,7 @@ describe("JSON Patch Integration", () => {
             id: Shape.plain.string(),
             text: Shape.plain.string(),
             completed: Shape.plain.boolean(),
-          })
+          }),
         ),
       })
 
@@ -285,23 +287,31 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema, emptyState)
 
       const patch: JsonPatch = [
-        { 
-          op: "add", 
-          path: "/todos/0", 
-          value: { id: "1", text: "Buy milk", completed: false }
+        {
+          op: "add",
+          path: "/todos/0",
+          value: { id: "1", text: "Buy milk", completed: false },
         },
-        { 
-          op: "add", 
-          path: "/todos/1", 
-          value: { id: "2", text: "Walk dog", completed: true }
+        {
+          op: "add",
+          path: "/todos/1",
+          value: { id: "2", text: "Walk dog", completed: true },
         },
       ]
 
       const result = typedDoc.applyPatch(patch)
 
       expect(result.todos).toHaveLength(2)
-      expect(result.todos[0]).toEqual({ id: "1", text: "Buy milk", completed: false })
-      expect(result.todos[1]).toEqual({ id: "2", text: "Walk dog", completed: true })
+      expect(result.todos[0]).toEqual({
+        id: "1",
+        text: "Buy milk",
+        completed: false,
+      })
+      expect(result.todos[1]).toEqual({
+        id: "2",
+        text: "Walk dog",
+        completed: true,
+      })
     })
   })
 
@@ -330,14 +340,51 @@ describe("JSON Patch Integration", () => {
 
       const result = typedDoc.applyPatch(patch)
 
-      // TODO: Fix move operation - currently has a limitation with list moves
-      // Expected: ["second", "third", "first"]
-      // Current behavior: ["first", "first", "third"] - duplicates source and loses middle item
-      // This is a known limitation that needs to be addressed in a future iteration
-      expect(result.items).toHaveLength(3)
-      expect(result.items).toContain("first")
-      expect(result.items).toContain("third")
-      // Note: "second" gets lost in the current implementation - this is the bug to fix
+      expect(result.items).toEqual(["second", "third", "first"])
+    })
+
+    it("should handle various move scenarios to prevent regressions", () => {
+      const schema = Shape.doc({
+        items: Shape.list(Shape.plain.string()),
+      })
+
+      const emptyState = {
+        items: [],
+      }
+
+      const typedDoc = createTypedDoc(schema, emptyState)
+
+      // Test move from 0 to 3 (move first item to end of 4-item list)
+      typedDoc.change(draft => {
+        draft.items.push("A")
+        draft.items.push("B")
+        draft.items.push("C")
+        draft.items.push("D")
+      })
+
+      const patch1: JsonPatch = [
+        { op: "move", from: "/items/0", path: "/items/3" },
+      ]
+
+      const result1 = typedDoc.applyPatch(patch1)
+      expect(result1.items).toEqual(["B", "C", "D", "A"])
+
+      // Reset for next test
+      typedDoc.change(draft => {
+        draft.items.delete(0, draft.items.length)
+        draft.items.push("A")
+        draft.items.push("B")
+        draft.items.push("C")
+        draft.items.push("D")
+      })
+
+      // Test move from 1 to 3 (move middle item to end)
+      const patch2: JsonPatch = [
+        { op: "move", from: "/items/1", path: "/items/3" },
+      ]
+
+      const result2 = typedDoc.applyPatch(patch2)
+      expect(result2.items).toEqual(["A", "C", "D", "B"])
     })
 
     it("should handle copy operations", () => {

@@ -1,6 +1,10 @@
 import type { Container } from "loro-crdt"
 import { convertInputToNode } from "../conversion.js"
-import type { ContainerShape, ListContainerShape, MovableListContainerShape } from "../shape.js"
+import type {
+  ContainerShape,
+  ListContainerShape,
+  MovableListContainerShape,
+} from "../shape.js"
 import type { InferDraftType, InferPlainType } from "../types.js"
 import { isContainer, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
@@ -25,13 +29,17 @@ export abstract class ListDraftNodeBase<
           this.absorbValueAtIndex(index, cachedItem)
         } else {
           // For container shapes, the item should be a draft node that handles its own absorption
-          if (cachedItem && typeof cachedItem === 'object' && 'absorbPlainValues' in cachedItem) {
+          if (
+            cachedItem &&
+            typeof cachedItem === "object" &&
+            "absorbPlainValues" in cachedItem
+          ) {
             ;(cachedItem as any).absorbPlainValues()
           }
         }
       }
     }
-    
+
     // Clear the cache after absorbing values
     this.itemCache.clear()
   }
@@ -99,9 +107,17 @@ export abstract class ListDraftNodeBase<
       if (isContainer(containerItem)) {
         // Convert container to plain object for predicate logic
         // Handle different container types that may not have toJSON method
-        if (typeof containerItem === 'object' && containerItem !== null && 'toJSON' in containerItem) {
+        if (
+          typeof containerItem === "object" &&
+          containerItem !== null &&
+          "toJSON" in containerItem
+        ) {
           return (containerItem as any).toJSON() as Item
-        } else if (typeof containerItem === 'object' && containerItem !== null && 'getShallowValue' in containerItem) {
+        } else if (
+          typeof containerItem === "object" &&
+          containerItem !== null &&
+          "getShallowValue" in containerItem
+        ) {
           // For containers like LoroCounter that don't have toJSON but have getShallowValue
           return (containerItem as any).getShallowValue() as Item
         } else {
@@ -126,12 +142,12 @@ export abstract class ListDraftNodeBase<
     if (containerItem === undefined) {
       return undefined as DraftItem
     }
-    
+
     if (isValueShape(this.shape.shape)) {
       // For value shapes, we need to ensure mutations persist
       // The key insight: we must return the SAME object for the same index
       // so that mutations to filtered/found items persist back to the cache
-      if (typeof containerItem === 'object' && containerItem !== null) {
+      if (typeof containerItem === "object" && containerItem !== null) {
         // Create a deep copy for objects so mutations can be tracked
         // IMPORTANT: Only create the copy once, then always return the same cached object
         cachedItem = JSON.parse(JSON.stringify(containerItem))
@@ -144,7 +160,7 @@ export abstract class ListDraftNodeBase<
     } else {
       // For container shapes, create a proper draft node using the new pattern
       cachedItem = createContainerDraftNode(
-        this.getDraftNodeParams(index, this.shape.shape as ContainerShape)
+        this.getDraftNodeParams(index, this.shape.shape as ContainerShape),
       )
       this.itemCache.set(index, cachedItem)
       return cachedItem as DraftItem
@@ -153,7 +169,7 @@ export abstract class ListDraftNodeBase<
 
   // Array-like methods for better developer experience
   // DUAL INTERFACE: Predicates get Item (plain data), return values are DraftItem (mutable)
-  
+
   find(
     predicate: (item: Item, index: number) => boolean,
   ): DraftItem | undefined {
@@ -226,10 +242,14 @@ export abstract class ListDraftNodeBase<
   }
 
   insert(index: number, item: Item): void {
+    // Update cache indices before performing the insert operation
+    this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
   }
 
   delete(index: number, len: number): void {
+    // Update cache indices before performing the delete operation
+    this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
   }
 
@@ -255,5 +275,40 @@ export abstract class ListDraftNodeBase<
 
   get length(): number {
     return this.container.length
+  }
+
+  // Update cache indices when items are deleted
+  private updateCacheForDelete(deleteIndex: number, deleteLen: number): void {
+    const newCache = new Map<number, any>()
+
+    for (const [cachedIndex, cachedItem] of this.itemCache.entries()) {
+      if (cachedIndex < deleteIndex) {
+        // Items before the deletion point keep their indices
+        newCache.set(cachedIndex, cachedItem)
+      } else if (cachedIndex >= deleteIndex + deleteLen) {
+        // Items after the deletion range shift down by deleteLen
+        newCache.set(cachedIndex - deleteLen, cachedItem)
+      }
+      // Items within the deletion range are removed from cache
+    }
+
+    this.itemCache = newCache
+  }
+
+  // Update cache indices when items are inserted
+  private updateCacheForInsert(insertIndex: number): void {
+    const newCache = new Map<number, any>()
+
+    for (const [cachedIndex, cachedItem] of this.itemCache.entries()) {
+      if (cachedIndex < insertIndex) {
+        // Items before the insertion point keep their indices
+        newCache.set(cachedIndex, cachedItem)
+      } else {
+        // Items at or after the insertion point shift up by 1
+        newCache.set(cachedIndex + 1, cachedItem)
+      }
+    }
+
+    this.itemCache = newCache
   }
 }

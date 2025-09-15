@@ -280,14 +280,14 @@ function handleMove<T extends DocShape>(
         return
       }
       
-      // Otherwise, get value, remove, then add with adjusted index
+      // Otherwise, get value, remove, then add at target index
       const value = getValueAtPath(draft, fromPath)
       handleRemove(draft, { op: "remove", path: operation.from })
       
-      // Adjust target index if we removed an item before it
-      const adjustedIndex = fromIndex < toIndex ? toIndex - 1 : toIndex
-      const adjustedPath = [...toPath.slice(0, -1), adjustedIndex]
-      handleAdd(draft, { op: "add", path: adjustedPath, value })
+      // For JSON Patch move semantics, the target index refers to the position
+      // in the final array, not the intermediate array after removal.
+      // No index adjustment needed - use the original target index.
+      handleAdd(draft, { op: "add", path: operation.path, value })
       return
     }
   }
