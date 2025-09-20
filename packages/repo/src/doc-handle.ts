@@ -1,5 +1,5 @@
 import Emittery from "emittery"
-import { LoroDoc, type LoroEventBatch } from "loro-crdt"
+import { LoroDoc } from "loro-crdt"
 import type { DocContent, DocumentId, LoroDocMutator, PeerId } from "./types.js"
 
 /** Peer status for a specific document */
@@ -24,31 +24,8 @@ export type ReadyState = {
 /** Custom predicate for determining readiness */
 export type ReadinessCheck = (readyStates: ReadyState[]) => boolean
 
-/** A dictionary of functions that the DocHandle can use to perform side effects. */
-export interface DocHandleServices<T extends DocContent> {
-  /** A function that loads document data from storage into the provided doc. */
-  loadFromStorage?: (documentId: DocumentId, doc: LoroDoc<T>) => Promise<void>
-  /** A function that saves the document to storage after changes. */
-  saveToStorage?: (
-    documentId: DocumentId,
-    doc: LoroDoc<T>,
-    event: LoroEventBatch,
-  ) => Promise<void>
-  /** A function that requests document data from the network into the provided doc. */
-  requestFromNetwork?: (
-    documentId: DocumentId,
-    doc: LoroDoc<T>,
-    timeout: number,
-  ) => Promise<void>
-}
-
 // The events that the DocHandle can emit
-type DocHandleEvents<T extends DocContent> = {
-  "doc-change": {
-    doc: LoroDoc<T>
-    event: LoroEventBatch
-  }
-  "doc-local-change": Uint8Array
+type DocHandleEvents = {
   "ready-state-changed": {
     readyStates: ReadyState[]
   }
@@ -56,7 +33,7 @@ type DocHandleEvents<T extends DocContent> = {
 
 /**
  * A simplified handle to a Loro document that is always available.
- * 
+ *
  * This class embraces CRDT semantics where documents are always-mergeable
  * and operations are idempotent. Instead of complex loading states, it
  * provides a flexible readiness API that allows applications to define
@@ -65,17 +42,11 @@ type DocHandleEvents<T extends DocContent> = {
  * @typeParam T - The plain JavaScript object schema for the document.
  */
 export class DocHandle<T extends DocContent> {
-  public readonly documentId: DocumentId
-  public readonly doc: LoroDoc<T> = new LoroDoc<T>() // Always available
-  
-  #services: DocHandleServices<T>
   #peers = new Map<PeerId, DocPeerStatus>()
   #readyStates = new Map<string, ReadyState>()
-  #isLoadingFromStorage = false
-  #isRequestingFromNetwork = false
 
   /** @internal */
-  _emitter = new Emittery<DocHandleEvents<T>>()
+  _emitter = new Emittery<DocHandleEvents>()
 
   // Public event API
   public on = this._emitter.on.bind(this._emitter)
@@ -83,22 +54,9 @@ export class DocHandle<T extends DocContent> {
   public off = this._emitter.off.bind(this._emitter)
 
   constructor(
-    documentId: DocumentId,
-    services: DocHandleServices<T> = {},
-    options: { autoLoad?: boolean } = {},
-  ) {
-    this.documentId = documentId
-    this.#services = services
-
-    // Set up document event subscriptions
-    this.#setupDocumentSubscriptions()
-
-    // Start background loading immediately (unless disabled)
-    if (options.autoLoad !== false) {
-      this.#loadFromStorage()
-      this.#requestFromNetwork()
-    }
-  }
+    public readonly documentId: DocumentId,
+    public readonly doc: LoroDoc<T> = new LoroDoc<T>(),
+  ) {}
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // PUBLIC API - Always-available document access
@@ -134,104 +92,49 @@ export class DocHandle<T extends DocContent> {
    * @param predicate Function that determines if the document is ready
    * @param timeout Optional timeout in milliseconds
    */
-  async waitUntilReady(
-    predicate: ReadinessCheck,
-    timeout?: number
-  ): Promise<void> {
-    // Check if already ready
-    if (predicate(Array.from(this.#readyStates.values()))) {
-      return
+  async waitUntilReady(predicate: ReadinessCheck): Promise<DocHandle<T>> {
+    for await (const { readyStates } of this._emitter.events(
+      "ready-state-changed",
+    )) {
+      if (predicate(readyStates)) return this
     }
-
-    // Wait for ready state changes
-    return new Promise((resolve, reject) => {
-      let timeoutId: NodeJS.Timeout | undefined
-      let isResolved = false
-
-      const cleanup = () => {
-        if (timeoutId) clearTimeout(timeoutId)
-        this._emitter.off("ready-state-changed", checkReadiness)
-      }
-
-      if (timeout) {
-        timeoutId = setTimeout(() => {
-          if (!isResolved) {
-            isResolved = true
-            cleanup()
-            reject(new Error(`Readiness timeout after ${timeout}ms`))
-          }
-        }, timeout)
-      }
-
-      const checkReadiness = ({ readyStates }: { readyStates: ReadyState[] }) => {
-        if (!isResolved && predicate(readyStates)) {
-          isResolved = true
-          cleanup()
-          resolve()
-        }
-      }
-
-      this._emitter.on("ready-state-changed", checkReadiness)
-    })
+    throw new Error("unreachable wait state")
   }
 
   /**
    * Convenience method: wait for storage to load.
    */
-  async waitForStorage(timeout?: number): Promise<void> {
-    // Trigger storage loading if not already in progress
-    if (!this.#isLoadingFromStorage) {
-      this.#loadFromStorage()
-    }
-    
-    return this.waitUntilReady(
-      (readyStates) =>
-        readyStates.some(
-          (s) => s.source.type === "storage" && s.state.type === "found"
-        ),
-      timeout
-    )
-  }
-
-  /**
-   * Convenience method: wait for a specific peer to provide the document.
-   */
-  async waitForPeer(peerId: PeerId, timeout?: number): Promise<void> {
-    return this.waitUntilReady(
-      (readyStates) =>
-        readyStates.some(
-          (s) =>
-            s.source.type === "network" &&
-            s.source.peerId === peerId &&
-            s.state.type === "found"
-        ),
-      timeout
+  async waitForStorage(): Promise<DocHandle<T>> {
+    return this.waitUntilReady(readyStates =>
+      readyStates.some(
+        s => s.source.type === "storage" && s.state.type === "found",
+      ),
     )
   }
 
   /**
    * Convenience method: wait for any network source to provide the document.
    */
-  async waitForNetwork(timeout?: number): Promise<void> {
-    // Trigger network loading if not already in progress
-    if (!this.#isRequestingFromNetwork) {
-      this.#requestFromNetwork()
-    }
-    
-    return this.waitUntilReady(
-      (readyStates) =>
-        readyStates.some(
-          (s) => s.source.type === "network" && s.state.type === "found"
-        ),
-      timeout
+  async waitForNetwork(): Promise<DocHandle<T>> {
+    return this.waitUntilReady(readyStates =>
+      readyStates.some(
+        s => s.source.type === "network" && s.state.type === "found",
+      ),
     )
   }
 
   /**
-   * Get current ready states for inspection.
+   * Convenience method: wait for a specific peer to provide the document.
    */
-  public getReadyStates(): ReadyState[] {
-    return Array.from(this.#readyStates.values())
+  async waitForPeer(peerId: PeerId): Promise<DocHandle<T>> {
+    return this.waitUntilReady(readyStates =>
+      readyStates.some(
+        s =>
+          s.source.type === "network" &&
+          s.source.peerId === peerId &&
+          s.state.type === "found",
+      ),
+    )
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -241,13 +144,16 @@ export class DocHandle<T extends DocContent> {
   /**
    * Update the status of a peer for this document.
    */
-  public updatePeerStatus(peerId: PeerId, status: Partial<DocPeerStatus>): void {
+  public updatePeerStatus(
+    peerId: PeerId,
+    status: Partial<DocPeerStatus>,
+  ): void {
     const current = this.#peers.get(peerId) || {
       hasDoc: false,
       isAwareOfDoc: false,
       isSyncingNow: false,
     }
-    
+
     this.#peers.set(peerId, { ...current, ...status })
   }
 
@@ -256,13 +162,6 @@ export class DocHandle<T extends DocContent> {
    */
   public getPeerStatus(peerId: PeerId): DocPeerStatus | undefined {
     return this.#peers.get(peerId)
-  }
-
-  /**
-   * Get all peer statuses for this document.
-   */
-  public getAllPeerStatuses(): Map<PeerId, DocPeerStatus> {
-    return new Map(this.#peers)
   }
 
   /**
@@ -290,128 +189,15 @@ export class DocHandle<T extends DocContent> {
       .map(([peerId]) => peerId)
   }
 
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // INTERNAL IMPLEMENTATION
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-  #setupDocumentSubscriptions(): void {
-    // Listen for all document changes
-    this.doc.subscribe((event) => {
-      this._emitter.emit("doc-change", {
-        doc: this.doc,
-        event,
-      })
-
-      // Trigger storage save if service is available
-      if (
-        this.#services.saveToStorage &&
-        (event.by === "local" || event.by === "import")
-      ) {
-        const savePromise = this.#services.saveToStorage(this.documentId, this.doc, event)
-        // Only attach catch handler if saveToStorage returns a promise
-        if (savePromise && typeof savePromise.catch === "function") {
-          savePromise.catch((error) => {
-            console.error(
-              `Failed to save document ${this.documentId} to storage:`,
-              error
-            )
-          })
-        }
-      }
-    })
-
-    // Listen for local updates for network synchronization
-    this.doc.subscribeLocalUpdates((syncMessage) => {
-      this._emitter.emit("doc-local-change", syncMessage)
-    })
-  }
-
-  async #loadFromStorage(): Promise<void> {
-    if (!this.#services.loadFromStorage || this.#isLoadingFromStorage) {
-      return
-    }
-
-    this.#isLoadingFromStorage = true
-    const storageId = "default" // Could be made configurable
-
-    // Update ready state to requesting
-    this.#updateReadyState(`storage-${storageId}`, {
-      source: { type: "storage", storageId },
-      state: { type: "requesting" },
-    })
-
-    try {
-      const hadContentBefore = this.#hasContent()
-      await this.#services.loadFromStorage(this.documentId, this.doc)
-      const hasNewContent = this.#hasContent() && !hadContentBefore
-
-      // Update ready state to found
-      this.#updateReadyState(`storage-${storageId}`, {
-        source: { type: "storage", storageId },
-        state: { type: "found", containsNewOperations: hasNewContent },
-      })
-    } catch (error) {
-      // Update ready state to not found
-      this.#updateReadyState(`storage-${storageId}`, {
-        source: { type: "storage", storageId },
-        state: { type: "not-found" },
-      })
-    } finally {
-      this.#isLoadingFromStorage = false
-    }
-  }
-
-  async #requestFromNetwork(timeout = 5000): Promise<void> {
-    if (!this.#services.requestFromNetwork || this.#isRequestingFromNetwork) {
-      return
-    }
-
-    this.#isRequestingFromNetwork = true
-    const networkId = "network-request" // Could include peer info
-
-    // Update ready state to requesting
-    this.#updateReadyState(networkId, {
-      source: { type: "network", peerId: "unknown" }, // Could be more specific
-      state: { type: "requesting" },
-    })
-
-    try {
-      const hadContentBefore = this.#hasContent()
-      await this.#services.requestFromNetwork(this.documentId, this.doc, timeout)
-      const hasNewContent = this.#hasContent() && !hadContentBefore
-
-      // Update ready state to found
-      this.#updateReadyState(networkId, {
-        source: { type: "network", peerId: "unknown" },
-        state: { type: "found", containsNewOperations: hasNewContent },
-      })
-    } catch (error) {
-      // Update ready state to not found
-      this.#updateReadyState(networkId, {
-        source: { type: "network", peerId: "unknown" },
-        state: { type: "not-found" },
-      })
-    } finally {
-      this.#isRequestingFromNetwork = false
-    }
-  }
-
-  #updateReadyState(key: string, readyState: ReadyState): void {
+  /**
+   * Update a source's ready state. Source could be storage or network.
+   * @param key Unique key for the source of data
+   * @param readyState
+   */
+  public updateReadyState(key: string, readyState: ReadyState): void {
     this.#readyStates.set(key, readyState)
     this._emitter.emit("ready-state-changed", {
       readyStates: Array.from(this.#readyStates.values()),
     })
-  }
-
-  #hasContent(): boolean {
-    // Check if the document has any operations by examining the version vector
-    const vv = this.doc.oplogVersion()
-    // If any peer has a counter > 0, the document has content
-    for (const [, counter] of vv.toJSON()) {
-      if (counter > 0) {
-        return true
-      }
-    }
-    return false
   }
 }

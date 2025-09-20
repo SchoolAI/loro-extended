@@ -162,7 +162,7 @@ export class Synchronizer {
           // With the new architecture, documents are always available
           // We just need to trigger background loading from storage/network
           // This happens automatically when the handle is created
-          
+
           // No need to check state or call find() - the document is immediately usable
         }
         break
@@ -190,7 +190,8 @@ export class Synchronizer {
         const handle = this.#services.getDoc(command.documentId)
 
         // Try to wait for storage to load, but don't wait too long
-        handle.waitForStorage(1000)
+        handle
+          .waitForStorage(1000)
           .then(() => {
             // Storage loaded successfully, send the document
             this.#services.send({

@@ -77,6 +77,10 @@ describe("Repo", () => {
     })
 
     const handle1 = repo1.create()
+    
+    // Wait for network connections to establish
+    await vi.advanceTimersByTimeAsync(100)
+    
     const handle2 = await repo2.findAndWait(handle1.documentId, {
       waitForNetwork: true,
       timeout: 1000,
@@ -87,7 +91,7 @@ describe("Repo", () => {
       doc.getMap("doc").set("text", "hello")
     })
 
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(100)
 
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
 
@@ -98,7 +102,7 @@ describe("Repo", () => {
       root.set("text", `${root.get("text")} world`)
     })
 
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(100)
 
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
   })
@@ -112,6 +116,10 @@ describe("Repo", () => {
     const repo2 = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
     const handle1 = repo1.create()
+    
+    // Wait for network connections to establish
+    await vi.advanceTimersByTimeAsync(100)
+    
     const handle2 = await repo2.findAndWait(handle1.documentId, {
       waitForNetwork: true,
       timeout: 1000,
@@ -119,7 +127,7 @@ describe("Repo", () => {
 
     await repo2.delete(handle1.documentId)
 
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(100)
 
     // The document should still exist in repo1
     expect(repo1.handles.has(handle1.documentId)).toBe(true)
@@ -186,6 +194,9 @@ describe("Repo", () => {
       handleA.change(doc => {
         doc.getMap("doc").set("text", "hello")
       })
+
+      // Wait for network connections to establish
+      await vi.advanceTimersByTimeAsync(100)
 
       // B explicitly requests the document. It should succeed.
       const handleB = await repoB.findAndWait(handleA.documentId, {

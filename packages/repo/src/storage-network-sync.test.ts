@@ -87,11 +87,14 @@ describe("Storage-Network Synchronization", () => {
     // CURRENT STATUS: This currently times out and fails
 
     try {
-      const clientHandle = await client.find(documentId)
+      // Client requests the document from the network
+      const clientHandle = await client.findAndWait(documentId, {
+        waitForNetwork: true,
+        timeout: 2000,
+      })
 
       // If we get here, the test passes (after implementing the fix)
-      expect(clientHandle.fullState).toBe("ready")
-      const docClient = clientHandle.doc()
+      const docClient = clientHandle.doc
       const rootClient = docClient.getMap("root")
       expect(rootClient.get("title")).toBe("Important Document")
       expect(rootClient.get("content")).toBe("This document exists in storage")
@@ -101,7 +104,7 @@ describe("Storage-Network Synchronization", () => {
       // (it should have loaded it from storage when client requested it)
       const server2Handle = server2.handles.get(documentId)
       expect(server2Handle).toBeDefined()
-      expect(server2Handle?.fullState).toBe("ready")
+      expect(server2Handle?.doc).toBeDefined()
     } catch (error) {
       // This is what currently happens - the find times out
       // because server2 doesn't check its storage

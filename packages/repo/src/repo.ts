@@ -1,4 +1,4 @@
-import { LoroDoc, type LoroEventBatch, type OpId } from "loro-crdt"
+import type { LoroDoc, LoroEventBatch, OpId } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
 import {
   InProcessBridge,
@@ -117,7 +117,7 @@ export class Repo {
     this.synchronizer = new Synchronizer(
       {
         send: message => this.networkSubsystem.send(message),
-        getDoc: documentId => this.getOrCreateHandle(documentId),
+        getDoc: documentId => this.getOrCreateDocHandle(documentId),
       },
       { permissions: this.permissionAdapter },
     )
@@ -168,111 +168,23 @@ export class Repo {
   //
 
   /**
-   * Creates a new document with an optional documentId.
+   * Gets or creates a new document with an optional documentId.
    * The document is immediately available for use.
    * @param options Configuration options for document creation
    * @returns The DocHandle with an immediately available document
    */
-  create<T extends DocContent>(
-    options: { documentId?: DocumentId } = {},
+  get<T extends DocContent>(
+    documentId: DocumentId = crypto.randomUUID(),
   ): DocHandle<T> {
-    const documentId = options.documentId ?? crypto.randomUUID()
-
     if (this.handleCache.has(documentId)) {
       throw new Error(`A document with id ${documentId} already exists.`)
     }
 
-    const handle = this.getOrCreateHandle<T>(documentId)
-    
+    const handle = this.getOrCreateDocHandle<T>(documentId)
+
     // Notify synchronizer that we have this document
     this.synchronizer.addDocument(documentId)
-    
-    return handle
-  }
 
-  /**
-   * Gets a document handle by its ID. The document is immediately available.
-   * Use the readiness API if you need to wait for storage/network loading.
-   * @param documentId The ID of the document to get
-   * @returns The DocHandle with an immediately available document
-   */
-  find<T extends DocContent>(documentId: DocumentId): DocHandle<T> {
-    return this.getOrCreateHandle<T>(documentId)
-  }
-
-  /**
-   * Gets a document handle and waits for it to be loaded from storage or network.
-   * This is a convenience method that combines find() with waitUntilReady().
-   * @param documentId The ID of the document to find
-   * @param options Configuration options
-   * @returns A promise that resolves when the document is ready
-   */
-  async findAndWait<T extends DocContent>(
-    documentId: DocumentId,
-    options: {
-      timeout?: number
-      waitForStorage?: boolean
-      waitForNetwork?: boolean
-    } = {},
-  ): Promise<DocHandle<T>> {
-    const handle = this.find<T>(documentId)
-    
-    const { timeout = 5000, waitForStorage = true, waitForNetwork = false } = options
-    
-    if (waitForStorage && waitForNetwork) {
-      // Wait for either storage or network
-      await handle.waitUntilReady(
-        (readyStates) =>
-          readyStates.some(
-            (s) =>
-              (s.source.type === "storage" && s.state.type === "found") ||
-              (s.source.type === "network" && s.state.type === "found")
-          ),
-        timeout
-      )
-    } else if (waitForStorage) {
-      await handle.waitForStorage(timeout)
-    } else if (waitForNetwork) {
-      await handle.waitForNetwork(timeout)
-    }
-    
-    return handle
-  }
-
-  /**
-   * Finds a document or creates it if not found after a timeout.
-   * This is a convenience method that tries to load from storage/network first,
-   * then creates the document if it's not available.
-   * @param documentId The ID of the document to find or create
-   * @param options Configuration options
-   * @returns A promise that resolves to the DocHandle when ready
-   */
-  async findOrCreate<T extends DocContent>(
-    documentId: DocumentId,
-    options: {
-      timeout?: number
-    } = {},
-  ): Promise<DocHandle<T>> {
-    const handle = this.find<T>(documentId)
-    const { timeout = 1000 } = options // Shorter default timeout
-    
-    try {
-      // Try to wait for storage or network to provide the document
-      await handle.waitUntilReady(
-        (readyStates) =>
-          readyStates.some(
-            (s) =>
-              (s.source.type === "storage" && s.state.type === "found") ||
-              (s.source.type === "network" && s.state.type === "found")
-          ),
-        timeout
-      )
-    } catch (error) {
-      // If timeout or not found, just notify synchronizer that we have this document
-      // The document is already available for use (always-available principle)
-      this.synchronizer.addDocument(documentId)
-    }
-    
     return handle
   }
 
@@ -389,7 +301,10 @@ export class Repo {
     timeout: number,
   ) => Promise<void> {
     return async (documentId: DocumentId, doc: LoroDoc<T>, timeout: number) => {
-      const result = await this.synchronizer.queryNetwork<T>(documentId, timeout)
+      const result = await this.synchronizer.queryNetwork<T>(
+        documentId,
+        timeout,
+      )
       if (result) {
         // Import the result into the provided doc
         const exported = result.export({ mode: "snapshot" })
@@ -400,27 +315,24 @@ export class Repo {
     }
   }
 
-  /**
-   * Gets an existing handle or creates a new one for the given document ID.
-   * This method ensures proper service injection and event wiring for each handle.
-   */
-  private getOrCreateHandle<T extends DocContent>(
+  private getCachedDocHandle(
     documentId: DocumentId,
-  ): DocHandle<T> {
+  ): DocHandle<DocContent> | undefined {
     const cached = this.handleCache.get(documentId)
     if (cached) {
-      return cached as unknown as DocHandle<T>
+      return cached
     }
+  }
 
-    // Create a new handle with injected services
-    const handle = new DocHandle<T>(
+  private createDocHandle(documentId: DocumentId): DocHandle<DocContent> {
+    const handle = new DocHandle<DocContent>(
       documentId,
       {
-        loadFromStorage: createStorageLoader<T>(this.storageAdapter),
-        saveToStorage: this.createSaveToStorage<T>(documentId),
-        requestFromNetwork: this.createRequestFromNetwork<T>(),
+        loadFromStorage: createStorageLoader(this.storageAdapter),
+        saveToStorage: this.createSaveToStorage(documentId),
+        requestFromNetwork: this.createRequestFromNetwork(),
       },
-      { autoLoad: true } // Enable auto-loading by default
+      { autoLoad: true }, // Enable auto-loading by default
     )
 
     // Listen for local changes to broadcast to peers (network synchronization)
@@ -428,7 +340,24 @@ export class Repo {
       this.synchronizer.onLocalChange(documentId, message)
     })
 
-    this.handleCache.set(documentId, handle as unknown as DocHandle<DocContent>)
     return handle
+  }
+
+  /**
+   * Gets an existing handle or creates a new one for the given document ID.
+   * This method ensures proper service injection and event wiring for each handle.
+   */
+  private getOrCreateDocHandle<T extends DocContent>(
+    documentId: DocumentId,
+  ): DocHandle<T> {
+    let handle = this.getCachedDocHandle(documentId)
+
+    // Create a new handle with injected services
+    if (!handle) {
+      handle = this.createDocHandle(documentId)
+      this.handleCache.set(documentId, handle)
+    }
+
+    return handle as unknown as DocHandle<T>
   }
 }
