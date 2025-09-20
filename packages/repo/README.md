@@ -56,11 +56,12 @@ The `Repo` class is the central orchestrator for the Loro state synchronization 
 
 ### DocHandle
 
-The `DocHandle` is a stateful wrapper around a single Loro document. It provides a higher-level API to manage the document's lifecycle, state, and mutations, abstracting away the complexities of the underlying CRDT.
+The `DocHandle` is an always-available wrapper around a single Loro document. It provides immediate access to the document while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
 
-- **State Machine**: Progresses through `idle` → `loading` → `ready` states
-- **Event-Driven**: Emits events for state changes, document changes, and sync messages
-- **Mutation Interface**: Provides a simple `change()` method for document updates
+- **Always Available**: Documents are immediately accessible without complex loading states
+- **Flexible Readiness**: Applications can define custom readiness criteria using predicates
+- **Event-Driven**: Emits events for document changes and sync messages
+- **Peer State Management**: Tracks which peers have or are aware of the document
 
 ### Storage Adapters
 
@@ -132,52 +133,56 @@ const peerId = repo.peerId;
 
 ### DocHandle Class
 
-#### Lifecycle Management
+#### Always-Available Document Access
 
 ```typescript
-// Listen for state transitions
-handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
-  console.log(`State changed from ${oldState.state} to ${newState.state}`);
+// Document is immediately available
+const doc = handle.doc; // LoroDoc instance, always ready
+
+// Flexible readiness API - define what "ready" means for your app
+await handle.waitUntilReady((readyStates) => {
+  // Wait for storage to load
+  return readyStates.some(s => s.source.type === "storage" && s.state.type === "found");
 });
 
-// Wait for the document to be ready
-await handle.whenReady();
-
-// Check current state
-const state = handle.state; // "idle" | "loading" | "ready" | "unavailable"
+// Convenience methods for common patterns
+await handle.waitForStorage(); // Wait for storage load
+await handle.waitForNetwork(); // Wait for network sync
 ```
 
 #### Document Mutations
 
 ```typescript
-// Make changes to the document
-handle.change((doc) => {
-  doc.title = "My Collaborative Document";
-  doc.tasks = [{ description: "Finish the README", completed: true }];
-});
+// Make changes to the document (always available)
+handle.doc.getMap("root").set("title", "My Collaborative Document");
+handle.doc.getList("tasks").push({ description: "Finish the README", completed: true });
 
 // Listen for local changes
-handle.on("doc-handle-local-change", (event) => {
-  console.log("Local change made:", event);
+handle.on("doc-handle-local-change", (syncMessage) => {
+  console.log("Local change made:", syncMessage);
 });
 
 // Listen for any changes (local or remote)
-handle.on("doc-handle-change", ({ doc }) => {
-  console.log("Document changed:", doc.toJSON().root);
+handle.on("doc-handle-change", ({ doc, event }) => {
+  console.log("Document changed:", doc.toJSON());
 });
 ```
 
-#### Document Operations
+#### Peer State Management
 
 ```typescript
-// Load a document (usually called internally by repo methods)
-await handle.load(async () => {
-  // Return a LoroDoc instance
-  return new LoroDoc();
-});
+// Track which peers have the document
+const peersWithDoc = handle.getPeersWithDoc();
 
-// Delete the document
-handle.delete();
+// Track which peers are aware of the document
+const peersAwareOfDoc = handle.getPeersAwareOfDoc();
+
+// Update peer status
+handle.updatePeerStatus(peerId, {
+  hasDoc: true,
+  isAwareOfDoc: true,
+  isSyncingNow: false
+});
 ```
 
 ## Storage Adapters
@@ -324,32 +329,32 @@ const todoHandle = await repo.findOrCreate<TodoDoc>("main-todos", {
   }),
 });
 
-// Wait for the document to be ready
-await todoHandle.whenReady();
+// Document is immediately available
+const doc = todoHandle.doc;
 
 // Listen for changes
-todoHandle.on("doc-handle-change", ({ doc }) => {
-  console.log("Todos updated:", doc.toJSON().root);
+todoHandle.on("doc-handle-change", ({ doc, event }) => {
+  console.log("Todos updated:", doc.toJSON());
   // Update UI here
 });
 
 // Add a new todo
-todoHandle.change((doc) => {
-  doc.todos.push({
-    id: crypto.randomUUID(),
-    text: "Learn about Loro",
-    completed: false,
-  });
+const todosMap = doc.getMap("root");
+const todosList = todosMap.get("todos") || todosMap.setContainer("todos", "List");
+todosList.push({
+  id: crypto.randomUUID(),
+  text: "Learn about Loro",
+  completed: false,
 });
 
 // Toggle a todo completion
 const toggleTodo = (id: string) => {
-  todoHandle.change((doc) => {
-    const todo = doc.todos.find((t) => t.id === id);
-    if (todo) {
-      todo.completed = !todo.completed;
-    }
-  });
+  const todosList = doc.getMap("root").get("todos");
+  const todoIndex = todosList.toArray().findIndex(t => t.id === id);
+  if (todoIndex >= 0) {
+    const todo = todosList.get(todoIndex);
+    todo.completed = !todo.completed;
+  }
 };
 ```
 
@@ -455,9 +460,13 @@ const repo = new Repo({
 
 This package implements a sophisticated distributed document synchronization system using several key architectural patterns:
 
+### Always-Available Documents
+
+The core architecture embraces CRDT semantics where documents are immediately available and operations are idempotent and commutative. This eliminates artificial loading states while providing flexible readiness APIs for applications.
+
 ### The Elm Architecture (TEA)
 
-Core components like `DocHandle` and `Synchronizer` use pure functional state machines with impure runtime hosts. This provides:
+The `Synchronizer` uses pure functional state machines with impure runtime hosts. This provides:
 
 - Predictable state transitions
 - Excellent testability
@@ -482,7 +491,7 @@ The synchronization protocol uses an "Announce/Request/Sync" pattern that ensure
 For detailed architectural documentation, see:
 
 - [Overall Architecture](./src/repo.md) - System design and component relationships
-- [DocHandle State Machine](./src/doc-handle.md) - Document lifecycle management
+- [DocHandle Architecture](./src/doc-handle.md) - Always-available document management
 - [Synchronizer Protocol](./src/synchronizer.md) - Peer-to-peer synchronization details
 
 ## Future Work

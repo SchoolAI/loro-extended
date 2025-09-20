@@ -20,16 +20,18 @@ import type { DocContent, DocumentId, PeerId } from "./types.js"
  * from stored snapshots and/or incremental updates.
  *
  * @param storageAdapter The storage adapter to load from
- * @returns A function that loads a document by its ID
+ * @returns A function that loads a document by its ID into an existing doc
  */
 function createStorageLoader<T extends DocContent>(
   storageAdapter: StorageAdapter,
-): (id: DocumentId) => Promise<LoroDoc<T> | null> {
-  return async (id: DocumentId) => {
+): (documentId: DocumentId, doc: LoroDoc<T>) => Promise<void> {
+  return async (documentId: DocumentId, doc: LoroDoc<T>) => {
     // Load all data for this document using loadRange
-    const chunks = await storageAdapter.loadRange([id])
+    const chunks = await storageAdapter.loadRange([documentId])
 
-    if (chunks.length === 0) return null
+    if (chunks.length === 0) {
+      throw new Error(`Document ${documentId} not found in storage`)
+    }
 
     // Get all updates and sort them by version key
     const updateChunks = chunks
@@ -41,16 +43,14 @@ function createStorageLoader<T extends DocContent>(
         return versionA.localeCompare(versionB)
       })
 
-    if (updateChunks.length === 0) return null
+    if (updateChunks.length === 0) {
+      throw new Error(`No updates found for document ${documentId}`)
+    }
 
-    // Create new doc and apply all updates in order
-    const doc = new LoroDoc<T>()
-
+    // Apply all updates in order to the existing doc
     for (const updateChunk of updateChunks) {
       doc.import(updateChunk.data)
     }
-
-    return doc
   }
 }
 
@@ -72,8 +72,8 @@ const defaultBridge = new InProcessBridge()
  * It manages the lifecycle of documents, coordinates subsystems, and provides the main
  * public API for document operations.
  *
- * Unlike DocHandle and Synchronizer which use TEA for complex state management,
- * Repo is a simple orchestrator that wires together the various subsystems.
+ * With the simplified DocHandle architecture, Repo becomes a simpler orchestrator
+ * that wires together the various subsystems without complex state management.
  */
 export class Repo {
   readonly peerId: PeerId
@@ -164,17 +164,18 @@ export class Repo {
   }
 
   //
-  // PUBLIC API - Now returns Promises
+  // PUBLIC API - Simplified with always-available documents
   //
 
   /**
    * Creates a new document with an optional documentId.
+   * The document is immediately available for use.
    * @param options Configuration options for document creation
-   * @returns A promise that resolves to the DocHandle when the document is ready
+   * @returns The DocHandle with an immediately available document
    */
-  async create<T extends DocContent>(
+  create<T extends DocContent>(
     options: { documentId?: DocumentId } = {},
-  ): Promise<DocHandle<T>> {
+  ): DocHandle<T> {
     const documentId = options.documentId ?? crypto.randomUUID()
 
     if (this.handleCache.has(documentId)) {
@@ -182,23 +183,66 @@ export class Repo {
     }
 
     const handle = this.getOrCreateHandle<T>(documentId)
-    return await handle.create()
+    
+    // Notify synchronizer that we have this document
+    this.synchronizer.addDocument(documentId)
+    
+    return handle
   }
 
   /**
-   * Finds an existing document by its ID.
-   * @param documentId The ID of the document to find
-   * @returns A promise that resolves to the DocHandle when found, or rejects if unavailable
+   * Gets a document handle by its ID. The document is immediately available.
+   * Use the readiness API if you need to wait for storage/network loading.
+   * @param documentId The ID of the document to get
+   * @returns The DocHandle with an immediately available document
    */
-  async find<T extends DocContent>(
-    documentId: DocumentId,
-  ): Promise<DocHandle<T>> {
-    const handle = this.getOrCreateHandle<T>(documentId)
-    return await handle.find()
+  find<T extends DocContent>(documentId: DocumentId): DocHandle<T> {
+    return this.getOrCreateHandle<T>(documentId)
   }
 
   /**
-   * Finds a document or creates it if not found.
+   * Gets a document handle and waits for it to be loaded from storage or network.
+   * This is a convenience method that combines find() with waitUntilReady().
+   * @param documentId The ID of the document to find
+   * @param options Configuration options
+   * @returns A promise that resolves when the document is ready
+   */
+  async findAndWait<T extends DocContent>(
+    documentId: DocumentId,
+    options: {
+      timeout?: number
+      waitForStorage?: boolean
+      waitForNetwork?: boolean
+    } = {},
+  ): Promise<DocHandle<T>> {
+    const handle = this.find<T>(documentId)
+    
+    const { timeout = 5000, waitForStorage = true, waitForNetwork = false } = options
+    
+    if (waitForStorage && waitForNetwork) {
+      // Wait for either storage or network
+      await handle.waitUntilReady(
+        (readyStates) =>
+          readyStates.some(
+            (s) =>
+              (s.source.type === "storage" && s.state.type === "found") ||
+              (s.source.type === "network" && s.state.type === "found")
+          ),
+        timeout
+      )
+    } else if (waitForStorage) {
+      await handle.waitForStorage(timeout)
+    } else if (waitForNetwork) {
+      await handle.waitForNetwork(timeout)
+    }
+    
+    return handle
+  }
+
+  /**
+   * Finds a document or creates it if not found after a timeout.
+   * This is a convenience method that tries to load from storage/network first,
+   * then creates the document if it's not available.
    * @param documentId The ID of the document to find or create
    * @param options Configuration options
    * @returns A promise that resolves to the DocHandle when ready
@@ -207,11 +251,29 @@ export class Repo {
     documentId: DocumentId,
     options: {
       timeout?: number
-      initialValue?: () => T
     } = {},
   ): Promise<DocHandle<T>> {
-    const handle = this.getOrCreateHandle<T>(documentId)
-    return await handle.findOrCreate(options)
+    const handle = this.find<T>(documentId)
+    const { timeout = 1000 } = options // Shorter default timeout
+    
+    try {
+      // Try to wait for storage or network to provide the document
+      await handle.waitUntilReady(
+        (readyStates) =>
+          readyStates.some(
+            (s) =>
+              (s.source.type === "storage" && s.state.type === "found") ||
+              (s.source.type === "network" && s.state.type === "found")
+          ),
+        timeout
+      )
+    } catch (error) {
+      // If timeout or not found, just notify synchronizer that we have this document
+      // The document is already available for use (always-available principle)
+      this.synchronizer.addDocument(documentId)
+    }
+    
+    return handle
   }
 
   /**
@@ -222,7 +284,6 @@ export class Repo {
     const handle = this.handleCache.get(documentId)
 
     if (handle) {
-      handle.delete()
       this.handleCache.delete(documentId)
       await this.storageAdapter.remove([documentId])
       this.synchronizer.removeDocument(documentId)
@@ -241,7 +302,6 @@ export class Repo {
     this.synchronizer.reset()
 
     // Clear all document handles
-    this.handleCache.forEach(h => h.delete())
     this.handleCache.clear()
   }
 
@@ -320,6 +380,27 @@ export class Repo {
   }
 
   /**
+   * Creates a requestFromNetwork service function that adapts the Synchronizer's queryNetwork
+   * to the DocHandle's expected interface.
+   */
+  private createRequestFromNetwork<T extends DocContent>(): (
+    documentId: DocumentId,
+    doc: LoroDoc<T>,
+    timeout: number,
+  ) => Promise<void> {
+    return async (documentId: DocumentId, doc: LoroDoc<T>, timeout: number) => {
+      const result = await this.synchronizer.queryNetwork<T>(documentId, timeout)
+      if (result) {
+        // Import the result into the provided doc
+        const exported = result.export({ mode: "snapshot" })
+        doc.import(exported)
+      } else {
+        throw new Error(`Failed to load document ${documentId} from network`)
+      }
+    }
+  }
+
+  /**
    * Gets an existing handle or creates a new one for the given document ID.
    * This method ensures proper service injection and event wiring for each handle.
    */
@@ -331,24 +412,19 @@ export class Repo {
       return cached as unknown as DocHandle<T>
     }
 
-    // Create a new handle with injected services including saveToStorage
-    const handle = new DocHandle<T>(documentId, {
-      loadFromStorage: createStorageLoader<T>(this.storageAdapter),
-      saveToStorage: this.createSaveToStorage<T>(documentId),
-      queryNetwork: this.synchronizer.queryNetwork.bind(this.synchronizer),
-    })
-
-    // Listen for state changes to coordinate with synchronizer
-    handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
-      if (newState.state === "ready" && oldState.state !== "ready") {
-        this.synchronizer.addDocument(documentId)
-      }
-    })
-
-    // Note: Storage is now handled by the saveToStorage service, not event listeners
+    // Create a new handle with injected services
+    const handle = new DocHandle<T>(
+      documentId,
+      {
+        loadFromStorage: createStorageLoader<T>(this.storageAdapter),
+        saveToStorage: this.createSaveToStorage<T>(documentId),
+        requestFromNetwork: this.createRequestFromNetwork<T>(),
+      },
+      { autoLoad: true } // Enable auto-loading by default
+    )
 
     // Listen for local changes to broadcast to peers (network synchronization)
-    handle.on("doc-handle-local-change", message => {
+    handle.on("doc-local-change", message => {
       this.synchronizer.onLocalChange(documentId, message)
     })
 

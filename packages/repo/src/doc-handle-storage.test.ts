@@ -5,17 +5,17 @@ import type { DocContent } from "./types.js"
 
 describe("DocHandle Storage Integration", () => {
   it("should call saveToStorage service when local changes occur", async () => {
-    const doc = new LoroDoc()
     const saveToStorage = vi.fn().mockResolvedValue(undefined)
 
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       saveToStorage,
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // Make a local change
     handle.change(doc => {
@@ -40,17 +40,17 @@ describe("DocHandle Storage Integration", () => {
   })
 
   it("should call saveToStorage when remote changes are imported", async () => {
-    const doc = new LoroDoc()
     const saveToStorage = vi.fn().mockResolvedValue(undefined)
 
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       saveToStorage,
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // Create a sync message from another doc
     const otherDoc = new LoroDoc()
@@ -77,16 +77,15 @@ describe("DocHandle Storage Integration", () => {
   })
 
   it("should handle missing saveToStorage service gracefully", async () => {
-    const doc = new LoroDoc()
-
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       // No saveToStorage service provided
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // This should not throw even without saveToStorage
     expect(() => {
@@ -98,20 +97,20 @@ describe("DocHandle Storage Integration", () => {
   })
 
   it("should handle saveToStorage errors gracefully", async () => {
-    const doc = new LoroDoc()
     const consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => {})
     const saveToStorage = vi.fn().mockRejectedValue(new Error("Storage failed"))
 
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       saveToStorage,
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // Make a change that will trigger a failed save
     handle.change(doc => {
@@ -128,24 +127,24 @@ describe("DocHandle Storage Integration", () => {
       expect.any(Error),
     )
 
-    // Document should still be in ready state
-    expect(handle.state).toBe("ready")
+    // Document should still be available
+    expect(handle.doc).toBeInstanceOf(LoroDoc)
 
     consoleErrorSpy.mockRestore()
   })
 
   it("should not call saveToStorage for checkout events", async () => {
-    const doc = new LoroDoc()
     const saveToStorage = vi.fn().mockResolvedValue(undefined)
 
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       saveToStorage,
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // Simulate a checkout event (these have by: "checkout")
     // This would typically happen during time travel or undo/redo
@@ -172,17 +171,17 @@ describe("DocHandle Storage Integration", () => {
   })
 
   it("should pass correct frontiers to saveToStorage", async () => {
-    const doc = new LoroDoc()
     const saveToStorage = vi.fn().mockResolvedValue(undefined)
 
     const services: DocHandleServices<DocContent> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Load some initial data
+        doc.getMap("doc").set("initial", "value")
+      }),
       saveToStorage,
-      queryNetwork: vi.fn(),
     }
 
     const handle = new DocHandle("test-doc", services)
-    await handle.find()
 
     // Make a change
     handle.change(doc => {
@@ -204,8 +203,7 @@ describe("DocHandle Storage Integration", () => {
     expect(Array.isArray(event.from)).toBe(true)
     expect(Array.isArray(event.to)).toBe(true)
 
-    // After first change, 'from' should be empty and 'to' should have content
-    expect(event.from).toHaveLength(0)
+    // After first change, 'to' should have content
     expect(event.to.length).toBeGreaterThan(0)
   })
 })

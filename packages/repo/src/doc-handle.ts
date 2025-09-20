@@ -1,65 +1,78 @@
 import Emittery from "emittery"
 import { LoroDoc, type LoroEventBatch } from "loro-crdt"
-import {
-  type Command,
-  type DocHandleState,
-  FIND_OR_CREATE_DEFAULT_TIMEOUT,
-  type HandleState,
-  type Message,
-  init as programInit,
-  update as programUpdate,
-} from "./doc-handle-program.js"
-import { RequestTracker } from "./request-tracker.js"
-import type { DocContent, DocumentId, LoroDocMutator } from "./types.js"
+import type { DocContent, DocumentId, LoroDocMutator, PeerId } from "./types.js"
+
+/** Peer status for a specific document */
+export type DocPeerStatus = {
+  hasDoc: boolean
+  isAwareOfDoc: boolean
+  isSyncingNow: boolean
+  lastSyncTime?: Date
+}
+
+/** Ready state information for flexible readiness API */
+export type ReadyState = {
+  source:
+    | { type: "storage"; storageId: string }
+    | { type: "network"; peerId: string }
+  state:
+    | { type: "requesting" }
+    | { type: "not-found" }
+    | { type: "found"; containsNewOperations: boolean }
+}
+
+/** Custom predicate for determining readiness */
+export type ReadinessCheck = (readyStates: ReadyState[]) => boolean
 
 /** A dictionary of functions that the DocHandle can use to perform side effects. */
 export interface DocHandleServices<T extends DocContent> {
-  /** A function that returns a promise resolving to the Loro document from storage. */
-  loadFromStorage: (documentId: DocumentId) => Promise<LoroDoc<T> | null>
+  /** A function that loads document data from storage into the provided doc. */
+  loadFromStorage?: (documentId: DocumentId, doc: LoroDoc<T>) => Promise<void>
   /** A function that saves the document to storage after changes. */
   saveToStorage?: (
     documentId: DocumentId,
     doc: LoroDoc<T>,
     event: LoroEventBatch,
   ) => Promise<void>
-  /** A function that returns a promise resolving to the Loro document from the network. */
-  queryNetwork: (
+  /** A function that requests document data from the network into the provided doc. */
+  requestFromNetwork?: (
     documentId: DocumentId,
+    doc: LoroDoc<T>,
     timeout: number,
-  ) => Promise<LoroDoc<T> | null>
+  ) => Promise<void>
 }
 
-// The events that the DocHandle can emit, with their expected payload.
-// Note that the state-change event now emits the full state objects.
+// The events that the DocHandle can emit
 type DocHandleEvents<T extends DocContent> = {
-  "doc-handle-state-transition": {
-    oldState: HandleState<T>
-    newState: HandleState<T>
-  }
-  "doc-handle-change": {
+  "doc-change": {
     doc: LoroDoc<T>
-    event: LoroEventBatch // Now includes the full event with frontiers
+    event: LoroEventBatch
   }
-  "doc-handle-local-change": Uint8Array
+  "doc-local-change": Uint8Array
+  "ready-state-changed": {
+    readyStates: ReadyState[]
+  }
 }
-
-export type DocHandleSimplifiedState = "loading" | "ready" | "unavailable"
 
 /**
- * A handle to a Loro document that manages its lifecycle and state
- * transitions according to The Elm Architecture (TEA).
- *
- * This class acts as the "runtime" for a pure state machine defined in
- * `doc-handle-program.ts`. It dispatches messages to the program, receives
- * new state and commands, and executes the commands as side effects.
+ * A simplified handle to a Loro document that is always available.
+ * 
+ * This class embraces CRDT semantics where documents are always-mergeable
+ * and operations are idempotent. Instead of complex loading states, it
+ * provides a flexible readiness API that allows applications to define
+ * what "ready" means for their specific use case.
  *
  * @typeParam T - The plain JavaScript object schema for the document.
  */
 export class DocHandle<T extends DocContent> {
   public readonly documentId: DocumentId
-  #state: HandleState<T>
-  #services: Partial<DocHandleServices<T>>
-  #requestTracker = new RequestTracker<DocHandle<T>>()
+  public readonly doc: LoroDoc<T> = new LoroDoc<T>() // Always available
+  
+  #services: DocHandleServices<T>
+  #peers = new Map<PeerId, DocPeerStatus>()
+  #readyStates = new Map<string, ReadyState>()
+  #isLoadingFromStorage = false
+  #isRequestingFromNetwork = false
 
   /** @internal */
   _emitter = new Emittery<DocHandleEvents<T>>()
@@ -71,117 +84,35 @@ export class DocHandle<T extends DocContent> {
 
   constructor(
     documentId: DocumentId,
-    services: Partial<DocHandleServices<T>> = {},
+    services: DocHandleServices<T> = {},
+    options: { autoLoad?: boolean } = {},
   ) {
     this.documentId = documentId
     this.#services = services
 
-    const [initialState, initialCommand] = programInit<T>()
-    this.#state = initialState
-    if (initialCommand) {
-      this.#executeCommand(initialCommand)
+    // Set up document event subscriptions
+    this.#setupDocumentSubscriptions()
+
+    // Start background loading immediately (unless disabled)
+    if (options.autoLoad !== false) {
+      this.#loadFromStorage()
+      this.#requestFromNetwork()
     }
   }
 
-  public get state(): DocHandleSimplifiedState {
-    switch (this.#state.state) {
-      case "deleted":
-      case "unavailable":
-        return "unavailable"
-      case "ready":
-        return "ready"
-      default:
-        return "loading"
-    }
-  }
-
-  /** The current state of the handle (e.g., "idle", "loading", "ready"). */
-  public get fullState(): DocHandleState {
-    return this.#state.state
-  }
-
-  /** The full state object, for more detailed inspection. */
-  public get stateObject(): HandleState<T> {
-    return this.#state
-  }
-
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // PUBLIC API - Methods that dispatch messages to the state machine
+  // PUBLIC API - Always-available document access
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-  /**
-   * Finds a document, trying local storage first, then the network.
-   * Does not create the document if it's not found.
-   */
-  public find(): Promise<DocHandle<T>> {
-    const [requestId, promise] = this.#requestTracker.createRequest()
-    this.#dispatch({ type: "msg-find", requestId })
-    return promise
-  }
-
-  /**
-   * Finds a document, trying local storage and the network. If not found after
-   * a timeout, it creates the document.
-   * @param options Configuration for the findOrCreate operation.
-   */
-  public findOrCreate(
-    options: { timeout?: number } = {},
-  ): Promise<DocHandle<T>> {
-    const [requestId, promise] = this.#requestTracker.createRequest()
-    this.#dispatch({
-      type: "msg-find-or-create",
-      requestId,
-      timeout: options.timeout ?? FIND_OR_CREATE_DEFAULT_TIMEOUT,
-    })
-
-    return promise
-  }
-
-  /**
-   * Creates a document immediately. If the document already exists, it will
-   * be merged with the existing document later.
-   * @param options Configuration for the create operation.
-   */
-  public create(): Promise<DocHandle<T>> {
-    const [requestId, promise] = this.#requestTracker.createRequest()
-    this.#dispatch({
-      type: "msg-create",
-      requestId,
-    })
-
-    return promise
-  }
-
-  /**
-   * Finds a document in storage only, without checking the network.
-   * Returns immediately if the document is not found in storage.
-   */
-  public findInStorageOnly(): Promise<DocHandle<T>> {
-    const [requestId, promise] = this.#requestTracker.createRequest()
-    this.#dispatch({ type: "msg-find-in-storage", requestId })
-    return promise
-  }
-
-  /** Marks the document as deleted. */
-  public delete(): void {
-    this.#dispatch({ type: "msg-delete" })
-  }
 
   /**
    * The primary method for an application to mutate the document.
-   * @param mutator A function that receives a draft of the document to modify.
+   * The document is always available for mutations.
+   * @param mutator A function that receives the document to modify.
    */
   public change(mutator: LoroDocMutator<T>): DocHandle<T> {
-    if (this.fullState !== "ready") {
-      throw new Error(
-        `Cannot change a document that is not ready. Current state: '${this.fullState}'`,
-      )
-    }
-
-    this.#dispatch({ type: "msg-local-change", mutator })
-
-    // Useful for chaining after create or findOrCreate
-    return this
+    mutator(this.doc)
+    this.doc.commit()
+    return this // Useful for chaining
   }
 
   /**
@@ -191,205 +122,296 @@ export class DocHandle<T extends DocContent> {
    * @internal
    */
   public applySyncMessage(message: Uint8Array): void {
-    if (this.fullState === "ready" && "doc" in this.#state) {
-      this.#dispatch({ type: "msg-remote-change", message })
-    } else {
-      // If we're not ready, we need to create a temporary doc to import into.
-      const doc = new LoroDoc<T>()
-      doc.import(message)
-      this.#dispatch({ type: "msg-remote-change", message, doc })
-    }
-  }
-
-  /**
-   * Returns the underlying LoroDoc's content.
-   * @throws If the document is not in the 'ready' state.
-   */
-  public doc(): LoroDoc<T> {
-    if (this.#state.state !== "ready") {
-      throw new Error(
-        `DocHandle is not ready. Current state: '${this.fullState}'`,
-      )
-    }
-    return this.#state.doc
+    this.doc.import(message)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // INTERNAL RUNTIME - The "impure" part that executes effects
+  // FLEXIBLE READINESS API
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   /**
-   * The core of the runtime. It takes a message, passes it to the pure `update`
-   * function, gets the new state and command, updates its own state, and then
-   * executes the command.
+   * Wait until the document meets custom readiness criteria.
+   * @param predicate Function that determines if the document is ready
+   * @param timeout Optional timeout in milliseconds
    */
-  #dispatch(message: Message<T>): void {
-    const [newState, command] = programUpdate(
-      message,
-      this.#state,
-      this.documentId,
-    )
-
-    const oldState = this.#state
-    if (newState !== oldState) {
-      this.#state = newState
-      this._emitter.emit("doc-handle-state-transition", { oldState, newState })
+  async waitUntilReady(
+    predicate: ReadinessCheck,
+    timeout?: number
+  ): Promise<void> {
+    // Check if already ready
+    if (predicate(Array.from(this.#readyStates.values()))) {
+      return
     }
 
-    if (command) {
-      this.#executeCommand(command)
-    }
-  }
+    // Wait for ready state changes
+    return new Promise((resolve, reject) => {
+      let timeoutId: NodeJS.Timeout | undefined
+      let isResolved = false
 
-  /**
-   * Executes the side effects described by commands from the `update` function.
-   * This is where all interaction with the outside world (storage, network, etc.) happens.
-   */
-  async #executeCommand(command: Command<T>): Promise<void> {
-    switch (command.type) {
-      case "cmd-load-from-storage": {
-        if (!this.#services.loadFromStorage) {
-          console.warn(
-            "No `loadFromStorage` service provided to DocHandle. Taking no action.",
-          )
-          this.#dispatch({ type: "msg-storage-load-failure" })
-          return
-        }
-        const doc = await this.#services.loadFromStorage(command.documentId)
-        if (doc) {
-          this.#dispatch({ type: "msg-storage-load-success", doc })
-        } else {
-          this.#dispatch({ type: "msg-storage-load-failure" })
-        }
-        break
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        this._emitter.off("ready-state-changed", checkReadiness)
       }
 
-      case "cmd-query-network": {
-        if (!this.#services.queryNetwork) {
-          console.warn(
-            "No `queryNetwork` service provided. Simulating timeout.",
-          )
-          setTimeout(
-            () => this.#dispatch({ type: "msg-network-timeout" }),
-            command.timeout,
-          )
-          return
-        }
-        const doc = await this.#services.queryNetwork(
-          command.documentId,
-          command.timeout,
-        )
-        if (doc) {
-          this.#dispatch({ type: "msg-network-load-success", doc })
-        } else {
-          this.#dispatch({ type: "msg-network-timeout" })
-        }
-        break
-      }
-
-      case "cmd-create-doc": {
-        const doc = new LoroDoc<T>()
-
-        command.initialize?.(doc)
-
-        // Treat creation like a successful load to transition to ready state
-        this.#dispatch({
-          type: "msg-storage-load-success",
-          doc,
-        })
-        break
-      }
-
-      case "cmd-apply-remote-change": {
-        if (this.#state.state !== "ready") {
-          // This should not happen if the program logic is correct
-          console.warn("Cannot apply remote change to a non-ready document.")
-          return
-        }
-        this.#state.doc.import(command.message)
-        break
-      }
-
-      case "cmd-subscribe-to-doc": {
-        // When any change happens (local or remote), notify listeners with full event details
-        command.doc.subscribe(event => {
-          this._emitter.emit("doc-handle-change", {
-            doc: command.doc,
-            event, // Include the full LoroEventBatch with frontiers
-          })
-
-          // Also trigger storage save if service is available
-          if (
-            this.#services.saveToStorage &&
-            (event.by === "local" || event.by === "import")
-          ) {
-            const savePromise = this.#services.saveToStorage(
-              this.documentId,
-              command.doc,
-              event,
-            )
-            // Only attach catch handler if saveToStorage returns a promise
-            if (savePromise && typeof savePromise.catch === "function") {
-              savePromise.catch(error => {
-                console.error(
-                  `Failed to save document ${this.documentId} to storage:`,
-                  error,
-                )
-              })
-            }
+      if (timeout) {
+        timeoutId = setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true
+            cleanup()
+            reject(new Error(`Readiness timeout after ${timeout}ms`))
           }
-        })
-
-        // Keep local updates subscription for network synchronization
-        command.doc.subscribeLocalUpdates(syncMessage => {
-          this._emitter.emit("doc-handle-local-change", syncMessage)
-        })
-        break
+        }, timeout)
       }
 
-      case "cmd-report-success": {
-        this.#requestTracker.resolve(command.requestId, this)
-        break
-      }
-
-      case "cmd-report-failure": {
-        this.#requestTracker.reject(command.requestId, command.error)
-        break
-      }
-
-      case "cmd-save-to-storage": {
-        // This command is now handled directly in cmd-subscribe-to-doc
-        // Keeping this case for backward compatibility if needed
-        if (!this.#services.saveToStorage) {
-          console.debug("No saveToStorage service provided, skipping save")
-          return
+      const checkReadiness = ({ readyStates }: { readyStates: ReadyState[] }) => {
+        if (!isResolved && predicate(readyStates)) {
+          isResolved = true
+          cleanup()
+          resolve()
         }
-        try {
-          await this.#services.saveToStorage(
-            command.documentId,
-            command.doc,
-            command.event,
-          )
-        } catch (error) {
-          console.error(
-            `Failed to save document ${command.documentId} to storage:`,
-            error,
-          )
-        }
-        break
       }
 
-      case "cmd-batch": {
-        for (const cmd of command.commands) {
-          this.#executeCommand(cmd)
-        }
-        break
-      }
+      this._emitter.on("ready-state-changed", checkReadiness)
+    })
+  }
 
-      default: {
-        const unhandled: never = command
-        throw new Error(`Unhandled command: ${JSON.stringify(unhandled)}`)
+  /**
+   * Convenience method: wait for storage to load.
+   */
+  async waitForStorage(timeout?: number): Promise<void> {
+    // Trigger storage loading if not already in progress
+    if (!this.#isLoadingFromStorage) {
+      this.#loadFromStorage()
+    }
+    
+    return this.waitUntilReady(
+      (readyStates) =>
+        readyStates.some(
+          (s) => s.source.type === "storage" && s.state.type === "found"
+        ),
+      timeout
+    )
+  }
+
+  /**
+   * Convenience method: wait for a specific peer to provide the document.
+   */
+  async waitForPeer(peerId: PeerId, timeout?: number): Promise<void> {
+    return this.waitUntilReady(
+      (readyStates) =>
+        readyStates.some(
+          (s) =>
+            s.source.type === "network" &&
+            s.source.peerId === peerId &&
+            s.state.type === "found"
+        ),
+      timeout
+    )
+  }
+
+  /**
+   * Convenience method: wait for any network source to provide the document.
+   */
+  async waitForNetwork(timeout?: number): Promise<void> {
+    // Trigger network loading if not already in progress
+    if (!this.#isRequestingFromNetwork) {
+      this.#requestFromNetwork()
+    }
+    
+    return this.waitUntilReady(
+      (readyStates) =>
+        readyStates.some(
+          (s) => s.source.type === "network" && s.state.type === "found"
+        ),
+      timeout
+    )
+  }
+
+  /**
+   * Get current ready states for inspection.
+   */
+  public getReadyStates(): ReadyState[] {
+    return Array.from(this.#readyStates.values())
+  }
+
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // PEER STATE MANAGEMENT
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  /**
+   * Update the status of a peer for this document.
+   */
+  public updatePeerStatus(peerId: PeerId, status: Partial<DocPeerStatus>): void {
+    const current = this.#peers.get(peerId) || {
+      hasDoc: false,
+      isAwareOfDoc: false,
+      isSyncingNow: false,
+    }
+    
+    this.#peers.set(peerId, { ...current, ...status })
+  }
+
+  /**
+   * Get the status of a specific peer for this document.
+   */
+  public getPeerStatus(peerId: PeerId): DocPeerStatus | undefined {
+    return this.#peers.get(peerId)
+  }
+
+  /**
+   * Get all peer statuses for this document.
+   */
+  public getAllPeerStatuses(): Map<PeerId, DocPeerStatus> {
+    return new Map(this.#peers)
+  }
+
+  /**
+   * Remove a peer from tracking.
+   */
+  public removePeer(peerId: PeerId): void {
+    this.#peers.delete(peerId)
+  }
+
+  /**
+   * Get peers that have this document.
+   */
+  public getPeersWithDoc(): PeerId[] {
+    return Array.from(this.#peers.entries())
+      .filter(([, status]) => status.hasDoc)
+      .map(([peerId]) => peerId)
+  }
+
+  /**
+   * Get peers that are aware of this document.
+   */
+  public getPeersAwareOfDoc(): PeerId[] {
+    return Array.from(this.#peers.entries())
+      .filter(([, status]) => status.isAwareOfDoc)
+      .map(([peerId]) => peerId)
+  }
+
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // INTERNAL IMPLEMENTATION
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  #setupDocumentSubscriptions(): void {
+    // Listen for all document changes
+    this.doc.subscribe((event) => {
+      this._emitter.emit("doc-change", {
+        doc: this.doc,
+        event,
+      })
+
+      // Trigger storage save if service is available
+      if (
+        this.#services.saveToStorage &&
+        (event.by === "local" || event.by === "import")
+      ) {
+        const savePromise = this.#services.saveToStorage(this.documentId, this.doc, event)
+        // Only attach catch handler if saveToStorage returns a promise
+        if (savePromise && typeof savePromise.catch === "function") {
+          savePromise.catch((error) => {
+            console.error(
+              `Failed to save document ${this.documentId} to storage:`,
+              error
+            )
+          })
+        }
+      }
+    })
+
+    // Listen for local updates for network synchronization
+    this.doc.subscribeLocalUpdates((syncMessage) => {
+      this._emitter.emit("doc-local-change", syncMessage)
+    })
+  }
+
+  async #loadFromStorage(): Promise<void> {
+    if (!this.#services.loadFromStorage || this.#isLoadingFromStorage) {
+      return
+    }
+
+    this.#isLoadingFromStorage = true
+    const storageId = "default" // Could be made configurable
+
+    // Update ready state to requesting
+    this.#updateReadyState(`storage-${storageId}`, {
+      source: { type: "storage", storageId },
+      state: { type: "requesting" },
+    })
+
+    try {
+      const hadContentBefore = this.#hasContent()
+      await this.#services.loadFromStorage(this.documentId, this.doc)
+      const hasNewContent = this.#hasContent() && !hadContentBefore
+
+      // Update ready state to found
+      this.#updateReadyState(`storage-${storageId}`, {
+        source: { type: "storage", storageId },
+        state: { type: "found", containsNewOperations: hasNewContent },
+      })
+    } catch (error) {
+      // Update ready state to not found
+      this.#updateReadyState(`storage-${storageId}`, {
+        source: { type: "storage", storageId },
+        state: { type: "not-found" },
+      })
+    } finally {
+      this.#isLoadingFromStorage = false
+    }
+  }
+
+  async #requestFromNetwork(timeout = 5000): Promise<void> {
+    if (!this.#services.requestFromNetwork || this.#isRequestingFromNetwork) {
+      return
+    }
+
+    this.#isRequestingFromNetwork = true
+    const networkId = "network-request" // Could include peer info
+
+    // Update ready state to requesting
+    this.#updateReadyState(networkId, {
+      source: { type: "network", peerId: "unknown" }, // Could be more specific
+      state: { type: "requesting" },
+    })
+
+    try {
+      const hadContentBefore = this.#hasContent()
+      await this.#services.requestFromNetwork(this.documentId, this.doc, timeout)
+      const hasNewContent = this.#hasContent() && !hadContentBefore
+
+      // Update ready state to found
+      this.#updateReadyState(networkId, {
+        source: { type: "network", peerId: "unknown" },
+        state: { type: "found", containsNewOperations: hasNewContent },
+      })
+    } catch (error) {
+      // Update ready state to not found
+      this.#updateReadyState(networkId, {
+        source: { type: "network", peerId: "unknown" },
+        state: { type: "not-found" },
+      })
+    } finally {
+      this.#isRequestingFromNetwork = false
+    }
+  }
+
+  #updateReadyState(key: string, readyState: ReadyState): void {
+    this.#readyStates.set(key, readyState)
+    this._emitter.emit("ready-state-changed", {
+      readyStates: Array.from(this.#readyStates.values()),
+    })
+  }
+
+  #hasContent(): boolean {
+    // Check if the document has any operations by examining the version vector
+    const vv = this.doc.oplogVersion()
+    // If any peer has a counter > 0, the document has content
+    for (const [, counter] of vv.toJSON()) {
+      if (counter > 0) {
+        return true
       }
     }
+    return false
   }
 }

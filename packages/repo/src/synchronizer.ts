@@ -156,19 +156,14 @@ export class Synchronizer {
     switch (command.type) {
       case "cmd-notify-docs-available":
         for (const documentId of command.documentIds) {
-          // Get the handle and trigger a find operation if it's not already ready
+          // Get the handle - it's always available now
           const handle = this.#services.getDoc(documentId)
 
-          // If the handle is ready, nothing to do
-          if (handle.fullState === "ready") {
-            continue
-          }
-
-          // For any non-ready handle, try to start a find operation
-          // Even if it's unavailable, we should try - the queryNetwork will work
-          handle.find().catch(error => {
-            console.log(`[Synchronizer] Find failed for ${documentId}:`, error)
-          })
+          // With the new architecture, documents are always available
+          // We just need to trigger background loading from storage/network
+          // This happens automatically when the handle is created
+          
+          // No need to check state or call find() - the document is immediately usable
         }
         break
       case "cmd-send-message": {
@@ -177,64 +172,52 @@ export class Synchronizer {
       }
       case "cmd-load-and-send-sync": {
         const handle = this.#services.getDoc(command.documentId)
-        if (handle.fullState === "ready") {
-          this.#services.send({
-            type: "sync-response",
-            targetIds: [command.to],
-            documentId: command.documentId,
-            transmission: {
-              type: "update",
-              data: handle.doc().export({ mode: "snapshot" }),
-            },
-            hopCount: 0, // Original message from this peer
-          })
-        }
+        // Document is always available now
+        this.#services.send({
+          type: "sync-response",
+          targetIds: [command.to],
+          documentId: command.documentId,
+          transmission: {
+            type: "update",
+            data: handle.doc.export({ mode: "snapshot" }),
+          },
+          hopCount: 0, // Original message from this peer
+        })
         break
       }
       case "cmd-check-storage-and-respond": {
-        // First check if we already have the document in memory
+        // Get the handle - document is always available
         const handle = this.#services.getDoc(command.documentId)
 
-        if (handle.fullState === "ready") {
-          // Document is already loaded in memory, send it directly
-          this.#services.send({
-            type: "sync-response",
-            targetIds: [command.to],
-            documentId: command.documentId,
-            transmission: {
-              type: "update",
-              data: handle.doc().export({ mode: "update" }),
-            },
-            hopCount: 0, // Original message from this peer
+        // Try to wait for storage to load, but don't wait too long
+        handle.waitForStorage(1000)
+          .then(() => {
+            // Storage loaded successfully, send the document
+            this.#services.send({
+              type: "sync-response",
+              targetIds: [command.to],
+              documentId: command.documentId,
+              transmission: {
+                type: "update",
+                data: handle.doc.export({ mode: "update" }),
+              },
+              hopCount: 0, // Original message from this peer
+            })
           })
-        } else {
-          // Document is not in memory, try to load it from storage only
-          // Use findInStorageOnly which checks storage but doesn't wait for network
-          handle
-            .findInStorageOnly()
-            .then(() => {
-              // After findInStorageOnly completes, check if the document is now ready
-              if (handle.fullState === "ready") {
-                this.#services.send({
-                  type: "sync-response",
-                  targetIds: [command.to],
-                  documentId: command.documentId,
-                  transmission: {
-                    type: "update",
-                    data: handle.doc().export({ mode: "update" }),
-                  },
-                  hopCount: 0, // Original message from this peer
-                })
-              }
-              // If the document couldn't be loaded from storage, findInStorageOnly will reject
-              // and we won't send a response, maintaining the same behavior as before
+          .catch(() => {
+            // Storage didn't load in time or document not found
+            // Send the current state (which might be empty)
+            this.#services.send({
+              type: "sync-response",
+              targetIds: [command.to],
+              documentId: command.documentId,
+              transmission: {
+                type: "update",
+                data: handle.doc.export({ mode: "update" }),
+              },
+              hopCount: 0, // Original message from this peer
             })
-            .catch(error => {
-              console.log("findInStorageOnly failed:", error)
-              // If findInStorageOnly() rejects, the document doesn't exist in storage
-              // We don't send a response, maintaining the same behavior as before
-            })
-        }
+          })
         break
       }
       case "cmd-set-timeout": {
@@ -263,7 +246,7 @@ export class Synchronizer {
         }
 
         if (command.requestId !== undefined) {
-          this.#networkRequestTracker.resolve(command.requestId, handle.doc())
+          this.#networkRequestTracker.resolve(command.requestId, handle.doc)
         }
         break
       }

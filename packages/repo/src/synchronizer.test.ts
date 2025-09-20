@@ -39,8 +39,8 @@ describe("Synchronizer (Host)", () => {
 
   it("should execute a load-and-send-sync command", async () => {
     const mockHandle = {
-      fullState: "ready",
-      doc: () => ({ export: () => new Uint8Array([1, 2, 3]) }),
+      doc: { export: () => new Uint8Array([1, 2, 3]) },
+      waitForStorage: vi.fn().mockResolvedValue(undefined),
     }
 
     ;(mockServices.getDoc as any).mockReturnValue(mockHandle)
@@ -70,7 +70,7 @@ describe("Synchronizer (Host)", () => {
   it("should apply a sync message on sync_succeeded", async () => {
     const mockHandle = {
       applySyncMessage: vi.fn(),
-      doc: () => "the-doc",
+      doc: "the-doc",
     }
 
     ;(mockServices.getDoc as any).mockReturnValue(mockHandle)

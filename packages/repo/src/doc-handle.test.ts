@@ -37,69 +37,55 @@ describe("DocHandle Integration Tests", () => {
     vi.useRealTimers()
   })
 
-  it("should initialize in an idle state", () => {
+  it("should initialize with an always-available document", () => {
     const handle = new DocHandle("test-doc")
-    expect(handle.fullState).toBe("idle")
+    expect(handle.doc).toBeInstanceOf(LoroDoc)
+    expect(handle.documentId).toBe("test-doc")
   })
 
-  it("should become 'unavailable' if find() is unsuccessful (no return)", async () => {
+  it("should load from storage in the background", async () => {
+    const mockDoc = new LoroDoc()
+    mockDoc.getMap("doc").set("text", "from storage")
+    
     const services: DocHandleServices<any> = {
-      loadFromStorage: vi.fn().mockResolvedValue(null),
-      queryNetwork: vi.fn(),
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Import the mock data into the provided doc
+        const exported = mockDoc.export({ mode: "snapshot" })
+        doc.import(exported)
+      }),
     }
     const handle = new DocHandle("test-doc", services)
 
-    // We don't await the promise here because we want to inspect the intermediate state
-    handle.find()
-    expect(handle.fullState).toBe("storage-loading")
-    await vi.runAllTimersAsync()
-
-    // The state transition to storage-loading is synchronous
-    expect(handle.fullState).toBe("unavailable")
-    expect(services.loadFromStorage).toHaveBeenCalledWith("test-doc")
+    // Wait for storage to load
+    await handle.waitForStorage(1000)
+    
+    expect(services.loadFromStorage).toHaveBeenCalledWith("test-doc", handle.doc)
+    expect(handle.doc.getMap("doc").get("text")).toBe("from storage")
   })
 
-  it("should transition through the find flow to ready", async () => {
-    const doc = new LoroDoc()
+  it("should handle storage load failure gracefully", async () => {
     const services: DocHandleServices<any> = {
-      loadFromStorage: vi.fn().mockResolvedValue(doc),
-      queryNetwork: vi.fn(),
+      loadFromStorage: vi.fn().mockRejectedValue(new Error("Storage error")),
     }
-    const handle = new DocHandle("test-doc", services)
+    // Disable auto-loading to prevent background operations
+    const handle = new DocHandle("test-doc", services, { autoLoad: false })
 
-    const resolvedHandle = await handle.find()
-
-    expect(resolvedHandle.fullState).toBe("ready")
-    expect(resolvedHandle.doc()).toBe(doc)
-    expect(services.loadFromStorage).toHaveBeenCalledOnce()
-    expect(handle).toBe(resolvedHandle) // The resolved handle should be the same instance
+    // Start the wait and advance timers to trigger timeout
+    const waitPromise = handle.waitForStorage(100)
+    await vi.advanceTimersByTimeAsync(100)
+    
+    // Should timeout when storage fails
+    await expect(waitPromise).rejects.toThrow("Readiness timeout")
+    
+    // But document should still be available for use
+    expect(handle.doc).toBeInstanceOf(LoroDoc)
   })
 
-  it("should create a document if findOrCreate times out", async () => {
-    const services: DocHandleServices<any> = {
-      loadFromStorage: vi.fn().mockResolvedValue(null),
-      queryNetwork: vi.fn().mockResolvedValue(null),
-    }
-
-    const handle = new DocHandle("test-doc", services)
-    await handle.findOrCreate()
-
-    expect(handle.fullState).toBe("ready")
-    expect(handle.doc()).toBeInstanceOf(LoroDoc)
-  })
-
-  it("should allow changing a document once ready", async () => {
+  it("should allow changing the document immediately", async () => {
     type TestSchema = { doc: LoroMap<{ text: string }> }
-    const doc = new LoroDoc<TestSchema>()
-    const services: DocHandleServices<TestSchema> = {
-      loadFromStorage: async () => doc,
-      queryNetwork: async () => null,
-    }
-    const handle = new DocHandle<TestSchema>("test-doc", services)
+    const handle = new DocHandle<TestSchema>("test-doc")
 
-    await handle.find()
-
-    const changePromise = waitForEvent(handle, "doc-handle-change")
+    const changePromise = waitForEvent(handle, "doc-change")
 
     handle.change(doc => {
       const root = doc.getMap("doc")
@@ -107,23 +93,16 @@ describe("DocHandle Integration Tests", () => {
     })
 
     await changePromise
-    const loroDoc = handle.doc()
-    const jsDoc = loroDoc.getMap("doc").toJSON()
+    const jsDoc = handle.doc.getMap("doc").toJSON()
     expect(jsDoc.text).toBe("hello world")
   })
 
-  it("should emit a 'sync-message' after a local change", async () => {
-    const doc = new LoroDoc()
-    const services = {
-      loadFromStorage: async () => doc,
-    }
-    const handle = new DocHandle("test-doc", services)
+  it("should emit local change events for network sync", async () => {
+    const handle = new DocHandle("test-doc")
 
-    await handle.find()
-
-    const syncPromise = waitForEvent(handle, "doc-handle-local-change")
+    const syncPromise = waitForEvent(handle, "doc-local-change")
     const listener = vi.fn()
-    handle.on("doc-handle-local-change", listener)
+    handle.on("doc-local-change", listener)
 
     handle.change(doc => {
       const root = doc.getMap("doc")
@@ -135,29 +114,19 @@ describe("DocHandle Integration Tests", () => {
     expect(listener.mock.calls[0][0]).toBeInstanceOf(Uint8Array)
   })
 
-  it("should throw when trying to change a non-ready document", () => {
-    const handle = new DocHandle("test-doc")
-    expect(handle.fullState).not.toBe("ready")
-    expect(() => {
-      handle.change(() => {})
-    }).toThrow()
-  })
-
   it("should sync changes between two handles", async () => {
     // Setup handle A
     const handleA = new DocHandle<any>("sync-doc")
-    await handleA.create()
 
     // Setup handle B
     const handleB = new DocHandle<any>("sync-doc")
-    await handleB.create()
 
     // Pipe messages from A to B
-    handleA.on("doc-handle-local-change", message => {
+    handleA.on("doc-local-change", (message: Uint8Array) => {
       handleB.applySyncMessage(message)
     })
 
-    const changePromise = waitForEvent(handleB, "doc-handle-change")
+    const changePromise = waitForEvent(handleB, "doc-change")
     handleA.change(doc => {
       const root = doc.getMap("doc")
       root.set("text", "synced")
@@ -165,8 +134,83 @@ describe("DocHandle Integration Tests", () => {
 
     await changePromise
 
-    const retrievedDocB = handleB.doc()
-    const jsDocB = retrievedDocB.getMap("doc").toJSON()
+    const jsDocB = handleB.doc.getMap("doc").toJSON()
     expect(jsDocB.text).toBe("synced")
+  })
+
+  it("should support flexible readiness API", async () => {
+    const services: DocHandleServices<any> = {
+      loadFromStorage: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Simulate loading delay
+        await new Promise(resolve => setTimeout(resolve, 50))
+        doc.getMap("doc").set("loaded", true)
+      }),
+      requestFromNetwork: vi.fn().mockImplementation(async (documentId, doc) => {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 100))
+        doc.getMap("doc").set("networked", true)
+      }),
+    }
+    const handle = new DocHandle("test-doc", services)
+
+    // Start the readiness check and advance timers
+    const readyPromise = handle.waitUntilReady(
+      (readyStates) =>
+        readyStates.some(
+          (s) => s.source.type === "storage" && s.state.type === "found"
+        ),
+      200
+    )
+    
+    // Advance timers to complete the storage loading
+    await vi.advanceTimersByTimeAsync(50)
+    await readyPromise
+
+    expect(handle.doc.getMap("doc").get("loaded")).toBe(true)
+  })
+
+  it("should track peer status", () => {
+    const handle = new DocHandle("test-doc")
+
+    // Update peer status
+    handle.updatePeerStatus("peer1", { hasDoc: true, isAwareOfDoc: true, isSyncingNow: false })
+    handle.updatePeerStatus("peer2", { hasDoc: false, isAwareOfDoc: true, isSyncingNow: true })
+
+    // Check peer status
+    expect(handle.getPeerStatus("peer1")).toEqual({
+      hasDoc: true,
+      isAwareOfDoc: true,
+      isSyncingNow: false,
+    })
+
+    // Get peers with doc
+    expect(handle.getPeersWithDoc()).toEqual(["peer1"])
+    expect(handle.getPeersAwareOfDoc()).toEqual(["peer1", "peer2"])
+
+    // Remove peer
+    handle.removePeer("peer1")
+    expect(handle.getPeerStatus("peer1")).toBeUndefined()
+    expect(handle.getPeersWithDoc()).toEqual([])
+  })
+
+  it("should handle save to storage", async () => {
+    const saveToStorage = vi.fn()
+    const services: DocHandleServices<any> = {
+      saveToStorage,
+    }
+    const handle = new DocHandle("test-doc", services)
+
+    handle.change(doc => {
+      doc.getMap("doc").set("text", "save me")
+    })
+
+    // Wait a bit for the save to be called
+    await vi.advanceTimersByTimeAsync(10)
+
+    expect(saveToStorage).toHaveBeenCalledWith(
+      "test-doc",
+      handle.doc,
+      expect.any(Object) // LoroEventBatch
+    )
   })
 })

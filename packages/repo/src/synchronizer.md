@@ -12,10 +12,10 @@ Its primary role is to answer the question: "Which peers have which documents, a
 
 The `Synchronizer` is a powerful example of the Single Responsibility Principle and is critical to the conceptual clarity of the entire `repo` architecture. The responsibilities are cleanly divided:
 
-- **`Repo`**: The central orchestrator and public-facing API. It owns all the subsystems and wires them together. It decides _when_ to initiate a sync by observing the state of its `DocHandle`s.
-- **`DocHandle`**: Manages the state, lifecycle, and data of a **single document**. It is responsible for loading the document from storage or applying sync changes, but it is completely unaware of _how_ it gets those changes from the network.
+- **`Repo`**: The central orchestrator and public-facing API. It owns all the subsystems and wires them together. It decides _when_ to initiate a sync by observing changes in its always-available `DocHandle`s.
+- **`DocHandle`**: Provides always-available access to a **single document** with built-in peer state management. It handles background loading from storage/network and applies sync changes directly to its `doc` property, but delegates network protocol decisions to the `Synchronizer`.
 - **`NetworkSubsystem`**: Manages the raw connections to other peers. It knows how to send a message from A to B but has no knowledge of what the message contains or why it's being sent.
-- **`Synchronizer`**: This class sits between the `Repo` and the `NetworkSubsystem`. It implements the **synchronization protocol** for the entire collection of documents. It maintains a directory of which peers have which documents and orchestrates the multi-step "dance" of requesting and receiving them.
+- **`Synchronizer`**: This class sits between the `Repo` and the `NetworkSubsystem`. It implements the **synchronization protocol** for the entire collection of documents. It maintains a directory of which peers have which documents and coordinates with always-available `DocHandle`s to apply sync messages.
 
 This separation allows each component to be developed, tested, and understood in isolation. The `DocHandle` doesn't need to know about network protocols, and the `NetworkSubsystem` doesn't need to know about document states.
 
@@ -27,10 +27,11 @@ The `Synchronizer` is a servant to the `Repo` and operates on its behalf.
 - **Events from `Repo` to `Synchronizer`**: The `Repo` informs the `Synchronizer` of key events:
   - `synchronizer.addPeer(peerId)`: When the `NetworkSubsystem` connects to a new peer.
   - `synchronizer.removePeer(peerId)`: When a peer disconnects.
-  - `synchronizer.addDocument(documentId)`: When the `Repo` creates or finds a handle for a new document.
-- **Events from `Synchronizer` to `Repo`**: The `Synchronizer` emits generic messages that the `Repo` is responsible for sending over the network via the `NetworkSubsystem`. It also delivers sync data back to the appropriate `DocHandle`.
+  - `synchronizer.addDocument(documentId)`: When a `DocHandle` has content to announce.
+  - `synchronizer.onLocalChange(documentId, syncMessage)`: When a `DocHandle` emits local changes.
+- **Events from `Synchronizer` to `Repo`**: The `Synchronizer` emits generic messages that the `Repo` is responsible for sending over the network via the `NetworkSubsystem`. It also delivers sync data directly to the appropriate always-available `DocHandle`.
 
-The `Synchronizer` and `DocHandle` are decoupled; they do not interact directly. The `Repo` acts as the intermediary, translating a state change in a `DocHandle` (e.g., "I need this document") into an action for the `Synchronizer` (e.g., "Find this document").
+The `Synchronizer` coordinates with always-available `DocHandle`s through the `Repo`. When sync messages arrive, the `Synchronizer` applies them directly to the `DocHandle.doc` property, leveraging Loro's built-in operation deduplication and conflict resolution.
 
 ## 4. The "Announce/Request/Sync" Protocol
 
@@ -127,26 +128,29 @@ The synchronizer originally used exponential backoff (5s → 10s → 20s → 40s
 - It created poor UX for `findOrCreate` operations (30+ second waits)
 - It was redundant with our event-driven architecture
 - New peer connections naturally trigger document announcements
+- It didn't align with the always-available DocHandle architecture
 
-### 6.2. Current Approach: Single Timeouts
+### 6.2. Current Approach: Single Timeouts with Always-Available Documents
 
-The synchronizer now uses single timeouts with no retries:
+The synchronizer now uses single timeouts with no retries, coordinating with always-available DocHandles:
 
-- **User-specified timeouts**: When DocHandle calls `queryNetwork` with a timeout (e.g., for `findOrCreate`), the synchronizer respects this timeout and fails immediately when it expires
+- **User-specified timeouts**: When `Repo` operations like `findOrCreate` specify a timeout, the synchronizer respects this timeout and fails immediately when it expires
 - **Default timeouts**: For regular sync operations, a default 5-second timeout is used
-- **Event-driven recovery**: If a document isn't found within the timeout, the sync fails, but if a new peer connects later with the document, synchronization happens naturally through the announce/request protocol
+- **Always-available coordination**: Documents are immediately available in DocHandles, and sync messages are applied directly to the `doc` property as they arrive
+- **Event-driven recovery**: If a document isn't found within the timeout, the operation may fail, but if a new peer connects later with the document, synchronization happens naturally through the announce/request protocol
 
 This approach provides:
 - **Predictable behavior**: Timeouts mean exactly what they say
-- **Better UX**: `findOrCreate` operations complete quickly
+- **Better UX**: `findOrCreate` operations complete quickly, documents are immediately usable
 - **Simpler code**: No retry logic or backoff calculations
 - **Natural resilience**: The event-driven protocol handles recovery
+- **CRDT alignment**: Embraces the always-mergeable nature of CRDTs
 
 ## 8. State Management & The Elm Architecture (TEA)
 
-Like the `DocHandle`, the `Synchronizer` is built using a pure-functional core based on The Elm Architecture.
+Unlike the simplified always-available `DocHandle`, the `Synchronizer` still uses a pure-functional core based on The Elm Architecture because it manages complex peer-to-peer protocol state.
 
 - **`synchronizer-program.ts`**: This file contains the pure, synchronous `update` function and the `Model` for the synchronizer's state. It declaratively defines how the state should change in response to messages and what side effects (Commands) should occur. The Model includes the two tracking maps (`peersWithDoc` and `peersAwareOfDoc`) that maintain document awareness state.
-- **`synchronizer.ts`**: This class is the "impure" runtime. It holds the state and executes the `Command`s (e.g., sending network messages, setting timeouts) generated by the pure `update` function.
+- **`synchronizer.ts`**: This class is the "impure" runtime. It holds the state and executes the `Command`s (e.g., sending network messages, setting timeouts) generated by the pure `update` function. It coordinates with always-available `DocHandle`s by applying sync messages directly to their `doc` property.
 
-This architectural pattern makes the complex, stateful logic of the synchronization protocol manageable, testable, and easier to reason about, which was critical to identifying and fixing the bugs in this system. The clear separation of concerns between "who has documents" and "who knows about documents" ensures correct message routing and prevents synchronization failures.
+This architectural pattern makes the complex, stateful logic of the synchronization protocol manageable, testable, and easier to reason about. The clear separation of concerns between "who has documents" and "who knows about documents" ensures correct message routing, while the coordination with always-available DocHandles leverages Loro's built-in operation deduplication and conflict resolution.

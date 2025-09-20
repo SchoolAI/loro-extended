@@ -19,22 +19,22 @@ The `Repo` class is the central orchestrator of the entire system. It is the mai
 
 ### 1.2. The `DocHandle`
 
-A `DocHandle` is a reference to a single document within the `Repo`. It is not the document itself, but a stateful wrapper that manages the document's lifecycle. A user never interacts with a `LoroDoc` directly; they always go through a `DocHandle`.
+A `DocHandle` is an always-available wrapper around a single document within the `Repo`. It provides immediate access to the underlying `LoroDoc` while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
 
 **Key Features:**
 
-- **TEA-Based State Machine**: The `DocHandle` implements The Elm Architecture with a pure functional core (`doc-handle-program.ts`) and an impure runtime host (`doc-handle.ts`). It progresses through a series of states:
-  - `idle`: The handle has been created, but we haven't tried to load it.
-  - `storage-loading`: We are actively trying to load the document from storage.
-  - `network-loading`: The document wasn't found in storage, so we are querying the network.
-  - `creating`: We are creating a new document.
-  - `ready`: The document is loaded and available.
-  - `unavailable`: We couldn't find the document in storage or on the network.
-  - `deleted`: The document has been marked for deletion.
-  
-- **Promise-Based API**: All public methods (`find()`, `create()`, `findOrCreate()`) return Promises that resolve when the operation completes, providing a modern async/await interface.
+- **Always-Available Architecture**: The `DocHandle` embraces CRDT semantics where documents are immediately accessible without complex loading states. The underlying `LoroDoc` is created synchronously and available via the `doc` property.
 
-- **Event-Driven**: It emits `change` events whenever the underlying document is modified, either by the local user or through a sync message from a peer.
+- **Flexible Readiness API**: Applications can define custom readiness criteria using predicates:
+  ```typescript
+  await handle.waitUntilReady((readyStates) =>
+    readyStates.some(s => s.source.type === "storage" && s.state.type === "found")
+  );
+  ```
+
+- **Peer State Management**: Tracks which peers have or are aware of the document using a peer-centric model with `DocPeerStatus` objects.
+
+- **Event-Driven**: Emits `doc-handle-change` events for document modifications and `peer-status-changed` events for peer state updates.
 
 ### 1.3. Adapters: Pluggable Backends
 
@@ -74,15 +74,12 @@ The `Repo` orchestrates several subsystems, each with distinct responsibilities:
 
 ### 2.1. Architectural Trade-offs
 
-**TEA vs Simple Orchestration**: 
-- **Where TEA is Used**: `DocHandle` and `Synchronizer` use The Elm Architecture because they manage complex state transitions. Their state machines have multiple states, complex transition logic, and need to be highly testable.
-- **Where TEA is NOT Used**: The `Repo` class is a simple orchestrator. It was initially implemented with TEA but was refactored to a plain class because:
-  - It has minimal state (just a cache of handles)
-  - Its primary role is dependency injection and service wiring
-  - The TEA pattern added unnecessary complexity without providing value
-  - Direct async/await APIs are more ergonomic for users
+**Always-Available vs TEA**:
+- **Where Always-Available is Used**: `DocHandle` uses an always-available architecture because CRDTs are inherently always-mergeable and idempotent. Complex loading states were artificial overhead that didn't align with CRDT semantics.
+- **Where TEA is Used**: The `Synchronizer` still uses The Elm Architecture because it manages complex peer-to-peer protocol state with multiple peers, timeouts, and retry logic.
+- **Where TEA is NOT Used**: The `Repo` class is a simple orchestrator with minimal state and direct async/await APIs for better ergonomics.
 
-This hybrid approach gives us the best of both worlds: predictable state management where it matters, and simplicity where it doesn't.
+This hybrid approach embraces CRDT properties where appropriate while maintaining predictable state management for complex distributed protocols.
 
 ### 2.2. `StorageSubsystem`
 
@@ -98,12 +95,13 @@ This subsystem manages the lifecycle of all `NetworkAdapter` instances. It is re
 
 ### 2.4. `Synchronizer`
 
-This is the heart of the synchronization logic. It implements a TEA-based state machine for managing document synchronization across peers.
+This is the heart of the synchronization logic. It implements a TEA-based state machine for managing document synchronization across peers while coordinating with always-available DocHandles.
 
 **Key Features:**
 - **Pure Functional Core**: The synchronization logic is implemented as a pure state machine in `synchronizer-program.ts`
-- **Retry Logic**: Implements exponential backoff for network requests
+- **Single Timeout Strategy**: Uses single timeouts with no retries, relying on event-driven recovery when new peers connect
 - **Peer Discovery**: Maintains a directory of which peers have which documents
+- **DocHandle Coordination**: Works with always-available DocHandles, applying sync messages directly to their `doc` property
 
 **Protocol Design:**
 
@@ -132,29 +130,31 @@ Here is the typical flow when working with documents:
 
 ```typescript
 // User calls create() - returns a Promise
-const handle = await repo.create<MyDoc>({ 
-  initialValue: () => ({ text: "Hello" }) 
+const handle = await repo.create<MyDoc>({
+  initialValue: () => ({ text: "Hello" })
 })
-// Handle is immediately ready
+// Handle is immediately available, doc property ready to use
 ```
 
-1. `Repo` creates a new `DocHandle` with injected services
-2. `DocHandle` transitions through states: `idle` → `creating` → `ready`
-3. The Promise resolves with the ready handle
-4. Document is saved to storage and announced to peers
+1. `Repo` creates a new `DocHandle` with injected services and `autoLoad: true`
+2. `DocHandle` creates an empty `LoroDoc` immediately (always available)
+3. Background loading from storage begins automatically
+4. The Promise resolves when the document is ready according to the operation's criteria
+5. Document is saved to storage and announced to peers
 
 ### 3.2. Finding a Document
 
 ```typescript
 // User calls find() - returns a Promise
 const handle = await repo.find<MyDoc>(documentId)
-// Handle is ready when document is found
+// Handle.doc is immediately available, Promise resolves when found
 ```
 
-1. `Repo` creates or retrieves a `DocHandle`
-2. `DocHandle` attempts to load from storage first
-3. If not in storage, queries the network via `Synchronizer`
+1. `Repo` creates or retrieves a `DocHandle` with `autoLoad: true`
+2. `DocHandle.doc` is immediately available (empty initially)
+3. Background loading from storage and network begins automatically
 4. Promise resolves when document is found or rejects if unavailable
+5. Found document data is merged into the existing `doc` instance
 
 ### 3.3. State Coordination
 
@@ -166,11 +166,16 @@ handle.on("doc-handle-local-change", (message) => {
   synchronizer.onLocalChange(documentId, message)
 })
 
-// When a handle is ready, we tell the synchronizer to announce it.
-handle.on("doc-handle-state-transition", ({ newState }) => {
-  if (newState.state === "ready") {
+// When a handle loads content, we tell the synchronizer to announce it.
+handle.on("doc-handle-change", ({ doc, event }) => {
+  if (event.by === "local" || event.by === "import") {
     synchronizer.addDocument(documentId)
   }
+})
+
+// Peer state changes are handled directly by the DocHandle
+handle.on("peer-status-changed", ({ peerId, status }) => {
+  // Applications can react to peer state changes
 })
 ```
 
