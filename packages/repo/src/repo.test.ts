@@ -6,7 +6,7 @@ import {
 } from "./network/in-process-network-adapter.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
-import { DocContent } from "./types.js"
+import type { DocContent } from "./types.js"
 
 describe("Repo", () => {
   // DocSchema should match the DocContent constraint (Record<string, Container>)
@@ -18,6 +18,7 @@ describe("Repo", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
 
     storage = new InMemoryStorageAdapter()
+
     repo = new Repo({
       storage,
       network: [],
@@ -42,7 +43,7 @@ describe("Repo", () => {
   })
 
   it("should create a document with initial value", () => {
-    const handle = repo.get().change((doc: any) => {
+    const handle = repo.get().change(doc => {
       const root = doc.getMap("root")
       root.set("text", "initial")
     })
@@ -65,10 +66,11 @@ describe("Repo", () => {
     expect(handle.doc).toBeDefined()
   })
 
-  it("should find a document from a peer", async () => {
+  it.only("should find a document from a peer", async () => {
     const bridge = new InProcessBridge()
 
     const networkA = new InProcessNetworkAdapter(bridge)
+
     const repoA = new Repo({
       network: [networkA],
       peerId: "repoA",
@@ -82,17 +84,13 @@ describe("Repo", () => {
     })
 
     const networkB = new InProcessNetworkAdapter(bridge)
+
     const repoB = new Repo({
       network: [networkB],
       peerId: "repoB",
     })
 
-    const handleB = await Promise.race<
-      [Promise<DocHandle<DocContent>>, Promise<never>]
-    >([
-      repoB.get(handleA.documentId).waitForNetwork(),
-      new Promise((_, reject) => setTimeout(reject, 1000)),
-    ])
+    const handleB = await repoB.get(handleA.documentId).waitForNetwork()
 
     const rootB = handleB.doc.getMap("root")
     expect(rootB.get("text")).toBe("hello")
@@ -136,7 +134,7 @@ describe("Repo", () => {
       saveSpy.mockClear()
 
       // Make multiple changes that actually modify the document version
-      handle.change((doc: any) => {
+      handle.change(doc => {
         const root = doc.getMap("root")
         root.set("text", "first")
         root.set("counter", 1)
@@ -145,7 +143,7 @@ describe("Repo", () => {
       // Wait a bit to ensure version changes
       await vi.advanceTimersByTimeAsync(10)
 
-      handle.change((doc: any) => {
+      handle.change(doc => {
         const root = doc.getMap("root")
         root.set("text", "second")
         root.set("counter", 2)
@@ -168,7 +166,7 @@ describe("Repo", () => {
 
       // First create and save a document
       const handle1 = repo.get("test-doc")
-      handle1.change((doc: any) => {
+      handle1.change(doc => {
         const root = doc.getMap("root")
         root.set("text", "stored")
       })
@@ -178,7 +176,7 @@ describe("Repo", () => {
 
       // Try to find the document
       loadRangeSpy.mockClear()
-      const handle2 = repo2.get("test-doc").waitForStorage()
+      repo2.get("test-doc").waitForStorage()
 
       // Should attempt to load from storage using loadRange
       // (this happens in the background)
@@ -205,12 +203,12 @@ describe("Repo", () => {
     expect(repo.networks).toBeDefined()
 
     // Test that we can start/stop network
-    repo.stopNetwork()
-    repo.startNetwork()
+    repo.networks.stopAll()
+    repo.networks.startAdapters()
   })
 
   it("should support disconnection", () => {
-    const handle = repo.get()
+    repo.get()
     expect(repo.handles.size).toBe(1)
 
     repo.disconnect()

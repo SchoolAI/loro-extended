@@ -54,7 +54,7 @@ describe("Storage-Network Synchronization", () => {
 
     // Step 2: Simulate server shutdown by stopping the network
     // This simulates the server going offline
-    server1.stopNetwork()
+    server1.networks.stopAll()
 
     // Create the new server instance
     const server2Adapter = new InProcessNetworkAdapter(bridge)

@@ -1,4 +1,4 @@
-import type { LoroDoc, LoroEventBatch, OpId } from "loro-crdt"
+import type { LoroDoc } from "loro-crdt"
 import { DocHandle } from "./doc-handle.js"
 import {
   InProcessBridge,
@@ -14,45 +14,6 @@ import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import type { StorageAdapter } from "./storage/storage-adapter.js"
 import { Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocumentId, PeerId } from "./types.js"
-
-/**
- * Creates a function that loads a document from storage by reconstructing it
- * from stored snapshots and/or incremental updates.
- *
- * @param storageAdapter The storage adapter to load from
- * @returns A function that loads a document by its ID into an existing doc
- */
-function createStorageLoader<T extends DocContent>(
-  storageAdapter: StorageAdapter,
-): (documentId: DocumentId, doc: LoroDoc<T>) => Promise<void> {
-  return async (documentId: DocumentId, doc: LoroDoc<T>) => {
-    // Load all data for this document using loadRange
-    const chunks = await storageAdapter.loadRange([documentId])
-
-    if (chunks.length === 0) {
-      throw new Error(`Document ${documentId} not found in storage`)
-    }
-
-    // Get all updates and sort them by version key
-    const updateChunks = chunks
-      .filter(chunk => chunk.key.length === 3 && chunk.key[1] === "update")
-      .sort((a, b) => {
-        // Sort by version key (third element)
-        const versionA = a.key[2] as string
-        const versionB = b.key[2] as string
-        return versionA.localeCompare(versionB)
-      })
-
-    if (updateChunks.length === 0) {
-      throw new Error(`No updates found for document ${documentId}`)
-    }
-
-    // Apply all updates in order to the existing doc
-    for (const updateChunk of updateChunks) {
-      doc.import(updateChunk.data)
-    }
-  }
-}
 
 export interface RepoConfig {
   storage?: StorageAdapter
@@ -176,10 +137,6 @@ export class Repo {
   get<T extends DocContent>(
     documentId: DocumentId = crypto.randomUUID(),
   ): DocHandle<T> {
-    if (this.handleCache.has(documentId)) {
-      throw new Error(`A document with id ${documentId} already exists.`)
-    }
-
     const handle = this.getOrCreateDocHandle<T>(documentId)
 
     // Notify synchronizer that we have this document
@@ -217,103 +174,9 @@ export class Repo {
     this.handleCache.clear()
   }
 
-  /**
-   * Starts the network subsystem.
-   * This should be called when the Repo is ready to participate in the network.
-   */
-  startNetwork(): void {
-    this.networkSubsystem.startAdapters()
-  }
-
-  /**
-   * Stops the network subsystem.
-   * This should be called when the Repo needs to temporarily disconnect from the network.
-   */
-  stopNetwork(): void {
-    this.networkSubsystem.stopAll()
-  }
-
   //
   // PRIVATE METHODS
   //
-
-  /**
-   * Converts frontiers to a string key for storage.
-   * Frontiers are an array of OpIds, we'll stringify them for a unique key.
-   */
-  private frontiersToKey(frontiers: OpId[]): string {
-    // Convert frontiers to a JSON string then base64 encode for compactness
-    const jsonStr = JSON.stringify(frontiers)
-    // Use browser-compatible base64 encoding instead of Node.js Buffer
-    const base64 = btoa(jsonStr)
-    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "") // Remove padding
-  }
-
-  /**
-   * Creates a saveToStorage service function for a specific document.
-   * This encapsulates the storage logic that was previously in event listeners.
-   */
-  private createSaveToStorage<T extends DocContent>(
-    documentId: DocumentId,
-  ): (
-    documentId: DocumentId,
-    doc: LoroDoc<T>,
-    event: LoroEventBatch,
-  ) => Promise<void> {
-    return async (_, doc, event) => {
-      // Only save actual changes, not checkouts
-      if (event.by === "local" || event.by === "import") {
-        // Use the 'to' frontiers as the unique key for this update
-        const frontiersKey = this.frontiersToKey(event.to)
-
-        // Convert frontiers to version vectors for the export
-        // This gives us the incremental update between the two states
-        const fromVersion = doc.frontiersToVV(event.from)
-        const update = doc.export({
-          mode: "update",
-          from: fromVersion,
-        })
-
-        try {
-          // Store with unique key based on frontiers
-          await this.storageAdapter.save(
-            [documentId, "update", frontiersKey],
-            update,
-          )
-        } catch (error) {
-          console.error(
-            `[Repo] Failed to save update for document ${documentId}:`,
-            error,
-          )
-          throw error // Re-throw to let DocHandle handle it
-        }
-      }
-    }
-  }
-
-  /**
-   * Creates a requestFromNetwork service function that adapts the Synchronizer's queryNetwork
-   * to the DocHandle's expected interface.
-   */
-  private createRequestFromNetwork<T extends DocContent>(): (
-    documentId: DocumentId,
-    doc: LoroDoc<T>,
-    timeout: number,
-  ) => Promise<void> {
-    return async (documentId: DocumentId, doc: LoroDoc<T>, timeout: number) => {
-      const result = await this.synchronizer.queryNetwork<T>(
-        documentId,
-        timeout,
-      )
-      if (result) {
-        // Import the result into the provided doc
-        const exported = result.export({ mode: "snapshot" })
-        doc.import(exported)
-      } else {
-        throw new Error(`Failed to load document ${documentId} from network`)
-      }
-    }
-  }
 
   private getCachedDocHandle(
     documentId: DocumentId,
@@ -324,19 +187,18 @@ export class Repo {
     }
   }
 
-  private createDocHandle(documentId: DocumentId): DocHandle<DocContent> {
-    const handle = new DocHandle<DocContent>(
-      documentId,
-      {
-        loadFromStorage: createStorageLoader(this.storageAdapter),
-        saveToStorage: this.createSaveToStorage(documentId),
-        requestFromNetwork: this.createRequestFromNetwork(),
-      },
-      { autoLoad: true }, // Enable auto-loading by default
-    )
+  /**
+   * Creates a DocHandle, with an optional LoroDoc.
+   * This method ensures proper event wiring for each handle.
+   */
+  private createDocHandle(
+    documentId: DocumentId,
+    doc?: LoroDoc,
+  ): DocHandle<DocContent> {
+    const handle = new DocHandle<DocContent>(documentId, doc)
 
     // Listen for local changes to broadcast to peers (network synchronization)
-    handle.on("doc-local-change", message => {
+    handle.doc.subscribeLocalUpdates(message => {
       this.synchronizer.onLocalChange(documentId, message)
     })
 
@@ -345,16 +207,16 @@ export class Repo {
 
   /**
    * Gets an existing handle or creates a new one for the given document ID.
-   * This method ensures proper service injection and event wiring for each handle.
    */
   private getOrCreateDocHandle<T extends DocContent>(
     documentId: DocumentId,
+    doc?: LoroDoc,
   ): DocHandle<T> {
     let handle = this.getCachedDocHandle(documentId)
 
-    // Create a new handle with injected services
+    // Create a new doc handle
     if (!handle) {
-      handle = this.createDocHandle(documentId)
+      handle = this.createDocHandle(documentId, doc)
       this.handleCache.set(documentId, handle)
     }
 
