@@ -220,9 +220,7 @@ const storage = new IndexedDBStorageAdapter();
 const repo = new Repo({ network: [network], storage });
 
 // Create or find a document
-const handle = await repo.findOrCreate("my-doc", {
-  initialValue: () => ({ title: "Collaborative Document", content: "" }),
-});
+const handle = await repo.get("my-doc");
 
 // Listen for changes
 handle.on("doc-handle-change", ({ doc }) => {

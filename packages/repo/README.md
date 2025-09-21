@@ -31,16 +31,8 @@ const repo = new Repo({
   storage,
 });
 
-// Create a new document
-const docHandle = await repo.create({ documentId: "my-doc" });
-
-// Or find an existing document
-const existingHandle = await repo.find("existing-doc-id");
-
-// Or find or create if it doesn't exist
-const docHandle = await repo.findOrCreate("todo-list", {
-  initialValue: () => ({ todos: [] }),
-});
+// Find or create a new document
+const docHandle = await repo.get({ documentId: "my-doc" });
 ```
 
 ## Core Concepts
@@ -102,14 +94,8 @@ const handle = await repo.create<T>({
   documentId: DocumentId, // Optional, auto-generated if not provided
 });
 
-// Find an existing document
-const handle = await repo.find<T>(documentId);
-
-// Find or create if not found
-const handle = await repo.findOrCreate<T>(documentId, {
-  timeout: number, // Optional timeout in milliseconds
-  initialValue: () => T, // Optional initial value function
-});
+// Get or create an existing document
+const handle = await repo.get<T>(documentId);
 
 // Delete a document
 await repo.delete(documentId);
@@ -142,7 +128,9 @@ const doc = handle.doc; // LoroDoc instance, always ready
 // Flexible readiness API - define what "ready" means for your app
 await handle.waitUntilReady((readyStates) => {
   // Wait for storage to load
-  return readyStates.some(s => s.source.type === "storage" && s.state.type === "found");
+  return readyStates.some(
+    (s) => s.source.type === "storage" && s.state.type === "found"
+  );
 });
 
 // Convenience methods for common patterns
@@ -155,7 +143,9 @@ await handle.waitForNetwork(); // Wait for network sync
 ```typescript
 // Make changes to the document (always available)
 handle.doc.getMap("root").set("title", "My Collaborative Document");
-handle.doc.getList("tasks").push({ description: "Finish the README", completed: true });
+handle.doc
+  .getList("tasks")
+  .push({ description: "Finish the README", completed: true });
 
 // Listen for local changes
 handle.on("doc-handle-local-change", (syncMessage) => {
@@ -181,7 +171,7 @@ const peersAwareOfDoc = handle.getPeersAwareOfDoc();
 handle.updatePeerStatus(peerId, {
   hasDoc: true,
   isAwareOfDoc: true,
-  isSyncingNow: false
+  isSyncingNow: false,
 });
 ```
 
@@ -322,12 +312,7 @@ const repo = new Repo({
 });
 
 // Get or create the todo document
-const todoHandle = await repo.findOrCreate<TodoDoc>("main-todos", {
-  initialValue: () => ({
-    title: "My Todos",
-    todos: [],
-  }),
-});
+const todoHandle = await repo.get<TodoDoc>("main-todos");
 
 // Document is immediately available
 const doc = todoHandle.doc;
@@ -340,7 +325,8 @@ todoHandle.on("doc-handle-change", ({ doc, event }) => {
 
 // Add a new todo
 const todosMap = doc.getMap("root");
-const todosList = todosMap.get("todos") || todosMap.setContainer("todos", "List");
+const todosList =
+  todosMap.get("todos") || todosMap.setContainer("todos", "List");
 todosList.push({
   id: crypto.randomUUID(),
   text: "Learn about Loro",
@@ -350,7 +336,7 @@ todosList.push({
 // Toggle a todo completion
 const toggleTodo = (id: string) => {
   const todosList = doc.getMap("root").get("todos");
-  const todoIndex = todosList.toArray().findIndex(t => t.id === id);
+  const todoIndex = todosList.toArray().findIndex((t) => t.id === id);
   if (todoIndex >= 0) {
     const todo = todosList.get(todoIndex);
     todo.completed = !todo.completed;
@@ -395,13 +381,6 @@ The Repo package follows a layered architecture:
 The Repo package provides several ways to handle errors:
 
 ```typescript
-// Handle document loading errors
-try {
-  const handle = await repo.find("nonexistent-doc");
-} catch (error) {
-  console.error("Document not found:", error);
-}
-
 // Handle state transitions
 handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
   if (newState.state === "unavailable") {
