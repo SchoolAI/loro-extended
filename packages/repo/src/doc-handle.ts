@@ -1,34 +1,15 @@
-import Emittery from "emittery"
-import { LoroDoc } from "loro-crdt"
-import type { DocContent, DocumentId, LoroDocMutator, PeerId } from "./types.js"
-
-/** Peer status for a specific document */
-export type DocPeerStatus = {
-  hasDoc: boolean
-  isAwareOfDoc: boolean
-  isSyncingNow: boolean
-  lastSyncTime?: Date
-}
-
-/** Ready state information for flexible readiness API */
-export type ReadyState = {
-  source:
-    | { type: "storage"; storageId: string }
-    | { type: "network"; peerId: string }
-  state:
-    | { type: "requesting" }
-    | { type: "not-found" }
-    | { type: "found"; containsNewOperations: boolean }
-}
+import { getLogger, type Logger } from "@logtape/logtape"
+import type { LoroDoc } from "loro-crdt"
+import type { Synchronizer } from "./synchronizer.js"
+import type { DocContent, DocId, LoroDocMutator, ReadyState } from "./types.js"
 
 /** Custom predicate for determining readiness */
 export type ReadinessCheck = (readyStates: ReadyState[]) => boolean
 
-// The events that the DocHandle can emit
-type DocHandleEvents = {
-  "ready-state-changed": {
-    readyStates: ReadyState[]
-  }
+type DocHandleParams = {
+  docId: DocId
+  synchronizer: Synchronizer
+  logger?: Logger
 }
 
 /**
@@ -41,22 +22,27 @@ type DocHandleEvents = {
  *
  * @typeParam T - The plain JavaScript object schema for the document.
  */
-export class DocHandle<T extends DocContent> {
-  #peers = new Map<PeerId, DocPeerStatus>()
-  #readyStates = new Map<string, ReadyState>()
+export class DocHandle<T extends DocContent = DocContent> {
+  private readonly synchronizer: Synchronizer
+  public readonly docId: DocId
+  private readonly logger: Logger
 
-  /** @internal */
-  _emitter = new Emittery<DocHandleEvents>()
+  constructor({ docId, synchronizer, logger }: DocHandleParams) {
+    this.docId = docId
+    this.synchronizer = synchronizer
+    this.synchronizer.getOrCreateDocumentState(this.docId)
+    this.logger = (logger ?? getLogger(["@loro-extended", "repo"])).with({
+      docId,
+    })
 
-  // Public event API
-  public on = this._emitter.on.bind(this._emitter)
-  public once = this._emitter.once.bind(this._emitter)
-  public off = this._emitter.off.bind(this._emitter)
+    this.logger.trace("new DocHandle")
+  }
 
-  constructor(
-    public readonly documentId: DocumentId,
-    public readonly doc: LoroDoc<T> = new LoroDoc<T>(),
-  ) {}
+  get doc(): LoroDoc<T> {
+    const docState = this.synchronizer.getOrCreateDocumentState(this.docId)
+
+    return docState.doc as LoroDoc<T>
+  }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // PUBLIC API - Always-available document access
@@ -68,20 +54,22 @@ export class DocHandle<T extends DocContent> {
    * @param mutator A function that receives the document to modify.
    */
   public change(mutator: LoroDocMutator<T>): DocHandle<T> {
+    this.logger.trace("change")
+
     mutator(this.doc)
     this.doc.commit()
     return this // Useful for chaining
   }
 
   /**
-   * Applies a sync message from a remote peer to this document.
-   * This is intended for internal use by the network subsystem.
-   * @param message The binary sync message.
-   * @internal
+   * Actively requests the latest version of the document from all
+   * connected peers and storage. This is useful when you want to
+   * ensure you have the most up-to-date version of a document.
    */
-  public applySyncMessage(message: Uint8Array): void {
-    this.doc.import(message)
-  }
+  // public sync(): DocHandle<T> {
+  //   this.synchronizer.sync(this.docId)
+  //   return this // Useful for chaining
+  // }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // FLEXIBLE READINESS API
@@ -93,12 +81,8 @@ export class DocHandle<T extends DocContent> {
    * @param timeout Optional timeout in milliseconds
    */
   async waitUntilReady(predicate: ReadinessCheck): Promise<DocHandle<T>> {
-    for await (const { readyStates } of this._emitter.events(
-      "ready-state-changed",
-    )) {
-      if (predicate(readyStates)) return this
-    }
-    throw new Error("unreachable wait state")
+    await this.synchronizer.waitUntilReady(this.docId, predicate)
+    return this
   }
 
   /**
@@ -107,7 +91,7 @@ export class DocHandle<T extends DocContent> {
   async waitForStorage(): Promise<DocHandle<T>> {
     return this.waitUntilReady(readyStates =>
       readyStates.some(
-        s => s.source.type === "storage" && s.state.type === "found",
+        s => s.channelMeta.kind === "storage" && s.loading.state === "found",
       ),
     )
   }
@@ -116,88 +100,11 @@ export class DocHandle<T extends DocContent> {
    * Convenience method: wait for any network source to provide the document.
    */
   async waitForNetwork(): Promise<DocHandle<T>> {
-    return this.waitUntilReady(readyStates =>
-      readyStates.some(
-        s => s.source.type === "network" && s.state.type === "found",
-      ),
-    )
-  }
-
-  /**
-   * Convenience method: wait for a specific peer to provide the document.
-   */
-  async waitForPeer(peerId: PeerId): Promise<DocHandle<T>> {
-    return this.waitUntilReady(readyStates =>
-      readyStates.some(
-        s =>
-          s.source.type === "network" &&
-          s.source.peerId === peerId &&
-          s.state.type === "found",
-      ),
-    )
-  }
-
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // PEER STATE MANAGEMENT
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-  /**
-   * Update the status of a peer for this document.
-   */
-  public updatePeerStatus(
-    peerId: PeerId,
-    status: Partial<DocPeerStatus>,
-  ): void {
-    const current = this.#peers.get(peerId) || {
-      hasDoc: false,
-      isAwareOfDoc: false,
-      isSyncingNow: false,
-    }
-
-    this.#peers.set(peerId, { ...current, ...status })
-  }
-
-  /**
-   * Get the status of a specific peer for this document.
-   */
-  public getPeerStatus(peerId: PeerId): DocPeerStatus | undefined {
-    return this.#peers.get(peerId)
-  }
-
-  /**
-   * Remove a peer from tracking.
-   */
-  public removePeer(peerId: PeerId): void {
-    this.#peers.delete(peerId)
-  }
-
-  /**
-   * Get peers that have this document.
-   */
-  public getPeersWithDoc(): PeerId[] {
-    return Array.from(this.#peers.entries())
-      .filter(([, status]) => status.hasDoc)
-      .map(([peerId]) => peerId)
-  }
-
-  /**
-   * Get peers that are aware of this document.
-   */
-  public getPeersAwareOfDoc(): PeerId[] {
-    return Array.from(this.#peers.entries())
-      .filter(([, status]) => status.isAwareOfDoc)
-      .map(([peerId]) => peerId)
-  }
-
-  /**
-   * Update a source's ready state. Source could be storage or network.
-   * @param key Unique key for the source of data
-   * @param readyState
-   */
-  public updateReadyState(key: string, readyState: ReadyState): void {
-    this.#readyStates.set(key, readyState)
-    this._emitter.emit("ready-state-changed", {
-      readyStates: Array.from(this.#readyStates.values()),
+    return this.waitUntilReady(readyStates => {
+      this.logger.info("wait-for-network", { readyStates })
+      return readyStates.some(
+        s => s.channelMeta.kind === "network" && s.loading.state === "found",
+      )
     })
   }
 }

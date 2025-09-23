@@ -1,6 +1,6 @@
 # @loro-extended/repo
 
-`@loro-extended/repo` is a core component for building distributed local-first applications with [Loro](https://github.com/loro-dev/loro), a fast CRDTs-based state synchronization library.
+`@loro-extended/repo` is a core component for building distributed local-first applications with [Loro](https://github.com/loro-dev/loro), a fast CRDT-based state synchronization library.
 
 ## What is Loro?
 
@@ -27,47 +27,41 @@ const storage = new IndexedDBStorageAdapter();
 
 // Create and configure the Repo
 const repo = new Repo({
-  network: [network],
-  storage,
+  adapters: [network, storage],
+  identity: { name: "my-peer" },
 });
 
-// Find or create a new document
-const docHandle = await repo.get({ documentId: "my-doc" });
+// Get or create a document (immediately available)
+const docHandle = repo.get("my-doc");
 ```
 
 ## Core Concepts
 
 ### Repo
 
-The `Repo` class is the central orchestrator for the Loro state synchronization system. It manages the lifecycle of documents, coordinates subsystems, and provides the main public API for document operations.
+The `Repo` class is the central orchestrator for the Loro state synchronization system. It manages the lifecycle of documents and coordinates the synchronization subsystem.
 
-- **Document Management**: Creates, finds, and deletes documents
-- **Subsystem Coordination**: Wires together storage, networking, and synchronization
-- **Event Handling**: Coordinates events between components
-- **Peer Management**: Handles peer discovery and communication
+- **Document Management**: Gets or creates documents via [`DocHandle`](./src/doc-handle.ts)
+- **Adapter Coordination**: Manages storage and network adapters through channels
+- **Identity Management**: Provides peer identity for synchronization
 
 ### DocHandle
 
-The `DocHandle` is an always-available wrapper around a single Loro document. It provides immediate access to the document while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
+The [`DocHandle`](./src/doc-handle.ts) is an always-available wrapper around a single Loro document. It provides immediate access to the document while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
 
 - **Always Available**: Documents are immediately accessible without complex loading states
 - **Flexible Readiness**: Applications can define custom readiness criteria using predicates
-- **Event-Driven**: Emits events for document changes and sync messages
-- **Peer State Management**: Tracks which peers have or are aware of the document
+- **Simple Mutations**: Use the [`change()`](./src/doc-handle.ts:56) method to modify documents
 
-### Storage Adapters
+### Adapters
 
-Storage adapters handle the persistence of documents and their updates. The package includes:
+Adapters provide pluggable storage and network implementations through a unified channel-based architecture:
 
-- **InMemoryStorageAdapter**: Stores data in memory (default, for testing)
-- **SimpleFileStorageAdapter**: Stores data in the filesystem (Node.js only)
+- **Storage Adapters**: Handle document persistence (e.g., [`InMemoryStorageAdapter`](./src/storage/in-memory-storage-adapter.ts))
+- **Network Adapters**: Handle peer communication (e.g., [`InProcessNetworkAdapter`](./src/network/in-process-network-adapter.ts))
+- **External Adapters**: Available in `@loro-extended/adapters` for SSE, IndexedDB, etc.
 
-### Network Adapters
-
-Network adapters handle communication between peers. The package includes:
-
-- **InProcessNetworkAdapter**: Enables direct in-process communication (for testing)
-- **External Adapters**: Integration with `@loro-extended/network-sse` for real-world applications
+All adapters implement the [`Adapter`](./src/adapter/adapter.ts) interface and communicate via channels.
 
 ## API Reference
 
@@ -76,45 +70,27 @@ Network adapters handle communication between peers. The package includes:
 #### Constructor
 
 ```typescript
-interface RepoConfig {
-  storage?: StorageAdapter; // Storage adapter (defaults to InMemoryStorageAdapter)
-  network?: NetworkAdapter[]; // Array of network adapters (defaults to InProcessNetworkAdapter)
-  peerId?: PeerId; // Unique identifier for this peer (auto-generated if not provided)
-  permissions?: Partial<PermissionAdapter>; // Permission configuration
+interface RepoParams {
+  adapters: AnyAdapter[]; // Array of storage and network adapters
+  identity?: PeerIdentityDetails; // Peer identity (auto-generated if not provided)
+  permissions?: Partial<Rules>; // Permission rules
+  onUpdate?: HandleUpdateFn; // Optional callback for model updates
 }
 
-const repo = new Repo(config);
+const repo = new Repo(params);
 ```
 
 #### Document Management
 
 ```typescript
-// Create a new document
-const handle = await repo.create<T>({
-  documentId: DocumentId, // Optional, auto-generated if not provided
-});
+// Get or create a document (immediately available)
+const handle = repo.get<T>(docId);
 
-// Get or create an existing document
-const handle = await repo.get<T>(documentId);
+// Delete a document (TODO: not yet implemented)
+await repo.delete(docId);
 
-// Delete a document
-await repo.delete(documentId);
-```
-
-#### Accessing Subsystems
-
-```typescript
-// Get all document handles
-const handles = repo.handles;
-
-// Get the network subsystem
-const network = repo.network;
-
-// Get the permission adapter
-const permissions = repo.permissions;
-
-// Get the peer ID
-const peerId = repo.peerId;
+// Reset the repo (disconnect adapters, clear state)
+repo.reset();
 ```
 
 ### DocHandle Class
@@ -129,7 +105,7 @@ const doc = handle.doc; // LoroDoc instance, always ready
 await handle.waitUntilReady((readyStates) => {
   // Wait for storage to load
   return readyStates.some(
-    (s) => s.source.type === "storage" && s.state.type === "found"
+    (s) => s.channelMeta.kind === "storage" && s.loading.state === "found"
   );
 });
 
@@ -141,143 +117,65 @@ await handle.waitForNetwork(); // Wait for network sync
 #### Document Mutations
 
 ```typescript
-// Make changes to the document (always available)
-handle.doc.getMap("root").set("title", "My Collaborative Document");
-handle.doc
-  .getList("tasks")
-  .push({ description: "Finish the README", completed: true });
-
-// Listen for local changes
-handle.on("doc-handle-local-change", (syncMessage) => {
-  console.log("Local change made:", syncMessage);
+// Make changes using the change() method
+handle.change((doc) => {
+  doc.getMap("root").set("title", "My Collaborative Document");
+  doc.getList("tasks").push({
+    description: "Finish the README",
+    completed: true
+  });
 });
 
-// Listen for any changes (local or remote)
-handle.on("doc-handle-change", ({ doc, event }) => {
-  console.log("Document changed:", doc.toJSON());
-});
+// Or access the document directly
+handle.doc.getMap("root").set("title", "Direct Access");
+handle.doc.commit(); // Don't forget to commit!
 ```
 
-#### Peer State Management
+## Adapters
+
+### Built-in Adapters
+
+The package includes basic adapters for testing and development:
+
+- [`InMemoryStorageAdapter`](./src/storage/in-memory-storage-adapter.ts) - Stores data in memory
+- [`InProcessNetworkAdapter`](./src/network/in-process-network-adapter.ts) - Direct in-process communication
+
+### External Adapters
+
+For production use, see `@loro-extended/adapters`:
+
+- **SSE Adapters**: Server-Sent Events for client-server sync
+- **IndexedDB Adapter**: Browser-based persistent storage
+- **LevelDB Adapter**: Node.js persistent storage
+
+### Custom Adapters
+
+Create custom adapters by extending the [`Adapter`](./src/adapter/adapter.ts) class:
 
 ```typescript
-// Track which peers have the document
-const peersWithDoc = handle.getPeersWithDoc();
+import { Adapter, type BaseChannel } from "@loro-extended/repo";
 
-// Track which peers are aware of the document
-const peersAwareOfDoc = handle.getPeersAwareOfDoc();
-
-// Update peer status
-handle.updatePeerStatus(peerId, {
-  hasDoc: true,
-  isAwareOfDoc: true,
-  isSyncingNow: false,
-});
-```
-
-## Storage Adapters
-
-### InMemoryStorageAdapter
-
-The default storage adapter that keeps all data in memory. Useful for testing and development.
-
-```typescript
-import { InMemoryStorageAdapter } from "@loro-extended/repo";
-
-const storage = new InMemoryStorageAdapter();
-const repo = new Repo({ storage });
-```
-
-### SimpleFileStorageAdapter
-
-A file-based storage adapter for Node.js applications.
-
-```typescript
-import { SimpleFileStorageAdapter } from "@loro-extended/repo";
-
-const storage = new SimpleFileStorageAdapter("./data");
-const repo = new Repo({ storage });
-```
-
-### Custom Storage Adapter
-
-Implement your own storage adapter by implementing the `StorageAdapter` interface:
-
-```typescript
-import type { StorageAdapter, Chunk, StorageKey } from "@loro-extended/repo";
-
-class CustomStorageAdapter implements StorageAdapter {
-  async load(key: StorageKey): Promise<Uint8Array | undefined> {
-    // Implement loading logic
+class CustomAdapter extends Adapter<MyContext> {
+  protected generate(context: MyContext): BaseChannel {
+    return {
+      kind: "storage", // or "network" or "other"
+      adapterId: this.adapterId,
+      send: (msg) => { /* send logic */ },
+      start: (receive) => { /* start logic */ },
+      stop: () => { /* stop logic */ },
+    };
   }
 
-  async save(key: StorageKey, data: Uint8Array): Promise<void> {
-    // Implement saving logic
+  init({ addChannel, removeChannel }) {
+    // Initialize adapter, create channels
   }
 
-  async remove(key: StorageKey): Promise<void> {
-    // Implement removal logic
+  deinit() {
+    // Clean up resources
   }
 
-  async loadRange(keyPrefix: StorageKey): Promise<Chunk[]> {
-    // Implement range loading logic
-  }
-
-  async removeRange(keyPrefix: StorageKey): Promise<void> {
-    // Implement range removal logic
-  }
-}
-```
-
-## Network Adapters
-
-### InProcessNetworkAdapter
-
-The default network adapter that enables direct communication between Repo instances in the same process. Useful for testing.
-
-```typescript
-import { InProcessNetworkAdapter } from "@loro-extended/repo";
-
-const network = new InProcessNetworkAdapter();
-const repo = new Repo({ network: [network] });
-```
-
-### External Network Adapters
-
-For real-world applications, use external network adapters from `@loro-extended/adapters`:
-
-```typescript
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
-import { Repo } from "@loro-extended/repo";
-
-const network = new SseClientNetworkAdapter("/api/sync");
-const repo = new Repo({ network: [network] });
-```
-
-### Custom Network Adapter
-
-Implement your own network adapter by implementing the `NetworkAdapter` interface:
-
-```typescript
-import type { NetworkAdapter, PeerMetadata } from "@loro-extended/repo";
-import Emittery from "emittery";
-
-class CustomNetworkAdapter
-  extends Emittery<NetworkAdapterEvents>
-  implements NetworkAdapter
-{
-  peerId?: PeerId;
-
-  connect(peerId: PeerId, metadata: PeerMetadata): void {
-    // Implement connection logic
-  }
-
-  send(message: RepoMessage): void {
-    // Implement message sending logic
-  }
-
-  disconnect(): void {
-    // Implement disconnection logic
+  start() {
+    // Start listening/connecting
   }
 }
 ```
@@ -291,57 +189,41 @@ import { Repo } from "@loro-extended/repo";
 import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
 import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
 
-// Define the document type
-interface TodoDoc {
-  title: string;
-  todos: Array<{
-    id: string;
-    text: string;
-    completed: boolean;
-  }>;
-}
-
 // Create adapters
 const network = new SseClientNetworkAdapter("/api/sync");
 const storage = new IndexedDBStorageAdapter();
 
 // Create the repo
 const repo = new Repo({
-  network: [network],
-  storage,
+  adapters: [network, storage],
+  identity: { name: "todo-app" },
 });
 
-// Get or create the todo document
-const todoHandle = await repo.get<TodoDoc>("main-todos");
+// Get the todo document (immediately available)
+const todoHandle = repo.get("main-todos");
 
-// Document is immediately available
+// Wait for storage to load before displaying
+await todoHandle.waitForStorage();
+
+// Document is always available
 const doc = todoHandle.doc;
 
-// Listen for changes
-todoHandle.on("doc-handle-change", ({ doc, event }) => {
-  console.log("Todos updated:", doc.toJSON());
+// Add a new todo using change()
+todoHandle.change((doc) => {
+  const todosMap = doc.getMap("root");
+  const todosList = todosMap.get("todos") || todosMap.setContainer("todos", "List");
+  todosList.push({
+    id: crypto.randomUUID(),
+    text: "Learn about Loro",
+    completed: false,
+  });
+});
+
+// Subscribe to changes
+doc.subscribe((event) => {
+  console.log("Document changed:", doc.toJSON());
   // Update UI here
 });
-
-// Add a new todo
-const todosMap = doc.getMap("root");
-const todosList =
-  todosMap.get("todos") || todosMap.setContainer("todos", "List");
-todosList.push({
-  id: crypto.randomUUID(),
-  text: "Learn about Loro",
-  completed: false,
-});
-
-// Toggle a todo completion
-const toggleTodo = (id: string) => {
-  const todosList = doc.getMap("root").get("todos");
-  const todoIndex = todosList.toArray().findIndex((t) => t.id === id);
-  if (todoIndex >= 0) {
-    const todo = todosList.get(todoIndex);
-    todo.completed = !todo.completed;
-  }
-};
 ```
 
 ## Architecture
@@ -354,134 +236,124 @@ The Repo package follows a layered architecture:
 ├─────────────────────────────────────────┤
 │                Repo                     │
 │  ┌─────────────┐  ┌──────────────────┐  │
-│  │  DocHandle  │  │ NetworkSubsystem │  │
+│  │  DocHandle  │  │  Synchronizer    │  │
 │  └─────────────┘  └──────────────────┘  │
 │         │                  │            │
-│  ┌──────▼───────┐  ┌───────▼───────┐    │
-│  │ Synchronizer │  │NetworkAdapters│    │
-│  └──────────────┘  └───────────────┘    │
-│         │                               │
-│  ┌──────▼───────┐                       │
-│  │StorageAdapter│                       │
-│  └──────────────┘                       │
+│         │          ┌───────▼────────┐   │
+│         │          │ AdapterManager │   │
+│         │          └───────┬────────┘   │
+│         │                  │            │
+│  ┌──────▼──────────────────▼─────────┐  │
+│  │         Adapters (via Channels)   │  │
+│  │  ┌─────────┐      ┌────────────┐  │  │
+│  │  │ Storage │      │  Network   │  │  │
+│  │  └─────────┘      └────────────┘  │  │
+│  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
 ```
 
 ### Data Flow
 
-1. **Document Creation**: Repo creates a DocHandle with injected services
-2. **Local Changes**: DocHandle processes mutations and notifies the Synchronizer
-3. **Network Sync**: Synchronizer coordinates with NetworkSubsystem to sync changes
-4. **Storage**: Changes are automatically persisted through the StorageAdapter
-5. **Remote Changes**: NetworkSubsystem receives updates and routes them to the Synchronizer
-6. **Document Update**: Synchronizer applies remote changes to the appropriate DocHandle
+1. **Document Access**: [`Repo.get()`](./src/repo.ts:67) creates a [`DocHandle`](./src/doc-handle.ts) with an immediately available document
+2. **Local Changes**: [`DocHandle.change()`](./src/doc-handle.ts:56) modifies the document and notifies the [`Synchronizer`](./src/synchronizer.ts)
+3. **Channel Communication**: [`Synchronizer`](./src/synchronizer.ts) sends messages through channels managed by [`AdapterManager`](./src/adapter/adapter-manager.ts)
+4. **Adapter Routing**: [`AdapterManager`](./src/adapter/adapter-manager.ts) routes messages to appropriate adapters
+5. **Remote Changes**: Adapters receive updates via channels and dispatch to [`Synchronizer`](./src/synchronizer.ts)
+6. **Document Update**: [`Synchronizer`](./src/synchronizer.ts) applies changes to the document's CRDT
 
-## Error Handling
+## Permission System
 
-The Repo package provides several ways to handle errors:
+Control document access using the [`Rules`](./src/rules.ts) interface:
 
 ```typescript
-// Handle state transitions
-handle.on("doc-handle-state-transition", ({ oldState, newState }) => {
-  if (newState.state === "unavailable") {
-    console.error("Document became unavailable");
-  }
+const repo = new Repo({
+  adapters: [network, storage],
+  permissions: {
+    canList: ({ docId, peerName }) => {
+      // Control which documents are visible to peers
+      return !docId.startsWith("private-");
+    },
+    canWrite: ({ docId, peerName }) => {
+      // Control who can modify documents
+      return peerName === "trusted-peer";
+    },
+    canBeginSync: ({ docId }) => {
+      // Control automatic sync initiation
+      return true;
+    },
+    canDelete: ({ docId, peerName }) => {
+      // Control document deletion
+      return peerName === "admin";
+    },
+  },
 });
-
-// Handle storage errors (in custom adapters)
-class SafeStorageAdapter implements StorageAdapter {
-  async save(key: StorageKey, data: Uint8Array): Promise<void> {
-    try {
-      // Save logic here
-    } catch (error) {
-      console.error("Storage error:", error);
-      throw error; // Let DocHandle handle it
-    }
-  }
-}
 ```
 
-## Troubleshooting
+## Logging
 
-### Common Issues
-
-**Document not found**
-
-- Ensure you're using the correct document ID
-- Check if the document was created on another peer
-- Verify network connectivity
-
-**Sync not working**
-
-- Check that network adapters are properly configured
-- Verify that peers can connect to each other
-- Check firewall and network settings
-
-**Storage errors**
-
-- Ensure storage adapter has proper permissions
-- Check available disk space
-- Verify storage path is accessible
-
-### Debug Mode
-
-Enable debug logging to troubleshoot issues:
+The package uses [@logtape/logtape](https://github.com/dahlia/logtape) for structured logging:
 
 ```typescript
-// Enable debug logging (if supported by adapters)
-const repo = new Repo({
-  network: [new DebugNetworkAdapter()],
-  storage: new DebugStorageAdapter(),
+import { configure, getConsoleSink } from "@logtape/logtape";
+
+await configure({
+  sinks: { console: getConsoleSink() },
+  loggers: [
+    { category: ["@loro-extended"], level: "debug", sinks: ["console"] },
+  ],
 });
 ```
 
 ## Architecture
 
-This package implements a sophisticated distributed document synchronization system using several key architectural patterns:
+This package implements a channel-based distributed document synchronization system:
 
 ### Always-Available Documents
 
-The core architecture embraces CRDT semantics where documents are immediately available and operations are idempotent and commutative. This eliminates artificial loading states while providing flexible readiness APIs for applications.
+Documents are immediately available via [`DocHandle`](./src/doc-handle.ts), embracing CRDT semantics where operations are idempotent and commutative. Applications can optionally wait for specific readiness conditions.
 
 ### The Elm Architecture (TEA)
 
-The `Synchronizer` uses pure functional state machines with impure runtime hosts. This provides:
+The [`Synchronizer`](./src/synchronizer.ts) uses pure functional state machines ([`synchronizer-program.ts`](./src/synchronizer-program.ts)) with impure runtime hosts, providing:
 
 - Predictable state transitions
 - Excellent testability
 - Clear separation of concerns
 
-### Pluggable Adapter System
+### Channel-Based Adapters
 
-Storage and network operations are abstracted through adapter interfaces, enabling:
+All storage and network operations flow through channels managed by adapters:
 
-- Environment-specific implementations (browser vs server)
-- Easy testing with in-memory adapters
-- Future extensibility
+- [`Adapter`](./src/adapter/adapter.ts) - Base class for all adapters
+- [`Channel`](./src/channel.ts) - Represents a connection to a storage or network peer
+- [`AdapterManager`](./src/adapter/adapter-manager.ts) - Routes messages to appropriate adapters
 
-### Event-Driven Protocol
+### Synchronization Protocol
 
-The synchronization protocol uses an "Announce/Request/Sync" pattern that ensures:
+The protocol uses establish/sync-request/sync-response patterns with:
 
-- Robust peer discovery
-- Reliable document exchange
-- Cascade prevention in hub-and-spoke topologies
+- Peer identity exchange via publish/consume documents
+- Version vector-based incremental sync
+- Hop count to prevent forwarding cascades
 
-For detailed architectural documentation, see:
+For detailed documentation, see:
 
-- [Overall Architecture](./src/repo.md) - System design and component relationships
-- [DocHandle Architecture](./src/doc-handle.md) - Always-available document management
-- [Synchronizer Protocol](./src/synchronizer.md) - Peer-to-peer synchronization details
+- [`repo.md`](./src/repo.md) - Overall system architecture
+- [`doc-handle.md`](./src/doc-handle.md) - Always-available document design
+- [`synchronizer.md`](./src/synchronizer.md) - Synchronization protocol details
+- [`adapter/adapter.md`](./src/adapter/adapter.md) - Adapter system design
 
-## Future Work
+## Development
 
-While the core functionality is complete, we're working on:
+Run tests:
+```bash
+pnpm --filter @loro-extended/repo -- test
+```
 
-- **Additional Storage Adapters**: SQLite, Redis, and cloud storage options
-- **More Network Protocols**: WebRTC, WebSocket, and MQTT adapters
-- **Advanced Permission Systems**: Fine-grained access control and authentication
-- **Performance Optimizations**: Batch operations and delta compression
-- **Developer Tools**: Debugging utilities and monitoring dashboards
+Run specific test file:
+```bash
+pnpm --filter @loro-extended/repo -- test run src/synchronizer.test.ts
+```
 
 ## Contributing
 

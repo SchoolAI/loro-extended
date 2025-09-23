@@ -61,7 +61,7 @@ Updated the existing synchronizer program to use the transformer pattern interna
 
 ```typescript
 // Before: Complex nested create() calls
-case "msg-peer-added": {
+case "msg/channel-added": {
   const newModel = create(model, (draft: Model) => {
     draft.peers.set(msg.peerId, { connected: true })
     draft.remoteDocs = addPeersAwareOfDocuments(draft.remoteDocs, [msg.peerId], docIds)
@@ -70,7 +70,7 @@ case "msg-peer-added": {
 }
 
 // After: Direct mutations, cleaner logic
-case "msg-peer-added": {
+case "msg/channel-added": {
   const docIds = [...model.localDocs].filter(docId =>
     model.permissions.canList(msg.peerId, docId)
   )
@@ -79,7 +79,7 @@ case "msg-peer-added": {
   addPeersAwareOfDocuments(model.remoteDocs, [msg.peerId], docIds)
 
   return {
-    type: "cmd-send-message",
+    type: "cmd/send-message",
     message: { /* ... */ }
   }
 }

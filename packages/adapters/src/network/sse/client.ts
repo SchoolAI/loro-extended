@@ -1,5 +1,5 @@
 import {
-  type NetMsg,
+  type ChannelMsg,
   NetworkAdapter,
   type PeerId,
   type PeerMetadata,
@@ -30,7 +30,7 @@ export class SseClientNetworkAdapter extends NetworkAdapter {
 
     this.#eventSource.onmessage = event => {
       const serializedMessage = JSON.parse(event.data)
-      const message = this.#deserializeMessage(serializedMessage) as NetMsg
+      const message = this.#deserializeMessage(serializedMessage) as ChannelMsg
       this.messageReceived(message)
     }
 
@@ -49,7 +49,7 @@ export class SseClientNetworkAdapter extends NetworkAdapter {
     this.peerId = undefined
   }
 
-  async send(message: NetMsg): Promise<void> {
+  async send(message: ChannelMsg): Promise<void> {
     // Convert Uint8Array to base64 for JSON serialization
     const serializedMessage = this.#serializeMessage(message)
     const response = await fetch(`${this.#serverUrl}/sync`, {

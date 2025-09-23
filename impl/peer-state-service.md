@@ -14,7 +14,7 @@ The system currently stores peer state in two separate places, leading to duplic
 
 2. **Synchronizer Program** ([`packages/repo/src/synchronizer-program.ts`](packages/repo/src/synchronizer-program.ts)):
    - Maintains its own peer state in the [`Model.peers`](packages/repo/src/synchronizer-program.ts:11) Set
-   - Handles peer additions via [`msg-peer-added`](packages/repo/src/synchronizer-program.ts:57) and removals via [`msg-peer-removed`](packages/repo/src/synchronizer-program.ts:58)
+   - Handles peer additions via [`msg-channel-added`](packages/repo/src/synchronizer-program.ts:57) and removals via [`msg-channel-removed`](packages/repo/src/synchronizer-program.ts:58)
    - Tracks document-specific peer relationships
 
 This duplication causes timing gaps where the synchronizer might try to send messages to peers that the network adapter knows are disconnected, resulting in warnings like:

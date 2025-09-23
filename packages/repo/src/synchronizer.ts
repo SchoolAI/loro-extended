@@ -1,142 +1,231 @@
-import type { LoroDoc } from "loro-crdt"
+import { getLogger, type Logger } from "@logtape/logtape"
+import Emittery from "emittery"
+import type { VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
-import type { DocHandle } from "./doc-handle.js"
-import type { AddressedNetMsg, NetMsg } from "./network/network-messages.js"
+import { v4 as uuid } from "uuid"
+import type { AnyAdapter } from "./adapter/adapter.js"
+import type { Channel } from "./channel.js"
+import { createPermissions, type Rules } from "./rules.js"
 import {
-  createPermissions,
-  type PermissionAdapter,
-} from "./permission-adapter.js"
-import { RequestTracker } from "./request-tracker.js"
-import {
-  type Command,
   createSynchronizerUpdate,
+  getReadyStates,
   init as programInit,
+  type Command,
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "./synchronizer-program.js"
-import type { DocContent, DocumentId, PeerId } from "./types.js"
+import type {
+  ChannelId,
+  DocId,
+  DocState,
+  LoadingState,
+  PeerIdentityDetails,
+  ReadyState,
+} from "./types.js"
+import { AdapterManager } from "./adapter/adapter-manager.js"
 
-export type SynchronizerServices = {
-  send: (message: AddressedNetMsg) => void
-  // biome-ignore lint/suspicious/noExplicitAny: many docs possible
-  getDoc: (documentId: DocumentId) => DocHandle<any>
+export type HandleUpdateFn = (patches: Patch[]) => void
+
+// The events that the Synchronizer can emit
+type SynchronizerEvents = {
+  "ready-state-changed": {
+    docId: string
+    readyStates: ReadyState[]
+  }
 }
 
-export type SynchronizerOptions = {
-  permissions?: PermissionAdapter
-  onPatch?: (patches: Patch[]) => void
+type SynchronizerParams = {
+  identity: Partial<PeerIdentityDetails>
+  adapters: AnyAdapter[]
+  permissions?: Rules
+  onUpdate?: HandleUpdateFn
+  logger?: Logger
 }
+
+type SynchronizerUpdate = (
+  msg: SynchronizerMessage,
+  model: SynchronizerModel,
+) => [SynchronizerModel, Command?]
 
 export class Synchronizer {
-  #services: SynchronizerServices
-  #model: SynchronizerModel
-  #timeouts = new Map<DocumentId, NodeJS.Timeout>()
-  #networkRequestTracker = new RequestTracker<LoroDoc<DocContent> | null>()
-  #updateFunction: (
-    msg: SynchronizerMessage,
-    model: SynchronizerModel,
-  ) => [SynchronizerModel, Command?]
+  readonly identity: PeerIdentityDetails
+  readonly adapters: AdapterManager
+  readonly logger: Logger
 
-  constructor(
-    services: SynchronizerServices,
-    options: SynchronizerOptions = {},
-  ) {
-    this.#services = services
+  model: SynchronizerModel
+  readonly updateFn: SynchronizerUpdate
 
-    this.#updateFunction = createSynchronizerUpdate(
-      createPermissions(options.permissions),
-      options.onPatch,
-    )
+  readonly emitter = new Emittery<SynchronizerEvents>()
 
-    const [initialModel, initialCommand] = programInit()
-    this.#model = initialModel
+  constructor({
+    identity,
+    adapters,
+    permissions,
+    onUpdate,
+    logger: preferredLogger,
+  }: SynchronizerParams) {
+    const logger = preferredLogger ?? getLogger(["@loro-extended", "repo"])
+    this.logger = logger
+
+    this.identity = {
+      name: identity.name ?? `synchronizer-${uuid()}`,
+    }
+
+    this.logger.debug(`new Synchronizer`)
+
+    this.adapters = new AdapterManager({
+      adapters,
+      onReset: (adapter: AnyAdapter) => {
+        for (const channel of adapter.channels) {
+          this.channelRemoved(channel)
+        }
+      },
+      logger,
+    })
+
+    this.updateFn = createSynchronizerUpdate({
+      permissions: createPermissions(permissions),
+      onUpdate,
+      logger,
+    })
+
+    const [initialModel, initialCommand] = programInit(this.identity)
+    this.model = initialModel
     if (initialCommand) {
       this.#executeCommand(initialCommand)
     }
+
+    // Prepare adapters to listen for events or whatever they need to do before connecting
+    for (const adapter of adapters) {
+      adapter.prepare({
+        channelAdded: this.channelAdded.bind(this),
+        channelRemoved: this.channelRemoved.bind(this),
+      })
+    }
+
+    // Let adapters start listening or connect
+    for (const adapter of adapters) {
+      adapter.start()
+    }
+  }
+
+  // Helper functions for adapter callbacks
+  channelAdded(channel: Channel) {
+    this.logger.debug(`channelAdded`, { channel })
+    this.#dispatch({ type: "msg/channel-added", channel })
+  }
+
+  channelRemoved(channel: Channel) {
+    this.logger.debug(`channelRemoved`, { channel })
+    this.#dispatch({ type: "msg/channel-removed", channel })
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // PUBLIC API
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  getOrCreateDocumentState(docId: DocId): DocState {
+    let docState = this.model.documents.get(docId)
 
-  public addPeer(peerId: PeerId) {
-    this.#dispatch({ type: "msg-peer-added", peerId })
+    if (!docState) {
+      this.#dispatch({ type: "msg/local-doc-ensure", docId })
+      docState = this.model.documents.get(docId)
+    }
+
+    if (!docState) {
+      throw new Error(`unable to find or create doc: ${docId}`)
+    }
+
+    return docState
   }
 
-  public removePeer(peerId: PeerId) {
-    this.#dispatch({ type: "msg-peer-removed", peerId })
+  getDocumentState(docId: DocId): DocState | undefined {
+    return this.model.documents.get(docId)
   }
 
-  public addDocument(documentId: DocumentId) {
-    this.#dispatch({ type: "msg-document-added", documentId })
+  getChannel(channelId: ChannelId): Channel | undefined {
+    return this.model.channels.get(channelId)
   }
 
-  public removeDocument(documentId: DocumentId) {
-    this.#dispatch({ type: "msg-document-removed", documentId })
+  /**
+   * Get channels that have the given docId
+   */
+  public getChannelsForDoc(
+    docId: DocId,
+    predicate: (loading: LoadingState) => boolean,
+  ): Channel[] {
+    const docState = this.getDocumentState(docId)
+
+    if (!docState) {
+      throw new Error(`doc state not found for ${docId}`)
+    }
+
+    const channelIds = Array.from(docState.channelState.entries()).flatMap(
+      ([channelId, state]) => (predicate(state.loading) ? [channelId] : []),
+    )
+
+    return channelIds.flatMap(id => {
+      const channel = this.getChannel(id)
+      return channel ? [channel] : []
+    })
   }
 
-  public onLocalChange(documentId: DocumentId, data: Uint8Array) {
-    this.#dispatch({ type: "msg-local-change", documentId, data })
+  /**
+   * Get docIds known to be available at the given channelId
+   */
+  public getChannelDocIds(channelId: ChannelId): DocId[] {
+    return Array.from(this.model.documents.entries()).flatMap(
+      ([docId, state]) => (state.channelState.has(channelId) ? [docId] : []),
+    )
   }
 
-  public isPeerConnected(peerId: PeerId): boolean {
-    return this.#model.peers.has(peerId)
-  }
+  /**
+   * Wait until a docId is "ready", with "ready" meaning any number of flexible things:
+   * e.g.
+   * - the document has been loaded from a storage channel
+   * - the document has been loaded from the server
+   * - with regard to the document, all channels (peers) have responded
+   *
+   * All of this flexibility is achieved by allowing you to pass a "predicate" function
+   * that returns true or false depending on your needs.
+   *
+   * @param docId The document ID under test for the predicate
+   * @param predicate A condition to wait for--the predicate is passed a ReadyState[] array
+   */
+  async waitUntilReady(
+    docId: DocId,
+    predicate: (readyStates: ReadyState[]) => boolean,
+  ) {
+    this.logger.debug(`wait-until-ready is WAITING`, { docId })
 
-  public handleRepoMessage(message: NetMsg) {
-    switch (message.type) {
-      case "directory-response": {
-        this.#dispatch({
-          type: "msg-received-doc-announced",
-          from: message.senderId,
-          documentIds: message.documentIds,
-        })
-        break
-      }
-      case "sync-request": {
-        this.#dispatch({
-          type: "msg-received-doc-request",
-          from: message.senderId,
-          documentId: message.documentId,
-        })
-        break
-      }
-      case "sync-response": {
-        if (message.transmission.type === "up-to-date") return
-        this.#dispatch({
-          type: "msg-received-sync",
-          from: message.senderId,
-          documentId: message.documentId,
-          transmission: message.transmission,
-          hopCount: message.hopCount,
-        })
+    const docState = this.model.documents.get(docId)
+
+    if (!docState) {
+      this.logger.warn(`wait-until-ready unable to get doc-state`)
+      return
+    }
+
+    const readyStates = getReadyStates(
+      this.model.channels,
+      docState.channelState,
+    )
+
+    if (predicate(readyStates)) {
+      this.logger.debug(`wait-until-ready is READY (immediate)`, {
+        docId,
+      })
+      return
+    }
+
+    // Wait for ready-state-changed events using async iteration
+    for await (const event of this.emitter.events("ready-state-changed")) {
+      // The event contains the readyStates array directly
+      if (event.docId === docId && predicate(event.readyStates)) {
+        // Condition met, we're done waiting
         break
       }
     }
-  }
-  /**
-   * Queries the network for a document with the given ID.
-   *
-   * @typeParam T - The specific document type extending DocContent
-   * @param documentId - The ID of the document to find
-   * @param timeout - Timeout in milliseconds for the network query
-   * @returns A promise that resolves to the document if found, or null if not found
-   *
-   * @note The type cast here is a limitation of the current architecture. Since the
-   * Synchronizer needs to handle documents of any type (T extends DocContent) but
-   * can only use a single RequestTracker instance, we need to cast the promise type.
-   * This is safe because:
-   * 1. The actual LoroDoc object is the same regardless of the generic type parameter
-   * 2. The type system only enforces the structure of the document content at compile time
-   * 3. At runtime, all documents are handled the same way by the Loro library
-   */
-  public queryNetwork<T extends DocContent>(
-    documentId: DocumentId,
-    timeout = 5000,
-  ): Promise<LoroDoc<T> | null> {
-    const [requestId, promise] = this.#networkRequestTracker.createRequest()
-    this.#dispatch({ type: "msg-sync-started", documentId, requestId, timeout })
-    return promise as Promise<LoroDoc<T> | null>
+
+    this.logger.debug(`wait-until-ready is READY`, { docId })
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- =-=-=-=-=-=-=-=
@@ -144,8 +233,12 @@ export class Synchronizer {
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   #dispatch(message: SynchronizerMessage) {
-    const [newModel, command] = this.#updateFunction(message, this.#model)
-    this.#model = newModel
+    if (!this.model) {
+      throw new Error("synchronizer model required")
+    }
+
+    const [newModel, command] = this.updateFn(message, this.model)
+    this.model = newModel
 
     if (command) {
       this.#executeCommand(command)
@@ -154,137 +247,203 @@ export class Synchronizer {
 
   #executeCommand(command: Command) {
     switch (command.type) {
-      case "cmd-notify-docs-available":
-        for (const documentId of command.documentIds) {
-          // Get the handle - it's always available now
-          const handle = this.#services.getDoc(documentId)
-
-          // With the new architecture, documents are always available
-          // We just need to trigger background loading from storage/network
-          // This happens automatically when the handle is created
-
-          // No need to check state or call find() - the document is immediately usable
-        }
-        break
-      case "cmd-send-message": {
-        this.#services.send(command.message)
+      case "cmd/start-channel": {
+        this.#executeStartChannel(command.channel)
         break
       }
-      case "cmd-load-and-send-sync": {
-        const handle = this.#services.getDoc(command.documentId)
-        // Document is always available now
-        this.#services.send({
-          type: "sync-response",
-          targetIds: [command.to],
-          documentId: command.documentId,
-          transmission: {
-            type: "update",
-            data: handle.doc.export({ mode: "snapshot" }),
-          },
-          hopCount: 0, // Original message from this peer
+
+      case "cmd/stop-channel": {
+        // Time to de-initialize a channel
+        command.channel.stop()
+        break
+      }
+
+      case "cmd/send-message": {
+        // Let the AdapterManager handle routing the envelope to the right place(s)
+        this.adapters.send(command.envelope)
+        break
+      }
+
+      case "cmd/send-sync-response": {
+        this.#executeSendSyncResponse(
+          command.docId,
+          command.requesterDocVersion,
+          command.toChannelId,
+        )
+        break
+      }
+
+      case "cmd/subscribe-local-doc": {
+        this.#executeSubscribeLocalDoc(command.docId)
+        break
+      }
+
+      case "cmd/emit-ready-state-changed": {
+        this.emitter.emit("ready-state-changed", {
+          docId: command.docId,
+          readyStates: command.readyStates,
         })
         break
       }
-      case "cmd-check-storage-and-respond": {
-        // Get the handle - document is always available
-        const handle = this.#services.getDoc(command.documentId)
 
-        // Try to wait for storage to load, but don't wait too long
-        handle
-          .waitForStorage(1000)
-          .then(() => {
-            // Storage loaded successfully, send the document
-            this.#services.send({
-              type: "sync-response",
-              targetIds: [command.to],
-              documentId: command.documentId,
-              transmission: {
-                type: "update",
-                data: handle.doc.export({ mode: "update" }),
-              },
-              hopCount: 0, // Original message from this peer
-            })
-          })
-          .catch(() => {
-            // Storage didn't load in time or document not found
-            // Send the current state (which might be empty)
-            this.#services.send({
-              type: "sync-response",
-              targetIds: [command.to],
-              documentId: command.documentId,
-              transmission: {
-                type: "update",
-                data: handle.doc.export({ mode: "update" }),
-              },
-              hopCount: 0, // Original message from this peer
-            })
-          })
+      case "cmd/establish-channel-doc": {
+        this.#executeEstablishChannelDoc(command.channel)
         break
       }
-      case "cmd-set-timeout": {
-        this.#clearTimeout(command.documentId)
-        const timeoutId = setTimeout(() => {
-          this.#dispatch({
-            type: "msg-sync-timeout-fired",
-            documentId: command.documentId,
-          })
-        }, command.duration)
-        this.#timeouts.set(command.documentId, timeoutId)
-        break
-      }
-      case "cmd-clear-timeout": {
-        this.#clearTimeout(command.documentId)
-        break
-      }
-      case "cmd-sync-succeeded": {
-        const handle = this.#services.getDoc(command.documentId)
 
-        switch (command.transmission.type) {
-          case "snapshot":
-          case "update":
-          case "update-with-version":
-            handle.applySyncMessage(command.transmission.data)
-        }
+      // (utility): A command that sends a dispatch back into the program message loop
+      case "cmd/dispatch": {
+        this.#dispatch(command.dispatch)
+        break
+      }
 
-        if (command.requestId !== undefined) {
-          this.#networkRequestTracker.resolve(command.requestId, handle.doc)
-        }
-        break
-      }
-      case "cmd-sync-failed": {
-        if (command.requestId !== undefined) {
-          this.#networkRequestTracker.resolve(command.requestId, null) // Resolve with null on failure
-        }
-        break
-      }
-      case "cmd-batch": {
+      // (utility): A command that executes a batch of commands
+      case "cmd/batch": {
         for (const cmd of command.commands) {
           this.#executeCommand(cmd)
         }
         break
       }
+
+      // (utility): A command that logs a message
+      case "cmd/log": {
+        this.logger.info(command.message)
+      }
     }
   }
 
-  #clearTimeout(documentId: DocumentId) {
-    const timeout = this.#timeouts.get(documentId)
+  #executeStartChannel(channel: Channel) {
+    // 0. At this point, we can rely on the fact that the model.channels Map contains the channel
+    if (!this.model.channels.has(channel.channelId)) {
+      this.logger.error(`can't start missing channel`, {
+        channel: channel.channelId,
+      })
+      return
+    }
 
-    if (!timeout) return
+    // 1. Time to initialize a new channel!
+    // - we need to do so inside an effect, because we need access to #dispatch
+    channel.start(message => {
+      // Whenever we receive a message from the channel, dispatch it to our synchronizer-program
+      this.#dispatch({
+        type: "msg/channel-receive-message",
+        envelope: {
+          fromChannelId: channel.channelId,
+          message,
+        },
+      })
+    })
 
-    clearTimeout(timeout)
-    this.#timeouts.delete(documentId)
+    // 2. Initiate a request to establish a shared doc for the channel
+    this.adapters.send({
+      toChannelIds: [channel.channelId],
+      message: {
+        type: "channel/establish-request",
+        identity: this.identity,
+        requesterPublishDocId: channel.publishDocId,
+      },
+    })
   }
 
-  public clearAllTimeouts() {
-    for (const documentId of this.#timeouts.keys()) {
-      this.#clearTimeout(documentId)
+  async #executeSendSyncResponse(
+    docId: DocId,
+    requesterDocVersion: VersionVector,
+    toChannelId: ChannelId,
+  ) {
+    const docState = this.model.documents.get(docId)
+    if (!docState) {
+      this.logger.warn(`can't get doc-state, doc not found`, { docId })
+      return
     }
+
+    const toChannel = docState.channelState.get(toChannelId)
+    if (!toChannel) {
+      this.logger.warn(`can't send sync-response, channel doesn't exist`, {
+        toChannelId,
+      })
+      return
+    }
+
+    // Export the document data to send as sync response
+    const data = docState.doc.export({
+      mode: "update",
+      from: requesterDocVersion,
+    })
+
+    // const version = docState.doc.version()
+
+    this.logger.debug(
+      "sending sync-response due to execute-send-sync-response",
+      {
+        channelId: toChannelId,
+        docId,
+      },
+    )
+
+    this.adapters.send({
+      toChannelIds: [toChannelId],
+      message: {
+        type: "channel/sync-response",
+        docId,
+        hopCount: 0,
+        transmission: {
+          type: "update",
+          data,
+        },
+      },
+    })
+  }
+
+  #executeSubscribeLocalDoc(docId: DocId) {
+    const docState = this.model.documents.get(docId)
+    if (!docState) {
+      this.logger.warn(`can't get doc-state, doc not found`, { docId })
+      return
+    }
+
+    docState.doc.subscribeLocalUpdates(data => {
+      this.#dispatch({ type: "msg/local-doc-change", docId, data })
+    })
+  }
+
+  /**
+   * Create a special document to be shared between this repo and the channel
+   *
+   * The publishDoc contains information that the *channel* wants to share with
+   * this repo about the doc. In other words, from this repo's perspective the
+   * publishDoc is read-only (but this is not enforced right now).
+   */
+  #executeEstablishChannelDoc(channel: Channel) {
+    if (channel.peer.state !== "established") {
+      this.logger.warn(`can't establish channel doc for channel`, { channel })
+      return
+    }
+
+    const docId = channel.peer.consumeDocId
+
+    const docState = this.getOrCreateDocumentState(docId)
+
+    const metadata = docState.doc.getMap("metadata")
+
+    metadata.subscribe(event => {
+      for (const e of event.events) {
+        // TODO(duane): convert these events into updates to docState
+        this.logger.info(`shared-doc event`, {
+          path: e.path,
+          diff: e.diff,
+          docId,
+        })
+      }
+    })
   }
 
   public reset() {
-    const [initialModel] = programInit()
-    this.#model = initialModel
-    this.clearAllTimeouts()
+    const [initialModel] = programInit(this.model.identity)
+
+    // Disconnect all network adapters
+    this.adapters.reset()
+
+    this.model = initialModel
   }
 
   /**
@@ -292,6 +451,6 @@ export class Synchronizer {
    * Returns a deep copy to prevent accidental mutations.
    */
   public getModelSnapshot(): SynchronizerModel {
-    return create(this.#model)[0]
+    return create(this.model)[0]
   }
 }

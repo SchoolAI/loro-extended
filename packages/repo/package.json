@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
+    "@logtape/logtape": "^1.1.1",
     "@loro-extended/change": "workspace:^",
     "emittery": "^1.0.1",
     "mutative": "^1.2.0",
@@ -36,10 +37,13 @@
     "loro-crdt": "^1.5.9"
   },
   "devDependencies": {
+    "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.12.12",
     "@types/uuid": "^9.0.8",
+    "lodash-es": "^4.17.21",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "zod": "^4.1.4"
   }
 }

@@ -1,4 +1,4 @@
-import { NetworkAdapter, type NetMsg, type PeerId } from "@loro-extended/repo"
+import { NetworkAdapter, type ChannelMsg, type PeerId } from "@loro-extended/repo"
 import type { Request, Response, Router } from "express"
 import express from "express"
 
@@ -30,7 +30,7 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
   }
 
   /** The NetworkSubsystem will call this method to send a message to a peer. */
-  async send(message: NetMsg): Promise<void> {
+  async send(message: ChannelMsg): Promise<void> {
     for (const targetId of message.targetIds) {
       const clientRes = this.#clients.get(targetId)
       if (clientRes) {
@@ -58,7 +58,7 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
     // Endpoint for clients to send messages TO the server.
     router.post("/sync", (req, res) => {
       const serializedMessage = req.body
-      const message = this.#deserializeMessage(serializedMessage) as NetMsg
+      const message = this.#deserializeMessage(serializedMessage) as ChannelMsg
 
       // Forward the message to the repo
       this.messageReceived(message)

@@ -57,7 +57,7 @@ export interface DocHandleServices<T extends DocContent> {
 
 ```typescript
 export type SaveToStorageCommand<T extends DocContent> = {
-  type: "cmd-save-to-storage";
+  type: "cmd/save-to-storage";
   documentId: DocumentId;
   doc: LoroDoc<T>;
   event: LoroEventBatch;
@@ -73,7 +73,7 @@ export type SaveToStorageCommand<T extends DocContent> = {
 ### Step 4: Update DocHandle Command Executor
 
 ```typescript
-case "cmd-save-to-storage": {
+case "cmd/save-to-storage": {
   if (!this.#services.saveToStorage) {
     // Storage is optional - just log if not provided
     console.debug("No saveToStorage service provided, skipping save")

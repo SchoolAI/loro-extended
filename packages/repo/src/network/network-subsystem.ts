@@ -1,13 +1,13 @@
 import Emittery from "emittery"
 import { type Result, withTimeout } from "src/utils/with-timeout.js"
-import type { PeerId } from "../types.js"
+import type { ChannelId } from "../types.js"
 import type { NetworkAdapter, NetworkAdapterEvents } from "./network-adapter.js"
-import type { AddressedNetMsg } from "./network-messages.js"
+import type { AddressedChannelMsg } from "../channel.js"
 
 type UnsubscribeFunction = () => void
 
 export type NetworkSubsystemServices = {
-  isPeerConnected: (peerId: PeerId) => boolean
+  isPeerConnected: (peerId: ChannelId) => boolean
 }
 
 /**
@@ -16,7 +16,7 @@ export type NetworkSubsystemServices = {
  * NetworkSubsystem, and messages to a peer are sent via the `send` method.
  */
 export class NetworkSubsystem extends Emittery<NetworkAdapterEvents> {
-  #peerId: PeerId
+  #peerId: ChannelId
   #adapters: NetworkAdapter[]
   #services: NetworkSubsystemServices
   #unsubscribeFunctions = new Map<NetworkAdapter, UnsubscribeFunction[]>()
@@ -26,7 +26,7 @@ export class NetworkSubsystem extends Emittery<NetworkAdapterEvents> {
     adapters,
     services,
   }: {
-    peerId: PeerId
+    peerId: ChannelId
     adapters: NetworkAdapter[]
     services: NetworkSubsystemServices
   }) {
@@ -65,7 +65,7 @@ export class NetworkSubsystem extends Emittery<NetworkAdapterEvents> {
     adapter.markAsReady()
   }
 
-  async send(message: AddressedNetMsg): Promise<void> {
+  async send(message: AddressedChannelMsg): Promise<void> {
     // Filter targetIds based on connectivity and permissions
     const filteredTargetIds = message.targetIds.filter(targetId => {
       // Check if peer is connected
