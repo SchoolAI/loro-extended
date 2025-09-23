@@ -120,13 +120,13 @@ function isRequestingFromNetwork(docState: DocumentState): boolean {
 
 ```typescript
 type Command = 
-  | { type: "cmd-load-from-source"; documentId: DocumentId; sourceId: string }
-  | { type: "cmd-save-to-source"; documentId: DocumentId; sourceId: string }
-  | { type: "cmd-request-from-sources"; documentId: DocumentId; sourceIds: string[] }
-  | { type: "cmd-send-message"; message: AddressedNetMsg }
-  | { type: "cmd-set-timeout"; documentId: DocumentId; duration: number }
-  | { type: "cmd-clear-timeout"; documentId: DocumentId }
-  | { type: "cmd-batch"; commands: Command[] }
+  | { type: "cmd/load-from-source"; documentId: DocumentId; sourceId: string }
+  | { type: "cmd/save-to-source"; documentId: DocumentId; sourceId: string }
+  | { type: "cmd/request-from-sources"; documentId: DocumentId; sourceIds: string[] }
+  | { type: "cmd/send-message"; message: AddressedChannelMsg }
+  | { type: "cmd/set-timeout"; documentId: DocumentId; duration: number }
+  | { type: "cmd/clear-timeout"; documentId: DocumentId }
+  | { type: "cmd/batch"; commands: Command[] }
 ```
 
 ### Phase 3: Data Source Coordination
@@ -194,7 +194,7 @@ function setupDocumentSubscriptions(docState: DocumentState, synchronizer: Synch
     // Handle doc changes, trigger storage saves
     if (event.by === "local" || event.by === "import") {
       synchronizer.#dispatch({
-        type: "msg-document-changed",
+        type: "msg/document-changed",
         documentId: docState.documentId,
         event
       })
@@ -204,7 +204,7 @@ function setupDocumentSubscriptions(docState: DocumentState, synchronizer: Synch
   docState.doc.subscribeLocalUpdates(syncMessage => {
     // Emit for network synchronization
     synchronizer.#dispatch({
-      type: "msg-local-change",
+      type: "msg/local-doc-change",
       documentId: docState.documentId,
       data: syncMessage
     })
@@ -350,13 +350,13 @@ class Synchronizer {
     let handle = this.#handles.get(documentId)
     if (!handle) {
       // Dispatch message to create document state in the model
-      this.#dispatch({ type: "msg-document-added", documentId })
+      this.#dispatch({ type: "msg/document-added", documentId })
       
       handle = new DocHandle<T>(this, documentId)
       this.#handles.set(documentId, handle)
       
       // Auto-load from storage using clipped logic
-      this.#executeCommand({ type: "cmd-load-from-source", documentId, sourceId: "default" })
+      this.#executeCommand({ type: "cmd/load-from-source", documentId, sourceId: "default" })
     }
     return handle as DocHandle<T>
   }
@@ -386,7 +386,7 @@ class Synchronizer {
 
   updateDocumentPeerStatus(documentId: DocumentId, peerId: PeerId, status: Partial<DocPeerStatus>): void {
     this.#dispatch({
-      type: "msg-update-peer-status",
+      type: "msg/update-doc-channel-state",
       documentId,
       peerId,
       status
@@ -395,14 +395,14 @@ class Synchronizer {
 
   // Network protocol methods (existing)
   addPeer(peerId: PeerId): void {
-    this.#dispatch({ type: "msg-peer-added", peerId })
+    this.#dispatch({ type: "msg/channel-added", peerId })
   }
 
   removePeer(peerId: PeerId): void {
-    this.#dispatch({ type: "msg-peer-removed", peerId })
+    this.#dispatch({ type: "msg/channel-removed", peerId })
   }
 
-  handleRepoMessage(message: NetMsg): void {
+  handleRepoMessage(message: ChannelMsg): void {
     // Existing network message handling
   }
 
@@ -422,10 +422,10 @@ class Synchronizer {
   #executeCommand(command: Command): void {
     // Enhanced command execution with clipped logic integration
     switch (command.type) {
-      case "cmd-load-from-source":
+      case "cmd/load-from-source":
         this.#executeLoadFromSource(command.documentId, command.sourceId)
         break
-      case "cmd-save-to-source":
+      case "cmd/save-to-source":
         this.#executeSaveToSource(command.documentId, command.sourceId)
         break
       // ... other commands
@@ -479,9 +479,9 @@ class Synchronizer {
 
 **New Messages**:
 ```typescript
-| { type: "msg-update-peer-status"; documentId: DocumentId; peerId: PeerId; status: Partial<DocPeerStatus> }
-| { type: "msg-document-changed"; documentId: DocumentId; event: LoroEventBatch }
-| { type: "msg-ready-state-changed"; documentId: DocumentId; sourceId: string; readyState: ReadyState }
+| { type: "msg/update-doc-channel-state"; documentId: DocumentId; peerId: PeerId; status: Partial<DocPeerStatus> }
+| { type: "msg/document-changed"; documentId: DocumentId; event: LoroEventBatch }
+| { type: "msg/doc-channel-state-changed"; documentId: DocumentId; sourceId: string; readyState: ReadyState }
 ```
 
 **Simplified Commands**:
@@ -563,5 +563,5 @@ async waitUntilReady<T extends DocContent>(
 
 **Next Steps**:
 - Ensure `ready-state-changed` events are emitted from both storage and network operations
-- The `#executeLoadFromSource` method should dispatch `msg-ready-state-changed` after updating ready states
+- The `#executeLoadFromSource` method should dispatch `msg-doc-channel-state-changed` after updating ready states
 - Network sync operations should also emit these events when they complete

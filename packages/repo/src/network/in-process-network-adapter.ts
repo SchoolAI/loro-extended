@@ -1,12 +1,12 @@
 import Emittery from "emittery"
-import type { PeerId } from "../types.js"
+import type { ChannelId } from "../types.js"
 import { NetworkAdapter } from "./network-adapter.js"
-import type { NetMsg } from "./network-messages.js"
+import type { ChannelMsg } from "../channel.js"
 
 interface InProcessBridgeEvents {
-  "peer-added": { peerId: PeerId; metadata: any }
-  "peer-removed": { peerId: PeerId }
-  message: { message: NetMsg }
+  "peer-added": { peerId: ChannelId; metadata: any }
+  "peer-removed": { peerId: ChannelId }
+  message: { message: ChannelMsg }
 }
 
 /**
@@ -14,7 +14,7 @@ interface InProcessBridgeEvents {
  * This enables direct message passing between adapters for testing purposes.
  */
 export class InProcessBridge extends Emittery<InProcessBridgeEvents> {
-  readonly #adapters = new Map<PeerId, InProcessNetworkAdapter>()
+  readonly #adapters = new Map<ChannelId, InProcessNetworkAdapter>()
 
   /**
    * Register an adapter with this bridge
@@ -28,42 +28,42 @@ export class InProcessBridge extends Emittery<InProcessBridgeEvents> {
   /**
    * Remove an adapter from this bridge
    */
-  removeAdapter(peerId: PeerId): void {
+  removeAdapter(peerId: ChannelId): void {
     this.#adapters.delete(peerId)
   }
 
   /**
    * Send a message through the bridge
    */
-  send(message: NetMsg): void {
+  send(message: ChannelMsg): void {
     this.emit("message", { message })
   }
 
   /**
    * Broadcast that a peer has been added to the network
    */
-  peerAdded(peerId: PeerId, metadata: any): void {
+  peerAdded(peerId: ChannelId, metadata: any): void {
     this.emit("peer-added", { peerId, metadata })
   }
 
   /**
    * Broadcast that a peer has been removed from the network
    */
-  peerRemoved(peerId: PeerId): void {
+  peerRemoved(peerId: ChannelId): void {
     this.emit("peer-removed", { peerId })
   }
 
   /**
    * Get all peer IDs currently in the network
    */
-  get peerIds(): Set<PeerId> {
+  get peerIds(): Set<ChannelId> {
     return new Set(this.#adapters.keys())
   }
 
   /**
    * Get the metadata for a peer
    */
-  getPeerMetadata(peerId: PeerId): any {
+  getPeerMetadata(peerId: ChannelId): any {
     const adapter = this.#adapters.get(peerId)
     return adapter?.metadata
   }
@@ -103,7 +103,7 @@ export class InProcessNetworkAdapter extends NetworkAdapter {
   readonly #bridge: InProcessBridge
   #bridgeUnsubscribes: (() => void)[] = []
 
-  peerId?: PeerId
+  peerId?: ChannelId
   metadata: any
 
   constructor(bridge: InProcessBridge) {
@@ -115,7 +115,7 @@ export class InProcessNetworkAdapter extends NetworkAdapter {
    * Start participating in the in-process network.
    * Registers this adapter with the bridge and begins listening for network events.
    */
-  async start(peerId: PeerId, metadata: any = {}): Promise<void> {
+  async start(peerId: ChannelId, metadata: any = {}): Promise<void> {
     this.peerId = peerId
     this.metadata = metadata
     this.#bridge.addAdapter(this)
@@ -171,7 +171,7 @@ export class InProcessNetworkAdapter extends NetworkAdapter {
    * Send a message to peers via the bridge.
    * The bridge will route the message to the appropriate recipients.
    */
-  async send(message: NetMsg): Promise<void> {
+  async send(message: ChannelMsg): Promise<void> {
     this.#bridge.send(message)
   }
 

@@ -1,6 +1,6 @@
-import type { DocumentId, PeerId } from "./types.js"
+import type { DocId, ChannelId } from "./types.js"
 
-export interface PermissionAdapter {
+export interface PermissionManager {
   /**
    * Determines if this repo can share the existence of a document with a remote
    * peer. This is called when we first connect to a peer, and any time a new
@@ -11,7 +11,7 @@ export interface PermissionAdapter {
    * @param documentId The ID of the document in question.
    * @returns `true` if listing the document is permitted, `false` otherwise.
    */
-  canList(peerId: PeerId, documentId: DocumentId): boolean
+  canList(peerId: ChannelId, documentId: DocId): boolean
 
   /**
    * Determines if we should accept a sync message from a remote peer for a
@@ -22,7 +22,7 @@ export interface PermissionAdapter {
    * @param documentId The ID of the document being changed.
    * @returns `true` if writing is permitted, `false` otherwise.
    */
-  canWrite(peerId: PeerId, documentId: DocumentId): boolean
+  canWrite(peerId: ChannelId, documentId: DocId): boolean
 
   /**
    * Determines if a peer is allowed to delete a document.
@@ -31,14 +31,14 @@ export interface PermissionAdapter {
    * @param documentId The ID of the document to be deleted.
    * @returns `true` if deletion is permitted, `false` otherwise.
    */
-  canDelete(peerId: PeerId, documentId: DocumentId): boolean
+  canDelete(peerId: ChannelId, documentId: DocId): boolean
 }
 
 const defaultPermission = () => true
 
 export function createPermissions(
-  permissions: Partial<PermissionAdapter> = {},
-): PermissionAdapter {
+  permissions: Partial<PermissionManager> = {},
+): PermissionManager {
   return {
     canList: permissions?.canList ?? defaultPermission,
     canWrite: permissions?.canWrite ?? defaultPermission,

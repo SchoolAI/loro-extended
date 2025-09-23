@@ -2,30 +2,29 @@ import Emittery, {
   type OmnipresentEventData,
   type UnsubscribeFunction,
 } from "emittery"
-import type { PeerId } from "../types.js"
-import type { NetMsg } from "./network-messages.js"
+import type { ChannelId } from "../types.js"
+import type { ChannelMsg } from "../channel.js"
 
-// biome-ignore lint/suspicious/noExplicitAny: Allow untyped data for custom adapters
-export type PeerMetadata = any
+export type PeerMetadata = object
 
 export interface NetworkAdapterEvents {
   /**
    * A peer has connected or become available for communication.
    * The adapter must emit this when it discovers or accepts a new peer.
    */
-  "peer-available": { peerId: PeerId; metadata: PeerMetadata }
+  "peer-available": { peerId: ChannelId; metadata: PeerMetadata }
 
   /**
    * A peer has disconnected and is no longer available.
    * The adapter must emit this to allow the Repo to clean up resources.
    */
-  "peer-disconnected": { peerId: PeerId }
+  "peer-disconnected": { peerId: ChannelId }
 
   /**
    * A message was received from a peer.
    * The adapter must emit this for all incoming messages.
    */
-  "message-received": { message: NetMsg }
+  "message-received": { message: ChannelMsg }
 }
 
 /**
@@ -122,7 +121,7 @@ export abstract class NetworkAdapter {
    * so that another adapter can potentially be given an opportunity to try to
    * deliver to the target.
    */
-  abstract send(message: NetMsg): Promise<void>
+  abstract send(message: ChannelMsg): Promise<void>
 
   /**
    * Activate this network adapter.
@@ -136,7 +135,7 @@ export abstract class NetworkAdapter {
    * This method must initialize all event-based communication for this peer,
    * and call `this.peerAvailable()` for all discovered or connecting peers.
    */
-  abstract start(peerId: PeerId, metadata?: PeerMetadata): Promise<void>
+  abstract start(peerId: ChannelId, metadata?: PeerMetadata): Promise<void>
 
   /**
    * Disconnect from the network.
@@ -151,7 +150,7 @@ export abstract class NetworkAdapter {
    * Report that a peer is available for communication.
    * Subclasses MUST call this when they discover or accept a new peer.
    */
-  protected peerAvailable(peerId: PeerId, metadata: PeerMetadata): void {
+  protected peerAvailable(peerId: ChannelId, metadata: PeerMetadata): void {
     this.emitEvent("peer-available", { peerId, metadata })
   }
 
@@ -159,7 +158,7 @@ export abstract class NetworkAdapter {
    * Report that a peer has disconnected.
    * Subclasses MUST call this when a peer is no longer available.
    */
-  protected peerDisconnected(peerId: PeerId): void {
+  protected peerDisconnected(peerId: ChannelId): void {
     this.emitEvent("peer-disconnected", { peerId })
   }
 
@@ -167,7 +166,7 @@ export abstract class NetworkAdapter {
    * Report that a message was received from a peer.
    * Subclasses MUST call this for all incoming messages.
    */
-  protected messageReceived(message: NetMsg): void {
+  protected messageReceived(message: ChannelMsg): void {
     this.emitEvent("message-received", { message })
   }
 }

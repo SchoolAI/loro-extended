@@ -23,15 +23,15 @@ When Browser A makes a change:
 We modified the synchronizer to forward received sync messages to other aware peers:
 
 ```typescript
-case "msg-received-sync": {
+case "msg/received-sync": {
   // Apply the sync locally
-  commands.push({ type: "cmd-sync-succeeded", ... })
+  commands.push({ type: "cmd/sync-succeeded", ... })
   
   // Forward to other aware peers (excluding sender)
   const forwardTargets = [...awarePeers].filter(peerId => peerId !== from)
   if (forwardTargets.length > 0) {
     commands.push({
-      type: "cmd-send-message",
+      type: "cmd/send-message",
       message: { type: "sync", targetIds: forwardTargets, ... }
     })
   }

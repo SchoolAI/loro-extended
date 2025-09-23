@@ -18,13 +18,13 @@ We solved this by implementing the "Host-as-Orchestrator" pattern. The `DocHandl
     *   Generates a unique `RequestId` (using `uuid`).
     *   Creates a new `Promise` and stores its `resolve` and `reject` functions in a private map (`#pendingRequests`), keyed by the `RequestId`.
 
-2.  **Dispatch**: The host dispatches the initial `Message` (e.g., `{ type: "msg-find" }`) to the **pure program**, including the `RequestId`.
+2.  **Dispatch**: The host dispatches the initial `Message` (e.g., `{ type: "msg/find" }`) to the **pure program**, including the `RequestId`.
 
 3.  **State Machine Logic**: The pure program (`doc-handle-program.ts`) is now aware of `RequestId`. Its `Model` was updated to store the `RequestId` in its loading states (e.g., `StorageLoadingState`, `NetworkLoadingState`). The program proceeds through its states as before, but it now "remembers" which request initiated the current sequence of operations.
 
 4.  **Terminal State & Reporting**: When the program reaches a terminal state for the request (e.g., the document is `ready` or `unavailable`), its `update` function issues a new type of `Command`:
-    *   `{ type: "cmd-report-success", requestId: "...", payload: doc }`
-    *   `{ type: "cmd-report-failure", requestId: "...", error: new Error(...) }`
+    *   `{ type: "cmd/report-success", requestId: "...", payload: doc }`
+    *   `{ type: "cmd/report-failure", requestId: "...", error: new Error(...) }`
 
 5.  **Promise Resolution**: The host's `#executeCommand` method handles these new commands. It looks up the `RequestId` in its `#pendingRequests` map and calls the corresponding `resolve` or `reject` function, thus fulfilling the promise that the original caller is awaiting. The completed request is then deleted from the map to prevent memory leaks.
 

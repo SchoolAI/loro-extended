@@ -32,7 +32,7 @@ export function useDocHandleState(documentId: DocumentId) {
 
   // Handle lifecycle management
   useEffect(() => {
-    repo.findOrCreate<DocWrapper>(documentId).then(setHandle)
+    repo.get<DocWrapper>(documentId).then(setHandle)
   }, [repo, documentId])
 
   // Event subscription management

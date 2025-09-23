@@ -27,7 +27,7 @@ describe("Repo", () => {
     })
 
     // Repo 1 creates a document
-    const handle1 = repo1.create()
+    const handle1 = repo1.get(crypto.randomUUID())
     expect(handle1.doc).toBeDefined()
 
     // Mutate the document
@@ -37,10 +37,9 @@ describe("Repo", () => {
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
 
     // Repo 2 finds the document and waits for network sync
-    const handle2 = await repo2.findAndWait(handle1.documentId, {
-      waitForNetwork: true,
-      timeout: 1000,
-    })
+    const handle2 = repo2.get(handle1.docId)
+    await handle2.waitForNetwork()
+
     expect(handle2.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
 
     // Mutate the document from repo 2
@@ -76,15 +75,13 @@ describe("Repo", () => {
       network: [new InProcessNetworkAdapter(bridge)],
     })
 
-    const handle1 = repo1.create()
-    
+    const handle1 = repo1.get(crypto.randomUUID())
+
     // Wait for network connections to establish
     await vi.advanceTimersByTimeAsync(100)
-    
-    const handle2 = await repo2.findAndWait(handle1.documentId, {
-      waitForNetwork: true,
-      timeout: 1000,
-    })
+
+    const handle2 = repo2.get(handle1.docId)
+    await handle2.waitForNetwork()
 
     // A change from a permitted peer should be applied
     handle2.change(doc => {
@@ -115,22 +112,20 @@ describe("Repo", () => {
     })
     const repo2 = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
-    const handle1 = repo1.create()
-    
+    const handle1 = repo1.get(crypto.randomUUID())
+
     // Wait for network connections to establish
     await vi.advanceTimersByTimeAsync(100)
-    
-    const handle2 = await repo2.findAndWait(handle1.documentId, {
-      waitForNetwork: true,
-      timeout: 1000,
-    })
 
-    await repo2.delete(handle1.documentId)
+    const handle2 = repo2.get(handle1.docId)
+    await handle2.waitForNetwork()
+
+    await repo2.delete(handle1.docId)
 
     await vi.advanceTimersByTimeAsync(100)
 
     // The document should still exist in repo1
-    expect(repo1.handles.has(handle1.documentId)).toBe(true)
+    expect(repo1.handles.has(handle1.docId)).toBe(true)
   })
 
   describe("canList permission", () => {
@@ -148,8 +143,8 @@ describe("Repo", () => {
         network: [new InProcessNetworkAdapter(bridge)],
         permissions: { canList: () => true },
       })
-      const handle1 = repoA.create()
-      const handle2 = repoA.create()
+      const handle1 = repoA.get(crypto.randomUUID())
+      const handle2 = repoA.get(crypto.randomUUID())
 
       repoB = new Repo({
         peerId: "repoB",
@@ -159,11 +154,11 @@ describe("Repo", () => {
       // Wait for the repos to connect and exchange messages
       await vi.runAllTimersAsync()
 
-      expect(repoB.handles.has(handle1.documentId)).toBe(true)
-      expect(repoB.handles.has(handle2.documentId)).toBe(true)
+      expect(repoB.handles.has(handle1.docId)).toBe(true)
+      expect(repoB.handles.has(handle2.docId)).toBe(true)
 
-      const bHandle1 = repoB.find(handle1.documentId)
-      const bHandle2 = repoB.find(handle2.documentId)
+      const bHandle1 = repoB.get(handle1.docId)
+      const bHandle2 = repoB.get(handle2.docId)
 
       expect(bHandle1.doc).toBeDefined()
       expect(bHandle2.doc).toBeDefined()
@@ -176,7 +171,7 @@ describe("Repo", () => {
       })
       repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
-      repoA.create() // Create a document that will not be announced
+      repoA.get(crypto.randomUUID()) // Create a document that will not be announced
       await vi.runAllTimersAsync()
 
       // B should not know about the doc, because it was not announced
@@ -190,7 +185,7 @@ describe("Repo", () => {
       })
       repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
-      const handleA = repoA.create()
+      const handleA = repoA.get(crypto.randomUUID())
       handleA.change(doc => {
         doc.getMap("doc").set("text", "hello")
       })
@@ -199,10 +194,8 @@ describe("Repo", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // B explicitly requests the document. It should succeed.
-      const handleB = await repoB.findAndWait(handleA.documentId, {
-        waitForNetwork: true,
-        timeout: 1000,
-      })
+      const handleB = repoB.get(handleA.docId)
+      await handleB.waitForNetwork()
 
       expect(handleB.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
     })
@@ -220,9 +213,9 @@ describe("Repo", () => {
         network: [new InProcessNetworkAdapter(bridge)],
       })
 
-      repoA.create({ documentId: "allowed-doc-1" })
-      repoA.create({ documentId: "denied-doc-1" })
-      repoA.create({ documentId: "allowed-doc-2" })
+      repoA.get("allowed-doc-1")
+      repoA.get("denied-doc-1")
+      repoA.get("allowed-doc-2")
       await vi.runAllTimersAsync()
 
       expect(repoB.handles.size).toBe(2)
@@ -246,7 +239,7 @@ describe("Repo", () => {
       })
 
       const documentId = "persistent-doc"
-      const handle1 = repo1.create({ documentId })
+      const handle1 = repo1.get(documentId)
 
       // Add some content
       handle1.change(doc => {
@@ -269,10 +262,8 @@ describe("Repo", () => {
       })
 
       // Try to find the document - it should load from storage
-      const handle2 = await repo2.findAndWait(documentId, {
-        waitForStorage: true,
-        timeout: 1000,
-      })
+      const handle2 = repo2.get(documentId)
+      await handle2.waitForStorage()
 
       // Verify the document was loaded correctly
       const root2 = handle2.doc.getMap("doc")
@@ -299,7 +290,7 @@ describe("Repo", () => {
       })
 
       const documentId = "incremental-doc"
-      const handle1 = repo1.create({ documentId })
+      const handle1 = repo1.get(documentId)
 
       handle1.change(doc => {
         const root = doc.getMap("doc")
@@ -315,10 +306,8 @@ describe("Repo", () => {
         storage,
       })
 
-      const handle2 = await repo2.findAndWait(documentId, {
-        waitForStorage: true,
-        timeout: 1000,
-      })
+      const handle2 = repo2.get(documentId)
+      await handle2.waitForStorage()
 
       // Verify initial content loaded from storage
       const root2 = handle2.doc.getMap("doc")
@@ -339,10 +328,8 @@ describe("Repo", () => {
         storage,
       })
 
-      const handle3 = await repo3.findAndWait(documentId, {
-        waitForStorage: true,
-        timeout: 1000,
-      })
+      const handle3 = repo3.get(documentId)
+      await handle3.waitForStorage()
 
       const root3 = handle3.doc.getMap("doc")
       expect(root3.get("items")).toEqual(["item1", "item2", "item3"])
@@ -365,7 +352,7 @@ describe("Repo", () => {
       })
 
       const documentId = "updates-only-doc"
-      const handle1 = repo1.create({ documentId })
+      const handle1 = repo1.get(documentId)
 
       handle1.change(doc => {
         const root = doc.getMap("doc")
@@ -389,7 +376,8 @@ describe("Repo", () => {
       })
 
       // Use findOrCreate with timeout 0 to immediately check storage
-      const handle2 = await repo2.findOrCreate(documentId, { timeout: 100 })
+      const handle2 = repo2.get(documentId)
+      await handle2.waitForStorage()
 
       // The document should be ready and have the expected content
       const root2 = handle2.doc.getMap("doc")
@@ -409,7 +397,7 @@ describe("Repo", () => {
       })
 
       const documentId = "complex-doc"
-      const handle1 = repo1.create({ documentId })
+      const handle1 = repo1.get(documentId)
 
       // Create a complex nested structure
       handle1.change(doc => {
@@ -457,10 +445,8 @@ describe("Repo", () => {
         storage,
       })
 
-      const handle2 = await repo2.findAndWait(documentId, {
-        waitForStorage: true,
-        timeout: 1000,
-      })
+      const handle2 = repo2.get(documentId)
+      await handle2.waitForStorage()
 
       // Verify complex structure is preserved
       const root2 = handle2.doc.getMap("doc")

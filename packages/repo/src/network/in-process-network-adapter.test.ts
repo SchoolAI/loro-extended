@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { PeerId } from "../types.js"
+import type { ChannelId } from "../types.js"
 import {
   InProcessBridge,
   InProcessNetworkAdapter,
 } from "./in-process-network-adapter.js"
-import type { NetMsgDirectoryRequest } from "./network-messages.js"
+import type { ChannelMsgDirectoryRequest } from "../channel.js"
 
 describe("InProcessNetworkAdapter", () => {
   let bridge: InProcessBridge
@@ -14,8 +14,8 @@ describe("InProcessNetworkAdapter", () => {
   })
 
   it("should allow two peers to connect and exchange messages", async () => {
-    const peer1Id: PeerId = "peer1"
-    const peer2Id: PeerId = "peer2"
+    const peer1Id: ChannelId = "peer1"
+    const peer2Id: ChannelId = "peer2"
 
     const adapter1 = new InProcessNetworkAdapter(bridge)
     const adapter2 = new InProcessNetworkAdapter(bridge)
@@ -35,8 +35,8 @@ describe("InProcessNetworkAdapter", () => {
     // Verify peers are connected in the peer state manager
     expect(bridge.peerIds).toEqual(new Set([peer1Id, peer2Id]))
 
-    const message: NetMsgDirectoryRequest = {
-      type: "directory-request",
+    const message: ChannelMsgDirectoryRequest = {
+      type: "channel/directory-request",
       senderId: peer1Id,
       targetIds: [peer2Id],
     }
@@ -49,13 +49,13 @@ describe("InProcessNetworkAdapter", () => {
 
   it("should handle sending messages to non-existent peers gracefully", async () => {
     const adapter = new InProcessNetworkAdapter(bridge)
-    const peerId: PeerId = "peer1"
-    const nonExistentPeerId: PeerId = "non-existent"
+    const peerId: ChannelId = "peer1"
+    const nonExistentPeerId: ChannelId = "non-existent"
 
     adapter.start(peerId)
 
-    const message: NetMsgDirectoryRequest = {
-      type: "directory-request",
+    const message: ChannelMsgDirectoryRequest = {
+      type: "channel/directory-request",
       senderId: peerId,
       targetIds: [nonExistentPeerId],
     }
@@ -77,10 +77,10 @@ describe("InProcessNetworkAdapter", () => {
     adapter3.on("message-received", messageMock3)
     adapter4.on("message-received", messageMock4)
 
-    const peer1Id: PeerId = "peer1"
-    const peer2Id: PeerId = "peer2"
-    const peer3Id: PeerId = "peer3"
-    const peer4Id: PeerId = "peer4"
+    const peer1Id: ChannelId = "peer1"
+    const peer2Id: ChannelId = "peer2"
+    const peer3Id: ChannelId = "peer3"
+    const peer4Id: ChannelId = "peer4"
 
     adapter1.start(peer1Id)
     adapter2.start(peer2Id)
@@ -92,8 +92,8 @@ describe("InProcessNetworkAdapter", () => {
     adapter3.markAsReady()
     adapter4.markAsReady()
 
-    const message: NetMsgDirectoryRequest = {
-      type: "directory-request",
+    const message: ChannelMsgDirectoryRequest = {
+      type: "channel/directory-request",
       senderId: peer1Id,
       targetIds: [peer2Id, peer3Id],
     }
@@ -109,12 +109,12 @@ describe("InProcessNetworkAdapter", () => {
 
   it("should handle sending a message with empty target IDs array", async () => {
     const adapter = new InProcessNetworkAdapter(bridge)
-    const peerId: PeerId = "peer1"
+    const peerId: ChannelId = "peer1"
 
     adapter.start(peerId)
 
-    const message: NetMsgDirectoryRequest = {
-      type: "directory-request",
+    const message: ChannelMsgDirectoryRequest = {
+      type: "channel/directory-request",
       senderId: peerId,
       targetIds: [],
     }
