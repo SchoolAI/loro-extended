@@ -148,17 +148,59 @@ For production use, see `@loro-extended/adapters`:
 - **IndexedDB Adapter**: Browser-based persistent storage
 - **LevelDB Adapter**: Node.js persistent storage
 
-### Custom Adapters
+### Custom Storage Adapters
 
-Create custom adapters by extending the [`Adapter`](./src/adapter/adapter.ts) class:
+Create custom storage adapters by extending the [`StorageAdapter`](./src/storage/storage-adapter.ts) base class. The base class handles all channel communication automatically - you only need to implement simple storage operations:
+
+```typescript
+import { StorageAdapter, type StorageKey, type Chunk } from "@loro-extended/repo";
+
+class MyStorageAdapter extends StorageAdapter {
+  constructor() {
+    super({ adapterId: "my-storage" });
+  }
+
+  async load(key: StorageKey): Promise<Uint8Array | undefined> {
+    // Load data for the given key
+    // Key is an array of strings, e.g., ["docId"] or ["docId", "update", "v1"]
+  }
+
+  async save(key: StorageKey, data: Uint8Array): Promise<void> {
+    // Save data for the given key
+  }
+
+  async remove(key: StorageKey): Promise<void> {
+    // Remove data for the given key
+  }
+
+  async loadRange(keyPrefix: StorageKey): Promise<Chunk[]> {
+    // Load all chunks whose keys start with the given prefix
+    // Returns array of { key, data } objects
+  }
+
+  async removeRange(keyPrefix: StorageKey): Promise<void> {
+    // Remove all chunks whose keys start with the given prefix
+  }
+}
+```
+
+**Key Features:**
+- **No Channel Knowledge Required**: The base class handles all channel protocol details
+- **Automatic Establishment**: Storage is always "ready" - no connection handshake needed
+- **Version-Aware Sync**: Automatically reconstructs documents from incremental updates
+- **Hierarchical Keys**: Supports efficient incremental storage with keys like `["docId", "update", "v1"]`
+
+### Custom Network Adapters
+
+Create custom network adapters by extending the [`Adapter`](./src/adapter/adapter.ts) class:
 
 ```typescript
 import { Adapter, type BaseChannel } from "@loro-extended/repo";
 
-class CustomAdapter extends Adapter<MyContext> {
+class CustomNetworkAdapter extends Adapter<MyContext> {
   protected generate(context: MyContext): BaseChannel {
     return {
-      kind: "storage", // or "network" or "other"
+      kind: "network",
       adapterId: this.adapterId,
       send: (msg) => { /* send logic */ },
       start: (receive) => { /* start logic */ },

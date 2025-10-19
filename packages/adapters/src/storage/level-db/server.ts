@@ -1,12 +1,17 @@
-import type { Chunk, StorageAdapter, StorageKey } from "@loro-extended/repo"
+import {
+  StorageAdapter,
+  type Chunk,
+  type StorageKey,
+} from "@loro-extended/repo"
 import { ClassicLevel } from "classic-level"
 
 const KEY_SEP = "::"
 
-export class LevelDBStorageAdapter implements StorageAdapter {
+export class LevelDBStorageAdapter extends StorageAdapter {
   #db: ClassicLevel<string, Uint8Array>
 
   constructor(dbPath: string) {
+    super({ adapterId: `leveldb:${dbPath}` })
     this.#db = new ClassicLevel(dbPath, {
       valueEncoding: "binary",
     })

@@ -1,4 +1,8 @@
-import type { Chunk, StorageAdapter, StorageKey } from "@loro-extended/repo"
+import {
+  StorageAdapter,
+  type Chunk,
+  type StorageKey,
+} from "@loro-extended/repo"
 import { openDB, type IDBPDatabase } from "idb"
 
 const DB_NAME = "loro-todo-app"
@@ -6,10 +10,11 @@ const DB_VERSION = 1
 const STORE_NAME = "chunks"
 const KEY_SEP = "::"
 
-export class IndexedDBStorageAdapter implements StorageAdapter {
+export class IndexedDBStorageAdapter extends StorageAdapter {
   #dbPromise: Promise<IDBPDatabase>
 
   constructor() {
+    super({ adapterId: "indexeddb" })
     this.#dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {

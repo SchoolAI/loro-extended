@@ -3,6 +3,7 @@ import Emittery from "emittery"
 import type { VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
 import { v4 as uuid } from "uuid"
+import { AdapterManager } from "./adapter/adapter-manager.js"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import type { Channel } from "./channel.js"
 import { createPermissions, type Rules } from "./rules.js"
@@ -22,7 +23,6 @@ import type {
   PeerIdentityDetails,
   ReadyState,
 } from "./types.js"
-import { AdapterManager } from "./adapter/adapter-manager.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 

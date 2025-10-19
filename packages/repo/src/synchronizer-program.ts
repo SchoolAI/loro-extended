@@ -123,7 +123,7 @@ function createSynchronizerLogic(
   ): Command | undefined {
     if (msg.type !== "msg/channel-receive-message") {
       const detail = "data" in msg ? { ...msg, data: "[omitted]" } : msg
-      // logger.trace(msg.type, detail)
+      logger.trace(msg.type, detail)
     }
 
     switch (msg.type) {

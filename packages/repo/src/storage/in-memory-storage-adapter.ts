@@ -1,7 +1,15 @@
-import type { Chunk, StorageAdapter, StorageKey } from "./storage-adapter.js"
+import {
+  StorageAdapter,
+  type Chunk,
+  type StorageKey,
+} from "./storage-adapter.js"
 
-export class InMemoryStorageAdapter implements StorageAdapter {
+export class InMemoryStorageAdapter extends StorageAdapter {
   #data = new Map<string, Uint8Array>()
+
+  constructor() {
+    super({ adapterId: "in-memory" })
+  }
 
   async load(key: StorageKey): Promise<Uint8Array | undefined> {
     return this.#data.get(this.#keyToString(key))
