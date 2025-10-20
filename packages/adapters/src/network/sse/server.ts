@@ -1,72 +1,120 @@
-import { NetworkAdapter, type ChannelMsg, type PeerId } from "@loro-extended/repo"
+import {
+  Adapter,
+  type BaseChannel,
+  type Channel,
+  type ChannelId,
+  type ChannelMsg,
+  type PeerId,
+  type ReceiveFn,
+} from "@loro-extended/repo"
 import type { Request, Response, Router } from "express"
 import express from "express"
 
-export class SseServerNetworkAdapter extends NetworkAdapter {
-  #clients = new Map<PeerId, Response>()
-  #heartbeats = new Map<PeerId, NodeJS.Timeout>()
-  #heartbeatInterval = 30000 // 30 seconds
+export class SseServerNetworkAdapter extends Adapter<PeerId> {
+  private clients = new Map<PeerId, Response>()
+  private receiveFns = new Map<PeerId, ReceiveFn>()
+  private heartbeats = new Map<PeerId, NodeJS.Timeout>()
+  private channelsByPeer = new Map<PeerId, Channel>()
+  private addChannel?: (context: PeerId) => Channel
+  private removeChannel?: (channelId: ChannelId) => Channel | undefined
+  private heartbeatInterval = 30000 // 30 seconds
 
-  //
-  // NetworkAdapter implementation
-  //
-
-  async start() {
-    console.info("[SSE-ADAPTER] Started")
+  constructor() {
+    super({ adapterId: "sse-server" })
   }
 
-  async stop(): Promise<void> {
-    // Close all active client connections
-    this.#clients.forEach(res => {
-      res.end()
-    })
-    // Clear all heartbeats
-    this.#heartbeats.forEach(timeout => {
-      clearTimeout(timeout)
-    })
-    this.#heartbeats.clear()
-    this.#clients.clear()
-    console.log("[SSE-ADAPTER] Disconnected and all clients removed")
-  }
-
-  /** The NetworkSubsystem will call this method to send a message to a peer. */
-  async send(message: ChannelMsg): Promise<void> {
-    for (const targetId of message.targetIds) {
-      const clientRes = this.#clients.get(targetId)
-      if (clientRes) {
-        // Convert Uint8Array to base64 for JSON serialization
-        const serializedMessage = this.#serializeMessage(message)
-        clientRes.write(`data: ${JSON.stringify(serializedMessage)}\n\n`)
-      } else {
-        // It's possible for the network subsystem to try sending to a peer that
-        // just disconnected, so a warning is appropriate.
-        console.warn(
-          `[SSE-ADAPTER] Tried to send message to disconnected peer ${targetId}`,
-        )
-      }
+  protected generate(peerId: PeerId): BaseChannel {
+    return {
+      kind: "network",
+      adapterId: this.adapterId,
+      send: async (msg: ChannelMsg) => {
+        const clientRes = this.clients.get(peerId)
+        if (clientRes) {
+          const serialized = this.#serializeMessage(msg)
+          clientRes.write(`data: ${JSON.stringify(serialized)}\n\n`)
+        } else {
+          this.logger.warn("Tried to send to disconnected peer", { peerId })
+        }
+      },
+      start: (receive) => {
+        // Store receive function for this peer
+        this.receiveFns.set(peerId, receive)
+      },
+      stop: () => {
+        // Cleanup receive function
+        this.receiveFns.delete(peerId)
+        this.#cleanupConnection(peerId)
+      },
     }
   }
 
-  //
-  // Express Integration
-  //
+  init({
+    addChannel,
+    removeChannel,
+  }: {
+    addChannel: (context: PeerId) => Channel
+    removeChannel: (channelId: ChannelId) => Channel | undefined
+  }) {
+    // Store callbacks for lazy channel creation
+    this.addChannel = addChannel
+    this.removeChannel = removeChannel
+  }
+
+  deinit() {
+    // Close all active client connections
+    for (const [peerId, res] of this.clients) {
+      res.end()
+    }
+
+    // Clear all heartbeats
+    for (const timeout of this.heartbeats.values()) {
+      clearTimeout(timeout)
+    }
+
+    // Clear all maps
+    this.clients.clear()
+    this.receiveFns.clear()
+    this.heartbeats.clear()
+    this.channelsByPeer.clear()
+
+    this.logger.info("SSE server adapter deinitialized")
+  }
+
+  start() {
+    // Nothing to do - server waits for connections
+    this.logger.info("SSE server adapter started")
+  }
 
   /** Returns an Express Router to be mounted on the main app. */
   public getExpressRouter(): Router {
     const router = express.Router()
 
-    // Endpoint for clients to send messages TO the server.
+    // Endpoint for clients to send messages TO the server
     router.post("/sync", (req, res) => {
-      const serializedMessage = req.body
-      const message = this.#deserializeMessage(serializedMessage) as ChannelMsg
+      const serialized = req.body
+      const message = this.#deserializeMessage(serialized) as ChannelMsg
 
-      // Forward the message to the repo
-      this.messageReceived(message)
+      // Extract peerId from header or message
+      const peerId = req.headers["x-peer-id"] as PeerId
 
-      res.status(200).send({ ok: true })
+      if (!peerId) {
+        res.status(400).send({ error: "Missing X-Peer-Id header" })
+        return
+      }
+
+      // Route to appropriate channel's receive function
+      const receive = this.receiveFns.get(peerId)
+
+      if (receive) {
+        receive(message)
+        res.status(200).send({ ok: true })
+      } else {
+        this.logger.warn("Received message from unknown peer", { peerId })
+        res.status(404).send({ error: "Peer not connected" })
+      }
     })
 
-    // Endpoint for clients to connect and listen for events FROM the server.
+    // Endpoint for clients to connect and listen for events FROM the server
     router.get("/events", (req, res) => {
       this.#setupSseConnection(req, res)
     })
@@ -89,33 +137,37 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
       return
     }
 
-    // Store the client's response object to send events later
-    this.#clients.set(peerId, res)
+    // Lazy channel creation
+    const channel = this.addChannel!(peerId)
+    this.channelsByPeer.set(peerId, channel)
+    this.clients.set(peerId, res)
 
-    console.log(
-      `[SSE-ADAPTER] Connect peer: ${peerId}. Total peers: ${this.#clients.size}`,
-    )
-
-    // Tell the Repo about the new peer
-    this.peerAvailable(peerId, {})
+    this.logger.info("Client connected", {
+      peerId,
+      channelId: channel.channelId,
+      totalClients: this.clients.size,
+    })
 
     // Setup heartbeat to detect stale connections
     this.#setupHeartbeat(peerId, res)
 
     // Handle client disconnect
     req.on("close", () => {
+      this.logger.info("Client disconnected", {
+        peerId,
+        totalClients: this.clients.size - 1,
+      })
+
+      // Remove channel
+      this.removeChannel!(channel.channelId)
+      this.channelsByPeer.delete(peerId)
       this.#cleanupConnection(peerId)
-      console.log(
-        `[SSE-ADAPTER] Disconnect peer ${peerId}. Total peers: ${this.#clients.size}`,
-      )
-      // Emit a "peer-disconnected" event
-      this.peerDisconnected(peerId)
     })
   }
 
   #setupHeartbeat(peerId: PeerId, res: Response) {
     // Clear any existing heartbeat for this peer
-    const existingHeartbeat = this.#heartbeats.get(peerId)
+    const existingHeartbeat = this.heartbeats.get(peerId)
     if (existingHeartbeat) {
       clearTimeout(existingHeartbeat)
     }
@@ -125,26 +177,31 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
       try {
         // Send a heartbeat comment (SSE comments are ignored by clients)
         res.write(": heartbeat\n\n")
-      } catch (_) {
+      } catch (err) {
         // If we can't write to the response, the connection is dead
+        this.logger.warn("Heartbeat failed, cleaning up connection", { peerId })
+        const channel = this.channelsByPeer.get(peerId)
+        if (channel) {
+          this.removeChannel!(channel.channelId)
+        }
+        this.channelsByPeer.delete(peerId)
         this.#cleanupConnection(peerId)
-        this.peerDisconnected(peerId)
       }
-    }, this.#heartbeatInterval)
+    }, this.heartbeatInterval)
 
-    this.#heartbeats.set(peerId, heartbeat)
+    this.heartbeats.set(peerId, heartbeat)
   }
 
   #cleanupConnection(peerId: PeerId) {
     // Clear heartbeat
-    const heartbeat = this.#heartbeats.get(peerId)
+    const heartbeat = this.heartbeats.get(peerId)
     if (heartbeat) {
       clearTimeout(heartbeat)
-      this.#heartbeats.delete(peerId)
+      this.heartbeats.delete(peerId)
     }
 
     // Remove client
-    this.#clients.delete(peerId)
+    this.clients.delete(peerId)
   }
 
   #serializeMessage(message: any): any {
@@ -156,7 +213,7 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
           data: Buffer.from(message).toString("base64"),
         }
       } else if (Array.isArray(message)) {
-        return message.map(item => this.#serializeMessage(item))
+        return message.map((item) => this.#serializeMessage(item))
       } else {
         const result: any = {}
         for (const key in message) {
@@ -174,7 +231,7 @@ export class SseServerNetworkAdapter extends NetworkAdapter {
         // Convert base64 back to Uint8Array
         return new Uint8Array(Buffer.from(message.data, "base64"))
       } else if (Array.isArray(message)) {
-        return message.map(item => this.#deserializeMessage(item))
+        return message.map((item) => this.#deserializeMessage(item))
       } else {
         const result: any = {}
         for (const key in message) {

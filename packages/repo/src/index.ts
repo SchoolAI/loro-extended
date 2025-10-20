@@ -1,4 +1,6 @@
 export * from "@loro-extended/change"
+export * from "./adapter/adapter.js"
+export * from "./adapter/types.js"
 export * from "./channel.js"
 export * from "./doc-handle.js"
 export * from "./network/network-adapter.js"

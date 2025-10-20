@@ -4,7 +4,7 @@ A collection of network and storage adapters for [@loro-extended/repo](../repo) 
 
 ## Overview
 
-This package provides production-ready adapters for:
+This package provides adapters for:
 
 - **Network Communication**: Server-Sent Events (SSE) for real-time bidirectional sync
 - **Storage Persistence**: IndexedDB for browsers and LevelDB for servers
@@ -122,29 +122,45 @@ const repo = new Repo({ storage });
 ### SseClientNetworkAdapter
 
 ```typescript
-class SseClientNetworkAdapter implements NetworkAdapter {
+class SseClientNetworkAdapter extends Adapter<void> {
   constructor(serverUrl: string);
 
-  // NetworkAdapter interface
-  connect(peerId: PeerId, metadata: PeerMetadata): void;
-  disconnect(): void;
-  send(message: RepoMessage): Promise<void>;
+  // Adapter interface
+  protected generate(): BaseChannel;
+  init({ addChannel }): void;
+  deinit(): void;
+  start(): void;
 }
 ```
+
+**Key Features:**
+- Automatically generates a unique peer ID on construction
+- Creates a single channel to the server
+- Handles automatic reconnection via ReconnectingEventSource
+- Sends messages via HTTP POST with X-Peer-Id header
 
 ### SseServerNetworkAdapter
 
 ```typescript
-class SseServerNetworkAdapter implements NetworkAdapter {
-  // NetworkAdapter interface
-  connect(peerId: PeerId, metadata: PeerMetadata): void;
-  disconnect(): void;
-  send(message: RepoMessage): void;
+class SseServerNetworkAdapter extends Adapter<PeerId> {
+  constructor();
+
+  // Adapter interface
+  protected generate(peerId: PeerId): BaseChannel;
+  init({ addChannel, removeChannel }): void;
+  deinit(): void;
+  start(): void;
 
   // Express integration
   getExpressRouter(): Router;
 }
 ```
+
+**Key Features:**
+- Creates channels lazily when clients connect
+- One channel per connected client (identified by peerId)
+- Automatic heartbeat to detect stale connections
+- Express router provides `/events` (SSE) and `/sync` (POST) endpoints
 
 ### IndexedDBStorageAdapter
 

@@ -3,6 +3,7 @@ import type { ChannelMeta } from "./channel.js"
 
 export type DocId = string
 export type ChannelId = number
+export type PeerId = string
 export type AdapterId = string
 export type DocContent = Record<string, Container>
 

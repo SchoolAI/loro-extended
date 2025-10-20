@@ -1,67 +1,89 @@
 import {
+  Adapter,
+  type BaseChannel,
+  type Channel,
+  type ChannelId,
   type ChannelMsg,
-  NetworkAdapter,
   type PeerId,
-  type PeerMetadata,
+  type ReceiveFn,
 } from "@loro-extended/repo"
 import ReconnectingEventSource from "reconnecting-eventsource"
+import { v4 as uuid } from "uuid"
 
-/*
-
-In the case of a server:
-
-
-*/
-
-export class SseClientNetworkAdapter extends NetworkAdapter {
-  peerId?: PeerId
-  #serverUrl: string
-  #eventSource?: ReconnectingEventSource
+export class SseClientNetworkAdapter extends Adapter<void> {
+  private peerId: PeerId
+  private serverUrl: string
+  private serverChannel?: Channel
+  private receive?: ReceiveFn
+  private eventSource?: ReconnectingEventSource
 
   constructor(serverUrl: string) {
-    super()
-    this.#serverUrl = serverUrl
+    super({ adapterId: "sse-client" })
+    this.peerId = uuid() // Generate unique peer ID
+    this.serverUrl = serverUrl
   }
 
-  async start(peerId: PeerId, _metadata: PeerMetadata): Promise<void> {
-    this.peerId = peerId
-    const url = `${this.#serverUrl}/events?peerId=${peerId}`
-    this.#eventSource = new ReconnectingEventSource(url)
+  protected generate(): BaseChannel {
+    return {
+      kind: "network",
+      adapterId: this.adapterId,
+      send: async (msg: ChannelMsg) => {
+        // Serialize and send via HTTP POST
+        const serialized = this.#serializeMessage(msg)
+        const response = await fetch(`${this.serverUrl}/sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Peer-Id": this.peerId, // Include peerId in header
+          },
+          body: JSON.stringify(serialized),
+        })
 
-    this.#eventSource.onmessage = event => {
-      const serializedMessage = JSON.parse(event.data)
-      const message = this.#deserializeMessage(serializedMessage) as ChannelMsg
-      this.messageReceived(message)
-    }
-
-    this.#eventSource.onerror = err => {
-      console.warn("disconnected", err)
-      this.peerDisconnected("server")
-    }
-
-    // When we connect, we can treat the server as a peer.
-    this.peerAvailable("server", {})
-  }
-
-  async stop(): Promise<void> {
-    this.#eventSource?.close()
-    this.peerDisconnected("server")
-    this.peerId = undefined
-  }
-
-  async send(message: ChannelMsg): Promise<void> {
-    // Convert Uint8Array to base64 for JSON serialization
-    const serializedMessage = this.#serializeMessage(message)
-    const response = await fetch(`${this.#serverUrl}/sync`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+        if (!response.ok) {
+          throw new Error(`Failed to send message: ${response.statusText}`)
+        }
       },
-      body: JSON.stringify(serializedMessage),
-    })
+      start: (receive) => {
+        this.receive = receive
+      },
+      stop: () => {
+        this.receive = undefined
+      },
+    }
+  }
 
-    if (!response.ok) {
-      throw new Error(`Failed to send message: ${response.statusText}`)
+  init({ addChannel }: { addChannel: (context: void) => Channel }) {
+    // Create single channel for server connection
+    this.serverChannel = addChannel()
+  }
+
+  deinit() {
+    this.eventSource?.close()
+    this.eventSource = undefined
+    this.serverChannel = undefined
+    this.receive = undefined
+  }
+
+  start() {
+    // Connect to server with peerId
+    const url = `${this.serverUrl}/events?peerId=${this.peerId}`
+    this.eventSource = new ReconnectingEventSource(url)
+
+    this.eventSource.onmessage = (event) => {
+      const serialized = JSON.parse(event.data)
+      const message = this.#deserializeMessage(serialized) as ChannelMsg
+
+      // Send to channel via receive function
+      this.receive?.(message)
+    }
+
+    this.eventSource.onerror = (err) => {
+      this.logger.warn("SSE connection error", { error: err })
+      // Connection will auto-reconnect via ReconnectingEventSource
+    }
+
+    this.eventSource.onopen = () => {
+      this.logger.debug("SSE connection established")
     }
   }
 
@@ -75,7 +97,7 @@ export class SseClientNetworkAdapter extends NetworkAdapter {
           data: base64,
         }
       } else if (Array.isArray(message)) {
-        return message.map(item => this.#serializeMessage(item))
+        return message.map((item) => this.#serializeMessage(item))
       } else {
         const result: any = {}
         for (const key in message) {
@@ -98,7 +120,7 @@ export class SseClientNetworkAdapter extends NetworkAdapter {
         }
         return bytes
       } else if (Array.isArray(message)) {
-        return message.map(item => this.#deserializeMessage(item))
+        return message.map((item) => this.#deserializeMessage(item))
       } else {
         const result: any = {}
         for (const key in message) {

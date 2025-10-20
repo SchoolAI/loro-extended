@@ -28,6 +28,11 @@ export interface NetworkAdapterEvents {
 }
 
 /**
+ * @deprecated Use Adapter<G> directly instead. This class will be removed in a future version.
+ *
+ * NetworkAdapter provided an event-based abstraction that is no longer needed.
+ * Extend Adapter<G> and implement the channel-based pattern instead.
+ *
  * A base class for all network adapters, e.g. SSE, WebSocket, etc. both client and server.
  *
  * Implementing a subclass
