@@ -1,5 +1,4 @@
 import type { VersionVector } from "loro-crdt"
-import { v4 as uuid } from "uuid"
 import type {
   AdapterId,
   ChannelId,
@@ -41,13 +40,11 @@ export type SyncTransmission =
 export type ChannelMsgEstablishRequest = {
   type: "channel/establish-request"
   identity: PeerIdentityDetails
-  requesterPublishDocId: DocId
 }
 
 export type ChannelMsgEstablishResponse = {
   type: "channel/establish-response"
   identity: PeerIdentityDetails
-  responderPublishDocId: DocId
 }
 
 export type ChannelMsgSyncRequest = {
@@ -148,13 +145,11 @@ export type Channel =
 
 export type ChannelIdentity = {
   channelId: ChannelId // ID used locally to this repo only
-  publishDocId: DocId
   peer:
     | { state: "unestablished" }
     | {
         state: "established"
         identity: PeerIdentityDetails
-        consumeDocId: DocId
       }
 }
 
@@ -173,62 +168,4 @@ export type ChannelKind = "storage" | "network" | "other"
 
 export type ReceiveFn = (msg: ChannelMsg) => void
 
-type GenerateFn<G> = (context: G) => BaseChannel
-
-let channelIssuanceId = 1
-
-export class ChannelDirectory<G> {
-  private readonly channels: Map<ChannelId, Channel> = new Map()
-
-  constructor(readonly generate: GenerateFn<G>) {}
-
-  *[Symbol.iterator](): IterableIterator<Channel> {
-    yield* this.channels.values()
-  }
-
-  has(channelId: ChannelId): boolean {
-    return this.channels.has(channelId)
-  }
-
-  get(channelId: ChannelId): Channel | undefined {
-    return this.channels.get(channelId)
-  }
-
-  get size(): number {
-    return this.channels.size
-  }
-
-  create(context: G): Channel {
-    const channelId = channelIssuanceId++
-
-    const channel: Channel = Object.assign(this.generate(context), {
-      channelId,
-      publishDocId: uuid(),
-      peer: {
-        state: "unestablished",
-      },
-    } as const)
-
-    this.channels.set(channelId, channel)
-
-    return channel
-  }
-
-  remove(channelId: ChannelId): Channel | undefined {
-    const channel = this.channels.get(channelId)
-
-    if (!channel) {
-      return
-    }
-
-    this.channels.delete(channelId)
-
-    return channel
-  }
-
-  reset() {
-    for (const channelId of this.channels.keys()) {
-      this.remove(channelId)
-    }
-  }
-}
+export type GenerateFn<G> = (context: G) => BaseChannel

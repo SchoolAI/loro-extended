@@ -3,15 +3,15 @@ import Emittery from "emittery"
 import type { VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
 import { v4 as uuid } from "uuid"
-import { AdapterManager } from "./adapter/adapter-manager.js"
 import type { AnyAdapter } from "./adapter/adapter.js"
+import { AdapterManager } from "./adapter/adapter-manager.js"
 import type { Channel } from "./channel.js"
 import { createPermissions, type Rules } from "./rules.js"
 import {
+  type Command,
   createSynchronizerUpdate,
   getReadyStates,
   init as programInit,
-  type Command,
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "./synchronizer-program.js"
@@ -97,7 +97,7 @@ export class Synchronizer {
 
     // Prepare adapters to listen for events or whatever they need to do before connecting
     for (const adapter of adapters) {
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: this.channelAdded.bind(this),
         channelRemoved: this.channelRemoved.bind(this),
       })
@@ -105,7 +105,7 @@ export class Synchronizer {
 
     // Let adapters start listening or connect
     for (const adapter of adapters) {
-      adapter.start()
+      adapter.onStart()
     }
   }
 
@@ -286,11 +286,6 @@ export class Synchronizer {
         break
       }
 
-      case "cmd/establish-channel-doc": {
-        this.#executeEstablishChannelDoc(command.channel)
-        break
-      }
-
       // (utility): A command that sends a dispatch back into the program message loop
       case "cmd/dispatch": {
         this.#dispatch(command.dispatch)
@@ -313,7 +308,7 @@ export class Synchronizer {
   }
 
   #executeStartChannel(channel: Channel) {
-    // 0. At this point, we can rely on the fact that the model.channels Map contains the channel
+    // 0. At this point, we should be able to rely model.channels Map containing the channel
     if (!this.model.channels.has(channel.channelId)) {
       this.logger.error(`can't start missing channel`, {
         channel: channel.channelId,
@@ -340,7 +335,6 @@ export class Synchronizer {
       message: {
         type: "channel/establish-request",
         identity: this.identity,
-        requesterPublishDocId: channel.publishDocId,
       },
     })
   }
@@ -403,37 +397,6 @@ export class Synchronizer {
 
     docState.doc.subscribeLocalUpdates(data => {
       this.#dispatch({ type: "msg/local-doc-change", docId, data })
-    })
-  }
-
-  /**
-   * Create a special document to be shared between this repo and the channel
-   *
-   * The publishDoc contains information that the *channel* wants to share with
-   * this repo about the doc. In other words, from this repo's perspective the
-   * publishDoc is read-only (but this is not enforced right now).
-   */
-  #executeEstablishChannelDoc(channel: Channel) {
-    if (channel.peer.state !== "established") {
-      this.logger.warn(`can't establish channel doc for channel`, { channel })
-      return
-    }
-
-    const docId = channel.peer.consumeDocId
-
-    const docState = this.getOrCreateDocumentState(docId)
-
-    const metadata = docState.doc.getMap("metadata")
-
-    metadata.subscribe(event => {
-      for (const e of event.events) {
-        // TODO(duane): convert these events into updates to docState
-        this.logger.info(`shared-doc event`, {
-          path: e.path,
-          diff: e.diff,
-          docId,
-        })
-      }
     })
   }
 

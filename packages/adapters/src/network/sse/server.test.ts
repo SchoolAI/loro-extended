@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
-import { SseServerNetworkAdapter } from "./server"
 import type { Channel, ChannelMsg, PeerId } from "@loro-extended/repo"
 import type { Request, Response } from "express"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { SseServerNetworkAdapter } from "./server"
 
 describe("SseServerNetworkAdapter", () => {
   let adapter: SseServerNetworkAdapter

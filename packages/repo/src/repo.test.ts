@@ -1,12 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { DocHandle } from "./doc-handle.js"
-import {
-  InProcessBridge,
-  InProcessNetworkAdapter,
-} from "./network/in-process-network-adapter.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
-import type { DocContent } from "./types.js"
 
 describe("Repo", () => {
   // DocSchema should match the DocContent constraint (Record<string, Container>)
@@ -15,18 +11,9 @@ describe("Repo", () => {
   let storage: InMemoryStorageAdapter
 
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
-
     storage = new InMemoryStorageAdapter()
 
-    repo = new Repo({
-      storage,
-      network: [],
-    })
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
+    repo = new Repo({ adapters: [storage] })
   })
 
   it("should create a new document and return a handle", () => {
@@ -66,95 +53,40 @@ describe("Repo", () => {
     expect(handle.doc).toBeDefined()
   })
 
-  it.only("should find a document from a peer", async () => {
+  it("should find a document from a peer", async () => {
     // Use real timers for this test since it involves network communication
-    vi.useRealTimers()
 
-    console.log("Test starting...")
+    const bridge = new Bridge()
 
-    const bridge = new InProcessBridge()
-    console.log("Bridge created")
-
-    // Add bridge event listeners for debugging
-    bridge.on("peer-added", ({ peerId }) => {
-      console.log("Bridge: peer-added", peerId)
-    })
-    bridge.on("message", ({ message }) => {
-      console.log(
-        "Bridge: message",
-        message.type,
-        "from",
-        message.senderId,
-        "to",
-        message.targetIds,
-      )
-    })
-
-    const networkA = new InProcessNetworkAdapter(bridge)
-    const networkB = new InProcessNetworkAdapter(bridge)
-    console.log("Network adapters created")
-
-    console.log("Creating repoA...")
+    const networkA = new BridgeAdapter({ adapterId: "network-a", bridge })
     const repoA = new Repo({
-      network: [networkA],
-      peerId: "repoA",
-    })
-    console.log("RepoA created")
-
-    // Add event listeners to debug network events
-    networkA.on("peer-available", ({ peerId }) => {
-      console.log("NetworkA: peer-available", peerId)
-    })
-    networkA.on("message-received", ({ message }) => {
-      console.log("NetworkA: message-received", message.type)
+      identity: { name: "repoA" },
+      adapters: [networkA],
     })
 
-    console.log("Creating repoB...")
+    const networkB = new BridgeAdapter({ adapterId: "network-b", bridge })
     const repoB = new Repo({
-      network: [networkB],
-      peerId: "repoB",
-    })
-    console.log("RepoB created")
-
-    // Add event listeners to debug network events
-    networkB.on("peer-available", ({ peerId }) => {
-      console.log("NetworkB: peer-available", peerId)
-    })
-    networkB.on("message-received", ({ message }) => {
-      console.log("NetworkB: message-received", message.type)
+      identity: { name: "repoB" },
+      adapters: [networkB],
     })
 
     // Give some time for the network adapters to connect
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    console.log(
-      "RepoA peers:",
-      repoA.synchronizer.getModelSnapshot().peers.size,
-    )
-    console.log(
-      "RepoB peers:",
-      repoB.synchronizer.getModelSnapshot().peers.size,
-    )
-
     const handleA = repoA.get("test-doc")
-    console.log("HandleA created")
 
     handleA.change(doc => {
       const root = doc.getMap("root")
       root.set("text", "hello")
     })
-    console.log("HandleA changed")
 
-    console.log("Getting handleB and calling fetch...")
-    const handleB = repoB.get(handleA.docId).fetch()
-    console.log("Fetch called, now waiting for network...")
+    const handleB = repoB.get(handleA.docId)
 
     const result = await handleB.waitForNetwork()
-    console.log("Network wait completed")
 
     const rootB = result.doc.getMap("root")
     expect(rootB.get("text")).toBe("hello")
-  }, 15000) // Increase timeout to 15 seconds
+  }, 1000)
 
   describe("storage operations", () => {
     it("should save updates when document changes", async () => {
@@ -169,9 +101,6 @@ describe("Repo", () => {
         const root = doc.getMap("root")
         root.set("text", "initial")
       })
-
-      // Wait for async save operation
-      await vi.advanceTimersByTimeAsync(10)
 
       // Should have saved an update
       expect(saveSpy).toHaveBeenCalled()
@@ -200,17 +129,11 @@ describe("Repo", () => {
         root.set("counter", 1)
       })
 
-      // Wait a bit to ensure version changes
-      await vi.advanceTimersByTimeAsync(10)
-
       handle.change(doc => {
         const root = doc.getMap("root")
         root.set("text", "second")
         root.set("counter", 2)
       })
-
-      // Wait for async save operations
-      await vi.advanceTimersByTimeAsync(10)
 
       // Should have saved multiple updates
       const updateCalls = saveSpy.mock.calls.filter(call => {
@@ -232,7 +155,7 @@ describe("Repo", () => {
       })
 
       // Create a new repo with the same storage
-      const repo2 = new Repo({ storage })
+      const repo2 = new Repo({ adapters: [storage] })
 
       // Try to find the document
       loadRangeSpy.mockClear()
@@ -240,7 +163,6 @@ describe("Repo", () => {
 
       // Should attempt to load from storage using loadRange
       // (this happens in the background)
-      await vi.advanceTimersByTimeAsync(10)
       expect(loadRangeSpy).toHaveBeenCalledWith(["test-doc"])
     })
   })
@@ -250,28 +172,11 @@ describe("Repo", () => {
     const documentId = handle.docId
 
     // Document should exist in cache
-    expect(repo.handles.has(documentId)).toBe(true)
+    expect(repo.has(documentId)).toBe(true)
 
     await repo.delete(documentId)
 
     // Document should be removed from cache
-    expect(repo.handles.has(documentId)).toBe(false)
-  })
-
-  it("should support network operations", () => {
-    // Test that network subsystem is properly initialized
-    // Network adapters are private, so we just test that repo was created successfully
-    expect(repo).toBeDefined()
-    expect(repo.peerId).toBeDefined()
-  })
-
-  it("should support disconnection", () => {
-    repo.get("test-doc")
-    expect(repo.handles.size).toBe(1)
-
-    repo.reset()
-
-    // Handles should be cleared
-    expect(repo.handles.size).toBe(0)
+    expect(repo.has(documentId)).toBe(false)
   })
 })

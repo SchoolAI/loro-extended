@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
 import type { Channel, ChannelMsg } from "@loro-extended/repo"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Mock the module with a factory function
 vi.mock("reconnecting-eventsource", () => {
@@ -19,7 +19,9 @@ vi.mock("reconnecting-eventsource", () => {
 
     simulateMessage(data: any) {
       if (this.onmessage) {
-        this.onmessage(new MessageEvent("message", { data: JSON.stringify(data) }))
+        this.onmessage(
+          new MessageEvent("message", { data: JSON.stringify(data) }),
+        )
       }
     }
 
@@ -64,7 +66,10 @@ describe("SseClientNetworkAdapter", () => {
   const serverUrl = "http://localhost:3000"
 
   beforeEach(() => {
-    adapter = new SseClientNetworkAdapter(serverUrl)
+    adapter = new SseClientNetworkAdapter({
+      postUrl: `${serverUrl}/sync`,
+      eventSourceUrl: `${serverUrl}/events`,
+    })
     vi.clearAllMocks()
   })
 
@@ -74,9 +79,15 @@ describe("SseClientNetworkAdapter", () => {
     })
 
     it("should generate a unique peerId on construction", () => {
-      const adapter1 = new SseClientNetworkAdapter(serverUrl)
-      const adapter2 = new SseClientNetworkAdapter(serverUrl)
-      
+      const adapter1 = new SseClientNetworkAdapter({
+        postUrl: `${serverUrl}/sync`,
+        eventSourceUrl: `${serverUrl}/events`,
+      })
+      const adapter2 = new SseClientNetworkAdapter({
+        postUrl: `${serverUrl}/sync`,
+        eventSourceUrl: `${serverUrl}/events`,
+      })
+
       // Both should have peerIds (private, but we can test behavior)
       expect(adapter1).toBeDefined()
       expect(adapter2).toBeDefined()
@@ -86,7 +97,7 @@ describe("SseClientNetworkAdapter", () => {
   describe("init()", () => {
     it("should create a single channel", () => {
       const channels: Channel[] = []
-      
+
       adapter.init({
         addChannel: () => {
           const channel = { channelId: 1, publishDocId: "test-doc" } as Channel
@@ -114,8 +125,7 @@ describe("SseClientNetworkAdapter", () => {
   describe("start()", () => {
     it("should create EventSource with correct URL including peerId", () => {
       adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
+        addChannel: () => ({ channelId: 1 }) as Channel,
       })
 
       adapter.start()
@@ -126,15 +136,14 @@ describe("SseClientNetworkAdapter", () => {
 
     it("should set up message handler", () => {
       const receiveFn = vi.fn()
-      
+
       adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
+        addChannel: () => ({ channelId: 1 }) as Channel,
       })
 
       const channel = (adapter as any).generate()
       channel.start(receiveFn)
-      
+
       adapter.start()
 
       // Simulate receiving a message
@@ -145,7 +154,7 @@ describe("SseClientNetworkAdapter", () => {
         hopCount: 0,
         transmission: { type: "up-to-date", version: {} as any },
       }
-      
+
       eventSource.simulateMessage(testMessage)
 
       expect(receiveFn).toHaveBeenCalledWith(testMessage)
@@ -161,8 +170,7 @@ describe("SseClientNetworkAdapter", () => {
       global.fetch = mockFetch
 
       adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
+        addChannel: () => ({ channelId: 1 }) as Channel,
       })
 
       const channel = (adapter as any).generate()
@@ -182,7 +190,7 @@ describe("SseClientNetworkAdapter", () => {
             "X-Peer-Id": expect.any(String),
           }),
           body: expect.any(String),
-        })
+        }),
       )
     })
 
@@ -194,8 +202,7 @@ describe("SseClientNetworkAdapter", () => {
       global.fetch = mockFetch
 
       adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
+        addChannel: () => ({ channelId: 1 }) as Channel,
       })
 
       const channel = (adapter as any).generate()
@@ -205,113 +212,23 @@ describe("SseClientNetworkAdapter", () => {
       }
 
       await expect(channel.send(testMessage)).rejects.toThrow(
-        "Failed to send message: Internal Server Error"
+        "Failed to send message: Internal Server Error",
       )
-    })
-  })
-
-  describe("serialization", () => {
-    it("should serialize Uint8Array to base64", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true })
-      global.fetch = mockFetch
-
-      adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
-      })
-
-      const channel = (adapter as any).generate()
-      const data = new Uint8Array([1, 2, 3, 4, 5])
-      const testMessage: ChannelMsg = {
-        type: "channel/sync-response",
-        docId: "test-doc",
-        hopCount: 0,
-        transmission: { type: "update", data },
-      }
-
-      await channel.send(testMessage)
-
-      const callArgs = mockFetch.mock.calls[0]
-      const body = JSON.parse(callArgs[1].body)
-      
-      expect(body.transmission.data).toHaveProperty("__type", "Uint8Array")
-      expect(body.transmission.data).toHaveProperty("data")
-      expect(typeof body.transmission.data.data).toBe("string")
-    })
-
-    it("should deserialize base64 to Uint8Array", () => {
-      const receiveFn = vi.fn()
-      
-      adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
-      })
-
-      const channel = (adapter as any).generate()
-      channel.start(receiveFn)
-      adapter.start()
-
-      const eventSource = (adapter as any).eventSource as MockEventSource
-      const serializedData = {
-        type: "channel/sync-response",
-        docId: "test-doc",
-        hopCount: 0,
-        transmission: {
-          type: "update",
-          data: {
-            __type: "Uint8Array",
-            data: btoa(String.fromCharCode(1, 2, 3, 4, 5)),
-          },
-        },
-      }
-
-      eventSource.simulateMessage(serializedData)
-
-      expect(receiveFn).toHaveBeenCalled()
-      const receivedMessage = receiveFn.mock.calls[0][0]
-      expect(receivedMessage.transmission.data).toBeInstanceOf(Uint8Array)
-      expect(Array.from(receivedMessage.transmission.data)).toEqual([1, 2, 3, 4, 5])
     })
   })
 
   describe("deinit()", () => {
     it("should close EventSource and clean up", () => {
-      adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
-      })
+      const channelAdded = vi.fn()
+      const channelRemoved = vi.fn()
+
+      adapter.prepare({ channelAdded, channelRemoved })
 
       adapter.start()
-      const eventSource = (adapter as any).eventSource as MockEventSource
-      const closeSpy = vi.spyOn(eventSource, "close")
+      expect(channelAdded).toHaveBeenCalledTimes(1)
 
-      adapter.deinit()
-
-      expect(closeSpy).toHaveBeenCalled()
-      expect((adapter as any).eventSource).toBeUndefined()
-      expect((adapter as any).serverChannel).toBeUndefined()
-      expect((adapter as any).receive).toBeUndefined()
-    })
-  })
-
-  describe("channel lifecycle", () => {
-    it("should handle start and stop correctly", () => {
-      const receiveFn = vi.fn()
-      
-      adapter.init({
-        addChannel: () => ({ channelId: 1 } as Channel),
-        
-      })
-
-      const channel = (adapter as any).generate()
-      
-      // Start channel
-      channel.start(receiveFn)
-      expect((adapter as any).receive).toBe(receiveFn)
-
-      // Stop channel
-      channel.stop()
-      expect((adapter as any).receive).toBeUndefined()
+      adapter.stop()
+      expect(channelRemoved).toHaveBeenCalledTimes(1)
     })
   })
 })

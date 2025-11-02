@@ -5,13 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { Channel } from "./channel.js"
 import { createPermissions } from "./rules.js"
 import {
+  type Command,
   createSynchronizerUpdate,
   init as programInit,
-  type Command,
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "./synchronizer-program.js"
-import { createDocState, type ChannelId, type DocId } from "./types.js"
+import { createDocState } from "./types.js"
 
 // Helper to create a proper VersionVector
 function createVersionVector() {
@@ -25,20 +25,12 @@ function createMockChannel(overrides: Partial<Channel> = {}): Channel {
     channelId: 1,
     kind: "network",
     adapterId: "test-adapter",
-    publishDocId: "publish-doc-1",
     peer: { state: "unestablished" },
     send: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
     ...overrides,
   }
-}
-
-function createModelWithDoc(docId: DocId): SynchronizerModel {
-  const [model] = programInit({ name: "test-identity" })
-  const docState = createDocState({ docId })
-  model.documents.set(docId, docState)
-  return model
 }
 
 function createModelWithChannel(channel: Channel): SynchronizerModel {
@@ -184,7 +176,7 @@ describe("Synchronizer Program", () => {
             fromChannelId: channel.channelId,
             message: {
               type: "channel/establish-request",
-              requesterPublishDocId: "requester-doc-id",
+              identity: { name: "test" },
             },
           },
         }
@@ -193,16 +185,18 @@ describe("Synchronizer Program", () => {
 
         // Channel should be established
         const updatedChannel = newModel.channels.get(channel.channelId)
-        expect(updatedChannel?.peer.state).toBe("established")
-        expect((updatedChannel?.peer as any).consumeDocId).toBe(
-          "requester-doc-id",
-        )
+        if (!updatedChannel) {
+          throw new Error("updatedChannel expected")
+        }
+
+        const peer = updatedChannel.peer
+        expect(peer.state).toBe("established")
+        expect(peer.state === "established" && peer.identity.name).toBe("test")
 
         // Should return batch command with establish and send-message
         expectBatchCommand(command)
         expect(command.commands).toHaveLength(2)
-        expect(command.commands[0].type).toBe("cmd/establish-channel-doc")
-        expect(command.commands[1].type).toBe("cmd/send-message")
+        expect(command.commands[0].type).toBe("cmd/send-message")
       })
     })
 
@@ -217,7 +211,7 @@ describe("Synchronizer Program", () => {
             fromChannelId: channel.channelId,
             message: {
               type: "channel/establish-response",
-              responderPublishDocId: "responder-doc-id",
+              identity: { name: "test" },
             },
           },
         }
@@ -226,12 +220,15 @@ describe("Synchronizer Program", () => {
 
         // Channel should be established
         const updatedChannel = newModel.channels.get(channel.channelId)
-        expect(updatedChannel?.peer.state).toBe("established")
-        expect((updatedChannel?.peer as any).consumeDocId).toBe(
-          "responder-doc-id",
-        )
+        if (!updatedChannel) {
+          throw new Error("updatedChannel expected")
+        }
 
-        expectCommand(command, "cmd/establish-channel-doc")
+        const peer = updatedChannel.peer
+        expect(peer.state).toBe("established")
+        expect(peer.state === "established" && peer.identity.name).toBe("test")
+
+        expectCommand(command, "cmd/send-message")
       })
     })
 
@@ -251,8 +248,12 @@ describe("Synchronizer Program", () => {
             fromChannelId: channel.channelId,
             message: {
               type: "channel/sync-request",
-              docId,
-              requesterDocVersion: createVersionVector(),
+              docs: [
+                {
+                  docId,
+                  requesterDocVersion: createVersionVector(),
+                },
+              ],
             },
           },
         }
@@ -274,8 +275,12 @@ describe("Synchronizer Program", () => {
             fromChannelId: channel.channelId,
             message: {
               type: "channel/sync-request",
-              docId: "nonexistent-doc",
-              requesterDocVersion: createVersionVector(),
+              docs: [
+                {
+                  docId: "nonexistent-doc",
+                  requesterDocVersion: createVersionVector(),
+                },
+              ],
             },
           },
         }
@@ -472,9 +477,29 @@ describe("Synchronizer Program", () => {
         const channel = createMockChannel()
         const initialModel = createModelWithChannel(channel)
 
-        // Add some documents
-        initialModel.documents.set("doc-1", createDocState({ docId: "doc-1" }))
-        initialModel.documents.set("doc-2", createDocState({ docId: "doc-2" }))
+        // Establish the channel first so getRuleContext works
+        const establishedChannel = {
+          ...channel,
+          peer: {
+            state: "established" as const,
+            identity: { name: "test-peer" },
+          },
+        }
+        initialModel.channels.set(channel.channelId, establishedChannel)
+
+        // Add some documents with channel state
+        const doc1 = createDocState({ docId: "doc-1" })
+        doc1.channelState.set(channel.channelId, {
+          awareness: "has-doc",
+          loading: { state: "initial" },
+        })
+        const doc2 = createDocState({ docId: "doc-2" })
+        doc2.channelState.set(channel.channelId, {
+          awareness: "has-doc",
+          loading: { state: "initial" },
+        })
+        initialModel.documents.set("doc-1", doc1)
+        initialModel.documents.set("doc-2", doc2)
 
         const message: SynchronizerMessage = {
           type: "msg/channel-receive-message",
@@ -550,119 +575,46 @@ describe("Synchronizer Program", () => {
     })
   })
 
-  describe("broadcast sync request", () => {
-    it("should send sync requests to all relevant channels", () => {
-      const channel1 = createMockChannel({ channelId: 1 })
-      const channel2 = createMockChannel({ channelId: 2 })
-      const docId = "test-doc"
-
-      const initialModel = createModelWithChannel(channel1)
-      initialModel.channels.set(channel2.channelId, channel2)
-
-      // Add document with channel states
-      const docState = createDocState({ docId })
-      docState.channelState.set(channel1.channelId, {
-        awareness: "has-doc",
-        loading: { state: "initial" },
-      })
-      docState.channelState.set(channel2.channelId, {
-        awareness: "unknown",
-        loading: { state: "initial" },
-      })
-      initialModel.documents.set(docId, docState)
-
-      const message: SynchronizerMessage = {
-        type: "msg/broadcast-sync-request",
-        docId,
-      }
-
-      const [_newModel, command] = update(message, initialModel)
-
-      expectBatchCommand(command)
-
-      // Should set loading states and send sync request
-      const sendMessageCmd = command.commands.find(
-        c => c.type === "cmd/send-message",
-      )
-      expect(sendMessageCmd).toBeDefined()
-
-      const envelope = (sendMessageCmd as any).envelope
-      expect(envelope.toChannelIds).toEqual([
-        channel1.channelId,
-        channel2.channelId,
-      ])
-      expect(envelope.message.type).toBe("channel/sync-request")
-      expect(envelope.message.docId).toBe(docId)
-    })
-
-    it("should log error when document not found", () => {
-      const [initialModel] = programInit({ name: "test" })
-
-      const message: SynchronizerMessage = {
-        type: "msg/broadcast-sync-request",
-        docId: "nonexistent-doc",
-      }
-
-      const [_newModel, command] = update(message, initialModel)
-
-      expectCommand(command, "cmd/log")
-      expect((command as any).message).toContain("unable to broadcast")
-    })
-
-    it("should skip channels that don't exist", () => {
-      const docId = "test-doc"
-      const initialModel = createModelWithDoc(docId)
-
-      // Add channel state for non-existent channel
-      const docState = initialModel.documents.get(docId)
-
-      if (!docState) {
-        throw new Error("docState not defined")
-      }
-
-      docState.channelState.set(999, {
-        awareness: "unknown",
-        loading: { state: "initial" },
-      })
-
-      const message: SynchronizerMessage = {
-        type: "msg/broadcast-sync-request",
-        docId,
-      }
-
-      const [_newModel, command] = update(message, initialModel)
-
-      expectBatchCommand(command)
-
-      // Should have log command for skipped channel
-      const logCmd = command.commands.find(c => c.type === "cmd/log")
-      expect(logCmd).toBeDefined()
-      expect((logCmd as any).message).toContain("broadcast regarding doc")
-    })
-  })
+  // Note: msg/broadcast-sync-request has been deprecated in favor of channel/sync-request
+  // which offers more directed communication through specific channels
 
   describe("permission integration", () => {
-    it("should respect canList permissions in directory response", () => {
+    it("should respect canReveal permissions in directory response", () => {
       const restrictivePermissions = createPermissions({
-        canList: (_channelId: ChannelId, docId: DocId) => {
-          return docId !== "secret-doc"
+        canReveal: context => {
+          return context.docId !== "secret-doc"
         },
       })
 
-      const restrictiveUpdate = createSynchronizerUpdate(restrictivePermissions)
+      const restrictiveUpdate = createSynchronizerUpdate({
+        permissions: restrictivePermissions,
+      })
 
       const channel = createMockChannel()
-      const initialModel = createModelWithChannel(channel)
 
-      // Add documents including a secret one
-      initialModel.documents.set(
-        "public-doc",
-        createDocState({ docId: "public-doc" }),
-      )
-      initialModel.documents.set(
-        "secret-doc",
-        createDocState({ docId: "secret-doc" }),
-      )
+      // Establish the channel first so getRuleContext works
+      const establishedChannel = {
+        ...channel,
+        peer: {
+          state: "established" as const,
+          identity: { name: "test-peer" },
+        },
+      }
+      const initialModel = createModelWithChannel(establishedChannel)
+
+      // Add documents including a secret one, with channel state
+      const publicDoc = createDocState({ docId: "public-doc" })
+      publicDoc.channelState.set(channel.channelId, {
+        awareness: "has-doc",
+        loading: { state: "initial" },
+      })
+      const secretDoc = createDocState({ docId: "secret-doc" })
+      secretDoc.channelState.set(channel.channelId, {
+        awareness: "has-doc",
+        loading: { state: "initial" },
+      })
+      initialModel.documents.set("public-doc", publicDoc)
+      initialModel.documents.set("secret-doc", secretDoc)
 
       const message: SynchronizerMessage = {
         type: "msg/channel-receive-message",
@@ -694,7 +646,7 @@ describe("Synchronizer Program", () => {
           fromChannelId: channel.channelId,
           message: {
             type: "channel/establish-request",
-            requesterPublishDocId: "requester-doc-id",
+            identity: { name: "test" },
           },
         },
       }
@@ -731,8 +683,12 @@ describe("Synchronizer Program", () => {
           fromChannelId: 999,
           message: {
             type: "channel/sync-request",
-            docId: "nonexistent-doc",
-            requesterDocVersion: createVersionVector(),
+            docs: [
+              {
+                docId: "nonexistent-doc",
+                requesterDocVersion: createVersionVector(),
+              },
+            ],
           },
         },
       }

@@ -3,7 +3,6 @@ import { Adapter } from "../adapter/adapter.js"
 import type {
   BaseChannel,
   Channel,
-  ChannelId,
   ChannelMsg,
   ChannelMsgDeleteRequest,
   ChannelMsgDirectoryRequest,
@@ -58,11 +57,10 @@ export abstract class StorageAdapter extends Adapter<void> {
   /**
    * Initialize the storage adapter by creating its single channel.
    */
-  init({
+  onBeforeStart({
     addChannel,
   }: {
     addChannel: (context: void) => Channel
-    removeChannel: (channelId: ChannelId) => Channel | undefined
   }): void {
     this.storageChannel = addChannel()
   }
@@ -70,7 +68,7 @@ export abstract class StorageAdapter extends Adapter<void> {
   /**
    * Clean up the storage adapter.
    */
-  deinit(): void {
+  onAfterStop(): void {
     this.storageChannel = undefined
     this.receive = undefined
   }
@@ -78,7 +76,7 @@ export abstract class StorageAdapter extends Adapter<void> {
   /**
    * Start the storage adapter. Storage is always "ready" - nothing to do.
    */
-  start(): void {
+  onStart(): void {
     // Storage is always ready - no async initialization needed
   }
 
@@ -93,6 +91,9 @@ export abstract class StorageAdapter extends Adapter<void> {
           break
         case "channel/sync-request":
           await this.handleSyncRequest(msg)
+          break
+        case "channel/sync-response":
+          await this.handleSyncResponse(msg)
           break
         case "channel/directory-request":
           await this.handleDirectoryRequest(msg)
@@ -109,16 +110,36 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
+   * Handle sync responses by saving document updates to storage.
+   */
+  private async handleSyncResponse(msg: ChannelMsg): Promise<void> {
+    if (msg.type !== "channel/sync-response") return
+
+    const { docId, transmission } = msg
+
+    // Only save if we received actual data
+    if (transmission.type === "update" || transmission.type === "snapshot") {
+      // Generate a unique key for this update
+      // Format: [docId, "update", timestamp]
+      const timestamp = Date.now().toString()
+      const key: StorageKey = [docId, "update", timestamp]
+
+      await this.save(key, transmission.data)
+    }
+  }
+
+  /**
    * Automatically respond to establishment requests.
    * Storage has no concept of "connection establishment" - it's always ready.
    */
   private autoEstablish(msg: ChannelMsgEstablishRequest): void {
-    if (!this.receive || !this.storageChannel) return
+    if (!this.receive) {
+      return
+    }
 
     this.receive({
       type: "channel/establish-response",
       identity: { name: this.adapterId },
-      responderPublishDocId: this.storageChannel.publishDocId,
     })
   }
 

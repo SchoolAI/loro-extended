@@ -79,18 +79,18 @@ export class Repo {
     return handle as unknown as DocHandle<T>
   }
 
+  has(docId: DocId): boolean {
+    return this.#handles.has(docId)
+  }
+
   /**
    * Deletes a document from the repo.
    * @param documentId The ID of the document to delete
    */
-  async delete(docId: DocId): Promise<void> {
-    // TODO: move this logic to the synchronizer
-    // const handle = this.handleCache.get(documentId)
-    // if (handle) {
-    //   this.handleCache.delete(documentId)
-    //   await this.storageAdapter.remove([documentId])
-    //   this.synchronizer.removeDocument(documentId)
-    // }
+  delete(docId: DocId): void {
+    this.#handles.delete(docId)
+    // TODO: Also remove from synchronizer and send delete messages to adapters
+    // this.#synchronizer.removeDocument(docId)
   }
 
   /**

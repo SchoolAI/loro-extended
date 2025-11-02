@@ -48,16 +48,17 @@ export function createDocState({ docId }: { docId: DocId }): DocState {
  *
  * Why is `awareness` separate from `loading`?
  * - we track `loading` state when:
- *   - THIS repo makes a sync request related to a docId through the channel to the other repo
+ *   - this repo makes a sync request related to a docId through the channel
  * - we track `awareness` state when:
- *   - THIS repo OR the OTHER repo makes any request related to a docId through the channel
+ *   - this repo makes a sync request related to a docId through the channel, OR
+ *   - we receive any request related to a docId from the channel
  *
- * This distinction allows us to retain clarity around the circumstances in which a
- * docId and a channelId are related, and current state. For example, `awareness` is useful
- * to determine if the other repo is aware of a docId by any means--whether we revealed it
- * to the other repo, or it revealed it knows about the docId to us. This helps us to not
- * leak information that we shouldn't, such as when a repo requests a directory listing of
- * our docIds, but our permission manager forbids revealing certain docIds.
+ * This distinction allows us to retain clarity around the circumstances in which a docId and a
+ * channelId are related, and current state. For example, `awareness` is useful to determine if the
+ * channel (e.g. perhaps another repo) is aware of a docId by any means--whether we revealed it to
+ * the channel, or it revealed it knows about the docId to us. This helps us to not leak
+ * information that we shouldn't, such as when a repo requests a directory listing of our docIds,
+ * but our permission manager forbids revealing certain docIds.
  *
  */
 export type DocChannelState = {

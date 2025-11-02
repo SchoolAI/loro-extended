@@ -23,7 +23,7 @@ export interface Rules {
    *
    * @returns `true` if listing the document is permitted, `false` otherwise.
    */
-  canList(context: RuleContext): boolean
+  canReveal(context: RuleContext): boolean
 
   /**
    * Determines if we should accept a sync message from a remote peer for a
@@ -32,7 +32,7 @@ export interface Rules {
    *
    * @returns `true` if writing is permitted, `false` otherwise.
    */
-  canWrite(context: RuleContext): boolean
+  canUpdate(context: RuleContext): boolean
 
   /**
    * Determines if a peer is allowed to delete a document.
@@ -49,8 +49,8 @@ export function createPermissions(
 ): Rules {
   return {
     canBeginSync: permissions?.canBeginSync ?? defaultPermission,
-    canList: permissions?.canList ?? defaultPermission,
-    canWrite: permissions?.canWrite ?? defaultPermission,
+    canReveal: permissions?.canReveal ?? defaultPermission,
+    canUpdate: permissions?.canUpdate ?? defaultPermission,
     canDelete: permissions?.canDelete ?? defaultPermission,
   }
 }

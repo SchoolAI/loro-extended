@@ -5,7 +5,7 @@ import type {
   Channel,
   ChannelId,
 } from "../channel.js"
-import { ChannelDirectory } from "../channel.js"
+import { ChannelDirectory } from "../channel-directory.js"
 import type { AdapterId } from "../types.js"
 import type { HandleSendFn } from "./types.js"
 
@@ -33,7 +33,7 @@ export abstract class Adapter<G> {
 
   protected abstract generate(context: G): BaseChannel
 
-  abstract init({
+  abstract onBeforeStart({
     addChannel,
     removeChannel,
   }: {
@@ -41,11 +41,11 @@ export abstract class Adapter<G> {
     removeChannel: (channelId: ChannelId) => Channel | undefined
   }): void
 
-  abstract deinit(): void
+  abstract onStart(): void
 
-  abstract start(): void
+  abstract onAfterStop(): void
 
-  prepare({
+  _prepare({
     channelAdded,
     channelRemoved,
   }: {
@@ -54,33 +54,29 @@ export abstract class Adapter<G> {
   }) {
     this.logger.trace(`prepare`)
 
-    return this.init({
-      addChannel: (context: G) => {
-        const channel = this.channels.create(context)
-
-        channelAdded(channel)
-
-        return channel
-      },
-      removeChannel: (channelId: ChannelId) => {
-        const channel = this.channels.remove(channelId)
-
-        if (channel) {
-          channelRemoved(channel)
-        }
-
-        return channel
-      },
+    this.channels.setHooks({
+      channelAdded,
+      channelRemoved,
     })
+
+    const addChannel = (context: G) => {
+      return this.channels.create(context)
+    }
+
+    const removeChannel = (channelId: ChannelId) => {
+      return this.channels.remove(channelId)
+    }
+
+    return this.onBeforeStart({ addChannel, removeChannel })
   }
 
-  stop() {
+  _stop() {
     this.logger.trace(`stop`)
     this.channels.reset()
-    this.deinit()
+    this.onAfterStop()
   }
 
-  send(envelope: AddressedEnvelope): boolean {
+  _send(envelope: AddressedEnvelope): boolean {
     let foundAddressee = false
 
     for (const toChannelId of envelope.toChannelIds) {

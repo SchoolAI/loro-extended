@@ -214,7 +214,7 @@ export class BridgeAdapter extends Adapter<InlineContext> {
    * Start participating in the in-process network.
    * Registers this adapter with the bridge and begins listening for network events.
    */
-  init({
+  onBeforeStart({
     addChannel,
     removeChannel,
   }: {
@@ -285,7 +285,7 @@ export class BridgeAdapter extends Adapter<InlineContext> {
     }
   }
 
-  start() {
+  onStart() {
     this.logger.trace(`start`)
 
     this.bridge.announceAdapterAdded(this.adapterId)
@@ -298,7 +298,7 @@ export class BridgeAdapter extends Adapter<InlineContext> {
     // })
   }
 
-  deinit() {
+  onAfterStop() {
     this.logger.trace(`deinit`)
 
     // Announce removal before cleaning up

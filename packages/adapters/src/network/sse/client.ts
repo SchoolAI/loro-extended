@@ -2,25 +2,35 @@ import {
   Adapter,
   type BaseChannel,
   type Channel,
-  type ChannelId,
   type ChannelMsg,
   type PeerId,
-  type ReceiveFn,
 } from "@loro-extended/repo"
 import ReconnectingEventSource from "reconnecting-eventsource"
 import { v4 as uuid } from "uuid"
 
 export class SseClientNetworkAdapter extends Adapter<void> {
   private peerId: PeerId
-  private serverUrl: string
+  private postUrl: string
+  private eventSourceUrl: string
   private serverChannel?: Channel
-  private receive?: ReceiveFn
   private eventSource?: ReconnectingEventSource
 
-  constructor(serverUrl: string) {
+  constructor({
+    postUrl,
+    eventSourceUrl,
+  }: {
+    postUrl: string | ((peerId: PeerId) => string)
+    eventSourceUrl: string | ((peerId: PeerId) => string)
+  }) {
     super({ adapterId: "sse-client" })
-    this.peerId = uuid() // Generate unique peer ID
-    this.serverUrl = serverUrl
+    this.peerId = uuid() // Generate unique peer ID for self
+
+    this.postUrl =
+      typeof postUrl === "function" ? postUrl(this.peerId) : postUrl
+    this.eventSourceUrl =
+      typeof eventSourceUrl === "function"
+        ? eventSourceUrl(this.peerId)
+        : eventSourceUrl
   }
 
   protected generate(): BaseChannel {
@@ -29,106 +39,51 @@ export class SseClientNetworkAdapter extends Adapter<void> {
       adapterId: this.adapterId,
       send: async (msg: ChannelMsg) => {
         // Serialize and send via HTTP POST
-        const serialized = this.#serializeMessage(msg)
-        const response = await fetch(`${this.serverUrl}/sync`, {
+        const response = await fetch(this.postUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Peer-Id": this.peerId, // Include peerId in header
           },
-          body: JSON.stringify(serialized),
+          body: JSON.stringify(msg),
         })
 
         if (!response.ok) {
           throw new Error(`Failed to send message: ${response.statusText}`)
         }
       },
-      start: (receive) => {
-        this.receive = receive
+      start: receive => {
+        this.eventSource = new ReconnectingEventSource(this.eventSourceUrl)
+
+        this.eventSource.onmessage = event => {
+          const message = JSON.parse(event.data)
+
+          // Send to channel via receive function
+          receive(message)
+        }
+
+        this.eventSource.onerror = err => {
+          this.logger.warn("SSE connection error", { error: err })
+          // Connection will auto-reconnect via ReconnectingEventSource
+        }
+
+        this.eventSource.onopen = () => {
+          this.logger.debug("SSE connection established")
+        }
       },
       stop: () => {
-        this.receive = undefined
+        this.eventSource?.close()
+        this.eventSource = undefined
       },
     }
   }
 
-  init({ addChannel }: { addChannel: (context: void) => Channel }) {
+  init({ addChannel }: { addChannel: () => Channel }) {
     // Create single channel for server connection
     this.serverChannel = addChannel()
   }
 
-  deinit() {
-    this.eventSource?.close()
-    this.eventSource = undefined
-    this.serverChannel = undefined
-    this.receive = undefined
-  }
+  start() {}
 
-  start() {
-    // Connect to server with peerId
-    const url = `${this.serverUrl}/events?peerId=${this.peerId}`
-    this.eventSource = new ReconnectingEventSource(url)
-
-    this.eventSource.onmessage = (event) => {
-      const serialized = JSON.parse(event.data)
-      const message = this.#deserializeMessage(serialized) as ChannelMsg
-
-      // Send to channel via receive function
-      this.receive?.(message)
-    }
-
-    this.eventSource.onerror = (err) => {
-      this.logger.warn("SSE connection error", { error: err })
-      // Connection will auto-reconnect via ReconnectingEventSource
-    }
-
-    this.eventSource.onopen = () => {
-      this.logger.debug("SSE connection established")
-    }
-  }
-
-  #serializeMessage(message: any): any {
-    if (message && typeof message === "object") {
-      if (message instanceof Uint8Array) {
-        // Convert Uint8Array to base64
-        const base64 = btoa(String.fromCharCode(...message))
-        return {
-          __type: "Uint8Array",
-          data: base64,
-        }
-      } else if (Array.isArray(message)) {
-        return message.map((item) => this.#serializeMessage(item))
-      } else {
-        const result: any = {}
-        for (const key in message) {
-          result[key] = this.#serializeMessage(message[key])
-        }
-        return result
-      }
-    }
-    return message
-  }
-
-  #deserializeMessage(message: any): any {
-    if (message && typeof message === "object") {
-      if (message.__type === "Uint8Array" && message.data) {
-        // Convert base64 back to Uint8Array
-        const binaryString = atob(message.data)
-        const bytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i)
-        }
-        return bytes
-      } else if (Array.isArray(message)) {
-        return message.map((item) => this.#deserializeMessage(item))
-      } else {
-        const result: any = {}
-        for (const key in message) {
-          result[key] = this.#deserializeMessage(message[key])
-        }
-        return result
-      }
-    }
-    return message
-  }
+  deinit() {}
 }

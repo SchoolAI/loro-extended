@@ -35,7 +35,7 @@ export class AdapterManager {
     let atLeastOneAddresseeFound = false
 
     for (const adapter of this.adapters) {
-      if (adapter.send(envelope)) {
+      if (adapter._send(envelope)) {
         atLeastOneAddresseeFound = true
       }
     }
@@ -48,7 +48,7 @@ export class AdapterManager {
   reset() {
     for (const adapter of this.adapters) {
       // Let the adapter clean up its part
-      adapter.stop()
+      adapter._stop()
 
       // Clean up our per-adapter part
       this.onReset(adapter)

@@ -87,7 +87,7 @@ describe("StorageAdapter", () => {
     it("creates a single channel on init", () => {
       let channelCount = 0
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => channelCount++,
         channelRemoved: () => channelCount--,
       })
@@ -97,7 +97,7 @@ describe("StorageAdapter", () => {
     })
 
     it("creates channel with correct metadata", () => {
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -110,7 +110,7 @@ describe("StorageAdapter", () => {
 
   describe("Auto-Establishment", () => {
     it("auto-responds to establishment request", async () => {
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -142,7 +142,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -171,7 +171,7 @@ describe("StorageAdapter", () => {
     })
 
     it("sends unavailable when document not found", async () => {
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -203,7 +203,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -235,7 +235,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -268,7 +268,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -292,7 +292,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -314,7 +314,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -338,7 +338,7 @@ describe("StorageAdapter", () => {
     it("translates delete-request to remove()", async () => {
       await adapter.save(["test-doc"], new Uint8Array([1]))
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -365,7 +365,7 @@ describe("StorageAdapter", () => {
 
     it("sends ignored status on delete error", async () => {
       // Don't save anything, so delete will fail
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -394,7 +394,7 @@ describe("StorageAdapter", () => {
         .fn()
         .mockRejectedValue(new Error("Storage error"))
 
-      errorAdapter.prepare({
+      errorAdapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })
@@ -435,7 +435,7 @@ describe("StorageAdapter", () => {
       })
       await adapter.save(["test-doc", "update", "v1"], update)
 
-      adapter.prepare({
+      adapter._prepare({
         channelAdded: () => {},
         channelRemoved: () => {},
       })

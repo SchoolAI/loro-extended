@@ -41,9 +41,6 @@ export type SynchronizerMessage =
   // (from channel via repo): a channel (storage, network peer) was removed
   | { type: "msg/channel-removed"; channel: Channel }
 
-  // (from repo): ask channels (storage, network peers) for data
-  | { type: "msg/broadcast-sync-request"; docId: DocId }
-
   // (?): create a doc locally
   | { type: "msg/local-doc-ensure"; docId: DocId }
 
@@ -58,7 +55,6 @@ export type SynchronizerMessage =
 export type Command =
   | { type: "cmd/start-channel"; channel: Channel }
   | { type: "cmd/stop-channel"; channel: Channel }
-  | { type: "cmd/establish-channel-doc"; channel: Channel }
   | { type: "cmd/send-message"; envelope: AddressedEnvelope }
   | {
       type: "cmd/send-sync-response"
@@ -173,6 +169,28 @@ function createSynchronizerLogic(
         if (!docState) {
           docState = createDocState({ docId })
           model.documents.set(docId, docState)
+
+          // Set awareness for all established channels where canReveal permits
+          // This ensures storage and permitted network channels receive updates for this new document
+          for (const channel of model.channels.values()) {
+            if (channel.peer.state === "established") {
+              // Start with unknown awareness so getRuleContext can access the channel state
+              setAwarenessState(docState, channel.channelId, "unknown")
+
+              const context = getRuleContext({
+                channel,
+                docState,
+              })
+
+              if (
+                !(context instanceof Error) &&
+                permissions.canReveal(context)
+              ) {
+                setAwarenessState(docState, channel.channelId, "has-doc")
+              }
+            }
+          }
+
           return { type: "cmd/subscribe-local-doc", docId }
         }
 
@@ -283,21 +301,13 @@ function mutatingChannelUpdate(
    */
   switch (channelMessage.type) {
     case "channel/establish-request": {
-      // 1. Learn what docId to consume from the requester
+      // 1. Establish the peer connection
       channel.peer = {
         state: "established",
         identity: channelMessage.identity,
-        consumeDocId: channelMessage.requesterPublishDocId,
       }
 
-      // 2. Now that we have the requester's publishDocId,
-      // start using it to keep metadata about the channel up-to-date
-      const establishChannelDocCmd: Command = {
-        type: "cmd/establish-channel-doc",
-        channel: current(channel),
-      }
-
-      // 3. Share our publishDocId back to the requester
+      // 2. Send establish response back to the requester
       const sendMessageCmd: Command = {
         type: "cmd/send-message",
         envelope: {
@@ -305,12 +315,11 @@ function mutatingChannelUpdate(
           message: {
             type: "channel/establish-response",
             identity: current(model.identity),
-            responderPublishDocId: channel.publishDocId,
           },
         },
       }
 
-      // 4. Kick off sync for documents that our rules allow
+      // 3. Kick off sync for documents that our rules allow
       const docs: ChannelMsgSyncRequest["docs"] = Array.from(
         model.documents.values(),
       ).map(({ doc, docId }) => {
@@ -329,26 +338,26 @@ function mutatingChannelUpdate(
         },
       }
 
-      return batchAsNeeded(
-        establishChannelDocCmd,
-        sendMessageCmd,
-        sendSyncRequestCmd,
-      )
+      return batchAsNeeded(sendMessageCmd, sendSyncRequestCmd)
     }
 
     case "channel/establish-response": {
-      // 1. Learn the responder's identity and what docId to consume
+      // 1. Establish the peer connection
       channel.peer = {
         state: "established",
         identity: channelMessage.identity,
-        consumeDocId: channelMessage.responderPublishDocId,
       }
 
-      // 2. Now that we have the responder's publishDocId, start using it to keep metadata
-      // about the channel up-to-date
-      const establishChannelDocCmd: Command = {
-        type: "cmd/establish-channel-doc",
-        channel: current(channel),
+      // 2. Set awareness for all existing documents where canReveal permits
+      for (const docState of model.documents.values()) {
+        const context = getRuleContext({
+          channel,
+          docState,
+        })
+
+        if (!(context instanceof Error) && permissions.canReveal(context)) {
+          setAwarenessState(docState, channel.channelId, "has-doc")
+        }
       }
 
       // 3. Kick off sync for documents that our rules allow
@@ -370,7 +379,7 @@ function mutatingChannelUpdate(
         },
       }
 
-      return batchAsNeeded(establishChannelDocCmd, sendSyncRequestCmd)
+      return batchAsNeeded(sendSyncRequestCmd)
     }
 
     case "channel/sync-request": {
@@ -403,51 +412,72 @@ function mutatingChannelUpdate(
     case "channel/sync-response": {
       const docState = model.documents.get(channelMessage.docId)
 
-      if (docState) {
-        switch (channelMessage.transmission.type) {
-          case "up-to-date": {
-            // nothing to do for doc data
+      if (!docState) {
+        // Document doesn't exist, nothing to do
+        return
+      }
 
-            // but track that this channel has the doc
-            setAwarenessState(docState, fromChannelId, "has-doc")
-
-            return
-          }
-
-          case "snapshot":
-          case "update": {
-            // apply the sync message to the document
-            docState.doc.import(channelMessage.transmission.data)
-
-            setAwarenessState(docState, fromChannelId, "has-doc")
-
-            // track that this channel has the doc
-            return setLoadingStateWithCommand(
-              model,
-              channelMessage.docId,
-              fromChannelId,
-              {
-                state: "found",
-                version: docState.doc.version(),
-              },
-            )
-          }
-
-          case "unavailable": {
-            setAwarenessState(docState, fromChannelId, "no-doc")
-
-            // track that this channel denied having the doc
-            return setLoadingStateWithCommand(
-              model,
-              channelMessage.docId,
-              fromChannelId,
-              {
-                state: "not-found",
-              },
-            )
-          }
+      const channelState = docState.channelState.get(fromChannelId)
+      if (!channelState) {
+        return {
+          type: "cmd/log",
+          message: `can't accept sync-response for docId ${channelMessage.docId} from channel ${fromChannelId}: channel state not found`,
         }
       }
+
+      switch (channelMessage.transmission.type) {
+        case "up-to-date": {
+          // nothing to do for doc data
+
+          // but track that this channel has the doc
+          setAwarenessState(docState, fromChannelId, "has-doc")
+
+          // track that this channel has the doc
+          return setLoadingStateWithCommand(
+            model,
+            channelMessage.docId,
+            fromChannelId,
+            {
+              state: "found",
+              version: channelMessage.transmission.version,
+            },
+          )
+        }
+
+        case "snapshot":
+        case "update": {
+          // apply the sync message to the document
+          docState.doc.import(channelMessage.transmission.data)
+
+          setAwarenessState(docState, fromChannelId, "has-doc")
+
+          // track that this channel has the doc
+          return setLoadingStateWithCommand(
+            model,
+            channelMessage.docId,
+            fromChannelId,
+            {
+              state: "found",
+              version: docState.doc.version(),
+            },
+          )
+        }
+
+        case "unavailable": {
+          setAwarenessState(docState, fromChannelId, "no-doc")
+
+          // track that this channel denied having the doc
+          return setLoadingStateWithCommand(
+            model,
+            channelMessage.docId,
+            fromChannelId,
+            {
+              state: "not-found",
+            },
+          )
+        }
+      }
+
       break
     }
 
@@ -469,7 +499,7 @@ function mutatingChannelUpdate(
           return [{ success: false, error: context }]
         }
 
-        if (permissions.canList(context)) {
+        if (permissions.canReveal(context)) {
           return [{ success: true, docId }]
         } else {
           return []

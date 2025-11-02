@@ -18,12 +18,12 @@ describe("Repo", () => {
   it("should synchronize a document between two repos", async () => {
     const bridge = new InProcessBridge()
     const repo1 = new Repo({
-      peerId: "repo1",
-      network: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo1" },
+      adapters: [new InProcessNetworkAdapter(bridge)],
     })
     const repo2 = new Repo({
-      peerId: "repo2",
-      network: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo1" },
+      adapters: [new InProcessNetworkAdapter(bridge)],
     })
 
     // Repo 1 creates a document
@@ -67,7 +67,7 @@ describe("Repo", () => {
       peerId: "repo1",
       network: [new InProcessNetworkAdapter(bridge)],
       permissions: {
-        canWrite: () => repo1CanWrite,
+        canUpdate: () => repo1CanWrite,
       },
     })
     const repo2 = new Repo({
@@ -128,7 +128,7 @@ describe("Repo", () => {
     expect(repo1.handles.has(handle1.docId)).toBe(true)
   })
 
-  describe("canList permission", () => {
+  describe("canReveal permission", () => {
     let bridge: InProcessBridge
     let repoA: Repo
     let repoB: Repo
@@ -137,11 +137,11 @@ describe("Repo", () => {
       bridge = new InProcessBridge()
     })
 
-    it("should reveal all documents when canList is always true", async () => {
+    it("should reveal all documents when canReveal is always true", async () => {
       repoA = new Repo({
         peerId: "repoA",
         network: [new InProcessNetworkAdapter(bridge)],
-        permissions: { canList: () => true },
+        permissions: { canReveal: () => true },
       })
       const handle1 = repoA.get(crypto.randomUUID())
       const handle2 = repoA.get(crypto.randomUUID())
@@ -164,10 +164,10 @@ describe("Repo", () => {
       expect(bHandle2.doc).toBeDefined()
     })
 
-    it("should not announce documents when canList is false", async () => {
+    it("should not announce documents when canReveal is false", async () => {
       repoA = new Repo({
         network: [new InProcessNetworkAdapter(bridge)],
-        permissions: { canList: () => false },
+        permissions: { canReveal: () => false },
       })
       repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
@@ -181,7 +181,7 @@ describe("Repo", () => {
     it("should sync a document on direct request even if not announced", async () => {
       repoA = new Repo({
         network: [new InProcessNetworkAdapter(bridge)],
-        permissions: { canList: () => false },
+        permissions: { canReveal: () => false },
       })
       repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
 
@@ -205,7 +205,7 @@ describe("Repo", () => {
         peerId: "repoA",
         network: [new InProcessNetworkAdapter(bridge)],
         permissions: {
-          canList: (_, documentId) => documentId.startsWith("allowed"),
+          canReveal: (_, documentId) => documentId.startsWith("allowed"),
         },
       })
       repoB = new Repo({
