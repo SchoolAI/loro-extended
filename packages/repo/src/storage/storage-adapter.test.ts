@@ -121,7 +121,6 @@ describe("StorageAdapter", () => {
       await channel.send({
         type: "channel/establish-request",
         identity: { name: "test-peer" },
-        requesterPublishDocId: "test-doc-id",
       })
 
       expect(receivedMessages).toHaveLength(1)
@@ -129,7 +128,6 @@ describe("StorageAdapter", () => {
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/establish-response",
         identity: { name: "mock-storage" },
-        responderPublishDocId: channel.publishDocId,
       })
     })
   })

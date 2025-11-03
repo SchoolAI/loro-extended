@@ -272,7 +272,7 @@ export abstract class StorageAdapter extends Adapter<void> {
     data: Uint8Array,
     version: VersionVector,
   ): void {
-    if (!this.receive || !this.storageChannel) return
+    if (!this.receive) return
 
     this.receive({
       type: "channel/sync-response",
@@ -289,7 +289,7 @@ export abstract class StorageAdapter extends Adapter<void> {
    * Send an up-to-date response when requester already has latest version.
    */
   private sendUpToDate(docId: DocId, version: VersionVector): void {
-    if (!this.receive || !this.storageChannel) return
+    if (!this.receive) return
 
     this.receive({
       type: "channel/sync-response",
@@ -306,7 +306,7 @@ export abstract class StorageAdapter extends Adapter<void> {
    * Send an unavailable response when document is not found.
    */
   private sendUnavailable(docId: DocId): void {
-    if (!this.receive || !this.storageChannel) return
+    if (!this.receive) return
 
     this.receive({
       type: "channel/sync-response",

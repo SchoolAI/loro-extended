@@ -170,6 +170,8 @@ function createSynchronizerLogic(
           docState = createDocState({ docId })
           model.documents.set(docId, docState)
 
+          const commands: Command[] = []
+
           // Set awareness for all established channels where canReveal permits
           // This ensures storage and permitted network channels receive updates for this new document
           for (const channel of model.channels.values()) {
@@ -191,7 +193,35 @@ function createSynchronizerLogic(
             }
           }
 
-          return { type: "cmd/subscribe-local-doc", docId }
+          // Send sync-request to all established channels to load the document
+          const docs: ChannelMsgSyncRequest["docs"] = [
+            {
+              docId,
+              requesterDocVersion: docState.doc.version(),
+            },
+          ]
+
+          for (const channel of model.channels.values()) {
+            if (channel.peer.state === "established") {
+              const channelState = docState.channelState.get(channel.channelId)
+              if (channelState && channelState.awareness === "has-doc") {
+                commands.push({
+                  type: "cmd/send-message",
+                  envelope: {
+                    toChannelIds: [channel.channelId],
+                    message: {
+                      type: "channel/sync-request",
+                      docs,
+                    },
+                  },
+                })
+              }
+            }
+          }
+
+          commands.push({ type: "cmd/subscribe-local-doc", docId })
+
+          return batchAsNeeded(...commands)
         }
 
         return
@@ -446,6 +476,26 @@ function mutatingChannelUpdate(
 
         case "snapshot":
         case "update": {
+          // Check if we're allowed to accept updates from this peer
+          const context = getRuleContext({
+            channel,
+            docState,
+          })
+
+          if (context instanceof Error) {
+            return {
+              type: "cmd/log",
+              message: `can't check canUpdate permission: ${context.message}`,
+            }
+          }
+
+          if (!permissions.canUpdate(context)) {
+            return {
+              type: "cmd/log",
+              message: `rejecting update from ${context.peerName} for ${channelMessage.docId}: canUpdate returned false`,
+            }
+          }
+
           // apply the sync message to the document
           docState.doc.import(channelMessage.transmission.data)
 

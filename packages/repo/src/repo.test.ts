@@ -159,10 +159,9 @@ describe("Repo", () => {
 
       // Try to find the document
       loadRangeSpy.mockClear()
-      repo2.get("test-doc").waitForStorage()
+      await repo2.get("test-doc").waitForStorage()
 
       // Should attempt to load from storage using loadRange
-      // (this happens in the background)
       expect(loadRangeSpy).toHaveBeenCalledWith(["test-doc"])
     })
   })

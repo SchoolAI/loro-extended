@@ -336,7 +336,12 @@ describe("Synchronizer Program", () => {
       })
 
       it("should handle snapshot response", () => {
-        const channel = createMockChannel()
+        const channel = createMockChannel({
+          peer: {
+            state: "established",
+            identity: { name: "test-peer" },
+          },
+        })
         const docId = "test-doc"
         const initialModel = createModelWithChannel(channel)
 

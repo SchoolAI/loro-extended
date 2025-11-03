@@ -268,6 +268,12 @@ describe("Synchronizer - Refactored", () => {
       const channel = mockAdapter.simulateChannelAdded("test-channel")
       const docState = synchronizer.getOrCreateDocumentState(docId)
 
+      // Establish the channel first
+      mockAdapter.simulateChannelMessage(channel.channelId, {
+        type: "channel/establish-request",
+        identity: { name: "test-peer" },
+      })
+
       // Add channel state
       docState.channelState.set(channel.channelId, {
         awareness: "unknown",

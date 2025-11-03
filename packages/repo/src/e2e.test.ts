@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  InProcessBridge,
-  InProcessNetworkAdapter,
-} from "./network/in-process-network-adapter.js"
+import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { Repo } from "./repo.js"
+import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 
 // Integration test suite for the Repo
-describe("Repo", () => {
+describe("Repo E2E", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
   })
@@ -16,14 +14,14 @@ describe("Repo", () => {
   })
 
   it("should synchronize a document between two repos", async () => {
-    const bridge = new InProcessBridge()
+    const bridge = new Bridge()
     const repo1 = new Repo({
       identity: { name: "repo1" },
-      adapters: [new InProcessNetworkAdapter(bridge)],
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
     })
     const repo2 = new Repo({
-      identity: { name: "repo1" },
-      adapters: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo2" },
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
     })
 
     // Repo 1 creates a document
@@ -60,19 +58,19 @@ describe("Repo", () => {
   })
 
   it("should not apply a change if a peer is not allowed to write", async () => {
-    const bridge = new InProcessBridge()
+    const bridge = new Bridge()
     let repo1CanWrite = true
 
     const repo1 = new Repo({
-      peerId: "repo1",
-      network: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo1" },
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
       permissions: {
         canUpdate: () => repo1CanWrite,
       },
     })
     const repo2 = new Repo({
-      peerId: "repo2",
-      network: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo2" },
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
     })
 
     const handle1 = repo1.get(crypto.randomUUID())
@@ -105,12 +103,16 @@ describe("Repo", () => {
   })
 
   it("should not delete a document if a peer is not allowed to", async () => {
-    const bridge = new InProcessBridge()
+    const bridge = new Bridge()
     const repo1 = new Repo({
-      network: [new InProcessNetworkAdapter(bridge)],
+      identity: { name: "repo1" },
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
       permissions: { canDelete: () => false },
     })
-    const repo2 = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
+    const repo2 = new Repo({
+      identity: { name: "repo2" },
+      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
+    })
 
     const handle1 = repo1.get(crypto.randomUUID())
 
@@ -125,37 +127,37 @@ describe("Repo", () => {
     await vi.advanceTimersByTimeAsync(100)
 
     // The document should still exist in repo1
-    expect(repo1.handles.has(handle1.docId)).toBe(true)
+    expect(repo1.has(handle1.docId)).toBe(true)
   })
 
   describe("canReveal permission", () => {
-    let bridge: InProcessBridge
+    let bridge: Bridge
     let repoA: Repo
     let repoB: Repo
 
     beforeEach(() => {
-      bridge = new InProcessBridge()
+      bridge = new Bridge()
     })
 
     it("should reveal all documents when canReveal is always true", async () => {
       repoA = new Repo({
-        peerId: "repoA",
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoA" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => true },
       })
       const handle1 = repoA.get(crypto.randomUUID())
       const handle2 = repoA.get(crypto.randomUUID())
 
       repoB = new Repo({
-        peerId: "repoB",
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoB" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
       // Wait for the repos to connect and exchange messages
       await vi.runAllTimersAsync()
 
-      expect(repoB.handles.has(handle1.docId)).toBe(true)
-      expect(repoB.handles.has(handle2.docId)).toBe(true)
+      expect(repoB.has(handle1.docId)).toBe(true)
+      expect(repoB.has(handle2.docId)).toBe(true)
 
       const bHandle1 = repoB.get(handle1.docId)
       const bHandle2 = repoB.get(handle2.docId)
@@ -166,24 +168,36 @@ describe("Repo", () => {
 
     it("should not announce documents when canReveal is false", async () => {
       repoA = new Repo({
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoA" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => false },
       })
-      repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
+      repoB = new Repo({
+        identity: { name: "repoB" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+      })
 
       repoA.get(crypto.randomUUID()) // Create a document that will not be announced
       await vi.runAllTimersAsync()
 
       // B should not know about the doc, because it was not announced
-      expect(repoB.handles.size).toBe(0)
+      // Note: We can't check handles.size directly as it's private, but we can check specific docIds
+      // For this test, we'll just verify that attempting to get a non-existent doc creates a new empty one
+      const docCount = Array.from(repoB["synchronizer"].model.documents.keys())
+        .length
+      expect(docCount).toBe(0)
     })
 
     it("should sync a document on direct request even if not announced", async () => {
       repoA = new Repo({
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoA" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => false },
       })
-      repoB = new Repo({ network: [new InProcessNetworkAdapter(bridge)] })
+      repoB = new Repo({
+        identity: { name: "repoB" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+      })
 
       const handleA = repoA.get(crypto.randomUUID())
       handleA.change(doc => {
@@ -202,15 +216,15 @@ describe("Repo", () => {
 
     it("should selectively announce documents based on permissions", async () => {
       repoA = new Repo({
-        peerId: "repoA",
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoA" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: {
-          canReveal: (_, documentId) => documentId.startsWith("allowed"),
+          canReveal: context => context.docId.startsWith("allowed"),
         },
       })
       repoB = new Repo({
-        peerId: "repoB",
-        network: [new InProcessNetworkAdapter(bridge)],
+        identity: { name: "repoB" },
+        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
       repoA.get("allowed-doc-1")
@@ -218,24 +232,20 @@ describe("Repo", () => {
       repoA.get("allowed-doc-2")
       await vi.runAllTimersAsync()
 
-      expect(repoB.handles.size).toBe(2)
-      expect(repoB.handles.has("allowed-doc-1")).toBe(true)
-      expect(repoB.handles.has("allowed-doc-2")).toBe(true)
-      expect(repoB.handles.has("denied-doc-1")).toBe(false)
+      expect(repoB.has("allowed-doc-1")).toBe(true)
+      expect(repoB.has("allowed-doc-2")).toBe(true)
+      expect(repoB.has("denied-doc-1")).toBe(false)
     })
   })
 
   describe("storage persistence", () => {
     it("should persist and load documents across repo instances", async () => {
-      const { InMemoryStorageAdapter } = await import(
-        "./storage/in-memory-storage-adapter.js"
-      )
       const storage = new InMemoryStorageAdapter()
 
       // Create first repo instance and create a document
       const repo1 = new Repo({
-        peerId: "repo1",
-        storage,
+        identity: { name: "repo1" },
+        adapters: [storage],
       })
 
       const documentId = "persistent-doc"
@@ -257,8 +267,8 @@ describe("Repo", () => {
 
       // Create a second repo instance with the same storage
       const repo2 = new Repo({
-        peerId: "repo2",
-        storage,
+        identity: { name: "repo2" },
+        adapters: [storage],
       })
 
       // Try to find the document - it should load from storage
@@ -277,16 +287,12 @@ describe("Repo", () => {
     })
 
     it("should handle incremental updates across sessions", async () => {
-      const { InMemoryStorageAdapter } = await import(
-        "./storage/in-memory-storage-adapter.js"
-      )
-
       const storage = new InMemoryStorageAdapter()
 
       // First session: create document with initial content
       const repo1 = new Repo({
-        peerId: "repo1",
-        storage,
+        identity: { name: "repo1" },
+        adapters: [storage],
       })
 
       const documentId = "incremental-doc"
@@ -302,8 +308,8 @@ describe("Repo", () => {
 
       // Second session: load document from storage
       const repo2 = new Repo({
-        peerId: "repo2",
-        storage,
+        identity: { name: "repo2" },
+        adapters: [storage],
       })
 
       const handle2 = repo2.get(documentId)
@@ -324,8 +330,8 @@ describe("Repo", () => {
 
       // Third session: verify all changes are persisted in storage
       const repo3 = new Repo({
-        peerId: "repo3",
-        storage,
+        identity: { name: "repo3" },
+        adapters: [storage],
       })
 
       const handle3 = repo3.get(documentId)
@@ -336,19 +342,12 @@ describe("Repo", () => {
     })
 
     it("should reconstruct document from updates alone (no snapshot)", async () => {
-      // This test verifies that the storage system works correctly
-      // The full reconstruction from updates-only is tested in other tests
-
-      const { InMemoryStorageAdapter } = await import(
-        "./storage/in-memory-storage-adapter.js"
-      )
-
       const storage = new InMemoryStorageAdapter()
 
       // Create document with changes
       const repo1 = new Repo({
-        peerId: "repo1",
-        storage,
+        identity: { name: "repo1" },
+        adapters: [storage],
       })
 
       const documentId = "updates-only-doc"
@@ -371,11 +370,10 @@ describe("Repo", () => {
 
       // Create new repo and load the document
       const repo2 = new Repo({
-        peerId: "repo2",
-        storage,
+        identity: { name: "repo2" },
+        adapters: [storage],
       })
 
-      // Use findOrCreate with timeout 0 to immediately check storage
       const handle2 = repo2.get(documentId)
       await handle2.waitForStorage()
 
@@ -386,14 +384,11 @@ describe("Repo", () => {
     })
 
     it("should save and load documents with complex nested structures", async () => {
-      const { InMemoryStorageAdapter } = await import(
-        "./storage/in-memory-storage-adapter.js"
-      )
       const storage = new InMemoryStorageAdapter()
 
       const repo1 = new Repo({
-        peerId: "repo1",
-        storage,
+        identity: { name: "repo1" },
+        adapters: [storage],
       })
 
       const documentId = "complex-doc"
@@ -441,8 +436,8 @@ describe("Repo", () => {
 
       // Load in new repo instance
       const repo2 = new Repo({
-        peerId: "repo2",
-        storage,
+        identity: { name: "repo2" },
+        adapters: [storage],
       })
 
       const handle2 = repo2.get(documentId)
