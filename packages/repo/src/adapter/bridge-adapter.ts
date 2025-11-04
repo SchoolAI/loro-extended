@@ -1,40 +1,18 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import Emittery, { type UnsubscribeFunction } from "emittery"
-import type { BaseChannel, Channel, ChannelMsg } from "../channel.js"
+import type { ChannelMsg, GeneratedChannel } from "../channel.js"
 import type { AdapterId, ChannelId } from "../types.js"
 import { Adapter } from "./adapter.js"
-
-interface BridgeEvents {
-  // announce an adapter has joined the bridge (buffered)
-  "adapter-added": { adapterId: AdapterId }
-
-  // announce an adapter has been removed from the bridge (buffered)
-  "adapter-removed": { adapterId: AdapterId }
-
-  // send or receive a message (unbuffered)
-  "send-message": { adapterId: AdapterId; message: ChannelMsg }
-}
-
-type BufferedEvent = {
-  event: "adapter-added" | "adapter-removed"
-  data: { adapterId: AdapterId }
-}
 
 type BridgeParams = {
   logger?: Logger
 }
 
 /**
- * A bridge that connects multiple BridgeAdapters within the same process.
+ * A simple message router that connects multiple BridgeAdapters within the same process.
  * This enables direct message passing between adapters for testing purposes.
- *
- * Uses message buffering to ensure new adapters learn about existing adapters,
- * solving the race condition where adapters start at different times.
  */
 export class Bridge {
-  readonly emitter = new Emittery<BridgeEvents>()
   readonly adapters = new Map<AdapterId, BridgeAdapter>()
-  readonly eventHistory: BufferedEvent[] = []
   readonly logger: Logger
 
   constructor({ logger }: BridgeParams = {}) {
@@ -59,97 +37,38 @@ export class Bridge {
   }
 
   /**
-   * Send a message to a bridged adapter
+   * Route a message from one adapter to another
    */
-  send(adapterId: AdapterId, message: ChannelMsg) {
-    this.emitter.emit("send-message", { adapterId, message })
-  }
-
-  /**
-   * Subscribe to messages from a bridged adapter
-   */
-  subscribe(adapterId: AdapterId, callback: (message: ChannelMsg) => void) {
-    return this.emitter.on(
-      "send-message",
-      ({ adapterId: toAdapterId, message }) => {
-        if (adapterId === toAdapterId) {
-          callback(message)
-        }
-      },
-    )
-  }
-
-  /**
-   * Subscribe to bridge events with automatic replay of buffered events.
-   * This ensures new listeners receive historical adapter-added/removed events.
-   */
-  on<E extends keyof BridgeEvents>(
-    event: E,
-    handler: (data: BridgeEvents[E]) => void | Promise<void>,
-  ): UnsubscribeFunction {
-    // Replay buffered events for this event type
-    if (event === "adapter-added" || event === "adapter-removed") {
-      for (const bufferedEvent of this.eventHistory) {
-        if (bufferedEvent.event === event) {
-          handler(bufferedEvent.data as BridgeEvents[E])
-        }
-      }
-    }
-
-    // Subscribe to future events
-    return this.emitter.on(event, handler)
-  }
-
-  /**
-   * Broadcast that an adapter has been added to the network
-   */
-  announceAdapterAdded(adapterId: AdapterId): void {
-    const data = { adapterId }
-
-    this.logger.debug(`announceAdapterAdded`, {
-      adapterId,
-      eventHistory: this.eventHistory,
+  routeMessage(
+    fromAdapterId: AdapterId,
+    toAdapterId: AdapterId,
+    message: ChannelMsg,
+  ): void {
+    this.logger.trace(`routeMessage`, {
+      from: fromAdapterId,
+      to: toAdapterId,
+      messageType: message.type,
     })
-
-    // Buffer the event
-    this.eventHistory.push({ event: "adapter-added", data })
-
-    // Emit to current listeners
-    this.emitter.emit("adapter-added", data)
-  }
-
-  /**
-   * Broadcast that an adapter has been removed from the network
-   */
-  announceAdapterRemoved(adapterId: AdapterId): void {
-    const data = { adapterId }
-
-    // Buffer the removal event
-    this.eventHistory.push({ event: "adapter-removed", data })
-
-    // Clean up: remove the corresponding adapter-added event to prevent memory leak
-    const addedIndex = this.eventHistory.findIndex(
-      e => e.event === "adapter-added" && e.data.adapterId === adapterId,
-    )
-    if (addedIndex !== -1) {
-      this.eventHistory.splice(addedIndex, 1)
+    const toAdapter = this.adapters.get(toAdapterId)
+    if (toAdapter) {
+      toAdapter.deliverMessage(fromAdapterId, message)
+    } else {
+      this.logger.warn(`routeMessage: target adapter not found`, {
+        toAdapterId,
+      })
     }
-
-    // Emit to current listeners
-    this.emitter.emit("adapter-removed", data)
   }
 
   /**
-   * Get all adapter IDs currently in the bridge network
+   * Get all adapter IDs currently in the bridge
    */
   get adapterIds(): Set<AdapterId> {
     return new Set(this.adapters.keys())
   }
 }
 
-type InlineContext = {
-  send: (msg: ChannelMsg) => void
-  subscribe: (fn: (msg: ChannelMsg) => void) => UnsubscribeFunction
+type BridgeAdapterContext = {
+  targetAdapterId: AdapterId
 }
 
 type BridgeAdapterParams = {
@@ -158,13 +77,13 @@ type BridgeAdapterParams = {
   logger?: Logger
 }
 
-export class BridgeAdapter extends Adapter<InlineContext> {
+export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   readonly bridge: Bridge
   readonly logger: Logger
 
-  #deinit: (() => void) | undefined
-  #unsubscribes: (() => void)[] = []
-  #adapterLookup: Map<AdapterId, ChannelId> = new Map()
+  // Track which remote adapter each channel connects to
+  private channelToAdapter = new Map<ChannelId, AdapterId>()
+  private adapterToChannel = new Map<AdapterId, ChannelId>()
 
   constructor({ adapterId, bridge, logger }: BridgeAdapterParams) {
     super({ adapterId })
@@ -176,138 +95,169 @@ export class BridgeAdapter extends Adapter<InlineContext> {
     this.logger.trace(`new BridgeAdapter`)
   }
 
-  generate(context: InlineContext): BaseChannel {
-    this.logger.trace(`generate`)
-
-    let started = false
-    let unsub: UnsubscribeFunction | null = null
+  generate(context: BridgeAdapterContext): GeneratedChannel {
+    this.logger.debug(`generate`, { targetAdapterId: context.targetAdapterId })
 
     return {
       adapterId: this.adapterId,
       kind: "network",
       send: msg => {
-        if (started) {
-          context.send(msg)
-        } else {
-          throw new Error(`adapter can't send message when stopped`)
-        }
-      },
-      start: receive => {
-        started = true
-        unsub = context.subscribe(msg => {
-          if (started) {
-            receive(msg)
-          } else {
-            throw new Error(`adapter can't receive message when stopped`)
-          }
+        this.logger.debug(`channel.send`, {
+          from: this.adapterId,
+          to: context.targetAdapterId,
+          messageType: msg.type,
         })
+        // Route message through bridge to target adapter
+        this.bridge.routeMessage(this.adapterId, context.targetAdapterId, msg)
       },
       stop: () => {
-        started = false
-        unsub?.()
-        unsub = null
+        // Cleanup handled by removeChannel
       },
     }
   }
 
   /**
    * Start participating in the in-process network.
-   * Registers this adapter with the bridge and begins listening for network events.
+   * Uses two-phase initialization:
+   * 1. Create all channels (no messages sent)
+   * 2. Establish channels (only the "newer" adapter initiates to avoid double-establishment)
    */
-  onBeforeStart({
-    addChannel,
-    removeChannel,
-  }: {
-    addChannel: (context: InlineContext) => Channel
-    removeChannel: (id: ChannelId) => Channel | undefined
-  }) {
-    this.logger.trace(`init`)
+  async onStart(): Promise<void> {
+    this.logger.trace(`onStart - registering with bridge`)
 
+    // Step 1: Register with bridge
     this.bridge.addAdapter(this)
 
-    // Listen for network events
-    this.#unsubscribes.push(
-      this.bridge.on("adapter-added", ({ adapterId }) => {
-        this.logger.trace(`adapter-added`, { addedAdapterId: adapterId })
-
-        // Don't create a channel to ourselves
-        if (adapterId === this.adapterId) {
-          this.logger.debug(`adapter-added not creating channel for self`)
-          return
-        }
-
-        if (this.#adapterLookup.has(adapterId)) {
-          this.logger.warn(`adapter-added not re-creating channel`, {
-            addedAdapterId: adapterId,
-          })
-          return
-        }
-
-        // When an adapter is added to the bridge, we create a channel between ourselves and that adapter
-        const channel = addChannel({
-          send: (message: ChannelMsg) => {
-            // Send message through the bridge to the target adapter
-            this.bridge.send(adapterId, message)
-          },
-
-          subscribe: (fn: (msg: ChannelMsg) => void) => {
-            return this.bridge.subscribe(this.adapterId, fn)
-          },
-        })
-
-        this.#adapterLookup.set(adapterId, channel.channelId)
-      }),
-    )
-
-    this.#unsubscribes.push(
-      this.bridge.on("adapter-removed", ({ adapterId }) => {
-        const channelId = this.#adapterLookup.get(adapterId)
-
-        if (!channelId) {
-          this.logger.warn(`adapter-removed unable to find adapter`, {
-            removedAdapterId: adapterId,
-          })
-          return
-        }
-
-        removeChannel(channelId)
-      }),
-    )
-
-    // De-init
-    this.#deinit = () => {
-      // Remove all bridge event listeners
-      for (const unsub of this.#unsubscribes) {
-        unsub()
+    // Phase 1: Create all channels (no establishment yet)
+    // Tell existing adapters to create channels to us
+    for (const [adapterId, adapter] of this.bridge.adapters) {
+      if (adapterId !== this.adapterId) {
+        this.logger.trace(`telling ${adapterId} to create channel to us`)
+        adapter.createChannelTo(this.adapterId)
       }
+    }
 
-      this.#unsubscribes = []
+    // Create our channels to existing adapters
+    for (const adapterId of this.bridge.adapters.keys()) {
+      if (adapterId !== this.adapterId) {
+        this.logger.trace(`creating our channel to ${adapterId}`)
+        this.createChannelTo(adapterId)
+      }
+    }
+
+    // Phase 2: Establish channels
+    // Only WE initiate establishment (to existing adapters)
+    // This avoids double-establishment since we're the "new" adapter joining
+    for (const channelId of this.adapterToChannel.values()) {
+      this.logger.trace(`establishing our channel ${channelId}`)
+      this.establishChannel(channelId)
+    }
+
+    this.logger.trace(`onStart complete`)
+  }
+
+  /**
+   * Stop participating in the in-process network.
+   * Cleans up all channels and removes from bridge.
+   */
+  async onStop(): Promise<void> {
+    this.logger.trace(`stop`)
+
+    // Tell other adapters to remove their channels to us
+    for (const [adapterId, adapter] of this.bridge.adapters) {
+      if (adapterId !== this.adapterId) {
+        adapter.removeChannelTo(this.adapterId)
+      }
+    }
+
+    // Remove ourselves from bridge
+    this.bridge.removeAdapter(this.adapterId)
+
+    // Remove all our channels
+    for (const channelId of this.channelToAdapter.keys()) {
+      this.removeChannel(channelId)
+    }
+    this.channelToAdapter.clear()
+    this.adapterToChannel.clear()
+  }
+
+  /**
+   * Create a channel to a target adapter (Phase 1).
+   * Does NOT trigger establishment - that happens in Phase 2.
+   * Called by our own onStart() or by other adapters when they start.
+   */
+  createChannelTo(targetAdapterId: AdapterId): void {
+    if (this.adapterToChannel.has(targetAdapterId)) {
+      this.logger.trace(`channel already exists to ${targetAdapterId}`)
+      return
+    }
+
+    const channel = this.addChannel({ targetAdapterId })
+    this.channelToAdapter.set(channel.channelId, targetAdapterId)
+    this.adapterToChannel.set(targetAdapterId, channel.channelId)
+
+    this.logger.trace(`channel created (not yet established)`, {
+      targetAdapterId,
+      channelId: channel.channelId,
+    })
+  }
+
+  /**
+   * Establish a channel to a target adapter (Phase 2).
+   * Triggers the establishment handshake.
+   * Called by our own onStart() or by other adapters when they start.
+   */
+  establishChannelTo(targetAdapterId: AdapterId): void {
+    const channelId = this.adapterToChannel.get(targetAdapterId)
+    if (!channelId) {
+      this.logger.warn(`no channel found to establish`, { targetAdapterId })
+      return
+    }
+
+    this.logger.trace(`establishing channel ${channelId}`)
+    this.establishChannel(channelId)
+  }
+
+  /**
+   * Remove a channel to a target adapter.
+   * Called by other adapters when they stop.
+   */
+  removeChannelTo(targetAdapterId: AdapterId): void {
+    const channelId = this.adapterToChannel.get(targetAdapterId)
+    if (channelId) {
+      this.logger.trace(`removing channel to adapter`, { targetAdapterId })
+      this.removeChannel(channelId)
+      this.channelToAdapter.delete(channelId)
+      this.adapterToChannel.delete(targetAdapterId)
     }
   }
 
-  onStart() {
-    this.logger.trace(`start`)
-
-    this.bridge.announceAdapterAdded(this.adapterId)
-    // for (const adapterId of this.#bridge.adapterIds) {
-    //   this.#bridge.announceAdapterAdded(adapterId)
-    // }
-    // console.log("start", this.adapterId, {
-    //   bridgeAdapters: this.#bridge.adapterIds,
-    //   channels: this.#adapterLookup,
-    // })
-  }
-
-  onAfterStop() {
-    this.logger.trace(`deinit`)
-
-    // Announce removal before cleaning up
-    this.bridge.announceAdapterRemoved(this.adapterId)
-
-    // Remove from bridge
-    this.bridge.removeAdapter(this.adapterId)
-
-    // Clean up event listeners
-    this.#deinit?.()
+  /**
+   * Deliver a message from another adapter to the appropriate channel.
+   * Called by Bridge.routeMessage().
+   */
+  deliverMessage(fromAdapterId: AdapterId, message: ChannelMsg): void {
+    const channelId = this.adapterToChannel.get(fromAdapterId)
+    if (channelId) {
+      const channel = this.channels.get(channelId)
+      if (channel) {
+        this.logger.trace(`delivering message to channel ${channelId}`, {
+          from: fromAdapterId,
+          messageType: message.type,
+        })
+        // Deliver to the channel's onReceive callback (set by synchronizer)
+        channel.onReceive(message)
+      } else {
+        this.logger.warn(`channel not found for message delivery`, {
+          fromAdapterId,
+          channelId,
+        })
+      }
+    } else {
+      this.logger.warn(`no channel found for adapter`, {
+        fromAdapterId,
+        availableChannels: Array.from(this.adapterToChannel.keys()),
+      })
+    }
   }
 }

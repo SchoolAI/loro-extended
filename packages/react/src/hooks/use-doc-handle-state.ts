@@ -1,8 +1,4 @@
-import type {
-  DocHandle,
-  DocHandleSimplifiedState,
-  DocumentId,
-} from "@loro-extended/repo"
+import type { DocHandle, DocId } from "@loro-extended/repo"
 import type { LoroDoc, LoroMap } from "loro-crdt"
 import {
   useCallback,
@@ -21,30 +17,37 @@ export type DocWrapper = {
  * Base hook that manages DocHandle lifecycle and state synchronization.
  * This is the foundation for both simple and typed document hooks.
  *
+ * With the new simplified DocHandle architecture:
+ * - DocHandle is immediately available (synchronous Repo.get())
+ * - Documents are always available (no loading states at DocHandle level)
+ * - We subscribe to LoroDoc changes directly via subscribeLocalUpdates
+ *
  * Follows SRP by handling only:
  * - Handle lifecycle (creation, cleanup)
  * - Event subscription management
  * - State synchronization with React
  */
-export function useDocHandleState(documentId: DocumentId) {
+export function useDocHandleState(documentId: DocId) {
   const repo = useRepo()
   const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
 
-  // Handle lifecycle management
+  // Handle lifecycle management - now synchronous!
   useEffect(() => {
-    repo.get<DocWrapper>(documentId).then(setHandle)
+    const newHandle = repo.get<DocWrapper>(documentId)
+    setHandle(newHandle)
   }, [repo, documentId])
 
-  // Event subscription management
+  // Event subscription management - subscribe to LoroDoc changes
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       if (!handle) return () => {}
-      handle.on("doc-handle-change", onStoreChange)
-      handle.on("doc-handle-state-transition", onStoreChange)
-      return () => {
-        handle.off("doc-handle-change", onStoreChange)
-        handle.off("doc-handle-state-transition", onStoreChange)
-      }
+      
+      // Subscribe to all document updates (local and remote)
+      const unsubscribe = handle.doc.subscribe(() => {
+        onStoreChange()
+      })
+      
+      return unsubscribe
     },
     [handle],
   )
@@ -52,23 +55,17 @@ export function useDocHandleState(documentId: DocumentId) {
   // State synchronization with stable snapshots
   const snapshotRef = useRef<{
     version: number
-    state: DocHandleSimplifiedState
   }>({
     version: -1,
-    state: "loading",
   })
 
   const getSnapshot = useCallback(() => {
     if (handle) {
-      const state = handle.state
-      const version = handle.doc()?.opCount() ?? -1
+      const version = handle.doc.opCount()
 
       // Only update the ref if something actually changed
-      if (
-        snapshotRef.current.state !== state ||
-        snapshotRef.current.version !== version
-      ) {
-        snapshotRef.current = { version, state }
+      if (snapshotRef.current.version !== version) {
+        snapshotRef.current = { version }
       }
     }
 
@@ -84,12 +81,12 @@ export function useDocHandleState(documentId: DocumentId) {
  * Hook that provides raw LoroDoc access without any transformation.
  * Built on top of useDocHandleState following composition over inheritance.
  */
-export function useRawLoroDoc(documentId: DocumentId) {
+export function useRawLoroDoc(documentId: DocId) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
-  // Return raw LoroDoc when ready, null when not
-  const doc =
-    snapshot.state === "ready" && handle ? (handle.doc() as LoroDoc) : null
+  // Return raw LoroDoc when handle is available
+  // With the new architecture, the doc is always available once we have a handle
+  const doc = handle ? (handle.doc as LoroDoc) : null
 
   return { doc, handle, snapshot }
 }

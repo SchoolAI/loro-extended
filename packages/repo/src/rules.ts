@@ -1,14 +1,29 @@
 import type { LoroDoc } from "loro-crdt"
-import type { ChannelId, DocChannelState, DocId } from "./types.js"
+import type { ChannelKind } from "./channel.js"
+import type { ChannelId, DocId } from "./types.js"
 
 export type RuleContext = {
   doc: LoroDoc
   docId: DocId
-  docChannelState: DocChannelState
   peerName: string
   channelId: ChannelId
+  channelKind: ChannelKind // "storage" | "network" | "other"
 }
 
+/**
+ * Example: Storage always gets updates, network peers only for public docs
+ *
+ * ```typescript
+ * const permissions = {
+ *   canReveal: (context) => {
+ *     if (context.channelKind === "storage") {
+ *       return true  // Storage always receives updates for persistence
+ *     }
+ *     return context.docId.startsWith("public-")  // Network peers only for public docs
+ *   }
+ * }
+ * ```
+ */
 export interface Rules {
   /**
    * @returns `true` if we should send a sync request immediately upon channel establishment
@@ -44,9 +59,7 @@ export interface Rules {
 
 const defaultPermission = () => true
 
-export function createPermissions(
-  permissions: Partial<Rules> = {},
-): Rules {
+export function createPermissions(permissions: Partial<Rules> = {}): Rules {
   return {
     canBeginSync: permissions?.canBeginSync ?? defaultPermission,
     canReveal: permissions?.canReveal ?? defaultPermission,

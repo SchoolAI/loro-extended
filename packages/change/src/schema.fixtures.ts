@@ -1,6 +1,7 @@
 import { Shape } from "./shape.js"
 
-const { crdt, value } = Shape
+const crdt = Shape
+const value = Shape.plain
 
 // Pattern 1: List with POJO objects (leaf nodes)
 export const simpleList = crdt.list(value.object({ title: value.string() }))

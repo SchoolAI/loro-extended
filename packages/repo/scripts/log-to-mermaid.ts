@@ -77,7 +77,7 @@ function extractMessages(entries: LogEntry[]): Message[] {
     if (!messageType) continue
 
     // Handle msg/ prefixed messages (repo to itself)
-    if (messageType.startsWith("msg/")) {
+    if (messageType.startsWith("synchronizer/")) {
       const docId = entry.docId || entry.channel?.channelId?.toString()
 
       messages.push({

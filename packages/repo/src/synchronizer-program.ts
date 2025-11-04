@@ -1,68 +1,178 @@
+/**
+ * Synchronizer Program - Core orchestration for document discovery and synchronization
+ *
+ * This module implements the main state machine for the loro-extended synchronization protocol.
+ * It follows The Elm Architecture (TEA) pattern with immutable updates via the mutative library.
+ *
+ * ## Architecture Overview
+ *
+ * The synchronizer uses a **pull-based discovery model** with two main message flows:
+ *
+ * 1. **Discovery Flow** (what documents exist):
+ *    - `directory-request/response` - Peers announce and discover documents
+ *    - Controlled by `canReveal` permission rule
+ *
+ * 2. **Sync Flow** (transferring document data):
+ *    - `sync-request/response` - Peers explicitly request and receive document data
+ *    - Controlled by `canUpdate` permission rule
+ *
+ * ## Key Design Principles
+ *
+ * - **Separation of Concerns**: Discovery and sync are separate, explicit steps
+ * - **Privacy by Design**: Rules checked at every decision point
+ * - **Symmetric Protocol**: Both peers use the same patterns (no client/server roles)
+ * - **Pull-Based**: Peers announce documents, interested peers request them
+ *
+ * ## Message Flow Patterns
+ *
+ * ### Pattern 1: New Document Created
+ * ```
+ * 1. local-doc-change triggered
+ * 2. Send directory-response (announcement) to channels where canReveal=true
+ * 3. Interested peers send sync-request
+ * 4. Send sync-response with document data
+ * ```
+ *
+ * ### Pattern 2: Existing Document Modified
+ * ```
+ * 1. local-doc-change triggered
+ * 2. If peer has previously requested (peerWantsUpdates=true):
+ *    - Send sync-response directly (real-time update)
+ * 3. Otherwise: Send directory-response announcement
+ * ```
+ *
+ * ### Pattern 3: Peer Connection Established
+ * ```
+ * 1. establish-request/response handshake
+ * 2. Both peers send directory-request
+ * 3. Both peers send sync-request for their own documents
+ * 4. Discovery and sync happen in parallel
+ * ```
+ *
+ * @see docs/discovery-and-sync-architecture.md for detailed architecture documentation
+ */
+
 import { getLogger, type Logger } from "@logtape/logtape"
 import { omit } from "lodash-es"
 import type { VersionVector } from "loro-crdt"
-import { current, type Patch } from "mutative"
+import type { Patch } from "mutative"
 import type {
-  AddressedEnvelope,
+  AddressedEstablishedEnvelope,
+  AddressedEstablishmentEnvelope,
   Channel,
   ChannelMsg,
-  ChannelMsgSyncRequest,
+  ConnectedChannel,
   ReturnEnvelope,
 } from "./channel.js"
-import type { RuleContext, Rules } from "./rules.js"
+import { isEstablished } from "./channel.js"
+import type { Rules } from "./rules.js"
 import {
-  type AwarenessState,
-  type ChannelId,
-  createDocChannelState,
-  createDocState,
-  type DocChannelState,
-  type DocId,
-  type DocState,
-  type LoadingState,
-  type PeerIdentityDetails,
-  type ReadyState,
+  type ChannelHandlerContext,
+  handleChannelAdded,
+  handleChannelRemoved,
+  handleDirectoryRequest,
+  handleDirectoryResponse,
+  handleEstablishChannel,
+  handleEstablishRequest,
+  handleEstablishResponse,
+  handleDocChange,
+  handleDocDelete,
+  handleDocEnsure,
+  handleSyncRequest,
+  handleSyncResponse,
+} from "./synchronizer/index.js"
+import type {
+  ChannelId,
+  DocId,
+  DocState,
+  PeerID,
+  PeerIdentityDetails,
+  PeerState,
+  ReadyState,
 } from "./types.js"
 import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // STATE
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+/**
+ * The synchronizer's state model
+ *
+ * This represents the complete state of the synchronization system at any point in time.
+ * All state updates are immutable (via mutative library).
+ */
 export type SynchronizerModel = {
+  /** Our own peer identity */
   identity: PeerIdentityDetails
+
+  /** All documents we know about (local and synced from peers) */
   documents: Map<DocId, DocState>
+
+  /** All active channels (storage adapters, network peers) */
   channels: Map<ChannelId, Channel>
+
+  /**
+   * Peer state tracking for reconnection optimization
+   *
+   * Tracks what each peer knows about our documents to enable:
+   * - Optimized sync on reconnection (only send changed docs)
+   * - Awareness-based message routing (announcements vs updates)
+   */
+  peers: Map<PeerID, PeerState>
 }
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // MESSAGES (inputs to the update function)
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+/**
+ * Messages that drive the synchronizer state machine
+ *
+ * These are the inputs to the update function. Each message triggers
+ * a state transition and may produce commands as side effects.
+ */
 export type SynchronizerMessage =
-  // (from channel via repo): a channel (storage, network peer) was added
-  | { type: "msg/channel-added"; channel: Channel }
+  // Channel lifecycle messages
+  | { type: "synchronizer/channel-added"; channel: ConnectedChannel }
+  | { type: "synchronizer/establish-channel"; channelId: ChannelId }
+  | { type: "synchronizer/channel-removed"; channel: Channel }
 
-  // (from channel via repo): a channel (storage, network peer) was removed
-  | { type: "msg/channel-removed"; channel: Channel }
+  // Document lifecycle messages
+  | { type: "synchronizer/doc-ensure"; docId: DocId }
+  | { type: "synchronizer/doc-change"; docId: DocId }
+  | { type: "synchronizer/doc-delete"; docId: DocId }
 
-  // (?): create a doc locally
-  | { type: "msg/local-doc-ensure"; docId: DocId }
+  // Channel message received (from network or storage)
+  | { type: "synchronizer/channel-receive-message"; envelope: ReturnEnvelope }
 
-  // (?): notify all concerned channels that a local edit was made to the doc
-  | { type: "msg/local-doc-change"; docId: DocId; data: Uint8Array }
-
-  // (from channel): a channel has received a message
-  | { type: "msg/channel-receive-message"; envelope: ReturnEnvelope }
-
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // COMMANDS (outputs of the update function)
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+/**
+ * Commands are side effects produced by the update function
+ *
+ * The synchronizer is pure - it doesn't perform side effects directly.
+ * Instead, it returns commands that the runtime executes.
+ */
 export type Command =
-  | { type: "cmd/start-channel"; channel: Channel }
+  // Channel operations
   | { type: "cmd/stop-channel"; channel: Channel }
-  | { type: "cmd/send-message"; envelope: AddressedEnvelope }
+  | {
+      type: "cmd/send-establishment-message"
+      envelope: AddressedEstablishmentEnvelope
+    }
+  | { type: "cmd/send-message"; envelope: AddressedEstablishedEnvelope }
   | {
       type: "cmd/send-sync-response"
       docId: DocId
       requesterDocVersion: VersionVector
       toChannelId: ChannelId
     }
-  | { type: "cmd/subscribe-local-doc"; docId: DocId }
+
+  // Document operations
+  | { type: "cmd/subscribe-doc"; docId: DocId }
 
   // Events
   | {
@@ -70,16 +180,15 @@ export type Command =
       docId: DocId
       readyStates: ReadyState[]
     }
-  // Timers
-  // | { type: "cmd/set-timeout"; docId: DocId; duration: number }
-  // | { type: "cmd/clear-timeout"; docId: DocId }
 
   // Utilities
   | { type: "cmd/dispatch"; dispatch: SynchronizerMessage }
   | { type: "cmd/batch"; commands: Command[] }
   | { type: "cmd/log"; message: string }
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // PROGRAM DEFINITION
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 export type Program = {
   update(
@@ -88,6 +197,12 @@ export type Program = {
   ): [SynchronizerModel, Command?]
 }
 
+/**
+ * Initialize the synchronizer with a peer identity
+ *
+ * @param identity - Our peer identity (name and stable peerId)
+ * @returns Initial model state with no documents, channels, or peers
+ */
 export function init(
   identity: PeerIdentityDetails,
 ): [SynchronizerModel, Command?] {
@@ -96,19 +211,39 @@ export function init(
       identity,
       documents: new Map(),
       channels: new Map(),
+      peers: new Map(),
     },
   ]
 }
 
 /**
- * Creates a mutative update function that captures permissions in closure.
- * This is used internally by the transformer to provide cleaner update logic.
+ * Creates the core synchronizer update logic with permissions captured in closure
+ *
+ * This function creates a mutative update function that's easier to write and reason about.
+ * The mutative library automatically converts it to an immutable update function.
+ *
+ * ## Message Routing
+ *
+ * The synchronizer handles two categories of messages:
+ *
+ * 1. **Synchronizer Messages** (synchronizer/*):
+ *    - Channel lifecycle (added, removed, establish)
+ *    - Document lifecycle (ensure, change, delete)
+ *    - Handled directly in this switch statement
+ *
+ * 2. **Channel Messages** (channel/*):
+ *    - Protocol messages from peers (establish, sync, directory)
+ *    - Routed to mutatingChannelUpdate for dispatch
+ *
+ * @param permissions - Rules for canReveal and canUpdate checks
+ * @param synchronizerLogger - Logger for tracing message flow
+ * @returns Mutative update function (converted to immutable by makeImmutableUpdate)
  */
 function createSynchronizerLogic(
   permissions: Rules,
   synchronizerLogger: Logger,
 ) {
-  const logger = synchronizerLogger.getChild("synchronizer-program")
+  const logger = synchronizerLogger.getChild("program")
 
   // A mutating update function is easier to read and write, because we need only concern ourselves
   // with what needs to change, using standard assignment and JS operations. But the machinery
@@ -117,178 +252,76 @@ function createSynchronizerLogic(
     msg: SynchronizerMessage,
     model: SynchronizerModel,
   ): Command | undefined {
-    if (msg.type !== "msg/channel-receive-message") {
+    // Log all messages except channel-receive-message (too noisy)
+    if (msg.type !== "synchronizer/channel-receive-message") {
       const detail = "data" in msg ? { ...msg, data: "[omitted]" } : msg
       logger.trace(msg.type, detail)
     }
 
+    // Route synchronizer messages to their handlers
+    // Each handler is in its own file under src/synchronizer/
     switch (msg.type) {
-      case "msg/channel-added": {
-        // 1. Add the channel to our model
-        model.channels.set(msg.channel.channelId, msg.channel)
+      case "synchronizer/channel-added":
+        return handleChannelAdded(msg, model)
 
-        // 2. It's our responsibility to initialize the new channel
-        const initChannelCmd: Command = {
-          type: "cmd/start-channel",
-          channel: msg.channel,
-        }
+      case "synchronizer/establish-channel":
+        return handleEstablishChannel(msg, model)
 
-        return initChannelCmd
-      }
+      case "synchronizer/channel-removed":
+        return handleChannelRemoved(msg, model)
 
-      case "msg/channel-removed": {
-        // 1. It's our responsibility to de-initialize the channel
-        const channel = model.channels.get(msg.channel.channelId)
+      case "synchronizer/doc-ensure":
+        return handleDocEnsure(msg, model, permissions)
 
-        const deinitChannelCmd: Command = channel
-          ? {
-              type: "cmd/stop-channel",
-              channel: current(channel),
-            }
-          : {
-              type: "cmd/log",
-              message: `channel didn't exist when removing: ${msg.channel.channelId}`,
-            }
+      case "synchronizer/doc-change":
+        return handleDocChange(msg, model, permissions, logger)
 
-        // 2. Remove the channel from our model
-        model.channels.delete(msg.channel.channelId)
+      case "synchronizer/doc-delete":
+        return handleDocDelete(msg, model)
 
-        // 3. Remove the channel from all document states
-        for (const docState of model.documents.values()) {
-          docState.channelState.delete(msg.channel.channelId)
-        }
-
-        return deinitChannelCmd
-      }
-
-      case "msg/local-doc-ensure": {
-        const { docId } = msg
-
-        let docState = model.documents.get(docId)
-
-        if (!docState) {
-          docState = createDocState({ docId })
-          model.documents.set(docId, docState)
-
-          const commands: Command[] = []
-
-          // Set awareness for all established channels where canReveal permits
-          // This ensures storage and permitted network channels receive updates for this new document
-          for (const channel of model.channels.values()) {
-            if (channel.peer.state === "established") {
-              // Start with unknown awareness so getRuleContext can access the channel state
-              setAwarenessState(docState, channel.channelId, "unknown")
-
-              const context = getRuleContext({
-                channel,
-                docState,
-              })
-
-              if (
-                !(context instanceof Error) &&
-                permissions.canReveal(context)
-              ) {
-                setAwarenessState(docState, channel.channelId, "has-doc")
-              }
-            }
-          }
-
-          // Send sync-request to all established channels to load the document
-          const docs: ChannelMsgSyncRequest["docs"] = [
-            {
-              docId,
-              requesterDocVersion: docState.doc.version(),
-            },
-          ]
-
-          for (const channel of model.channels.values()) {
-            if (channel.peer.state === "established") {
-              const channelState = docState.channelState.get(channel.channelId)
-              if (channelState && channelState.awareness === "has-doc") {
-                commands.push({
-                  type: "cmd/send-message",
-                  envelope: {
-                    toChannelIds: [channel.channelId],
-                    message: {
-                      type: "channel/sync-request",
-                      docs,
-                    },
-                  },
-                })
-              }
-            }
-          }
-
-          commands.push({ type: "cmd/subscribe-local-doc", docId })
-
-          return batchAsNeeded(...commands)
-        }
-
-        return
-      }
-
-      case "msg/local-doc-change": {
-        const { docId, data } = msg
-
-        const docState = model.documents.get(docId)
-
-        if (!docState) {
-          return {
-            type: "cmd/log",
-            message: `local-doc-change: unable to find doc-state ${docId}`,
-          }
-        }
-
-        const commands: Command[] = []
-
-        for (const [channelId, state] of docState.channelState.entries()) {
-          if (state.awareness === "has-doc") {
-            logger.debug("sending sync-response due to local-doc-change", {
-              channelId,
-              docId,
-            })
-            commands.push({
-              type: "cmd/send-message",
-              envelope: {
-                toChannelIds: [channelId],
-                message: {
-                  type: "channel/sync-response",
-                  docId,
-                  hopCount: 0,
-                  transmission: { type: "update", data },
-                },
-              },
-            })
-          } else {
-            commands.push({
-              type: "cmd/log",
-              message: `not sending change to ${channelId}; awareness is ${state.awareness}`,
-            })
-          }
-        }
-
-        return batchAsNeeded(...commands)
-      }
-
-      // Handle a ChannelMsg that has been received via a Channel
-      case "msg/channel-receive-message": {
-        const fromChannelId = msg.envelope.fromChannelId
-
-        const channelMessage = msg.envelope.message
-
+      case "synchronizer/channel-receive-message":
+        // Channel messages are routed through the channel dispatcher
         return mutatingChannelUpdate(
-          channelMessage,
+          msg.envelope.message,
           model,
-          fromChannelId,
+          msg.envelope.fromChannelId,
           permissions,
           logger,
         )
-      }
     }
     return
   }
 }
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// CHANNEL MESSAGE DISPATCHER
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+/**
+ * Dispatches channel protocol messages to their handlers
+ *
+ * Channel messages implement the discovery and sync protocol between peers.
+ * This function:
+ * 1. Validates the channel exists
+ * 2. Logs the message for debugging
+ * 3. Routes to the appropriate handler based on message type
+ *
+ * ## Message Types
+ *
+ * **Establishment** (connection setup):
+ * - `establish-request` - Peer wants to connect
+ * - `establish-response` - Connection accepted
+ *
+ * **Discovery** (what documents exist):
+ * - `directory-request` - Ask peer what documents they have
+ * - `directory-response` - Announce documents (filtered by canReveal)
+ *
+ * **Sync** (transfer document data):
+ * - `sync-request` - Request document data
+ * - `sync-response` - Send document data (filtered by canUpdate)
+ *
+ * @see docs/discovery-and-sync-architecture.md for protocol details
+ */
 function mutatingChannelUpdate(
   channelMessage: ChannelMsg,
   model: SynchronizerModel,
@@ -305,16 +338,16 @@ function mutatingChannelUpdate(
     }
   }
 
-  const fromChannel = model.channels.get(fromChannelId)
-  const from =
-    fromChannel?.peer.state === "established"
-      ? fromChannel?.peer.identity.name
-      : channelMessage.type === "channel/establish-request"
+  // Determine sender name for logging
+  const from = isEstablished(channel)
+    ? model.peers.get(channel.peerId)?.identity.name
+    : channelMessage.type === "channel/establish-request"
+      ? channelMessage.identity.name
+      : channelMessage.type === "channel/establish-response"
         ? channelMessage.identity.name
-        : channelMessage.type === "channel/establish-response"
-          ? channelMessage.identity.name
-          : "unknown"
+        : "unknown"
 
+  // Log all channel messages for debugging
   logger.trace(channelMessage.type, {
     from,
     to: model.identity.name,
@@ -323,300 +356,37 @@ function mutatingChannelUpdate(
     channelMessage: omit(channelMessage, "type"),
   })
 
-  /**
-   * Main channel message switch--act on each type of channel message
-   *
-   * We play both sides here: requests and responses--but in this context we are always
-   * "receiving" the request or response.
-   */
+  // Build context for handlers
+  const ctx: ChannelHandlerContext = {
+    channel,
+    model,
+    fromChannelId,
+    permissions,
+    logger,
+  }
+
+  // Route to appropriate handler
+  // Each handler is in its own file under src/synchronizer/
   switch (channelMessage.type) {
-    case "channel/establish-request": {
-      // 1. Establish the peer connection
-      channel.peer = {
-        state: "established",
-        identity: channelMessage.identity,
-      }
+    case "channel/establish-request":
+      return handleEstablishRequest(channelMessage, ctx)
 
-      // 2. Send establish response back to the requester
-      const sendMessageCmd: Command = {
-        type: "cmd/send-message",
-        envelope: {
-          toChannelIds: [fromChannelId],
-          message: {
-            type: "channel/establish-response",
-            identity: current(model.identity),
-          },
-        },
-      }
+    case "channel/establish-response":
+      return handleEstablishResponse(channelMessage, ctx)
 
-      // 3. Kick off sync for documents that our rules allow
-      const docs: ChannelMsgSyncRequest["docs"] = Array.from(
-        model.documents.values(),
-      ).map(({ doc, docId }) => {
-        const requesterDocVersion = doc.version()
-        return { docId, requesterDocVersion }
-      })
+    case "channel/sync-request":
+      return handleSyncRequest(channelMessage, ctx)
 
-      const sendSyncRequestCmd: Command = {
-        type: "cmd/send-message",
-        envelope: {
-          toChannelIds: [fromChannelId],
-          message: {
-            type: "channel/sync-request",
-            docs,
-          },
-        },
-      }
+    case "channel/sync-response":
+      return handleSyncResponse(channelMessage, ctx)
 
-      return batchAsNeeded(sendMessageCmd, sendSyncRequestCmd)
-    }
+    case "channel/directory-request":
+      return handleDirectoryRequest(channelMessage, ctx)
 
-    case "channel/establish-response": {
-      // 1. Establish the peer connection
-      channel.peer = {
-        state: "established",
-        identity: channelMessage.identity,
-      }
-
-      // 2. Set awareness for all existing documents where canReveal permits
-      for (const docState of model.documents.values()) {
-        const context = getRuleContext({
-          channel,
-          docState,
-        })
-
-        if (!(context instanceof Error) && permissions.canReveal(context)) {
-          setAwarenessState(docState, channel.channelId, "has-doc")
-        }
-      }
-
-      // 3. Kick off sync for documents that our rules allow
-      const docs: ChannelMsgSyncRequest["docs"] = Array.from(
-        model.documents.values(),
-      ).map(({ doc, docId }) => {
-        const requesterDocVersion = doc.version()
-        return { docId, requesterDocVersion }
-      })
-
-      const sendSyncRequestCmd: Command = {
-        type: "cmd/send-message",
-        envelope: {
-          toChannelIds: [channel.channelId],
-          message: {
-            type: "channel/sync-request",
-            docs,
-          },
-        },
-      }
-
-      return batchAsNeeded(sendSyncRequestCmd)
-    }
-
-    case "channel/sync-request": {
-      const { docs } = channelMessage
-
-      const commands: (Command | undefined)[] = []
-
-      for (const { docId, requesterDocVersion } of docs) {
-        const docState = model.documents.get(docId)
-
-        if (docState) {
-          logger.debug("sending sync-response due to channel/sync-request", {
-            docId,
-          })
-
-          // Respond with document data if we have it
-          commands.push({
-            type: "cmd/send-sync-response",
-            toChannelId: fromChannelId,
-            docId,
-            requesterDocVersion,
-          })
-
-          commands.push(setAwarenessState(docState, fromChannelId, "has-doc"))
-        }
-      }
-
-      return batchAsNeeded(...commands)
-    }
-    case "channel/sync-response": {
-      const docState = model.documents.get(channelMessage.docId)
-
-      if (!docState) {
-        // Document doesn't exist, nothing to do
-        return
-      }
-
-      const channelState = docState.channelState.get(fromChannelId)
-      if (!channelState) {
-        return {
-          type: "cmd/log",
-          message: `can't accept sync-response for docId ${channelMessage.docId} from channel ${fromChannelId}: channel state not found`,
-        }
-      }
-
-      switch (channelMessage.transmission.type) {
-        case "up-to-date": {
-          // nothing to do for doc data
-
-          // but track that this channel has the doc
-          setAwarenessState(docState, fromChannelId, "has-doc")
-
-          // track that this channel has the doc
-          return setLoadingStateWithCommand(
-            model,
-            channelMessage.docId,
-            fromChannelId,
-            {
-              state: "found",
-              version: channelMessage.transmission.version,
-            },
-          )
-        }
-
-        case "snapshot":
-        case "update": {
-          // Check if we're allowed to accept updates from this peer
-          const context = getRuleContext({
-            channel,
-            docState,
-          })
-
-          if (context instanceof Error) {
-            return {
-              type: "cmd/log",
-              message: `can't check canUpdate permission: ${context.message}`,
-            }
-          }
-
-          if (!permissions.canUpdate(context)) {
-            return {
-              type: "cmd/log",
-              message: `rejecting update from ${context.peerName} for ${channelMessage.docId}: canUpdate returned false`,
-            }
-          }
-
-          // apply the sync message to the document
-          docState.doc.import(channelMessage.transmission.data)
-
-          setAwarenessState(docState, fromChannelId, "has-doc")
-
-          // track that this channel has the doc
-          return setLoadingStateWithCommand(
-            model,
-            channelMessage.docId,
-            fromChannelId,
-            {
-              state: "found",
-              version: docState.doc.version(),
-            },
-          )
-        }
-
-        case "unavailable": {
-          setAwarenessState(docState, fromChannelId, "no-doc")
-
-          // track that this channel denied having the doc
-          return setLoadingStateWithCommand(
-            model,
-            channelMessage.docId,
-            fromChannelId,
-            {
-              state: "not-found",
-            },
-          )
-        }
-      }
-
-      break
-    }
-
-    case "channel/directory-request": {
-      // Filter documents based on permissions
-      type Result =
-        | { success: true; docId: string }
-        | { success: false; error: Error }
-
-      const docResults: Result[] = Array.from(
-        model.documents.keys(),
-      ).flatMap<Result>(docId => {
-        const context = getRuleContext({
-          channel: model.channels.get(fromChannelId),
-          docState: model.documents.get(docId),
-        })
-
-        if (context instanceof Error) {
-          return [{ success: false, error: context }]
-        }
-
-        if (permissions.canReveal(context)) {
-          return [{ success: true, docId }]
-        } else {
-          return []
-        }
-      })
-
-      const allowedDocIds = docResults.flatMap(result =>
-        result.success ? [result.docId] : [],
-      )
-
-      const logCmds: Command[] = docResults.flatMap(result =>
-        result.success
-          ? []
-          : [{ type: "cmd/log", message: result.error.message }],
-      )
-
-      const sendMessageCmd: Command = {
-        type: "cmd/send-message",
-        envelope: {
-          toChannelIds: [fromChannelId],
-          message: {
-            type: "channel/directory-response",
-            docIds: allowedDocIds,
-          },
-        },
-      }
-
-      return batchAsNeeded(...logCmds, sendMessageCmd)
-    }
-
-    case "channel/directory-response": {
-      const commands: (Command | undefined)[] = []
-
-      for (const docId of channelMessage.docIds) {
-        let docState = model.documents.get(docId)
-
-        if (!docState) {
-          docState = createDocState({ docId })
-          model.documents.set(docId, docState)
-          commands.push({ type: "cmd/subscribe-local-doc", docId })
-        }
-
-        setAwarenessState(docState, fromChannelId, "has-doc")
-      }
-
-      return batchAsNeeded(...commands)
-    }
+    case "channel/directory-response":
+      return handleDirectoryResponse(channelMessage, ctx)
   }
   return
-}
-
-function batchAsNeeded(
-  ...commandSequence: (Command | undefined)[]
-): Command | undefined {
-  const definedCommands: Command[] = commandSequence.flatMap(c =>
-    c ? [c] : [],
-  )
-
-  if (definedCommands.length === 0) {
-    return
-  }
-
-  if (definedCommands.length === 1) {
-    return definedCommands[0]
-  }
-
-  return { type: "cmd/batch", commands: definedCommands }
 }
 
 type CreateSynchronizerUpdateParams = {
@@ -626,10 +396,28 @@ type CreateSynchronizerUpdateParams = {
 }
 
 /**
- * Creates a standard raj-compatible update function with permissions captured in closure.
- * Uses the transformer to provide immutability while keeping the logic clean.
+ * Creates the main synchronizer update function
  *
- * onPatch: optional debug callback that receives a list of changes at each update cycle
+ * This is the public API for creating a synchronizer. It wraps the mutative
+ * update logic with immutability guarantees via the mutative library.
+ *
+ * ## Usage
+ *
+ * ```typescript
+ * const update = createSynchronizerUpdate({
+ *   permissions: {
+ *     canReveal: (ctx) => ctx.channelKind === "storage" || isOwner(ctx),
+ *     canUpdate: (ctx) => ctx.channelKind === "storage" || hasWriteAccess(ctx),
+ *   },
+ *   logger: getLogger(["my-app", "sync"]),
+ *   onUpdate: (patches) => console.log("State changed:", patches),
+ * })
+ * ```
+ *
+ * @param permissions - Rules for canReveal and canUpdate checks
+ * @param logger - Optional logger (defaults to @loro-extended/repo logger)
+ * @param onUpdate - Optional callback for debugging state changes
+ * @returns Immutable update function compatible with raj/TEA pattern
  */
 export function createSynchronizerUpdate({
   permissions,
@@ -645,117 +433,5 @@ export function createSynchronizerUpdate({
   )
 }
 
-export function getReadyStates(
-  channels: Map<ChannelId, Channel>,
-  channelState: Map<ChannelId, DocChannelState>,
-): ReadyState[] {
-  const readyStates: ReadyState[] = []
-
-  for (const [channelId, state] of channelState.entries()) {
-    const channel = channels.get(channelId)
-    if (channel) {
-      readyStates.push({
-        channelMeta: {
-          kind: channel.kind,
-          adapterId: channel.adapterId,
-        },
-        loading: Object.assign({}, state.loading),
-      })
-    }
-  }
-
-  return readyStates
-}
-
-function getRuleContext({
-  channel,
-  docState,
-}: {
-  channel: Channel | undefined
-  docState: DocState | undefined
-}): RuleContext | Error {
-  if (!channel || channel.peer.state !== "established") {
-    return new Error(`can't get rules context for undefined channel`)
-  }
-
-  if (!docState) {
-    return new Error(`can't get rules context for undefined docState`)
-  }
-
-  const docChannelState = docState.channelState.get(channel.channelId)
-
-  if (!docChannelState) {
-    return new Error(`can't get rules context for undefined docChannelState`)
-  }
-
-  return {
-    peerName: channel.peer.identity.name,
-    channelId: channel.channelId,
-    doc: docState.doc,
-    docId: docState.docId,
-    docChannelState,
-  }
-}
-
-function setAwarenessState(
-  docState: DocState,
-  channelId: ChannelId,
-  awareness: AwarenessState,
-): undefined {
-  const status = docState.channelState.get(channelId)
-
-  if (status) {
-    status.awareness = awareness
-  } else {
-    docState.channelState.set(channelId, createDocChannelState({ awareness }))
-  }
-}
-
-function setLoadingStateWithCommand(
-  model: SynchronizerModel,
-  docId: DocId,
-  channelId: ChannelId,
-  loading: LoadingState,
-): Command | undefined {
-  const docState = model.documents.get(docId)
-
-  if (!docState) {
-    return {
-      type: "cmd/log",
-      message: `set-loading unable to get doc-state for docId ${docId}`,
-    }
-  }
-
-  const status = docState.channelState.get(channelId)
-
-  let didSetLoading = false
-
-  if (status) {
-    // Handle new loading state case
-    if (status.loading.state !== loading.state) {
-      status.loading = loading
-      didSetLoading = true
-    }
-
-    // Handle updated version case
-    if (
-      status.loading.state === "found" &&
-      loading.state === "found" &&
-      status.loading.version.compare(loading.version) !== undefined
-    ) {
-      status.loading.version = loading.version
-      didSetLoading = true
-    }
-  } else {
-    docState.channelState.set(channelId, createDocChannelState({ loading }))
-    didSetLoading = true
-  }
-
-  if (didSetLoading) {
-    return {
-      type: "cmd/emit-ready-state-changed",
-      docId: docState.docId,
-      readyStates: getReadyStates(model.channels, docState.channelState),
-    }
-  }
-}
+// Re-export helpers for backward compatibility
+export { getReadyStates } from "./synchronizer/state-helpers.js"

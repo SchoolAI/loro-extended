@@ -14,6 +14,9 @@ importers:
 
   examples/todo-app:
     dependencies:
+      '@logtape/logtape':
+        specifier: ^1.1.1
+        version: 1.1.1
       '@loro-extended/adapters':
         specifier: workspace:^
         version: link:../../packages/adapters
@@ -127,8 +130,8 @@ importers:
         specifier: ^8.0.3
         version: 8.0.3
       loro-crdt:
-        specifier: ^1.5.9
-        version: 1.6.0
+        specifier: ^1.9.0
+        version: 1.9.0
       reconnecting-eventsource:
         specifier: ^1.6.4
         version: 1.6.4
@@ -155,8 +158,8 @@ importers:
   packages/change:
     dependencies:
       loro-crdt:
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.0
+        version: 1.9.0
     devDependencies:
       tsup:
         specifier: ^8.5.0
@@ -177,8 +180,8 @@ importers:
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
-        specifier: ^1.5.9
-        version: 1.6.0
+        specifier: ^1.9.0
+        version: 1.9.0
       react:
         specifier: '>=18'
         version: 19.1.1
@@ -221,8 +224,8 @@ importers:
         specifier: ^1.0.1
         version: 1.2.0
       loro-crdt:
-        specifier: ^1.5.9
-        version: 1.6.0
+        specifier: ^1.9.0
+        version: 1.9.0
       mutative:
         specifier: ^1.2.0
         version: 1.2.0
@@ -1513,8 +1516,8 @@ packages:
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
 
-  loro-crdt@1.6.0:
-    resolution: {integrity: sha512-Jdtjo3GITCncKxFU9LbK1ykGwZ4zOmlhPtJFA1vzRYuy3tYpuu/gU6rXx0nZ3pSuDNv0ZklS+7mm1cSEjouOqQ==}
+  loro-crdt@1.9.0:
+    resolution: {integrity: sha512-twXAoypRaqSj8t0KJxKPis7ceqcJufrolcB8GLRkq2iGdqJ2EKT+rCJgwVoVgx8dhgFfbJjJEnpLKRs/bY6TcQ==}
 
   loupe@3.2.0:
     resolution: {integrity: sha512-2NCfZcT5VGVNX9mSZIxLRkEAegDGBpuQZBy13desuHeVORmBDyAET4TkJr4SjqQy3A8JDofMN6LpkK8Xcm/dlw==}
@@ -3432,7 +3435,7 @@ snapshots:
 
   lodash@4.17.21: {}
 
-  loro-crdt@1.6.0: {}
+  loro-crdt@1.9.0: {}
 
   loupe@3.2.0: {}
 

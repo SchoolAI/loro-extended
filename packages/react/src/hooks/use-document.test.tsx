@@ -31,7 +31,7 @@ describe("useDocument", () => {
 
     expect(doc).toEqual(testEmptyState) // Always defined due to empty state
     expect(typeof changeDoc).toBe("function")
-    expect(handle).toBeNull() // Initially null
+    expect(handle).not.toBeNull() // Handle is immediately available with new API
   })
 
   it("should compose useLoroDocState and useLoroDocChanger correctly", () => {
@@ -42,19 +42,18 @@ describe("useDocument", () => {
       wrapper: RepoWrapper,
     })
 
-    const [, changeDoc] = result.current
+    const [doc, changeDoc, handle] = result.current
 
-    // Test that changeDoc warns when handle is null (from useLoroDocChanger)
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    // With the new synchronous API, handle is immediately available
+    expect(handle).not.toBeNull()
+    expect(doc).toEqual(testEmptyState)
 
+    // Test that changeDoc works correctly
     const mockChangeFn = vi.fn()
     changeDoc(mockChangeFn)
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "doc handle not available for change",
-    )
-
-    consoleSpy.mockRestore()
+    // The change function should have been called
+    expect(mockChangeFn).toHaveBeenCalled()
   })
 
   it("should maintain stable function references", () => {
@@ -90,11 +89,14 @@ describe("useDocument", () => {
 
     const [doc2, changeDoc2, handle2] = result.current
 
-    // Both docs should show empty state, handles initially null
+    // Both docs should show empty state, handles are immediately available
     expect(doc1).toEqual(testEmptyState)
     expect(doc2).toEqual(testEmptyState)
-    expect(handle1).toBeNull()
-    expect(handle2).toBeNull()
+    expect(handle1).not.toBeNull()
+    expect(handle2).not.toBeNull()
+    
+    // They should be different instances
+    expect(handle1).not.toBe(handle2)
 
     // Change functions should be functions
     expect(typeof changeDoc1).toBe("function")

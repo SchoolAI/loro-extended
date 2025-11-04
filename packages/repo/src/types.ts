@@ -1,18 +1,24 @@
-import { type Container, LoroDoc, type VersionVector } from "loro-crdt"
+import {
+  type Container,
+  LoroDoc,
+  type PeerID,
+  type VersionVector,
+} from "loro-crdt"
 import type { ChannelMeta } from "./channel.js"
+
+export type { PeerID } from "loro-crdt"
 
 export type DocId = string
 export type ChannelId = number
-export type PeerId = string
 export type AdapterId = string
 export type DocContent = Record<string, Container>
 
 export type LoroDocMutator<T extends DocContent> = (doc: LoroDoc<T>) => void
 
 export type PeerIdentityDetails = {
+  peerId: PeerID // Globally unique, stable identifier (not generated per-connection)
   name: string // peer can give itself a name; this is not unique
-  // uuid: string // globally unique
-  // publicKey: Uint8Array // TODO: let's use public key signing
+  // publicKey?: Uint8Array // Future: For cryptographic identity
 }
 
 export type LoadingState =
@@ -27,51 +33,28 @@ export type ReadyState = {
   loading: LoadingState
 }
 
-export type AwarenessState = "unknown" | "has-doc" | "no-doc"
+export type PeerDocumentAwareness = {
+  awareness: "unknown" | "has-doc" | "no-doc"
+  lastKnownVersion?: VersionVector
+  lastUpdated: Date
+}
+
+export type PeerState = {
+  identity: PeerIdentityDetails
+  documentAwareness: Map<DocId, PeerDocumentAwareness>
+  subscriptions: Set<DocId>
+  lastSeen: Date
+  channels: Set<ChannelId>
+}
 
 export type DocState = {
   doc: LoroDoc
   docId: DocId
-  channelState: Map<ChannelId, DocChannelState>
 }
 
 export function createDocState({ docId }: { docId: DocId }): DocState {
   return {
     doc: new LoroDoc(),
     docId,
-    channelState: new Map(),
-  }
-}
-
-/**
- * DocChannelState is like a join table--it holds state specific to document-channel pairs.
- *
- * Why is `awareness` separate from `loading`?
- * - we track `loading` state when:
- *   - this repo makes a sync request related to a docId through the channel
- * - we track `awareness` state when:
- *   - this repo makes a sync request related to a docId through the channel, OR
- *   - we receive any request related to a docId from the channel
- *
- * This distinction allows us to retain clarity around the circumstances in which a docId and a
- * channelId are related, and current state. For example, `awareness` is useful to determine if the
- * channel (e.g. perhaps another repo) is aware of a docId by any means--whether we revealed it to
- * the channel, or it revealed it knows about the docId to us. This helps us to not leak
- * information that we shouldn't, such as when a repo requests a directory listing of our docIds,
- * but our permission manager forbids revealing certain docIds.
- *
- */
-export type DocChannelState = {
-  awareness: AwarenessState
-  loading: LoadingState
-}
-
-export function createDocChannelState(
-  status: Partial<DocChannelState> = {},
-): DocChannelState {
-  return {
-    awareness: "unknown",
-    loading: { state: "initial" },
-    ...status,
   }
 }

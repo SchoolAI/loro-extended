@@ -1,9 +1,9 @@
 import { LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { ChannelMsg, ReceiveFn } from "../channel.js"
+import type { ChannelMsg, ConnectedChannel, ReceiveFn } from "../channel.js"
 import {
-  StorageAdapter,
   type Chunk,
+  StorageAdapter,
   type StorageKey,
 } from "./storage-adapter.js"
 
@@ -75,6 +75,28 @@ describe("StorageAdapter", () => {
   let receivedMessages: ChannelMsg[]
   let receive: ReceiveFn
 
+  // Helper function to initialize and start adapter with no-op callbacks
+  async function initializeAdapter(
+    adapterInstance: MockStorageAdapter = adapter,
+  ): Promise<ConnectedChannel> {
+    adapterInstance._initialize({
+      identity: { peerId: "123", name: "test-peer" },
+      onChannelAdded: () => {},
+      onChannelRemoved: () => {},
+      onChannelReceive: () => {},
+      onChannelEstablish: () => {},
+    })
+
+    await adapterInstance._start()
+
+    const channel = Array.from(adapterInstance.channels)[0]
+    if (!channel || channel.type !== "connected") {
+      throw new Error("Expected a connected channel")
+    }
+    channel.onReceive = receive
+    return channel
+  }
+
   beforeEach(() => {
     adapter = new MockStorageAdapter()
     receivedMessages = []
@@ -84,23 +106,25 @@ describe("StorageAdapter", () => {
   })
 
   describe("Channel Creation", () => {
-    it("creates a single channel on init", () => {
+    it("creates a single channel on init", async () => {
       let channelCount = 0
 
-      adapter._prepare({
-        channelAdded: () => channelCount++,
-        channelRemoved: () => channelCount--,
+      adapter._initialize({
+        identity: { peerId: "123", name: "test-peer" },
+        onChannelAdded: () => channelCount++,
+        onChannelRemoved: () => channelCount--,
+        onChannelReceive: () => {},
+        onChannelEstablish: () => {},
       })
+
+      await adapter._start()
 
       expect(channelCount).toBe(1)
       expect(adapter.channels.size).toBe(1)
     })
 
-    it("creates channel with correct metadata", () => {
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
+    it("creates channel with correct metadata", async () => {
+      await initializeAdapter()
 
       const channel = Array.from(adapter.channels)[0]
       expect(channel.kind).toBe("storage")
@@ -110,24 +134,21 @@ describe("StorageAdapter", () => {
 
   describe("Auto-Establishment", () => {
     it("auto-responds to establishment request", async () => {
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/establish-request",
-        identity: { name: "test-peer" },
+        identity: { peerId: "123", name: "test-peer" },
       })
 
       expect(receivedMessages).toHaveLength(1)
       expect(receivedMessages[0].type).toBe("channel/establish-response")
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/establish-response",
-        identity: { name: "mock-storage" },
+        identity: {
+          peerId: expect.any(String),
+          name: "mock-storage",
+        },
       })
     })
   })
@@ -140,13 +161,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       // Clear previous calls
       adapter.loadRangeCalls = []
@@ -169,13 +184,7 @@ describe("StorageAdapter", () => {
     })
 
     it("sends unavailable when document not found", async () => {
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/sync-request",
@@ -201,13 +210,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/sync-request",
@@ -233,13 +236,7 @@ describe("StorageAdapter", () => {
       const snapshot = doc.export({ mode: "snapshot" })
       await adapter.save(["test-doc"], snapshot)
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       // Requester has empty version
       await channel.send({
@@ -266,13 +263,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       adapter.loadRangeCalls = []
 
@@ -290,13 +281,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/directory-request",
@@ -312,13 +297,7 @@ describe("StorageAdapter", () => {
       await adapter.save(["doc1"], new Uint8Array([1]))
       await adapter.save(["doc2"], new Uint8Array([2]))
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/directory-request",
@@ -330,19 +309,38 @@ describe("StorageAdapter", () => {
         docIds: ["doc1"],
       })
     })
+
+    it("returns unique docIds when documents have multiple chunks", async () => {
+      // Simulate a document with multiple update chunks (the bug scenario)
+      await adapter.save(["doc1", "update", "1"], new Uint8Array([1]))
+      await adapter.save(["doc1", "update", "2"], new Uint8Array([2]))
+      await adapter.save(["doc1", "update", "3"], new Uint8Array([3]))
+      await adapter.save(["doc2", "update", "1"], new Uint8Array([4]))
+      await adapter.save(["doc2", "update", "2"], new Uint8Array([5]))
+
+      const channel = await initializeAdapter()
+
+      await channel.send({
+        type: "channel/directory-request",
+      })
+
+      // Should return unique docIds, not one per chunk
+      const response = receivedMessages[0]
+      expect(response).toMatchObject({
+        type: "channel/directory-response",
+        docIds: expect.arrayContaining(["doc1", "doc2"]),
+      })
+      if (response.type === "channel/directory-response") {
+        expect(response.docIds).toHaveLength(2) // Not 5!
+      }
+    })
   })
 
   describe("Delete Request Translation", () => {
     it("translates delete-request to remove()", async () => {
       await adapter.save(["test-doc"], new Uint8Array([1]))
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       adapter.removeCalls = []
 
@@ -363,13 +361,7 @@ describe("StorageAdapter", () => {
 
     it("sends ignored status on delete error", async () => {
       // Don't save anything, so delete will fail
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/delete-request",
@@ -392,13 +384,7 @@ describe("StorageAdapter", () => {
         .fn()
         .mockRejectedValue(new Error("Storage error"))
 
-      errorAdapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(errorAdapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter(errorAdapter)
 
       await channel.send({
         type: "channel/sync-request",
@@ -433,13 +419,7 @@ describe("StorageAdapter", () => {
       })
       await adapter.save(["test-doc", "update", "v1"], update)
 
-      adapter._prepare({
-        channelAdded: () => {},
-        channelRemoved: () => {},
-      })
-
-      const channel = Array.from(adapter.channels)[0]
-      channel.start(receive)
+      const channel = await initializeAdapter()
 
       await channel.send({
         type: "channel/sync-request",
@@ -455,8 +435,12 @@ describe("StorageAdapter", () => {
       expect(receivedMessages[0].type).toBe("channel/sync-response")
 
       // Verify the response contains the full document
-      const response = receivedMessages[0] as any
-      if (response.transmission.type === "update") {
+      const response = receivedMessages[0]
+      if (
+        response &&
+        response.type === "channel/sync-response" &&
+        response.transmission.type === "update"
+      ) {
         const reconstructed = new LoroDoc()
         reconstructed.import(response.transmission.data)
         expect(reconstructed.getText("text").toString()).toBe("Hello World")

@@ -1,5 +1,8 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type { AddressedEnvelope } from "../channel.js"
+import type {
+  AddressedEstablishedEnvelope,
+  AddressedEstablishmentEnvelope,
+} from "../channel.js"
 import type { AnyAdapter } from "./adapter.js"
 import type { HandleSendFn } from "./types.js"
 
@@ -31,18 +34,32 @@ export class AdapterManager {
     this.logger = logger ?? getLogger(["@loro-extended", "repo"])
   }
 
-  send(envelope: AddressedEnvelope) {
-    let atLeastOneAddresseeFound = false
+  /**
+   * Send an establishment message (establish-request or establish-response).
+   * These messages can be sent to channels that are not yet established.
+   */
+  sendEstablishmentMessage(envelope: AddressedEstablishmentEnvelope): number {
+    let sentCount = 0
 
     for (const adapter of this.adapters) {
-      if (adapter._send(envelope)) {
-        atLeastOneAddresseeFound = true
-      }
+      sentCount += adapter._send(envelope)
     }
 
-    if (!atLeastOneAddresseeFound) {
-      this.logger.warn(`message not delivered`, { envelope })
+    return sentCount
+  }
+
+  /**
+   * Send an established message (sync, directory, delete).
+   * These messages can only be sent to channels that have been established.
+   */
+  send(envelope: AddressedEstablishedEnvelope): number {
+    let sentCount = 0
+
+    for (const adapter of this.adapters) {
+      sentCount += adapter._send(envelope)
     }
+
+    return sentCount
   }
 
   reset() {

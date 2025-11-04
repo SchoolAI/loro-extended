@@ -1,4 +1,4 @@
-import { Repo, type RepoConfig } from "@loro-extended/repo"
+import { Repo, type RepoParams } from "@loro-extended/repo"
 import {
   createContext,
   type ReactNode,
@@ -13,7 +13,7 @@ export const RepoProvider = ({
   config,
   children,
 }: {
-  config: RepoConfig
+  config: RepoParams
   children: ReactNode
 }) => {
   const repo = useMemo(() => new Repo(config), [config])
@@ -21,8 +21,8 @@ export const RepoProvider = ({
   // Proper cleanup when component unmounts
   useEffect(() => {
     return () => {
-      // Disconnect all network adapters and clean up resources when RepoProvider unmounts
-      repo.disconnect()
+      // Clean up resources when RepoProvider unmounts
+      repo.reset()
     }
   }, [repo])
 

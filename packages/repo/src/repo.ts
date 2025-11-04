@@ -1,14 +1,14 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import { v4 as uuidv4 } from "uuid"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { DocHandle } from "./doc-handle.js"
 import { createPermissions, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocId, PeerIdentityDetails } from "./types.js"
+import { generatePeerId } from "./utils/generate-peer-id.js"
 
 export interface RepoParams {
   adapters: AnyAdapter[]
-  identity?: PeerIdentityDetails
+  identity?: Partial<PeerIdentityDetails>
   permissions?: Partial<Rules>
   onUpdate?: HandleUpdateFn
 }
@@ -33,9 +33,14 @@ export class Repo {
   readonly #handles: Map<DocId, DocHandle> = new Map()
 
   constructor({ identity, adapters, permissions, onUpdate }: RepoParams) {
-    this.identity = identity ?? { name: uuidv4() }
+    // Ensure identity has both peerId and name
+    const peerId = identity?.peerId ?? generatePeerId()
+    const name = identity?.name ?? peerId
+    this.identity = { peerId, name }
 
-    const logger = getLogger(["@loro-extended", "repo"]).with({ identity })
+    const logger = getLogger(["@loro-extended", "repo"]).with({
+      identity: this.identity,
+    })
     this.logger = logger
 
     logger.debug("new Repo", { identity: this.identity })
@@ -80,17 +85,20 @@ export class Repo {
   }
 
   has(docId: DocId): boolean {
-    return this.#handles.has(docId)
+    // Check both handles and synchronizer's document state
+    // This allows has() to return true for documents discovered via directory-response
+    const hasHandle = this.#handles.has(docId)
+    const hasDocState = this.#synchronizer.getDocumentState(docId) !== undefined
+    return hasHandle || hasDocState
   }
 
   /**
    * Deletes a document from the repo.
    * @param documentId The ID of the document to delete
    */
-  delete(docId: DocId): void {
+  async delete(docId: DocId): Promise<void> {
     this.#handles.delete(docId)
-    // TODO: Also remove from synchronizer and send delete messages to adapters
-    // this.#synchronizer.removeDocument(docId)
+    await this.#synchronizer.removeDocument(docId)
   }
 
   /**

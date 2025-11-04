@@ -1,10 +1,28 @@
+import { configure, getConsoleSink } from "@logtape/logtape"
 import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client"
-import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client"
 import { RepoProvider } from "@loro-extended/react"
-import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import App from "./client/app.tsx"
 import "./index.css"
+import type { RepoParams } from "@loro-extended/repo"
+
+// Configure LogTape to log everything to console
+await configure({
+  sinks: { console: getConsoleSink() },
+  filters: {},
+  loggers: [
+    {
+      category: ["@loro-extended"],
+      lowestLevel: "debug", // Enable debug logging to see sync details
+      sinks: ["console"],
+    },
+    {
+      category: ["logtape", "meta"],
+      lowestLevel: "warning",
+      sinks: ["console"],
+    },
+  ],
+})
 
 const root = document.getElementById("root")
 if (!root) {
@@ -12,15 +30,19 @@ if (!root) {
 }
 
 // Create the Repo config so it's a singleton.
-const config = {
-  network: [new SseClientNetworkAdapter("/loro")],
-  storage: new IndexedDBStorageAdapter(),
+// Connect directly to the backend server (no proxy)
+const sseAdapter = new SseClientNetworkAdapter({
+  postUrl: "http://localhost:5170/loro/sync",
+  eventSourceUrl: peerId =>
+    `http://localhost:5170/loro/events?peerId=${peerId}`,
+})
+
+const config: RepoParams = {
+  adapters: [sseAdapter],
 }
 
 createRoot(root).render(
-  <StrictMode>
-    <RepoProvider config={config}>
-      <App />
-    </RepoProvider>
-  </StrictMode>,
+  <RepoProvider config={config}>
+    <App />
+  </RepoProvider>,
 )

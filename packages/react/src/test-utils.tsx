@@ -1,8 +1,9 @@
-import type { DocHandle, DocumentId, RepoConfig } from "@loro-extended/repo"
+import type { DocHandle, DocId, RepoParams } from "@loro-extended/repo"
+import { InMemoryStorageAdapter } from "@loro-extended/repo"
 import { type RenderOptions, render } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { vi } from "vitest"
-import type { DocWrapper } from "./hooks/use-loro-doc-state.js"
+import type { DocWrapper } from "./hooks/use-doc-handle-state.js"
 import { RepoProvider } from "./repo-context.js"
 
 // Mock DocHandle for testing
@@ -24,26 +25,20 @@ export function createMockDocHandle(
   return mockHandle
 }
 
-// Create a test RepoConfig
+// Create a test RepoParams
 export function createTestRepoConfig(
-  overrides: Partial<RepoConfig> = {},
-): RepoConfig {
+  overrides: Partial<RepoParams> = {},
+): RepoParams {
   return {
-    peerId: `test-peer-${Math.random().toString(36).substr(2, 9)}`,
-    storage: {
-      save: vi.fn().mockResolvedValue(undefined),
-      load: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined),
-      loadRange: vi.fn().mockResolvedValue([]),
-      removeRange: vi.fn().mockResolvedValue(undefined),
-    },
+    adapters: [new InMemoryStorageAdapter()],
+    identity: { name: `test-peer-${Math.random().toString(36).substr(2, 9)}` },
     ...overrides,
   }
 }
 
 // Custom render function with RepoProvider
 interface CustomRenderOptions extends Omit<RenderOptions, "wrapper"> {
-  repoConfig?: RepoConfig
+  repoConfig?: RepoParams
 }
 
 export function renderWithRepo(
@@ -62,7 +57,7 @@ export function renderWithRepo(
 
 // Create a proper wrapper component for renderHook
 export function createRepoWrapper(
-  repoConfig: RepoConfig = createTestRepoConfig(),
+  repoConfig: RepoParams = createTestRepoConfig(),
 ) {
   return function RepoWrapper({ children }: { children: React.ReactNode }) {
     return <RepoProvider config={repoConfig}>{children}</RepoProvider>
@@ -70,6 +65,6 @@ export function createRepoWrapper(
 }
 
 // Helper to create a test document ID
-export function createTestDocumentId(): DocumentId {
-  return `test-doc-${Math.random().toString(36).substr(2, 9)}` as DocumentId
+export function createTestDocumentId(): DocId {
+  return `test-doc-${Math.random().toString(36).substr(2, 9)}`
 }

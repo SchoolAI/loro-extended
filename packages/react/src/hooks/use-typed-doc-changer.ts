@@ -27,6 +27,7 @@ export function useTypedDocChanger<T extends DocShape>(
   emptyState: InferPlainType<T>,
 ) {
   // Create a transformer that converts LoroDoc to typed draft
+  // Note: The loroDoc parameter is already the LoroDoc from handle.doc (property, not method)
   const transformer = useCallback(
     (loroDoc: LoroDoc) => {
       const typedDoc = new TypedDoc(schema, emptyState, loroDoc)

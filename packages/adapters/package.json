@@ -42,7 +42,7 @@
     "emittery": "^1.2.0",
     "express": "^4.21.2",
     "idb": "^8.0.3",
-    "loro-crdt": "^1.5.9",
+    "loro-crdt": "^1.9.0",
     "reconnecting-eventsource": "^1.6.4",
     "uuid": "11.1.0"
   },

@@ -1,4 +1,4 @@
-import type { DocumentId } from "@loro-extended/repo"
+import type { DocId } from "@loro-extended/repo"
 import { useEffect, useState } from "react"
 
 /**
@@ -6,9 +6,9 @@ import { useEffect, useState } from "react"
  * @param defaultDocId The default document ID to use when hash is not set
  * @returns The current document ID based on URL hash or default
  */
-export function useDocIdFromHash(defaultDocId: DocumentId): DocumentId {
+export function useDocIdFromHash(defaultDocId: DocId): DocId {
   // Get document ID from URL hash if present, otherwise use default
-  const [docId, setDocId] = useState<DocumentId>(() => {
+  const [docId, setDocId] = useState<DocId>(() => {
     const hash = window.location.hash.slice(1) // Remove the '#' character
     return hash || defaultDocId
   })

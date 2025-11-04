@@ -1,13 +1,23 @@
-import { v4 as uuid } from "uuid"
-import type { Channel, ChannelId, GenerateFn } from "./channel.js"
+import type {
+  Channel,
+  ChannelId,
+  ConnectedChannel,
+  GenerateFn,
+  ReceiveFn,
+} from "./channel.js"
 
 let channelIssuanceId = 1
+
+export type ChannelDirectoryHooks = {
+  onChannelAdded: (channel: Channel) => void
+  onChannelRemoved: (channel: Channel) => void
+}
 
 export class ChannelDirectory<G> {
   private readonly channels: Map<ChannelId, Channel> = new Map()
 
-  private channelAdded?: (channel: Channel) => void
-  private channelRemoved?: (channel: Channel) => void
+  private onChannelAdded?: (channel: Channel) => void
+  private onChannelRemoved?: (channel: Channel) => void
 
   constructor(readonly generate: GenerateFn<G>) {}
 
@@ -27,28 +37,39 @@ export class ChannelDirectory<G> {
     return this.channels.size
   }
 
-  setHooks(hooks: {
-    channelAdded: (channel: Channel) => void
-    channelRemoved: (channel: Channel) => void
-  }) {
-    this.channelAdded = hooks.channelAdded
-    this.channelRemoved = hooks.channelRemoved
+  setHooks(hooks: ChannelDirectoryHooks) {
+    this.onChannelAdded = hooks.onChannelAdded
+    this.onChannelRemoved = hooks.onChannelRemoved
   }
 
-  create(context: G): Channel {
+  /**
+   * Using an adapter's `generate` function, create a GeneratedChannel and then fill in
+   * details needed to convert it to a ConnectedChannel.
+   *
+   * @param context The context specific to the Adapter type
+   * @param onReceive A callback to be used to forward messages to the synchronizer
+   * @returns a ConnectedChannel capable of sending EstablishmentMsgs
+   */
+  create(context: G, onReceive: ReceiveFn): ConnectedChannel {
     const channelId = channelIssuanceId++
 
-    const channel: Channel = Object.assign(this.generate(context), {
+    const generatedChannel = this.generate(context)
+
+    const channel: Channel = {
+      // NOTE:
+      //   The 'send' function becomes type-narrowed here so that only messages related
+      //   to establishing the peer identity can be sent through the 'connected' channel.
+      //   Runtime-wise, however, the `send` function is identical, which is why we can
+      //   pass it through with a spread.
+      ...generatedChannel,
+      type: "connected",
       channelId,
-      publishDocId: uuid(),
-      peer: {
-        state: "unestablished",
-      },
-    } as const)
+      onReceive,
+    }
 
     this.channels.set(channelId, channel)
 
-    this.channelAdded?.(channel)
+    this.onChannelAdded?.(channel)
 
     return channel
   }
@@ -62,7 +83,7 @@ export class ChannelDirectory<G> {
 
     this.channels.delete(channelId)
 
-    this.channelRemoved?.(channel)
+    this.onChannelRemoved?.(channel)
 
     return channel
   }

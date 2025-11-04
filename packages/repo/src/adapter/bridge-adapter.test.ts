@@ -1,53 +1,6 @@
-import { configure, getConsoleSink, getStreamSink } from "@logtape/logtape"
-import fs from "node:fs"
-import stream from "node:stream"
 import { describe, expect, it } from "vitest"
 import { Repo } from "../repo.js"
-import { getJsonLinesFormatter } from "../utils/get-json-lines-formatter.js"
 import { Bridge, BridgeAdapter } from "./bridge-adapter.js"
-
-const LOG_PIPE_PATH = "./log.jsonl"
-
-const logPipeStream = fs.createWriteStream(LOG_PIPE_PATH, { flags: "w" })
-
-await configure({
-  sinks: {
-    console: getConsoleSink({
-      formatter: getJsonLinesFormatter({ properties: "flatten" }),
-    }),
-    file: getStreamSink(stream.Writable.toWeb(logPipeStream), {
-      formatter: getJsonLinesFormatter({ properties: "flatten" }),
-    }),
-  },
-  loggers: [
-    {
-      category: ["@loro-extended", "repo"],
-      lowestLevel: "trace",
-      sinks: ["file"],
-      filters: ["channel"],
-    },
-    {
-      category: ["logtape", "meta"],
-      lowestLevel: "warning",
-      sinks: ["console"],
-    },
-  ],
-
-  filters: {
-    // program: record => {
-    //   return record.category.includes("synchronizer-program")
-    // },
-    channel: record => {
-      const message = record.message[0]
-      if (!message || typeof message !== "string") return false
-      return (
-        message.startsWith("channel/") ||
-        message.startsWith("msg/") ||
-        record.properties.debug === true
-      )
-    },
-  },
-})
 
 describe("BridgeAdapter Integration Tests", () => {
   it("should connect two repos through a shared bridge", async () => {
@@ -119,8 +72,6 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Verify the document was synchronized
     const root2 = handle2.doc.getMap("root")
-    const doc = handle2.doc.toJSON()
-    console.log({ doc })
     expect(root2.get("message")).toBe("Hello from repo1")
     expect(root2.get("count")).toBe(42)
   })

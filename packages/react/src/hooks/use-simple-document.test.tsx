@@ -17,9 +17,10 @@ describe("useSimpleDocument", () => {
 
     const [doc, changeDoc, handle] = result.current
 
-    expect(doc).toBeNull() // Initially null (no empty state overlay)
+    // With the new synchronous API, doc and handle are immediately available
+    expect(doc).not.toBeNull() // Doc is immediately available
     expect(typeof changeDoc).toBe("function")
-    expect(handle).toBeNull() // Initially null
+    expect(handle).not.toBeNull() // Handle is immediately available
   })
 
   it("should compose useSimpleLoroDocState and useSimpleLoroDocChanger correctly", () => {
@@ -30,19 +31,18 @@ describe("useSimpleDocument", () => {
       wrapper: RepoWrapper,
     })
 
-    const [, changeDoc] = result.current
+    const [doc, changeDoc, handle] = result.current
 
-    // Test that changeDoc warns when handle is null (from useSimpleLoroDocChanger)
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    // With the new synchronous API, handle is immediately available
+    expect(handle).not.toBeNull()
+    expect(doc).not.toBeNull()
 
+    // Test that changeDoc works correctly
     const mockChangeFn = vi.fn()
     changeDoc(mockChangeFn)
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "doc handle not available for change",
-    )
-
-    consoleSpy.mockRestore()
+    // The change function should have been called
+    expect(mockChangeFn).toHaveBeenCalled()
   })
 
   it("should maintain stable function references", () => {
@@ -78,11 +78,15 @@ describe("useSimpleDocument", () => {
 
     const [doc2, changeDoc2, handle2] = result.current
 
-    // Both docs should be null initially, handles initially null
-    expect(doc1).toBeNull()
-    expect(doc2).toBeNull()
-    expect(handle1).toBeNull()
-    expect(handle2).toBeNull()
+    // With the new synchronous API, docs and handles are immediately available
+    expect(doc1).not.toBeNull()
+    expect(doc2).not.toBeNull()
+    expect(handle1).not.toBeNull()
+    expect(handle2).not.toBeNull()
+    
+    // They should be different instances
+    expect(doc1).not.toBe(doc2)
+    expect(handle1).not.toBe(handle2)
 
     // Change functions should be functions
     expect(typeof changeDoc1).toBe("function")
@@ -105,14 +109,12 @@ describe("useSimpleDocument", () => {
     const [doc, changeDoc, handle] = result.current
 
     // Type assertions to verify TypeScript compatibility
-    expect(doc).toBeNull()
+    expect(doc).not.toBeNull() // Doc is immediately available
     expect(typeof changeDoc).toBe("function")
-    expect(handle).toBeNull()
+    expect(handle).not.toBeNull() // Handle is immediately available
 
     // Users can cast the result when using TypeScript
-    if (doc) {
-      const data = doc.toJSON() as TodoDoc
-      expect(typeof data).toBe("object")
-    }
+    const data = doc!.toJSON() as TodoDoc
+    expect(typeof data).toBe("object")
   })
 })

@@ -3,6 +3,7 @@ import type {
   AdapterId,
   ChannelId,
   DocId,
+  PeerID,
   PeerIdentityDetails,
 } from "./types.js"
 
@@ -24,6 +25,7 @@ export type SyncTransmission =
       // Once peers are in sync, sending updates is sufficient
       type: "update"
       data: Uint8Array
+      version: VersionVector
     }
   | {
       // A request to sync can be made to a peer, but that peer may decide not to respond (e.g. permissions), or have nothing to respond with
@@ -59,12 +61,6 @@ export type ChannelMsgSyncResponse = {
   type: "channel/sync-response"
   docId: DocId
   transmission: SyncTransmission
-  /**
-   * Hop count to prevent infinite forwarding cascades.
-   * 0 = original message, 1 = forwarded once, etc.
-   * Messages with hopCount >= 1 should not be forwarded again.
-   */
-  hopCount: number
 }
 
 export type ChannelMsgDirectoryRequest = {
@@ -88,11 +84,20 @@ export type ChannelMsgDeleteResponse = {
   status: "deleted" | "ignored"
 }
 
+export type AddressedEstablishmentEnvelope = {
+  toChannelIds: ChannelId[]
+  message: EstablishmentMsg
+}
 /**
  * A channel message wrapped in target channelIds to send the message to
  *
  * These augment bare network messages with targetIds, giving the message addressable recipients.
  */
+
+export type AddressedEstablishedEnvelope = {
+  toChannelIds: ChannelId[]
+  message: EstablishedMsg
+}
 
 export type AddressedEnvelope = {
   toChannelIds: ChannelId[]
@@ -110,9 +115,17 @@ export type ReturnEnvelope = {
  * These are probably what you're looking for--a way to annotate the type of message.
  */
 
-export type ChannelMsg =
+/**
+ * Message type unions based on valid channel states
+ */
+
+/** Messages valid during the establishment phase (ConnectedChannel) */
+export type EstablishmentMsg =
   | ChannelMsgEstablishRequest
   | ChannelMsgEstablishResponse
+
+/** Messages valid after establishment is complete (Channel with peerId) */
+export type EstablishedMsg =
   | ChannelMsgSyncRequest
   | ChannelMsgSyncResponse
   | ChannelMsgDirectoryRequest
@@ -120,18 +133,64 @@ export type ChannelMsg =
   | ChannelMsgDeleteRequest
   | ChannelMsgDeleteResponse
 
+/** All channel messages */
+export type ChannelMsg = EstablishmentMsg | EstablishedMsg
+
 /**
- * A `BaseChannel` is the base of each of our 2 Channel types. It can also be used as
- * as a primordial Channel that doesn't yet have a channelId.
+ * Type predicate to check if a message is an establishment message.
+ */
+export function isEstablishmentMsg(msg: ChannelMsg): msg is EstablishmentMsg {
+  return (
+    msg.type === "channel/establish-request" ||
+    msg.type === "channel/establish-response"
+  )
+}
+
+/**
+ * Type predicate to check if a message requires an established channel.
+ */
+export function isEstablishedMsg(msg: ChannelMsg): msg is EstablishedMsg {
+  return !isEstablishmentMsg(msg)
+}
+
+/**
+ * A `GeneratedChannel` is created by an adapter's generate() method.
+ * It has metadata and actions but no connection to the synchronizer yet.
  *
  * biome-ignore format: left-align
  */
-export type BaseChannel =
+export type GeneratedChannel =
   & ChannelMeta
   & ChannelActions
 
 /**
- * A `Channel` is our side of a connection to an external representation of a document.
+ * A `ConnectedChannel` is registered with the synchronizer and can send/receive messages.
+ * It has a channelId and an onReceive handler.
+ *
+ * biome-ignore format: left-align
+ */
+export type ConnectedChannel =
+  & GeneratedChannel
+  & ChannelIdentity
+  & {
+      type: 'connected',
+
+      /**
+       * Receive handler for incoming messages.
+       * Set by the Synchronizer when the channel is added.
+       */
+      onReceive: (msg: ChannelMsg) => void
+
+      /**
+       * Type-safe send for establishment phase messages.
+       * Only establishment messages can be sent before the channel is established.
+       */
+      send: (msg: EstablishmentMsg) => void
+    }
+
+/**
+ * A `Channel` is a ConnectedChannel that has completed the establish handshake
+ * and knows which peer it's connected to.
  *
  * Examples of different kinds of channels:
  *   - storage: we need to send a request to a database to get a document out of storage
@@ -139,18 +198,34 @@ export type BaseChannel =
  *
  * biome-ignore format: left-align
  */
-export type Channel =
-  & BaseChannel
+export type EstablishedChannel =
+  & GeneratedChannel
   & ChannelIdentity
+  & {
+      type: 'established'
 
-export type ChannelIdentity = {
-  channelId: ChannelId // ID used locally to this repo only
-  peer:
-    | { state: "unestablished" }
-    | {
-        state: "established"
-        identity: PeerIdentityDetails
-      }
+      peerId: PeerID
+
+      /**
+       * Receive handler for incoming messages.
+       * Set by the Synchronizer when the channel is added.
+       */
+      onReceive: (msg: ChannelMsg) => void
+
+      /**
+       * Type-safe send for established channel messages.
+       * Only sync/directory/delete messages can be sent after establishment.
+       */
+      send: (msg: EstablishedMsg) => void
+    }
+
+export type Channel = ConnectedChannel | EstablishedChannel
+
+/**
+ * Type guard to check if a Channel has been established with a peer.
+ */
+export function isEstablished(channel: Channel): channel is EstablishedChannel {
+  return channel.type === "established"
 }
 
 export type ChannelMeta = {
@@ -158,9 +233,21 @@ export type ChannelMeta = {
   adapterId: AdapterId
 }
 
+export type ChannelIdentity = {
+  channelId: ChannelId
+}
+
 export type ChannelActions = {
+  /**
+   * Generic send method for channel messages.
+   *
+   * ⚠️ WARNING: This method does not enforce type safety at compile time.
+   * Prefer using `sendEstablishment()` or `sendEstablished()` for type-safe sends.
+   *
+   * This method is kept for internal use where the caller is responsible for
+   * ensuring messages are sent to channels in the correct state.
+   */
   send: (msg: ChannelMsg) => void
-  start: (receive: ReceiveFn) => void
   stop: () => void
 }
 
@@ -168,4 +255,18 @@ export type ChannelKind = "storage" | "network" | "other"
 
 export type ReceiveFn = (msg: ChannelMsg) => void
 
-export type GenerateFn<G> = (context: G) => BaseChannel
+/**
+ * @deprecated Channels are now ready-on-creation, no lifecycle callbacks needed
+ * A set of callbacks for the channel to report its lifecycle events
+ * to the Synchronizer. This allows the Synchronizer to manage connection state.
+ */
+export interface ChannelLifecycle {
+  /** The channel is now connected and ready to send messages. */
+  onReady: () => void
+  /** An error occurred in the channel. */
+  onError: (error: Error) => void
+  /** The channel has disconnected. */
+  onDisconnect: () => void
+}
+
+export type GenerateFn<G> = (context: G) => GeneratedChannel

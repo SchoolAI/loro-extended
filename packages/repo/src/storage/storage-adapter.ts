@@ -1,16 +1,15 @@
 import { LoroDoc, type VersionVector } from "loro-crdt"
 import { Adapter } from "../adapter/adapter.js"
 import type {
-  BaseChannel,
-  Channel,
   ChannelMsg,
   ChannelMsgDeleteRequest,
   ChannelMsgDirectoryRequest,
-  ChannelMsgEstablishRequest,
   ChannelMsgSyncRequest,
-  ReceiveFn,
+  ConnectedChannel,
+  GeneratedChannel,
 } from "../channel.js"
-import type { DocId } from "../types.js"
+import type { DocId, PeerID } from "../types.js"
+import { generatePeerId } from "../utils/generate-peer-id.js"
 
 export type StorageKey = string[]
 
@@ -33,74 +32,71 @@ export type Chunk = {
  * - Sends appropriate responses back through the channel
  */
 export abstract class StorageAdapter extends Adapter<void> {
-  protected storageChannel?: Channel
-  protected receive?: ReceiveFn
+  protected storageChannel?: ConnectedChannel
+  private readonly storagePeerId: PeerID
+
+  constructor(params: { adapterId: string }) {
+    super(params)
+    // Generate a cryptographically random peerId for this storage adapter instance
+    this.storagePeerId = generatePeerId()
+  }
 
   /**
    * Generate the base channel for this storage adapter.
    * This is called by the ChannelDirectory when creating the channel.
+   * The channel is ready to use immediately.
    */
-  protected generate(): BaseChannel {
+  protected generate(): GeneratedChannel {
     return {
       kind: "storage",
       adapterId: this.adapterId,
       send: this.handleChannelMessage.bind(this),
-      start: receive => {
-        this.receive = receive
-      },
       stop: () => {
-        this.receive = undefined
+        // Cleanup if needed
       },
     }
   }
 
   /**
-   * Initialize the storage adapter by creating its single channel.
+   * Start the storage adapter by creating its single channel.
+   * Storage is always "ready" - no async initialization needed.
    */
-  onBeforeStart({
-    addChannel,
-  }: {
-    addChannel: (context: void) => Channel
-  }): void {
-    this.storageChannel = addChannel()
+  async onStart(): Promise<void> {
+    this.storageChannel = this.addChannel()
+    // Establish the channel to trigger the establishment handshake
+    this.establishChannel(this.storageChannel.channelId)
   }
 
   /**
-   * Clean up the storage adapter.
+   * Stop the storage adapter and clean up resources.
    */
-  onAfterStop(): void {
-    this.storageChannel = undefined
-    this.receive = undefined
-  }
-
-  /**
-   * Start the storage adapter. Storage is always "ready" - nothing to do.
-   */
-  onStart(): void {
-    // Storage is always ready - no async initialization needed
+  async onStop(): Promise<void> {
+    if (this.storageChannel) {
+      this.removeChannel(this.storageChannel.channelId)
+      this.storageChannel = undefined
+    }
   }
 
   /**
    * Handle incoming channel messages and translate them into storage operations.
    */
   private async handleChannelMessage(msg: ChannelMsg): Promise<void> {
+    this.logger.trace("handleChannelMessage", { msg })
+
     try {
       switch (msg.type) {
         case "channel/establish-request":
-          this.autoEstablish(msg)
-          break
+          return await this.handleEstablishRequest()
         case "channel/sync-request":
-          await this.handleSyncRequest(msg)
-          break
+          return await this.handleSyncRequest(msg)
         case "channel/sync-response":
-          await this.handleSyncResponse(msg)
-          break
+          return await this.handleSyncResponse(msg)
         case "channel/directory-request":
-          await this.handleDirectoryRequest(msg)
-          break
+          return await this.handleDirectoryRequest(msg)
+        case "channel/directory-response":
+          return await this.handleDirectoryResponse(msg)
         case "channel/delete-request":
-          await this.handleDeleteRequest(msg)
-          break
+          return await this.handleDeleteRequest(msg)
         default:
           this.logger.warn("unhandled message type", { type: msg.type })
       }
@@ -129,17 +125,30 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
+   * Send a reply message through the storage channel.
+   * Throws an error if the channel is not properly initialized.
+   */
+  private reply(msg: ChannelMsg): void {
+    if (!this.storageChannel) {
+      throw new Error("Cannot reply: storage channel not initialized")
+    }
+    this.storageChannel.onReceive(msg)
+  }
+
+  /**
    * Automatically respond to establishment requests.
    * Storage has no concept of "connection establishment" - it's always ready.
+   * We immediately respond with our identity so the channel becomes established.
    */
-  private autoEstablish(msg: ChannelMsgEstablishRequest): void {
-    if (!this.receive) {
-      return
-    }
-
-    this.receive({
+  private async handleEstablishRequest(): Promise<void> {
+    // Small delay to ensure the channel is fully registered
+    await Promise.resolve()
+    this.reply({
       type: "channel/establish-response",
-      identity: { name: this.adapterId },
+      identity: {
+        peerId: this.storagePeerId,
+        name: this.adapterId,
+      },
     })
   }
 
@@ -157,10 +166,15 @@ export abstract class StorageAdapter extends Adapter<void> {
       try {
         // Load all data for this document (snapshot + updates)
         const chunks = await this.loadRange([docId])
+        this.logger.debug("loaded chunks", { docId, count: chunks.length })
 
         if (chunks.length === 0) {
-          // Document not found in storage
-          this.sendUnavailable(docId)
+          // Document not found in storage yet
+          // Send "unavailable" to indicate we don't have the data
+          // The synchronizer will keep wantsUpdates=true for storage channels
+          // so future updates will still be sent to us for persistence
+          this.logger.debug("document not found in storage", { docId })
+          this.replyUnavailable(docId)
           continue
         }
 
@@ -168,16 +182,14 @@ export abstract class StorageAdapter extends Adapter<void> {
         // Note: Order doesn't matter - Loro's CRDT is commutative
         const tempDoc = new LoroDoc()
 
-        for (const chunk of chunks) {
-          try {
-            tempDoc.import(chunk.data)
-          } catch (error) {
-            this.logger.warn("failed to import chunk", {
-              docId,
-              key: chunk.key,
-              error,
-            })
-          }
+        try {
+          const updates = chunks.map(chunk => chunk.data)
+          tempDoc.importBatch(updates)
+        } catch (error) {
+          this.logger.warn("failed to import chunk batch", {
+            docId,
+            error,
+          })
         }
 
         // Export version-aware response
@@ -188,10 +200,10 @@ export abstract class StorageAdapter extends Adapter<void> {
 
         if (comparison === 0) {
           // Versions are equal - requester is up to date
-          this.sendUpToDate(docId, currentVersion)
+          this.replyUpToDate(docId, currentVersion)
         } else if (comparison === 1) {
           // Requester version is greater - they're ahead (shouldn't happen normally)
-          this.sendUpToDate(docId, currentVersion)
+          this.replyUpToDate(docId, currentVersion)
         } else {
           // Requester version is less than or concurrent - send updates
           const data = tempDoc.export({
@@ -199,11 +211,11 @@ export abstract class StorageAdapter extends Adapter<void> {
             from: requesterDocVersion,
           })
 
-          this.sendSyncResponse(docId, data, currentVersion)
+          this.replyWithSyncResponse(docId, data, currentVersion)
         }
       } catch (error) {
         this.logger.error("sync request failed", { docId, error })
-        this.sendUnavailable(docId)
+        this.replyUnavailable(docId)
       }
     }
   }
@@ -218,17 +230,47 @@ export abstract class StorageAdapter extends Adapter<void> {
       if (msg.docIds) {
         // Check specific docIds
         const available = await this.checkDocIds(msg.docIds)
-        this.sendDirectoryResponse(available)
+        this.replyWithDirectoryResponse(available)
       } else {
         // List all documents
         const chunks = await this.loadRange([])
-        const docIds = chunks.map(chunk => chunk.key[0])
-        this.sendDirectoryResponse(docIds)
+        // Extract unique docIds from chunks (each doc may have multiple chunks)
+        const docIds = Array.from(new Set(chunks.map(chunk => chunk.key[0])))
+        this.replyWithDirectoryResponse(docIds)
       }
     } catch (error) {
       this.logger.error("directory request failed", { error })
-      this.sendDirectoryResponse([])
+      this.replyWithDirectoryResponse([])
     }
+  }
+
+  /**
+   * Handle directory responses (announcements) by eagerly requesting documents.
+   * Storage adapters are "eager" - they automatically request all announced documents.
+   */
+  private async handleDirectoryResponse(msg: ChannelMsg): Promise<void> {
+    if (msg.type !== "channel/directory-response") return
+
+    const { docIds } = msg
+
+    if (docIds.length === 0) return
+
+    this.logger.debug("received directory-response announcement", {
+      docIds,
+      count: docIds.length,
+    })
+
+    // Storage is eager - request all announced documents
+    // Use empty version to get full snapshot
+    const docs = docIds.map(docId => ({
+      docId,
+      requesterDocVersion: new LoroDoc().version(),
+    }))
+
+    this.reply({
+      type: "channel/sync-request",
+      docs,
+    })
   }
 
   /**
@@ -239,10 +281,10 @@ export abstract class StorageAdapter extends Adapter<void> {
   ): Promise<void> {
     try {
       await this.remove([msg.docId])
-      this.sendDeleteResponse(msg.docId, "deleted")
+      this.replyWithDeleteResponse(msg.docId, "deleted")
     } catch (error) {
       this.logger.warn("delete failed", { docId: msg.docId, error })
-      this.sendDeleteResponse(msg.docId, "ignored")
+      this.replyWithDeleteResponse(msg.docId, "ignored")
     }
   }
 
@@ -265,36 +307,31 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
-   * Send a sync response with document data.
+   * Reply with a sync response containing document data.
    */
-  private sendSyncResponse(
+  private replyWithSyncResponse(
     docId: DocId,
     data: Uint8Array,
     version: VersionVector,
   ): void {
-    if (!this.receive) return
-
-    this.receive({
+    this.reply({
       type: "channel/sync-response",
       docId,
-      hopCount: 0,
       transmission: {
         type: "update",
         data,
+        version,
       },
     })
   }
 
   /**
-   * Send an up-to-date response when requester already has latest version.
+   * Reply that the requester already has the latest version.
    */
-  private sendUpToDate(docId: DocId, version: VersionVector): void {
-    if (!this.receive) return
-
-    this.receive({
+  private replyUpToDate(docId: DocId, version: VersionVector): void {
+    this.reply({
       type: "channel/sync-response",
       docId,
-      hopCount: 0,
       transmission: {
         type: "up-to-date",
         version,
@@ -303,41 +340,34 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
-   * Send an unavailable response when document is not found.
+   * Reply that the document is not available.
    */
-  private sendUnavailable(docId: DocId): void {
-    if (!this.receive) return
-
-    this.receive({
+  private replyUnavailable(docId: DocId): void {
+    this.reply({
       type: "channel/sync-response",
       docId,
-      hopCount: 0,
       transmission: { type: "unavailable" },
     })
   }
 
   /**
-   * Send a directory response with available docIds.
+   * Reply with a directory listing of available docIds.
    */
-  private sendDirectoryResponse(docIds: DocId[]): void {
-    if (!this.receive) return
-
-    this.receive({
+  private replyWithDirectoryResponse(docIds: DocId[]): void {
+    this.reply({
       type: "channel/directory-response",
       docIds,
     })
   }
 
   /**
-   * Send a delete response.
+   * Reply with the result of a delete operation.
    */
-  private sendDeleteResponse(
+  private replyWithDeleteResponse(
     docId: DocId,
     status: "deleted" | "ignored",
   ): void {
-    if (!this.receive) return
-
-    this.receive({
+    this.reply({
       type: "channel/delete-response",
       docId,
       status,

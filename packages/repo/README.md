@@ -133,12 +133,32 @@ handle.doc.commit(); // Don't forget to commit!
 
 ## Adapters
 
+Adapters are the backbone of the synchronization system, providing a pluggable architecture for network and storage.
+
+### Channel Lifecycle
+
+At the core of the adapter system is the concept of a **channel**, which represents a connection to a peer or a storage endpoint. Channels follow a strict lifecycle, enforced by the type system, ensuring robust communication:
+
+1.  **`ConnectedChannel`**: The initial state when a channel is first created. In this state, only establishment messages can be exchanged to verify peer identities.
+2.  **`EstablishedChannel`**: After identities are exchanged, the channel transitions to this state. It is now associated with a stable `peerId` and can be used to send and receive document synchronization messages.
+
+This two-phase process prevents data from being sent before both sides have confirmed their identity and permissions, providing a secure foundation for synchronization.
+
+### Peer State & Reconnection Optimization
+
+The repo maintains a sophisticated **peer state model** that tracks the status of every known peer, including which documents they are aware of (`documentAwareness`). This enables a significant performance optimization:
+
+-   **New Peer Connections**: When connecting to a new peer for the first time, the repo performs a full discovery process, using a `directory-request` to learn which documents the peer has.
+-   **Reconnections**: When reconnecting to a known peer, the repo uses its cached `PeerState`. It sends an optimized sync request containing only the changes made since the last connection, dramatically reducing redundant data transfer.
+
+This intelligent state tracking ensures that synchronization is both fast and efficient, especially in environments with intermittent connectivity.
+
 ### Built-in Adapters
 
 The package includes basic adapters for testing and development:
 
 - [`InMemoryStorageAdapter`](./src/storage/in-memory-storage-adapter.ts) - Stores data in memory
-- [`InProcessNetworkAdapter`](./src/network/in-process-network-adapter.ts) - Direct in-process communication
+- [`BridgeAdapter`](./src/adapter/bridge-adapter.ts) & [`Bridge`](./src/adapter/bridge-adapter.ts) - Enables in-process testing of multiple repos by creating a "bridge" between them
 
 ### External Adapters
 
@@ -150,7 +170,7 @@ For production use, see `@loro-extended/adapters`:
 
 ### Custom Storage Adapters
 
-Create custom storage adapters by extending the [`StorageAdapter`](./src/storage/storage-adapter.ts) base class. The base class handles all channel communication automatically - you only need to implement simple storage operations:
+Create custom storage adapters by extending the [`StorageAdapter`](./src/storage/storage-adapter.ts) base class. The base class is a powerful tool that handles **all channel protocol and synchronization logic automatically**. Subclasses only need to implement a simple key/value storage interface, with no knowledge of the underlying channel mechanics.
 
 ```typescript
 import { StorageAdapter, type StorageKey, type Chunk } from "@loro-extended/repo";
@@ -185,39 +205,72 @@ class MyStorageAdapter extends StorageAdapter {
 ```
 
 **Key Features:**
-- **No Channel Knowledge Required**: The base class handles all channel protocol details
-- **Automatic Establishment**: Storage is always "ready" - no connection handshake needed
-- **Version-Aware Sync**: Automatically reconstructs documents from incremental updates
-- **Hierarchical Keys**: Supports efficient incremental storage with keys like `["docId", "update", "v1"]`
+
+-   **Zero Channel Knowledge Required**: The base class transparently handles all channel message boilerplate, including establishment, sync requests, and responses.
+-   **Automatic Establishment**: The adapter automatically handles the channel establishment handshake, presenting itself as a stable peer to the repo.
+-   **Intelligent Version-Aware Sync**: When the repo requests a document, the base class automatically:
+    1.  Loads all relevant data chunks for the document using `loadRange`.
+    2.  Reconstructs the document's complete history in a temporary `LoroDoc`.
+    3.  Exports only the specific updates the requester needs based on their version vector.
+-   **Incremental Storage**: The base class is designed for incremental storage, saving updates with keys like `["docId", "update", "timestamp"]` to support the version-aware sync process.
+-   **`wantsUpdates` vs `loading`**: The system distinguishes between a channel's *permission* to receive updates (`wantsUpdates`) and its current *sync status* (`loading`). This allows a storage adapter to persist updates for a document it doesn't have yet, ensuring it can build a complete history over time.
+
+### Adapter Lifecycle
+
+All adapters, whether for network or storage, follow a strict, internally managed lifecycle to ensure predictable behavior:
+
+1.  **`created`**: The adapter has been instantiated but not yet configured by the repo.
+2.  **`initialized`**: The repo has provided the adapter with the necessary hooks for communication.
+3.  **`started`**: The adapter's `onStart()` method has been called. Only in this state can an adapter add or remove channels. `onStart` is the place to set up listeners or initiate connections.
+4.  **`stopped`**: The adapter has been shut down, and all its resources have been cleaned up.
+
+Subclasses must implement `onStart()` and `onStop()` to manage their specific resources. The `Adapter` base class enforces this lifecycle, throwing errors if methods like `addChannel()` are called in the wrong state.
 
 ### Custom Network Adapters
 
-Create custom network adapters by extending the [`Adapter`](./src/adapter/adapter.ts) class:
+Create custom network adapters by extending the [`Adapter`](./src/adapter/adapter.ts) class. The key is to manage channels correctly within the `onStart` and `onStop` lifecycle methods.
 
 ```typescript
-import { Adapter, type BaseChannel } from "@loro-extended/repo";
+import { Adapter, type GeneratedChannel } from "@loro-extended/repo";
 
-class CustomNetworkAdapter extends Adapter<MyContext> {
-  protected generate(context: MyContext): BaseChannel {
+class CustomNetworkAdapter extends Adapter<ConnectionContext> {
+  // `generate` is called by `addChannel` to create the channel's core logic
+  protected generate(context: ConnectionContext): GeneratedChannel {
     return {
       kind: "network",
       adapterId: this.adapterId,
-      send: (msg) => { /* send logic */ },
-      start: (receive) => { /* start logic */ },
-      stop: () => { /* stop logic */ },
+      send: (msg) => {
+        // Your logic to send a message over the connection
+        context.connection.send(JSON.stringify(msg));
+      },
+      stop: () => {
+        // Your logic to close the connection
+        context.connection.close();
+      },
     };
   }
 
-  init({ addChannel, removeChannel }) {
-    // Initialize adapter, create channels
+  // `onStart` is the place to create channels
+  async onStart(): Promise<void> {
+    // Example: Create a channel for a new WebSocket connection
+    const ws = new WebSocket("wss://example.com/sync");
+
+    ws.onopen = () => {
+      const channel = this.addChannel({ connection: ws });
+      this.establishChannel(channel.channelId); // Begin the handshake
+    };
+
+    ws.onmessage = (event) => {
+      // Find the channel for this connection and pass the message to the repo
+      // (This requires more logic to map connections to channels)
+    };
   }
 
-  deinit() {
-    // Clean up resources
-  }
-
-  start() {
-    // Start listening/connecting
+  async onStop(): Promise<void> {
+    // Clean up all active connections and channels
+    for (const channel of this.channels) {
+      this.removeChannel(channel.channelId);
+    }
   }
 }
 ```
@@ -305,26 +358,39 @@ The Repo package follows a layered architecture:
 
 ## Permission System
 
-Control document access using the [`Rules`](./src/rules.ts) interface:
+Control document access using the [`Rules`](./src/rules.ts) interface. The `RuleContext` provides information about the document, peer, and channel, allowing for fine-grained control.
+
+### `canReveal`
+
+The `canReveal` permission is the most important for controlling document visibility. It's called whenever a new peer connects or a new document is created. If it returns `false`, the document's existence will not be revealed to the peer.
+
+### Using `channelKind` for Storage vs. Network Rules
+
+A key feature of the permission system is the `channelKind` property in the `RuleContext`. This allows you to define different rules for storage adapters versus network adapters. This is crucial for ensuring documents are persisted to storage even if they are not shared with network peers.
 
 ```typescript
+import { Repo } from "@loro-extended/repo";
+
 const repo = new Repo({
   adapters: [network, storage],
   permissions: {
-    canList: ({ docId, peerName }) => {
-      // Control which documents are visible to peers
-      return !docId.startsWith("private-");
+    canReveal: (context) => {
+      // Storage adapters must always be able to receive updates to persist them
+      if (context.channelKind === "storage") {
+        return true;
+      }
+
+      // For network peers, only reveal documents with a "public-" prefix
+      return context.docId.startsWith("public-");
     },
-    canWrite: ({ docId, peerName }) => {
-      // Control who can modify documents
+
+    canUpdate: ({ docId, peerName }) => {
+      // Example: only allow trusted peers to modify documents
       return peerName === "trusted-peer";
     },
-    canBeginSync: ({ docId }) => {
-      // Control automatic sync initiation
-      return true;
-    },
+
     canDelete: ({ docId, peerName }) => {
-      // Control document deletion
+      // Example: only allow admins to delete documents
       return peerName === "admin";
     },
   },
@@ -372,11 +438,12 @@ All storage and network operations flow through channels managed by adapters:
 
 ### Synchronization Protocol
 
-The protocol uses establish/sync-request/sync-response patterns with:
+The protocol is designed for efficiency and robustness, especially in environments with intermittent connectivity.
 
-- Peer identity exchange via publish/consume documents
-- Version vector-based incremental sync
-- Hop count to prevent forwarding cascades
+-   **Establishment Handshake**: A two-phase handshake (`establish-request` / `establish-response`) ensures that both peers have confirmed their identity before any document data is exchanged.
+-   **Directory Protocol**: When connecting to a new peer, the repo sends a `directory-request` to discover which documents the peer has. The peer's response is filtered by `canReveal` permissions, ensuring private documents are not exposed. This step is skipped on reconnection to a known peer, thanks to the peer state cache.
+-   **Version-Vector Sync**: All synchronization is based on Loro's version vectors. When requesting a document, the repo sends its current version. The recipient uses this to calculate the precise set of updates needed, minimizing data transfer.
+-   **Hop Count**: Messages include a `hopCount` to prevent infinite forwarding loops in multi-peer networks.
 
 For detailed documentation, see:
 

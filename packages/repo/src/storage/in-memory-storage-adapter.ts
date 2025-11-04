@@ -7,8 +7,24 @@ import {
 export class InMemoryStorageAdapter extends StorageAdapter {
   #data = new Map<string, Uint8Array>()
 
-  constructor() {
-    super({ adapterId: "in-memory" })
+  constructor(sharedDataOrOptions?: Map<string, Uint8Array> | { sharedData?: Map<string, Uint8Array>; adapterId?: string }) {
+    // Handle both old API (just sharedData) and new API (options object)
+    const options = sharedDataOrOptions instanceof Map
+      ? { sharedData: sharedDataOrOptions, adapterId: "in-memory" }
+      : { adapterId: "in-memory", ...sharedDataOrOptions }
+    
+    super({ adapterId: options.adapterId })
+    
+    if (options.sharedData) {
+      this.#data = options.sharedData
+    }
+  }
+
+  /**
+   * Get the underlying storage map for sharing between instances
+   */
+  getStorage(): Map<string, Uint8Array> {
+    return this.#data
   }
 
   async load(key: StorageKey): Promise<Uint8Array | undefined> {

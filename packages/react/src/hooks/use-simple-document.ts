@@ -1,4 +1,4 @@
-import type { DocHandle, DocumentId } from "@loro-extended/repo"
+import type { DocHandle, DocId } from "@loro-extended/repo"
 import type { LoroDoc } from "loro-crdt"
 import type { SimpleChangeFn } from "./use-doc-changer.js"
 import { useSimpleDocChanger } from "./use-doc-changer.js"
@@ -58,7 +58,7 @@ export type UseSimpleDocumentReturn = [
  * ```
  */
 export function useSimpleDocument(
-  documentId: DocumentId,
+  documentId: DocId,
 ): UseSimpleDocumentReturn {
   const { doc, handle } = useRawLoroDoc(documentId)
   const changeDoc = useSimpleDocChanger(handle)

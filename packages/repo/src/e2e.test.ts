@@ -25,7 +25,7 @@ describe("Repo E2E", () => {
     })
 
     // Repo 1 creates a document
-    const handle1 = repo1.get(crypto.randomUUID())
+    const handle1 = repo1.get("the-doc-id")
     expect(handle1.doc).toBeDefined()
 
     // Mutate the document
@@ -35,7 +35,7 @@ describe("Repo E2E", () => {
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
 
     // Repo 2 finds the document and waits for network sync
-    const handle2 = repo2.get(handle1.docId)
+    const handle2 = repo2.get("the-doc-id")
     await handle2.waitForNetwork()
 
     expect(handle2.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
@@ -55,7 +55,7 @@ describe("Repo E2E", () => {
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({
       text: "hello world",
     })
-  })
+  }, 500)
 
   it("should not apply a change if a peer is not allowed to write", async () => {
     const bridge = new Bridge()
@@ -100,7 +100,7 @@ describe("Repo E2E", () => {
     await vi.advanceTimersByTimeAsync(100)
 
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
-  })
+  }, 500)
 
   it("should not delete a document if a peer is not allowed to", async () => {
     const bridge = new Bridge()
@@ -128,7 +128,7 @@ describe("Repo E2E", () => {
 
     // The document should still exist in repo1
     expect(repo1.has(handle1.docId)).toBe(true)
-  })
+  }, 500)
 
   describe("canReveal permission", () => {
     let bridge: Bridge
@@ -164,7 +164,7 @@ describe("Repo E2E", () => {
 
       expect(bHandle1.doc).toBeDefined()
       expect(bHandle2.doc).toBeDefined()
-    })
+    }, 500)
 
     it("should not announce documents when canReveal is false", async () => {
       repoA = new Repo({
@@ -183,10 +183,11 @@ describe("Repo E2E", () => {
       // B should not know about the doc, because it was not announced
       // Note: We can't check handles.size directly as it's private, but we can check specific docIds
       // For this test, we'll just verify that attempting to get a non-existent doc creates a new empty one
-      const docCount = Array.from(repoB["synchronizer"].model.documents.keys())
-        .length
+      const docCount = Array.from(
+        repoB["synchronizer"].model.documents.keys(),
+      ).length
       expect(docCount).toBe(0)
-    })
+    }, 500)
 
     it("should sync a document on direct request even if not announced", async () => {
       repoA = new Repo({
@@ -212,7 +213,7 @@ describe("Repo E2E", () => {
       await handleB.waitForNetwork()
 
       expect(handleB.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
-    })
+    }, 500)
 
     it("should selectively announce documents based on permissions", async () => {
       repoA = new Repo({
@@ -222,31 +223,44 @@ describe("Repo E2E", () => {
           canReveal: context => context.docId.startsWith("allowed"),
         },
       })
+
+      // Create documents and make changes BEFORE repoB connects
+      const handle1 = repoA.get("allowed-doc-1")
+      handle1.change(doc => doc.getMap("doc").set("test", "1"))
+
+      const handle2 = repoA.get("denied-doc-1")
+      handle2.change(doc => doc.getMap("doc").set("test", "2"))
+
+      const handle3 = repoA.get("allowed-doc-2")
+      handle3.change(doc => doc.getMap("doc").set("test", "3"))
+
+      // Now create repoB - it should receive announcements based on canReveal
       repoB = new Repo({
         identity: { name: "repoB" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
-      repoA.get("allowed-doc-1")
-      repoA.get("denied-doc-1")
-      repoA.get("allowed-doc-2")
+      // Wait for repos to connect and exchange messages
       await vi.runAllTimersAsync()
 
       expect(repoB.has("allowed-doc-1")).toBe(true)
       expect(repoB.has("allowed-doc-2")).toBe(true)
       expect(repoB.has("denied-doc-1")).toBe(false)
     })
-  })
+  }, 500)
 
   describe("storage persistence", () => {
     it("should persist and load documents across repo instances", async () => {
-      const storage = new InMemoryStorageAdapter()
+      const storage1 = new InMemoryStorageAdapter()
 
       // Create first repo instance and create a document
       const repo1 = new Repo({
         identity: { name: "repo1" },
-        adapters: [storage],
+        adapters: [storage1],
       })
+
+      // Wait for storage to be ready
+      await vi.runAllTimersAsync()
 
       const documentId = "persistent-doc"
       const handle1 = repo1.get(documentId)
@@ -265,15 +279,18 @@ describe("Repo E2E", () => {
       // Wait for storage operations to complete
       await vi.runAllTimersAsync()
 
-      // Create a second repo instance with the same storage
+      // Create a second repo instance with a fresh storage adapter that shares the same data
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
         identity: { name: "repo2" },
-        adapters: [storage],
+        adapters: [storage2],
       })
 
       // Try to find the document - it should load from storage
       const handle2 = repo2.get(documentId)
-      await handle2.waitForStorage()
+
+      // Allow time for storage channel to establish and respond
+      await vi.runAllTimersAsync()
 
       // Verify the document was loaded correctly
       const root2 = handle2.doc.getMap("doc")
@@ -284,16 +301,19 @@ describe("Repo E2E", () => {
       // The snapshots should be equivalent
       const snapshot2 = handle2.doc.export({ mode: "snapshot" })
       expect(snapshot2).toEqual(snapshot1)
-    })
+    }, 500)
 
     it("should handle incremental updates across sessions", async () => {
-      const storage = new InMemoryStorageAdapter()
+      const storage1 = new InMemoryStorageAdapter()
 
       // First session: create document with initial content
       const repo1 = new Repo({
         identity: { name: "repo1" },
-        adapters: [storage],
+        adapters: [storage1],
       })
+
+      // Wait for storage to be ready
+      await vi.runAllTimersAsync()
 
       const documentId = "incremental-doc"
       const handle1 = repo1.get(documentId)
@@ -306,14 +326,17 @@ describe("Repo E2E", () => {
       // Wait for storage save to complete
       await vi.runAllTimersAsync()
 
-      // Second session: load document from storage
+      // Second session: load document from storage with fresh adapter
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
         identity: { name: "repo2" },
-        adapters: [storage],
+        adapters: [storage2],
       })
 
       const handle2 = repo2.get(documentId)
-      await handle2.waitForStorage()
+
+      // Allow time for storage channel to establish and respond
+      await vi.runAllTimersAsync()
 
       // Verify initial content loaded from storage
       const root2 = handle2.doc.getMap("doc")
@@ -328,27 +351,33 @@ describe("Repo E2E", () => {
 
       await vi.runAllTimersAsync()
 
-      // Third session: verify all changes are persisted in storage
+      // Third session: verify all changes are persisted in storage with fresh adapter
+      const storage3 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo3 = new Repo({
         identity: { name: "repo3" },
-        adapters: [storage],
+        adapters: [storage3],
       })
 
       const handle3 = repo3.get(documentId)
-      await handle3.waitForStorage()
+
+      // Allow time for storage channel to establish and respond
+      await vi.runAllTimersAsync()
 
       const root3 = handle3.doc.getMap("doc")
       expect(root3.get("items")).toEqual(["item1", "item2", "item3"])
-    })
+    }, 500)
 
     it("should reconstruct document from updates alone (no snapshot)", async () => {
-      const storage = new InMemoryStorageAdapter()
+      const storage1 = new InMemoryStorageAdapter()
 
       // Create document with changes
       const repo1 = new Repo({
         identity: { name: "repo1" },
-        adapters: [storage],
+        adapters: [storage1],
       })
+
+      // Wait for storage to be ready
+      await vi.runAllTimersAsync()
 
       const documentId = "updates-only-doc"
       const handle1 = repo1.get(documentId)
@@ -359,37 +388,53 @@ describe("Repo E2E", () => {
         root.set("data", "hello")
       })
 
+      // Wait for first change to be saved
+      await vi.runAllTimersAsync()
+
       handle1.change(doc => {
         const root = doc.getMap("doc")
         root.set("step", 2)
         root.set("data", "hello world")
       })
 
-      // Wait for saves
+      // Wait for second change to be saved
       await vi.runAllTimersAsync()
 
-      // Create new repo and load the document
+      // Verify data was saved to storage
+      const savedChunks = await storage1.loadRange([documentId])
+      expect(savedChunks.length).toBeGreaterThan(0)
+
+      // Create new repo and load the document with fresh adapter
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
         identity: { name: "repo2" },
-        adapters: [storage],
+        adapters: [storage2],
       })
 
+      // Wait for storage to be ready
+      await vi.runAllTimersAsync()
+
       const handle2 = repo2.get(documentId)
-      await handle2.waitForStorage()
+
+      // Allow time for storage channel to establish and respond
+      await vi.runAllTimersAsync()
 
       // The document should be ready and have the expected content
       const root2 = handle2.doc.getMap("doc")
       expect(root2.get("step")).toBe(2)
       expect(root2.get("data")).toBe("hello world")
-    })
+    }, 500)
 
     it("should save and load documents with complex nested structures", async () => {
-      const storage = new InMemoryStorageAdapter()
+      const storage1 = new InMemoryStorageAdapter()
 
       const repo1 = new Repo({
         identity: { name: "repo1" },
-        adapters: [storage],
+        adapters: [storage1],
       })
+
+      // Wait for storage to be ready
+      await vi.runAllTimersAsync()
 
       const documentId = "complex-doc"
       const handle1 = repo1.get(documentId)
@@ -434,14 +479,17 @@ describe("Repo E2E", () => {
 
       await vi.runAllTimersAsync()
 
-      // Load in new repo instance
+      // Load in new repo instance with fresh adapter
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
         identity: { name: "repo2" },
-        adapters: [storage],
+        adapters: [storage2],
       })
 
       const handle2 = repo2.get(documentId)
-      await handle2.waitForStorage()
+
+      // Allow time for storage channel to establish and respond
+      await vi.runAllTimersAsync()
 
       // Verify complex structure is preserved
       const root2 = handle2.doc.getMap("doc")
@@ -463,6 +511,6 @@ describe("Repo E2E", () => {
       expect(commentsArray[0].get("text")).toBe("Great work!")
       expect(commentsArray[1].get("author")).toBe("Charlie")
       expect(commentsArray[1].get("text")).toBe("Thanks!")
-    })
+    }, 500)
   })
 })

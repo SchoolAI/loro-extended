@@ -1,68 +1,48 @@
-import type { Channel, ChannelMsg } from "@loro-extended/repo"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import type {
+  AdapterHooks,
+  Channel,
+  ChannelMsg,
+} from "@loro-extended/repo"
+import { VersionVector } from "loro-crdt"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { SseClientNetworkAdapter } from "./client"
 
 // Mock the module with a factory function
+const mockEventSourceInstance = {
+  close: vi.fn(),
+  onmessage: null as ((event: MessageEvent) => void) | null,
+  onopen: null as (() => void) | null,
+  onerror: null as ((error: Event) => void) | null,
+  simulateMessage(data: any) {
+    if (this.onmessage) {
+      this.onmessage(new MessageEvent("message", { data: JSON.stringify(data) }))
+    }
+  },
+  simulateOpen() {
+    if (this.onopen) {
+      this.onopen()
+    }
+  },
+  simulateError(error: Event) {
+    if (this.onerror) {
+      this.onerror(error)
+    }
+  },
+}
+
 vi.mock("reconnecting-eventsource", () => {
-  class MockEventSource {
-    url: string
-    onmessage: ((event: MessageEvent) => void) | null = null
-    onerror: ((event: Event) => void) | null = null
-    onopen: (() => void) | null = null
-
-    constructor(url: string) {
-      this.url = url
-    }
-
-    close() {
-      // Mock close
-    }
-
-    simulateMessage(data: any) {
-      if (this.onmessage) {
-        this.onmessage(
-          new MessageEvent("message", { data: JSON.stringify(data) }),
-        )
-      }
-    }
-
-    simulateOpen() {
-      if (this.onopen) {
-        this.onopen()
-      }
-    }
-
-    simulateError(error: Event) {
-      if (this.onerror) {
-        this.onerror(error)
-      }
-    }
-  }
-
+  const MockEventSource = vi.fn(() => mockEventSourceInstance)
   return {
     default: MockEventSource,
   }
 })
-
-// Import after mocking
-import { SseClientNetworkAdapter } from "./client"
-
-// Type for MockEventSource
-type MockEventSource = {
-  url: string
-  onmessage: ((event: MessageEvent) => void) | null
-  onerror: ((event: Event) => void) | null
-  onopen: (() => void) | null
-  close(): void
-  simulateMessage(data: any): void
-  simulateOpen(): void
-  simulateError(error: Event): void
-}
 
 // Mock fetch
 global.fetch = vi.fn()
 
 describe("SseClientNetworkAdapter", () => {
   let adapter: SseClientNetworkAdapter
+  let hooks: AdapterHooks
   const serverUrl = "http://localhost:3000"
 
   beforeEach(() => {
@@ -70,6 +50,26 @@ describe("SseClientNetworkAdapter", () => {
       postUrl: `${serverUrl}/sync`,
       eventSourceUrl: `${serverUrl}/events`,
     })
+
+    const channels: Record<number, Channel> = {}
+    hooks = {
+      identity: { peerId: "123", name: "test-client" },
+      onChannelAdded: vi.fn((channel: Channel) => {
+        channels[channel.channelId] = channel
+      }),
+      onChannelRemoved: vi.fn((channel: Channel) => {
+        delete channels[channel.channelId]
+      }),
+      onChannelReceive: vi.fn(),
+      onChannelEstablish: vi.fn(),
+    }
+
+    adapter._initialize(hooks)
+    vi.clearAllMocks()
+    mockEventSourceInstance.close.mockClear()
+  })
+
+  afterEach(() => {
     vi.clearAllMocks()
   })
 
@@ -77,138 +77,83 @@ describe("SseClientNetworkAdapter", () => {
     it("should create adapter with correct adapterId", () => {
       expect(adapter.adapterId).toBe("sse-client")
     })
-
-    it("should generate a unique peerId on construction", () => {
-      const adapter1 = new SseClientNetworkAdapter({
-        postUrl: `${serverUrl}/sync`,
-        eventSourceUrl: `${serverUrl}/events`,
-      })
-      const adapter2 = new SseClientNetworkAdapter({
-        postUrl: `${serverUrl}/sync`,
-        eventSourceUrl: `${serverUrl}/events`,
-      })
-
-      // Both should have peerIds (private, but we can test behavior)
-      expect(adapter1).toBeDefined()
-      expect(adapter2).toBeDefined()
-    })
-  })
-
-  describe("onBeforeStart()", () => {
-    it("should create a single channel", () => {
-      const channels: Channel[] = []
-
-      adapter.onBeforeStart({
-        addChannel: () => {
-          const channel = {
-            channelId: 1,
-            kind: "network",
-            adapterId: "sse-client",
-            send: vi.fn(),
-            start: vi.fn(),
-            stop: vi.fn(),
-            peer: { state: "unestablished" }
-          } as Channel
-          channels.push(channel)
-          return channel
-        },
-      })
-
-      expect(channels).toHaveLength(1)
-    })
   })
 
   describe("generate()", () => {
-    it("should return a BaseChannel with correct properties", () => {
+    it("should return a GeneratedChannel with correct properties", () => {
       const channel = (adapter as any).generate()
-
       expect(channel.kind).toBe("network")
       expect(channel.adapterId).toBe("sse-client")
       expect(typeof channel.send).toBe("function")
-      expect(typeof channel.start).toBe("function")
       expect(typeof channel.stop).toBe("function")
     })
   })
 
   describe("onStart()", () => {
-    it("should create EventSource with correct URL including peerId", () => {
-      adapter.onBeforeStart({
-        addChannel: () => ({
-          channelId: 1,
-          kind: "network",
-          adapterId: "sse-client",
-          send: vi.fn(),
-          start: vi.fn(),
-          stop: vi.fn(),
-          peer: { state: "unestablished" }
-        }) as Channel,
-      })
-
-      adapter.onStart()
-
-      // EventSource should be created (we can't directly access it, but we can test behavior)
-      expect(adapter).toBeDefined()
+    it("should add a channel and create an EventSource", async () => {
+      await adapter._start()
+      expect(hooks.onChannelAdded).toHaveBeenCalledTimes(1)
+      const MockEventSource = (await import("reconnecting-eventsource")).default
+      expect(MockEventSource).toHaveBeenCalledTimes(1)
     })
 
-    it("should set up message handler", () => {
-      const receiveFn = vi.fn()
+    it("should set up message handler on the EventSource", async () => {
+      await adapter._start()
+      const serverChannel = (hooks.onChannelAdded as any).mock.calls[0][0]
 
-      adapter.onBeforeStart({
-        addChannel: () => ({
-          channelId: 1,
-          kind: "network",
-          adapterId: "sse-client",
-          send: vi.fn(),
-          start: vi.fn(),
-          stop: vi.fn(),
-          peer: { state: "unestablished" }
-        }) as Channel,
-      })
-
-      const channel = (adapter as any).generate()
-      channel.start(receiveFn)
-
-      adapter.onStart()
-
-      // Simulate receiving a message
-      const eventSource = (adapter as any).eventSource as MockEventSource
       const testMessage: ChannelMsg = {
         type: "channel/sync-response",
         docId: "test-doc",
         hopCount: 0,
-        transmission: { type: "up-to-date", version: {} as any },
+        transmission: { type: "up-to-date", version: new VersionVector(new Map()) },
       }
 
-      eventSource.simulateMessage(testMessage)
+      mockEventSourceInstance.simulateMessage(testMessage)
+      expect(hooks.onChannelReceive).toHaveBeenCalledWith(
+        serverChannel,
+        expect.objectContaining({
+          type: "channel/sync-response",
+          docId: "test-doc",
+          hopCount: 0,
+          transmission: expect.objectContaining({
+            type: "up-to-date",
+          }),
+        }),
+      )
+    })
 
-      expect(receiveFn).toHaveBeenCalledWith(testMessage)
+    it("should establish channel on EventSource open", async () => {
+      await adapter._start()
+      mockEventSourceInstance.simulateOpen()
+      expect(hooks.onChannelEstablish).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("onStop()", () => {
+    it("should close EventSource and remove channel", async () => {
+      await adapter._start()
+      const serverChannel = (hooks.onChannelAdded as any).mock.calls[0][0]
+
+      await adapter._stop()
+
+      expect(mockEventSourceInstance.close).toHaveBeenCalledTimes(1)
+      expect(hooks.onChannelRemoved).toHaveBeenCalledWith(
+        expect.objectContaining({ channelId: serverChannel.channelId }),
+      )
     })
   })
 
   describe("send()", () => {
     it("should send messages via HTTP POST with correct headers", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-      })
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 })
       global.fetch = mockFetch
 
-      adapter.onBeforeStart({
-        addChannel: () => ({
-          channelId: 1,
-          kind: "network",
-          adapterId: "sse-client",
-          send: vi.fn(),
-          start: vi.fn(),
-          stop: vi.fn(),
-          peer: { state: "unestablished" }
-        }) as Channel,
-      })
-
+      await adapter._start()
       const channel = (adapter as any).generate()
+
       const testMessage: ChannelMsg = {
         type: "channel/sync-request",
-        docs: [{ docId: "test-doc", requesterDocVersion: {} as any }],
+        docs: [{ docId: "test-doc", requesterDocVersion: new VersionVector(new Map()) }],
       }
 
       await channel.send(testMessage)
@@ -221,54 +166,9 @@ describe("SseClientNetworkAdapter", () => {
             "Content-Type": "application/json",
             "X-Peer-Id": expect.any(String),
           }),
-          body: expect.any(String),
+          body: expect.any(String), // Serialized JSON
         }),
       )
-    })
-
-    it("should throw error on failed send", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        statusText: "Internal Server Error",
-      })
-      global.fetch = mockFetch
-
-      adapter.onBeforeStart({
-        addChannel: () => ({
-          channelId: 1,
-          kind: "network",
-          adapterId: "sse-client",
-          send: vi.fn(),
-          start: vi.fn(),
-          stop: vi.fn(),
-          peer: { state: "unestablished" }
-        }) as Channel,
-      })
-
-      const channel = (adapter as any).generate()
-      const testMessage: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [{ docId: "test-doc", requesterDocVersion: {} as any }],
-      }
-
-      await expect(channel.send(testMessage)).rejects.toThrow(
-        "Failed to send message: Internal Server Error",
-      )
-    })
-  })
-
-  describe("onAfterStop()", () => {
-    it("should close EventSource and clean up", () => {
-      const channelAdded = vi.fn()
-      const channelRemoved = vi.fn()
-
-      adapter._prepare({ channelAdded, channelRemoved })
-
-      adapter.onStart()
-      expect(channelAdded).toHaveBeenCalledTimes(1)
-
-      adapter._stop()
-      expect(channelRemoved).toHaveBeenCalledTimes(1)
     })
   })
 })

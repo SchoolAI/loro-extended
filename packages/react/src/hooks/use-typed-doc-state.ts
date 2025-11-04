@@ -3,7 +3,7 @@ import {
   type DocShape,
   type InferPlainType,
 } from "@loro-extended/change"
-import type { DocumentId } from "@loro-extended/repo"
+import type { DocId } from "@loro-extended/repo"
 import { useMemo } from "react"
 import { useDocHandleState } from "./use-doc-handle-state.js"
 
@@ -11,30 +11,40 @@ import { useDocHandleState } from "./use-doc-handle-state.js"
  * Hook that provides schema-aware document state with empty state overlay.
  * Built on top of useDocHandleState following composition over inheritance.
  *
+ * With the new simplified DocHandle architecture:
+ * - Documents are always available once we have a handle
+ * - We use the doc property (getter) instead of doc() method
+ *
  * Follows SRP by handling only:
  * - TypedDoc integration with DocHandle
  * - Empty state overlay logic
  */
 export function useTypedDocState<T extends DocShape>(
-  documentId: DocumentId,
+  documentId: DocId,
   schema: T,
   emptyState: InferPlainType<T>,
 ) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
   // Data transformation from Loro to JSON with empty state overlay
+  // We include snapshot.version to trigger re-computation when the document changes
   const doc = useMemo(() => {
-    if (snapshot.state !== "ready" || !handle) {
+    if (!handle) {
       // Return empty state immediately - no loading needed!
       return emptyState
     }
 
-    // Update the TypedDoc's underlying LoroDoc with the handle's doc
-    const loroDoc = handle.doc()
+    // Access the doc via the getter property (not a method call)
+    const loroDoc = handle.doc
     // Create a new TypedDoc with the same schema/emptyState but updated LoroDoc
     const updatedTypedDoc = new TypedDoc(schema, emptyState, loroDoc)
+    
+    // Use snapshot.version to ensure we re-compute when document changes
+    // biome-ignore lint/correctness/useExhaustiveDependencies: snapshot.version triggers re-computation
+    void snapshot.version
+    
     return updatedTypedDoc.value
-  }, [snapshot, handle, schema, emptyState])
+  }, [snapshot.version, handle, schema, emptyState])
 
   return { doc, handle, snapshot }
 }

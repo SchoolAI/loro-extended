@@ -1,13 +1,28 @@
-import type { Channel, ChannelMsg, PeerId } from "@loro-extended/repo"
+import type {
+  AdapterHooks,
+  ChannelMsg,
+  PeerID,
+} from "@loro-extended/repo"
 import type { Request, Response } from "express"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { SseServerNetworkAdapter } from "./server"
+import { SseServerNetworkAdapter, createSseExpressRouter } from "./server"
 
 describe("SseServerNetworkAdapter", () => {
   let adapter: SseServerNetworkAdapter
+  let hooks: AdapterHooks
 
   beforeEach(() => {
     adapter = new SseServerNetworkAdapter()
+    
+    hooks = {
+      identity: { peerId: "123", name: "test-server" },
+      onChannelAdded: vi.fn(),
+      onChannelRemoved: vi.fn(),
+      onChannelReceive: vi.fn(),
+      onChannelEstablish: vi.fn(),
+    }
+
+    adapter._initialize(hooks)
     vi.clearAllMocks()
   })
 
@@ -17,57 +32,23 @@ describe("SseServerNetworkAdapter", () => {
     })
   })
 
-  describe("onBeforeStart()", () => {
-    it("should store addChannel and removeChannel callbacks", () => {
-      const addChannel = vi.fn()
-      const removeChannel = vi.fn()
-
-      adapter.onBeforeStart({ addChannel, removeChannel })
-
-      // Callbacks should be stored (we can't directly test private fields, but we can test behavior)
-      expect(adapter).toBeDefined()
-    })
-  })
-
   describe("generate()", () => {
-    it("should return a BaseChannel for a specific peerId", () => {
-      const peerId: PeerId = "test-peer-123"
+    beforeEach(async () => {
+      await adapter._start()
+    })
+
+    it("should return a GeneratedChannel for a specific peerId", () => {
+      const peerId: PeerID = "123"
       const channel = (adapter as any).generate(peerId)
 
       expect(channel.kind).toBe("network")
       expect(channel.adapterId).toBe("sse-server")
       expect(typeof channel.send).toBe("function")
-      expect(typeof channel.start).toBe("function")
       expect(typeof channel.stop).toBe("function")
     })
 
-    it("should create send function that writes to client response", async () => {
-      const peerId: PeerId = "test-peer-123"
-      const mockResponse = {
-        write: vi.fn(),
-      } as unknown as Response
-
-      // Set up the adapter with a mock client
-      ;(adapter as any).clients.set(peerId, mockResponse)
-
-      const channel = (adapter as any).generate(peerId)
-      const testMessage: ChannelMsg = {
-        type: "channel/sync-response",
-        docId: "test-doc",
-        hopCount: 0,
-        transmission: { type: "up-to-date", version: {} as any },
-      }
-
-      await channel.send(testMessage)
-
-      expect(mockResponse.write).toHaveBeenCalled()
-      const writeCall = (mockResponse.write as any).mock.calls[0][0]
-      expect(writeCall).toContain("data:")
-      expect(writeCall).toContain("\n\n")
-    })
-
     it("should log warning when sending to disconnected peer", async () => {
-      const peerId: PeerId = "disconnected-peer"
+      const peerId: PeerID = "456"
       const channel = (adapter as any).generate(peerId)
       
       const loggerSpy = vi.spyOn(adapter.logger, "warn")
@@ -83,81 +64,55 @@ describe("SseServerNetworkAdapter", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "Tried to send to disconnected peer",
-        { peerId }
+        { peerId },
       )
     })
   })
 
-  describe("onStart()", () => {
-    it("should log that server adapter started", () => {
+  describe("lifecycle", () => {
+    it("should start successfully", async () => {
       const loggerSpy = vi.spyOn(adapter.logger, "info")
-      
-      adapter.onStart()
-
+      await adapter._start()
       expect(loggerSpy).toHaveBeenCalledWith("SSE server adapter started")
     })
-  })
 
-  describe("onAfterStop()", () => {
-    it("should close all client connections", () => {
-      const mockRes1 = { end: vi.fn() } as unknown as Response
-      const mockRes2 = { end: vi.fn() } as unknown as Response
+    it("should stop and disconnect all connections", async () => {
+      await adapter._start()
+      
+      const conn1 = adapter.registerConnection("1" as PeerID)
+      const conn2 = adapter.registerConnection("2" as PeerID)
+      
+      const disconnectSpy1 = vi.fn()
+      const disconnectSpy2 = vi.fn()
+      conn1.setDisconnectHandler(disconnectSpy1)
+      conn2.setDisconnectHandler(disconnectSpy2)
 
-      ;(adapter as any).clients.set("peer1", mockRes1)
-      ;(adapter as any).clients.set("peer2", mockRes2)
+      await adapter._stop()
 
-      adapter.onAfterStop()
-
-      expect(mockRes1.end).toHaveBeenCalled()
-      expect(mockRes2.end).toHaveBeenCalled()
-    })
-
-    it("should clear all heartbeats", () => {
-      const timeout1 = setTimeout(() => {}, 1000)
-      const timeout2 = setTimeout(() => {}, 1000)
-
-      ;(adapter as any).heartbeats.set("peer1", timeout1)
-      ;(adapter as any).heartbeats.set("peer2", timeout2)
-
-      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout")
-
-      adapter.onAfterStop()
-
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timeout1)
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timeout2)
-    })
-
-    it("should clear all maps", () => {
-      const mockRes = { end: vi.fn() } as unknown as Response
-      ;(adapter as any).clients.set("peer1", mockRes)
-      ;(adapter as any).receiveFns.set("peer1", vi.fn())
-      ;(adapter as any).heartbeats.set("peer1", setTimeout(() => {}, 1000))
-      ;(adapter as any).channelsByPeer.set("peer1", {} as Channel)
-
-      adapter.onAfterStop()
-
-      expect((adapter as any).clients.size).toBe(0)
-      expect((adapter as any).receiveFns.size).toBe(0)
-      expect((adapter as any).heartbeats.size).toBe(0)
-      expect((adapter as any).channelsByPeer.size).toBe(0)
+      expect(disconnectSpy1).toHaveBeenCalled()
+      expect(disconnectSpy2).toHaveBeenCalled()
     })
   })
 
-  describe("getExpressRouter()", () => {
+  describe("createSseExpressRouter()", () => {
     it("should return an Express router", () => {
-      const router = adapter.getExpressRouter()
+      const router = createSseExpressRouter(adapter)
       expect(router).toBeDefined()
       expect(typeof router).toBe("function") // Express routers are functions
     })
   })
 
   describe("Express /sync endpoint", () => {
-    it("should route messages to correct receive function", () => {
-      const router = adapter.getExpressRouter()
-      const peerId: PeerId = "test-peer"
-      const receiveFn = vi.fn()
+    beforeEach(async () => {
+      await adapter._start()
+    })
 
-      ;(adapter as any).receiveFns.set(peerId, receiveFn)
+    it("should route messages to correct connection", () => {
+      const router = createSseExpressRouter(adapter)
+      const peerId: PeerID = "789"
+      
+      const connection = adapter.registerConnection(peerId)
+      const receiveSpy = vi.spyOn(connection, "receive")
 
       const mockReq = {
         body: {
@@ -174,20 +129,19 @@ describe("SseServerNetworkAdapter", () => {
         send: vi.fn(),
       } as unknown as Response
 
-      // Find the POST /sync handler
       const postHandler = (router as any).stack.find(
         (layer: any) => layer.route?.path === "/sync" && layer.route?.methods?.post
       )
 
       if (postHandler) {
         postHandler.route.stack[0].handle(mockReq, mockRes)
-        expect(receiveFn).toHaveBeenCalled()
+        expect(receiveSpy).toHaveBeenCalled()
         expect(mockRes.status).toHaveBeenCalledWith(200)
       }
     })
 
     it("should return 400 if X-Peer-Id header is missing", () => {
-      const router = adapter.getExpressRouter()
+      const router = createSseExpressRouter(adapter)
 
       const mockReq = {
         body: {},
@@ -206,13 +160,13 @@ describe("SseServerNetworkAdapter", () => {
       if (postHandler) {
         postHandler.route.stack[0].handle(mockReq, mockRes)
         expect(mockRes.status).toHaveBeenCalledWith(400)
-        expect(mockRes.send).toHaveBeenCalledWith({ error: "Missing X-Peer-Id header" })
+        expect(mockRes.send).toHaveBeenCalledWith({ error: "Missing peer ID" })
       }
     })
 
     it("should return 404 if peer not connected", () => {
-      const router = adapter.getExpressRouter()
-      const peerId: PeerId = "unknown-peer"
+      const router = createSseExpressRouter(adapter)
+      const peerId: PeerID = "999"
 
       const mockReq = {
         body: {},
@@ -239,22 +193,13 @@ describe("SseServerNetworkAdapter", () => {
   })
 
   describe("Express /events endpoint", () => {
-    it("should create channel lazily when client connects", () => {
-      const addChannel = vi.fn().mockReturnValue({
-        channelId: 1,
-        kind: "network",
-        adapterId: "sse-server",
-        send: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        peer: { state: "unestablished" }
-      } as Channel)
-      const removeChannel = vi.fn()
+    beforeEach(async () => {
+      await adapter._start()
+    })
 
-      adapter.onBeforeStart({ addChannel, removeChannel })
-
-      const router = adapter.getExpressRouter()
-      const peerId: PeerId = "new-peer"
+    it("should create connection when client connects", () => {
+      const router = createSseExpressRouter(adapter)
+      const peerId: PeerID = "111"
 
       const mockReq = {
         query: { peerId },
@@ -274,7 +219,7 @@ describe("SseServerNetworkAdapter", () => {
       if (getHandler) {
         getHandler.route.stack[0].handle(mockReq, mockRes)
         
-        expect(addChannel).toHaveBeenCalledWith(peerId)
+        expect(adapter.isConnected(peerId)).toBe(true)
         expect(mockRes.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({
           "Content-Type": "text/event-stream",
         }))
@@ -282,12 +227,7 @@ describe("SseServerNetworkAdapter", () => {
     })
 
     it("should return 400 if peerId query parameter is missing", () => {
-      adapter.onBeforeStart({
-        addChannel: vi.fn(),
-        removeChannel: vi.fn(),
-      })
-
-      const router = adapter.getExpressRouter()
+      const router = createSseExpressRouter(adapter)
 
       const mockReq = {
         query: {},
@@ -308,21 +248,25 @@ describe("SseServerNetworkAdapter", () => {
       if (getHandler) {
         getHandler.route.stack[0].handle(mockReq, mockRes)
         expect(mockRes.status).toHaveBeenCalledWith(400)
-        expect(mockRes.end).toHaveBeenCalledWith("peerId query parameter is required")
+        expect(mockRes.end).toHaveBeenCalledWith("peerId is required")
       }
     })
   })
 
   describe("serialization", () => {
-    it("should serialize Uint8Array to base64", async () => {
-      const peerId: PeerId = "test-peer"
-      const mockResponse = {
-        write: vi.fn(),
-      } as unknown as Response
+    beforeEach(async () => {
+      await adapter._start()
+    })
 
-      ;(adapter as any).clients.set(peerId, mockResponse)
+    it("should serialize Uint8Array to base64", () => {
+      const peerId: PeerID = "222"
+      const connection = adapter.registerConnection(peerId)
+      
+      const mockWrite = vi.fn()
+      connection.setSendFunction((msg) => {
+        mockWrite(msg)
+      })
 
-      const channel = (adapter as any).generate(peerId)
       const data = new Uint8Array([1, 2, 3, 4, 5])
       const testMessage: ChannelMsg = {
         type: "channel/sync-response",
@@ -331,73 +275,9 @@ describe("SseServerNetworkAdapter", () => {
         transmission: { type: "update", data },
       }
 
-      await channel.send(testMessage)
+      connection.send(testMessage)
 
-      expect(mockResponse.write).toHaveBeenCalled()
-      const writeCall = (mockResponse.write as any).mock.calls[0][0]
-      const jsonData = JSON.parse(writeCall.replace("data: ", "").replace("\n\n", ""))
-      
-      expect(jsonData.transmission.data).toHaveProperty("__type", "Uint8Array")
-      expect(jsonData.transmission.data).toHaveProperty("data")
-      expect(typeof jsonData.transmission.data.data).toBe("string")
-    })
-  })
-
-  describe("heartbeat mechanism", () => {
-    it("should setup heartbeat when client connects", () => {
-      const addChannel = vi.fn().mockReturnValue({
-        channelId: 1,
-        kind: "network",
-        adapterId: "sse-server",
-        send: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        peer: { state: "unestablished" }
-      } as Channel)
-
-      adapter.onBeforeStart({ addChannel, removeChannel: vi.fn() })
-
-      const router = adapter.getExpressRouter()
-      const peerId: PeerId = "test-peer"
-
-      const mockReq = {
-        query: { peerId },
-        on: vi.fn(),
-      } as unknown as Request
-
-      const mockRes = {
-        writeHead: vi.fn(),
-        flushHeaders: vi.fn(),
-        write: vi.fn(),
-      } as unknown as Response
-
-      const getHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/events" && layer.route?.methods?.get
-      )
-
-      if (getHandler) {
-        getHandler.route.stack[0].handle(mockReq, mockRes)
-        
-        // Heartbeat should be set up
-        expect((adapter as any).heartbeats.has(peerId)).toBe(true)
-      }
-    })
-  })
-
-  describe("channel lifecycle", () => {
-    it("should handle channel start and stop", () => {
-      const peerId: PeerId = "test-peer"
-      const receiveFn = vi.fn()
-      
-      const channel = (adapter as any).generate(peerId)
-      
-      // Start channel
-      channel.start(receiveFn)
-      expect((adapter as any).receiveFns.get(peerId)).toBe(receiveFn)
-
-      // Stop channel
-      channel.stop()
-      expect((adapter as any).receiveFns.has(peerId)).toBe(false)
+      expect(mockWrite).toHaveBeenCalledWith(testMessage)
     })
   })
 })

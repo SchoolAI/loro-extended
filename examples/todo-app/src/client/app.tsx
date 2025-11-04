@@ -1,5 +1,5 @@
 import { Shape, useDocument } from "@loro-extended/react"
-import type { DocumentId } from "@loro-extended/repo"
+import type { DocId } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
@@ -12,7 +12,7 @@ const schema = Shape.doc({
 })
 
 // A known, constant ID for our single todo list document
-const DEFAULT_TODO_DOC_ID: DocumentId = "todos-example-document"
+const DEFAULT_TODO_DOC_ID: DocId = "todos-example-document"
 
 function App() {
   // Get document ID from URL hash if present, otherwise use default
@@ -25,7 +25,8 @@ function App() {
 
   useEffect(() => {
     console.log("doc state", doc)
-  }, [doc])
+    console.log("handle state", handle)
+  }, [doc, handle])
 
   const addTodo = (text: string) => {
     changeDoc(d => {
@@ -55,14 +56,12 @@ function App() {
     })
   }
 
-  const state = handle?.state || "loading"
-
   return (
     <div className="app-container">
       <header>
         <h1>Loro Todo</h1>
         <div className="connection-status">
-          Repo State: <span className={`status-${state}`}>{state}</span>
+          {handle ? "Connected" : "Initializing..."}
         </div>
       </header>
       <div className="todo-app">
@@ -72,8 +71,6 @@ function App() {
           onToggle={toggleTodo}
           onDelete={deleteTodo}
         />
-        {state === "loading" && <p>Syncing...</p>}
-        {state === "unavailable" && <p>Working offline</p>}
       </div>
     </div>
   )

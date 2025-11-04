@@ -29,6 +29,8 @@ export function useDocChanger<TInput = LoroDoc>(
         return
       }
 
+      // With the new API, handle.change() accepts a mutator function
+      // that receives the LoroDoc directly
       handle.change(loroDoc => {
         const input = transformer
           ? transformer(loroDoc as LoroDoc)
