@@ -48,7 +48,7 @@ export class SseServerNetworkAdapter extends Adapter<PeerId> {
     }
   }
 
-  init({
+  onBeforeStart({
     addChannel,
     removeChannel,
   }: {
@@ -60,7 +60,7 @@ export class SseServerNetworkAdapter extends Adapter<PeerId> {
     this.removeChannel = removeChannel
   }
 
-  deinit() {
+  onAfterStop() {
     // Close all active client connections
     for (const [peerId, res] of this.clients) {
       res.end()
@@ -80,7 +80,7 @@ export class SseServerNetworkAdapter extends Adapter<PeerId> {
     this.logger.info("SSE server adapter deinitialized")
   }
 
-  start() {
+  onStart() {
     // Nothing to do - server waits for connections
     this.logger.info("SSE server adapter started")
   }

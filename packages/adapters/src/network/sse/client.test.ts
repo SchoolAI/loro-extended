@@ -94,13 +94,21 @@ describe("SseClientNetworkAdapter", () => {
     })
   })
 
-  describe("init()", () => {
+  describe("onBeforeStart()", () => {
     it("should create a single channel", () => {
       const channels: Channel[] = []
 
-      adapter.init({
+      adapter.onBeforeStart({
         addChannel: () => {
-          const channel = { channelId: 1, publishDocId: "test-doc" } as Channel
+          const channel = {
+            channelId: 1,
+            kind: "network",
+            adapterId: "sse-client",
+            send: vi.fn(),
+            start: vi.fn(),
+            stop: vi.fn(),
+            peer: { state: "unestablished" }
+          } as Channel
           channels.push(channel)
           return channel
         },
@@ -122,13 +130,21 @@ describe("SseClientNetworkAdapter", () => {
     })
   })
 
-  describe("start()", () => {
+  describe("onStart()", () => {
     it("should create EventSource with correct URL including peerId", () => {
-      adapter.init({
-        addChannel: () => ({ channelId: 1 }) as Channel,
+      adapter.onBeforeStart({
+        addChannel: () => ({
+          channelId: 1,
+          kind: "network",
+          adapterId: "sse-client",
+          send: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          peer: { state: "unestablished" }
+        }) as Channel,
       })
 
-      adapter.start()
+      adapter.onStart()
 
       // EventSource should be created (we can't directly access it, but we can test behavior)
       expect(adapter).toBeDefined()
@@ -137,14 +153,22 @@ describe("SseClientNetworkAdapter", () => {
     it("should set up message handler", () => {
       const receiveFn = vi.fn()
 
-      adapter.init({
-        addChannel: () => ({ channelId: 1 }) as Channel,
+      adapter.onBeforeStart({
+        addChannel: () => ({
+          channelId: 1,
+          kind: "network",
+          adapterId: "sse-client",
+          send: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          peer: { state: "unestablished" }
+        }) as Channel,
       })
 
       const channel = (adapter as any).generate()
       channel.start(receiveFn)
 
-      adapter.start()
+      adapter.onStart()
 
       // Simulate receiving a message
       const eventSource = (adapter as any).eventSource as MockEventSource
@@ -169,8 +193,16 @@ describe("SseClientNetworkAdapter", () => {
       })
       global.fetch = mockFetch
 
-      adapter.init({
-        addChannel: () => ({ channelId: 1 }) as Channel,
+      adapter.onBeforeStart({
+        addChannel: () => ({
+          channelId: 1,
+          kind: "network",
+          adapterId: "sse-client",
+          send: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          peer: { state: "unestablished" }
+        }) as Channel,
       })
 
       const channel = (adapter as any).generate()
@@ -201,8 +233,16 @@ describe("SseClientNetworkAdapter", () => {
       })
       global.fetch = mockFetch
 
-      adapter.init({
-        addChannel: () => ({ channelId: 1 }) as Channel,
+      adapter.onBeforeStart({
+        addChannel: () => ({
+          channelId: 1,
+          kind: "network",
+          adapterId: "sse-client",
+          send: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          peer: { state: "unestablished" }
+        }) as Channel,
       })
 
       const channel = (adapter as any).generate()
@@ -217,17 +257,17 @@ describe("SseClientNetworkAdapter", () => {
     })
   })
 
-  describe("deinit()", () => {
+  describe("onAfterStop()", () => {
     it("should close EventSource and clean up", () => {
       const channelAdded = vi.fn()
       const channelRemoved = vi.fn()
 
-      adapter.prepare({ channelAdded, channelRemoved })
+      adapter._prepare({ channelAdded, channelRemoved })
 
-      adapter.start()
+      adapter.onStart()
       expect(channelAdded).toHaveBeenCalledTimes(1)
 
-      adapter.stop()
+      adapter._stop()
       expect(channelRemoved).toHaveBeenCalledTimes(1)
     })
   })

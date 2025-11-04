@@ -17,12 +17,12 @@ describe("SseServerNetworkAdapter", () => {
     })
   })
 
-  describe("init()", () => {
+  describe("onBeforeStart()", () => {
     it("should store addChannel and removeChannel callbacks", () => {
       const addChannel = vi.fn()
       const removeChannel = vi.fn()
 
-      adapter.init({ addChannel, removeChannel })
+      adapter.onBeforeStart({ addChannel, removeChannel })
 
       // Callbacks should be stored (we can't directly test private fields, but we can test behavior)
       expect(adapter).toBeDefined()
@@ -88,17 +88,17 @@ describe("SseServerNetworkAdapter", () => {
     })
   })
 
-  describe("start()", () => {
+  describe("onStart()", () => {
     it("should log that server adapter started", () => {
       const loggerSpy = vi.spyOn(adapter.logger, "info")
       
-      adapter.start()
+      adapter.onStart()
 
       expect(loggerSpy).toHaveBeenCalledWith("SSE server adapter started")
     })
   })
 
-  describe("deinit()", () => {
+  describe("onAfterStop()", () => {
     it("should close all client connections", () => {
       const mockRes1 = { end: vi.fn() } as unknown as Response
       const mockRes2 = { end: vi.fn() } as unknown as Response
@@ -106,7 +106,7 @@ describe("SseServerNetworkAdapter", () => {
       ;(adapter as any).clients.set("peer1", mockRes1)
       ;(adapter as any).clients.set("peer2", mockRes2)
 
-      adapter.deinit()
+      adapter.onAfterStop()
 
       expect(mockRes1.end).toHaveBeenCalled()
       expect(mockRes2.end).toHaveBeenCalled()
@@ -121,7 +121,7 @@ describe("SseServerNetworkAdapter", () => {
 
       const clearTimeoutSpy = vi.spyOn(global, "clearTimeout")
 
-      adapter.deinit()
+      adapter.onAfterStop()
 
       expect(clearTimeoutSpy).toHaveBeenCalledWith(timeout1)
       expect(clearTimeoutSpy).toHaveBeenCalledWith(timeout2)
@@ -134,7 +134,7 @@ describe("SseServerNetworkAdapter", () => {
       ;(adapter as any).heartbeats.set("peer1", setTimeout(() => {}, 1000))
       ;(adapter as any).channelsByPeer.set("peer1", {} as Channel)
 
-      adapter.deinit()
+      adapter.onAfterStop()
 
       expect((adapter as any).clients.size).toBe(0)
       expect((adapter as any).receiveFns.size).toBe(0)
@@ -242,11 +242,16 @@ describe("SseServerNetworkAdapter", () => {
     it("should create channel lazily when client connects", () => {
       const addChannel = vi.fn().mockReturnValue({
         channelId: 1,
-        publishDocId: "test-doc",
+        kind: "network",
+        adapterId: "sse-server",
+        send: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        peer: { state: "unestablished" }
       } as Channel)
       const removeChannel = vi.fn()
 
-      adapter.init({ addChannel, removeChannel })
+      adapter.onBeforeStart({ addChannel, removeChannel })
 
       const router = adapter.getExpressRouter()
       const peerId: PeerId = "new-peer"
@@ -277,7 +282,7 @@ describe("SseServerNetworkAdapter", () => {
     })
 
     it("should return 400 if peerId query parameter is missing", () => {
-      adapter.init({
+      adapter.onBeforeStart({
         addChannel: vi.fn(),
         removeChannel: vi.fn(),
       })
@@ -342,10 +347,15 @@ describe("SseServerNetworkAdapter", () => {
     it("should setup heartbeat when client connects", () => {
       const addChannel = vi.fn().mockReturnValue({
         channelId: 1,
-        publishDocId: "test-doc",
+        kind: "network",
+        adapterId: "sse-server",
+        send: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        peer: { state: "unestablished" }
       } as Channel)
 
-      adapter.init({ addChannel, removeChannel: vi.fn() })
+      adapter.onBeforeStart({ addChannel, removeChannel: vi.fn() })
 
       const router = adapter.getExpressRouter()
       const peerId: PeerId = "test-peer"

@@ -78,12 +78,12 @@ export class SseClientNetworkAdapter extends Adapter<void> {
     }
   }
 
-  init({ addChannel }: { addChannel: () => Channel }) {
+  onBeforeStart({ addChannel }: { addChannel: () => Channel }) {
     // Create single channel for server connection
     this.serverChannel = addChannel()
   }
 
-  start() {}
+  onStart() {}
 
-  deinit() {}
+  onAfterStop() {}
 }
