@@ -44,9 +44,16 @@ Manages document synchronization across peers with pluggable storage and network
 pnpm install
 ```
 
+### Build the monorepo packages
+
+```bash
+pnpm -w build
+```
+
 ### Run the development server
 
 ```bash
+cd examples/todo-app
 pnpm dev
 ```
 
