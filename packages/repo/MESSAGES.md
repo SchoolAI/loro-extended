@@ -255,12 +255,11 @@ When a document is modified locally:
 
 ```typescript
 // 1. DocHandle change triggers subscription callback
-docState.doc.subscribeLocalUpdates(data => {
+docState.doc.subscribe(() => {
   // 2. Dispatch local-doc-change message
   {
     type: "msg/local-doc-change",
-    docId,
-    data: Uint8Array // The update data
+    docId
   }
 })
 
@@ -316,7 +315,7 @@ Commands are side effects returned by the update function:
 - **`cmd/stop-channel`**: Deinitialize a channel
 - **`cmd/send-message`**: Send a message through a channel
 - **`cmd/send-sync-response`**: Send document data to a peer
-- **`cmd/subscribe-local-doc`**: Subscribe to local document changes
+- **`cmd/subscribe-doc`**: Subscribe to document changes
 - **`cmd/emit-ready-state-changed`**: Emit ready state event
 - **`cmd/dispatch`**: Dispatch another message (utility)
 - **`cmd/batch`**: Execute multiple commands (utility)

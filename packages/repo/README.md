@@ -86,7 +86,7 @@ const repo = new Repo(params);
 // Get or create a document (immediately available)
 const handle = repo.get<T>(docId);
 
-// Delete a document (TODO: not yet implemented)
+// Delete a document
 await repo.delete(docId);
 
 // Reset the repo (disconnect adapters, clear state)

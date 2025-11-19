@@ -20,7 +20,7 @@ export type DocWrapper = {
  * With the new simplified DocHandle architecture:
  * - DocHandle is immediately available (synchronous Repo.get())
  * - Documents are always available (no loading states at DocHandle level)
- * - We subscribe to LoroDoc changes directly via subscribeLocalUpdates
+ * - We subscribe to LoroDoc changes directly via subscribe
  *
  * Follows SRP by handling only:
  * - Handle lifecycle (creation, cleanup)
