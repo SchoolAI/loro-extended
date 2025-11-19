@@ -49,6 +49,7 @@ const storageAdapter = new LevelDBStorageAdapter("loro-todo-app.db")
 // The repo is not directly used, but its constructor sets up the listeners
 // between the network and storage adapters.
 new Repo({
+  identity: { name: "todo-app-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
 })
 
