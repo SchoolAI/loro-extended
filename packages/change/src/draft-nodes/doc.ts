@@ -9,6 +9,7 @@ const containerGetter = {
   list: "getList",
   map: "getMap",
   movableList: "getMovableList",
+  record: "getMap",
   text: "getText",
   tree: "getTree",
 } as const

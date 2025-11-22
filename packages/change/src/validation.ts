@@ -6,10 +6,12 @@ import type {
   MapContainerShape,
   MovableListContainerShape,
   ObjectValueShape,
+  RecordContainerShape,
+  RecordValueShape,
   UnionValueShape,
   ValueShape,
 } from "./shape.js"
-import { InferPlainType } from "./types.js"
+import type { InferPlainType } from "./types.js"
 
 /**
  * Validates a value against a ContainerShape or ValueShape schema
@@ -70,6 +72,23 @@ export function validateValue(
       const nestedPath = `${currentPath}.${key}`
       const nestedValue = (value as Record<string, unknown>)[key]
       result[key] = validateValue(nestedValue, nestedSchema, nestedPath)
+    }
+    return result
+  }
+
+  if (schema._type === "record") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(
+        `Expected object at path ${currentPath}, got ${typeof value}`,
+      )
+    }
+    const recordSchema = schema as RecordContainerShape
+    const result: Record<string, unknown> = {}
+
+    // Validate each property in the record
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const nestedPath = `${currentPath}.${key}`
+      result[key] = validateValue(nestedValue, recordSchema.shape, nestedPath)
     }
     return result
   }
@@ -151,6 +170,27 @@ export function validateValue(
           const nestedPath = `${currentPath}.${key}`
           const nestedValue = (value as Record<string, unknown>)[key]
           result[key] = validateValue(nestedValue, nestedSchema, nestedPath)
+        }
+        return result
+      }
+
+      case "record": {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new Error(
+            `Expected object at path ${currentPath}, got ${typeof value}`,
+          )
+        }
+        const recordSchema = valueSchema as RecordValueShape
+        const result: Record<string, unknown> = {}
+
+        // Validate each property in the record
+        for (const [key, nestedValue] of Object.entries(value)) {
+          const nestedPath = `${currentPath}.${key}`
+          result[key] = validateValue(
+            nestedValue,
+            recordSchema.shape,
+            nestedPath,
+          )
         }
         return result
       }

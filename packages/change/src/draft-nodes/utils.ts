@@ -4,6 +4,7 @@ import type {
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
+  RecordContainerShape,
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
@@ -12,6 +13,7 @@ import { CounterDraftNode } from "./counter.js"
 import { ListDraftNode } from "./list.js"
 import { MapDraftNode } from "./map.js"
 import { MovableListDraftNode } from "./movable-list.js"
+import { RecordDraftNode } from "./record.js"
 import { TextDraftNode } from "./text.js"
 import { TreeDraftNode } from "./tree.js"
 
@@ -36,6 +38,10 @@ export function createContainerDraftNode(
     case "movableList":
       return new MovableListDraftNode(
         params as DraftNodeParams<MovableListContainerShape>,
+      )
+    case "record":
+      return new RecordDraftNode(
+        params as DraftNodeParams<RecordContainerShape>,
       )
     case "text":
       return new TextDraftNode(params as DraftNodeParams<TextContainerShape>)

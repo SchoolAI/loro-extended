@@ -14,6 +14,8 @@ import type {
   MapContainerShape,
   MovableListContainerShape,
   ObjectValueShape,
+  RecordContainerShape,
+  RecordValueShape,
 } from "./shape.js"
 import {
   isContainer,
@@ -122,6 +124,30 @@ function convertMapInput(
 }
 
 /**
+ * Converts object input to LoroMap container (Record)
+ */
+function convertRecordInput(
+  value: { [key: string]: Value },
+  shape: RecordContainerShape | RecordValueShape,
+): LoroMap | { [key: string]: Value } {
+  if (!isContainerShape(shape)) {
+    return value
+  }
+
+  const map = new LoroMap()
+  for (const [k, v] of Object.entries(value)) {
+    const convertedValue = convertInputToNode(v, shape.shape)
+    if (isContainer(convertedValue)) {
+      map.setContainer(k, convertedValue)
+    } else {
+      map.set(k, convertedValue)
+    }
+  }
+
+  return map
+}
+
+/**
  * Main conversion function that transforms input values to appropriate CRDT containers
  * based on schema definitions
  */
@@ -164,6 +190,13 @@ export function convertInputToNode<Shape extends ContainerOrValueShape>(
       }
 
       return convertMapInput(value, shape)
+    }
+    case "record": {
+      if (!isObjectValue(value)) {
+        throw new Error("object expected")
+      }
+
+      return convertRecordInput(value, shape)
     }
     case "value": {
       if (!isValueShape(shape)) {

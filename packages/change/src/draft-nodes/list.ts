@@ -1,10 +1,15 @@
-import type { ListContainerShape } from "../shape.js"
+import type { LoroList } from "loro-crdt"
+import type { ContainerOrValueShape } from "../shape.js"
 import { ListDraftNodeBase } from "./list-base.js"
 
 // List draft node
 export class ListDraftNode<
-  Shape extends ListContainerShape,
-> extends ListDraftNodeBase<Shape> {
+  NestedShape extends ContainerOrValueShape,
+> extends ListDraftNodeBase<NestedShape> {
+  protected get container(): LoroList {
+    return super.container as LoroList
+  }
+
   protected absorbValueAtIndex(index: number, value: any): void {
     // LoroList doesn't have set method, need to delete and insert
     this.container.delete(index, 1)

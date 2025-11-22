@@ -1,23 +1,35 @@
-import type { Container } from "loro-crdt"
+import type { Container, LoroList, LoroMovableList } from "loro-crdt"
 import { convertInputToNode } from "../conversion.js"
 import type {
+  ContainerOrValueShape,
   ContainerShape,
   ListContainerShape,
   MovableListContainerShape,
 } from "../shape.js"
-import type { InferDraftType, InferPlainType } from "../types.js"
 import { isContainer, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { createContainerDraftNode } from "./utils.js"
 
 // Shared logic for list operations
 export abstract class ListDraftNodeBase<
-  Shape extends ListContainerShape | MovableListContainerShape,
-  Item = InferPlainType<Shape["shape"]>,
-  DraftItem = InferDraftType<Shape["shape"]>,
-> extends DraftNode<Shape> {
+  NestedShape extends ContainerOrValueShape,
+  Item = NestedShape["_plain"],
+  DraftItem = NestedShape["_draft"],
+> extends DraftNode<any> {
   // Cache for items returned by array methods to track mutations
   private itemCache = new Map<number, any>()
+
+  protected get container(): LoroList | LoroMovableList {
+    return super.container as LoroList | LoroMovableList
+  }
+
+  protected get shape():
+    | ListContainerShape<NestedShape>
+    | MovableListContainerShape<NestedShape> {
+    return super.shape as
+      | ListContainerShape<NestedShape>
+      | MovableListContainerShape<NestedShape>
+  }
 
   absorbPlainValues() {
     // Critical function: absorb mutated plain values back into Loro containers

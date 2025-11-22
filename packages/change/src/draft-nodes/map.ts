@@ -8,7 +8,12 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
-import type { ContainerShape, MapContainerShape, ValueShape } from "../shape.js"
+import type {
+  ContainerOrValueShape,
+  ContainerShape,
+  MapContainerShape,
+  ValueShape,
+} from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { createContainerDraftNode } from "./utils.js"
@@ -18,19 +23,28 @@ const containerConstructor = {
   list: LoroList,
   map: LoroMap,
   movableList: LoroMovableList,
+  record: LoroMap,
   text: LoroText,
   tree: LoroTree,
 } as const
 
 // Map draft node
 export class MapDraftNode<
-  Shape extends MapContainerShape,
-> extends DraftNode<Shape> {
+  NestedShapes extends Record<string, ContainerOrValueShape>,
+> extends DraftNode<any> {
   private propertyCache = new Map<string, DraftNode<ContainerShape> | Value>()
 
-  constructor(params: DraftNodeParams<Shape>) {
+  constructor(params: DraftNodeParams<MapContainerShape<NestedShapes>>) {
     super(params)
     this.createLazyProperties()
+  }
+
+  protected get shape(): MapContainerShape<NestedShapes> {
+    return super.shape as MapContainerShape<NestedShapes>
+  }
+
+  protected get container(): LoroMap {
+    return super.container as LoroMap
   }
 
   absorbPlainValues() {
@@ -50,7 +64,8 @@ export class MapDraftNode<
     key: string,
     shape: S,
   ): DraftNodeParams<ContainerShape> {
-    const emptyState = this.emptyState?.[key]
+    // biome-ignore lint/suspicious/noExplicitAny: prevent excessively deep type errors
+    const emptyState = (this.emptyState as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
 
@@ -78,11 +93,11 @@ export class MapDraftNode<
           node = containerValue as Value
         } else {
           // Only fall back to empty state if the container doesn't have the value
-          const emptyState = this.emptyState?.[key]
+          const emptyState = (this.emptyState as any)?.[key]
           if (!emptyState) {
             throw new Error("empty state required")
           }
-          node = emptyState
+          node = emptyState as Value
         }
       }
       if (!node) throw new Error("no container made")

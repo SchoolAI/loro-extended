@@ -1372,7 +1372,7 @@ describe("Edge Cases and Error Handling", () => {
           const evens = draft.numbers.filter(num => num % 2 === 0)
           expect(evens).toEqual([2, 4])
 
-          const withIndex = draft.numbers.filter((num, index) => index > 2)
+          const withIndex = draft.numbers.filter((_num, index) => index > 2)
           expect(withIndex).toEqual([4, 5])
         })
       })
@@ -1460,7 +1460,7 @@ describe("Edge Cases and Error Handling", () => {
           const allOdd = draft.numbers.every(num => num % 2 === 1)
           expect(allOdd).toBe(false)
 
-          const allPositive = draft.numbers.every((num, index) => num > 0)
+          const allPositive = draft.numbers.every((num, _index) => num > 0)
           expect(allPositive).toBe(true)
         })
       })
@@ -1633,12 +1633,12 @@ describe("Edge Cases and Error Handling", () => {
 
         typedDoc.change(draft => {
           // Test all methods on empty list
-          expect(draft.items.find(item => true)).toBeUndefined()
-          expect(draft.items.findIndex(item => true)).toBe(-1)
+          expect(draft.items.find(_item => true)).toBeUndefined()
+          expect(draft.items.findIndex(_item => true)).toBe(-1)
           expect(draft.items.map(item => item)).toEqual([])
-          expect(draft.items.filter(item => true)).toEqual([])
-          expect(draft.items.some(item => true)).toBe(false)
-          expect(draft.items.every(item => true)).toBe(true) // vacuous truth
+          expect(draft.items.filter(_item => true)).toEqual([])
+          expect(draft.items.some(_item => true)).toBe(false)
+          expect(draft.items.every(_item => true)).toBe(true) // vacuous truth
 
           let forEachCalled = false
           draft.items.forEach(() => {
@@ -1699,11 +1699,11 @@ describe("Edge Cases and Error Handling", () => {
           draft.items.push("c")
 
           // Test that index parameter is correct in all methods
-          const findResult = draft.items.find((item, index) => index === 1)
+          const findResult = draft.items.find((_item, index) => index === 1)
           expect(findResult).toBe("b")
 
           const findIndexResult = draft.items.findIndex(
-            (item, index) => index === 2,
+            (_item, index) => index === 2,
           )
           expect(findIndexResult).toBe(2)
 
@@ -1711,7 +1711,7 @@ describe("Edge Cases and Error Handling", () => {
           expect(mapResult).toEqual(["0:a", "1:b", "2:c"])
 
           const filterResult = draft.items.filter(
-            (item, index) => index % 2 === 0,
+            (_item, index) => index % 2 === 0,
           )
           expect(filterResult).toEqual(["a", "c"])
 
@@ -1720,7 +1720,7 @@ describe("Edge Cases and Error Handling", () => {
           )
           expect(someResult).toBe(true)
 
-          const everyResult = draft.items.every((item, index) => index < 3)
+          const everyResult = draft.items.every((_item, index) => index < 3)
           expect(everyResult).toBe(true)
 
           const forEachResults: Array<{ item: string; index: number }> = []

@@ -16,6 +16,7 @@ import type {
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
+  RecordContainerShape,
   TextContainerShape,
   TreeContainerShape,
   ValueShape,
@@ -70,6 +71,8 @@ export function isLoroTree(container: Container): container is LoroTree {
 /**
  * Type guard to check if an object is a LoroTreeNode
  * Note: LoroTreeNode is not a Container, so we check for its specific properties
+ *
+ * biome-ignore lint/suspicious/noExplicitAny: type guard
  */
 export function isLoroTreeNode(obj: any): obj is LoroTreeNode {
   return (
@@ -154,6 +157,15 @@ export function isMapShape(
 }
 
 /**
+ * Type guard to check if a schema is for RecordDraftNode
+ */
+export function isRecordShape(
+  schema: ContainerOrValueShape,
+): schema is RecordContainerShape {
+  return schema && typeof schema === "object" && schema._type === "record"
+}
+
+/**
  * Type guard to check if a schema is for TreeDraftNode
  */
 export function isTreeShape(
@@ -184,6 +196,7 @@ export function isValueShape(
       "undefined",
       "uint8array",
       "object",
+      "record",
       "array",
     ].includes(schema.valueType)
   )

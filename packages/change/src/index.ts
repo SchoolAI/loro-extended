@@ -14,11 +14,13 @@ export type {
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
+  RecordContainerShape,
   TextContainerShape,
   TreeContainerShape,
   // Value shapes
   ValueShape,
   ArrayValueShape,
+  RecordValueShape,
   // ...
 } from "./shape.js"
 
