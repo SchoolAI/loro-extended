@@ -41,12 +41,12 @@ export function useDocHandleState(documentId: DocId) {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       if (!handle) return () => {}
-      
+
       // Subscribe to all document updates (local and remote)
       const unsubscribe = handle.doc.subscribe(() => {
         onStoreChange()
       })
-      
+
       return unsubscribe
     },
     [handle],

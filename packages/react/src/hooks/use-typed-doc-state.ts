@@ -1,7 +1,7 @@
 import {
-  TypedDoc,
   type DocShape,
   type InferPlainType,
+  TypedDoc,
 } from "@loro-extended/change"
 import type { DocId } from "@loro-extended/repo"
 import { useMemo } from "react"
@@ -38,11 +38,10 @@ export function useTypedDocState<T extends DocShape>(
     const loroDoc = handle.doc
     // Create a new TypedDoc with the same schema/emptyState but updated LoroDoc
     const updatedTypedDoc = new TypedDoc(schema, emptyState, loroDoc)
-    
+
     // Use snapshot.version to ensure we re-compute when document changes
-    // biome-ignore lint/correctness/useExhaustiveDependencies: snapshot.version triggers re-computation
     void snapshot.version
-    
+
     return updatedTypedDoc.value
   }, [snapshot.version, handle, schema, emptyState])
 
