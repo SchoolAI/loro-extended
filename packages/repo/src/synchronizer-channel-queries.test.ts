@@ -93,7 +93,7 @@ describe("Synchronizer - Channel Queries", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -111,7 +111,7 @@ describe("Synchronizer - Channel Queries", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
     // Simulate sync requests to establish subscriptions

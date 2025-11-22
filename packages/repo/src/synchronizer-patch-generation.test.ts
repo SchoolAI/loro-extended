@@ -70,7 +70,7 @@ describe("Synchronizer - Patch Generation", () => {
 
   it("should generate patches when onPatch is provided", async () => {
     new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       onUpdate: onPatch,
     })
@@ -88,7 +88,7 @@ describe("Synchronizer - Patch Generation", () => {
 
   it("should work without onPatch callback", () => {
     const syncWithoutPatch = new Synchronizer({
-      identity: { name: "test" },
+      identity: { peerId: "1", name: "test", type: "user" },
       adapters: [new MockAdapter({ adapterId: "test" }) as AnyAdapter],
     })
 

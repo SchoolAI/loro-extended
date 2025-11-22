@@ -37,7 +37,7 @@ type SynchronizerEvents = {
 }
 
 type SynchronizerParams = {
-  identity?: Partial<PeerIdentityDetails>
+  identity: PeerIdentityDetails
   adapters: AnyAdapter[]
   permissions?: Rules
   onUpdate?: HandleUpdateFn
@@ -69,10 +69,7 @@ export class Synchronizer {
     const logger = preferredLogger ?? getLogger()
     this.logger = logger.getChild("synchronizer")
 
-    // Ensure identity has both peerId and name
-    const peerId = identity?.peerId ?? generatePeerId()
-    const name = identity?.name ?? peerId
-    this.identity = { peerId, name }
+    this.identity = identity
 
     this.logger.debug(`new Synchronizer`, { identity: this.identity })
 
@@ -202,6 +199,13 @@ export class Synchronizer {
    */
   public getPeers(): PeerState[] {
     return Array.from(this.model.peers.values())
+  }
+
+  /**
+   * Get the current ready states for a document
+   */
+  public getReadyStates(docId: DocId): ReadyState[] {
+    return getReadyStates(this.model.channels, this.model.peers, docId)
   }
 
   /**

@@ -10,7 +10,7 @@ describe("Synchronizer - Document Management", () => {
 
   beforeEach(() => {
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [],
       permissions: createPermissions(),
     })

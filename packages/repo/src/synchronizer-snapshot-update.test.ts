@@ -93,7 +93,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -111,7 +111,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "test-peer" },
+      identity: { peerId: "1" as any, name: "test-peer", type: "user" },
     })
 
     // Clear previous messages AFTER establishment
@@ -155,7 +155,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "test-peer" },
+      identity: { peerId: "1" as any, name: "test-peer", type: "user" },
     })
 
     // Clear previous messages
@@ -200,7 +200,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "test-peer" },
+      identity: { peerId: "1" as any, name: "test-peer", type: "user" },
     })
 
     // Clear previous messages
@@ -241,7 +241,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "test-peer" },
+      identity: { peerId: "1" as any, name: "test-peer", type: "user" },
     })
 
     // Clear previous messages
@@ -287,7 +287,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "client" },
+      identity: { peerId: "1" as any, name: "client", type: "user" },
     })
 
     // Clear previous messages
@@ -328,7 +328,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "client" },
+      identity: { peerId: "1" as any, name: "client", type: "user" },
     })
 
     // Clear previous messages

@@ -63,7 +63,7 @@ describe("Synchronizer - Adapter Integration", () => {
 
   it("should send messages through adapters", async () => {
     new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
     })
 
@@ -82,7 +82,7 @@ describe("Synchronizer - Adapter Integration", () => {
     const adapter2 = new MockAdapter({ adapterId: "adapter-2" })
 
     const multiSync = new Synchronizer({
-      identity: { name: "test" },
+      identity: { peerId: "2", name: "test", type: "user" },
       adapters: [adapter1 as AnyAdapter, adapter2 as AnyAdapter],
     })
 

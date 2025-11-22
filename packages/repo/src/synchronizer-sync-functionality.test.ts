@@ -80,12 +80,6 @@ class MockAdapter extends Adapter<{ name: string }> {
   }
 }
 
-// Helper to create a version vector
-function createVersionVector() {
-  const doc = new LoroDoc()
-  return doc.version()
-}
-
 describe("Synchronizer - Sync Functionality", () => {
   let synchronizer: Synchronizer
   let mockAdapter: MockAdapter
@@ -93,7 +87,7 @@ describe("Synchronizer - Sync Functionality", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -108,7 +102,7 @@ describe("Synchronizer - Sync Functionality", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
     // Create valid document data

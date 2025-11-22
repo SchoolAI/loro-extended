@@ -18,6 +18,7 @@ export type LoroDocMutator<T extends DocContent> = (doc: LoroDoc<T>) => void
 export type PeerIdentityDetails = {
   peerId: PeerID // Globally unique, stable identifier (not generated per-connection)
   name: string // peer can give itself a name; this is not unique
+  type: "user" | "bot" | "service"
   // publicKey?: Uint8Array // Future: For cryptographic identity
 }
 
@@ -33,6 +34,8 @@ export type ReadyState = {
   loading: LoadingState
 }
 
+// TODO(duane): Refactor this type into discriminated union
+// - fix state-helpers use of `!` to assert existence of lastKnownVersion
 export type PeerDocumentAwareness = {
   awareness: "unknown" | "has-doc" | "no-doc"
   lastKnownVersion?: VersionVector

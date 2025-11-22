@@ -62,7 +62,7 @@ describe("Synchronizer - Reset Functionality", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })

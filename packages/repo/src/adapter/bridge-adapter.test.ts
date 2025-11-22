@@ -15,7 +15,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     new Repo({
@@ -25,7 +25,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     // Verify both repos are connected through the bridge
@@ -43,7 +43,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     const repo2 = new Repo({
@@ -53,7 +53,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     // Create and modify a document in repo1
@@ -86,7 +86,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     const repo2 = new Repo({
@@ -96,7 +96,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     const docId = "bidirectional-doc"
@@ -137,7 +137,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     const repo2 = new Repo({
@@ -147,7 +147,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     const docId = "concurrent-doc"
@@ -196,7 +196,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     const repo2 = new Repo({
@@ -206,7 +206,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     // Create multiple documents in repo1
@@ -245,7 +245,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     new Repo({
@@ -255,7 +255,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     // Verify both adapters are registered
@@ -285,7 +285,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
       // onUpdate: patches => {
       //   console.log(
       //     `REPO1 PATCHES (${patches.length}):`,
@@ -302,7 +302,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
       // onUpdate: patches => {
       //   console.log(
       //     `REPO2 PATCHES (${patches.length}):`,
@@ -319,7 +319,7 @@ describe("BridgeAdapter Integration Tests", () => {
           adapterId: "bridge-adapter-repo3",
         }),
       ],
-      identity: { name: "repo3" },
+      identity: { name: "repo3", type: "user" },
       // onUpdate: patches => {
       //   console.log(
       //     `REPO3 PATCHES (${patches.length}):`,

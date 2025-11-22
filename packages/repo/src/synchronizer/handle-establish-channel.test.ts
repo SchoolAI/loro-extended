@@ -46,6 +46,7 @@ describe("handle-establish-channel", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
 
     const message: SynchronizerMessage = {

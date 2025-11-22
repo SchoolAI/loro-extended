@@ -71,7 +71,7 @@ describe("Synchronizer - Channel Management", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -120,7 +120,11 @@ describe("Synchronizer - Channel Management", () => {
     if (connectedChannel) {
       synchronizer.onChannelReceive(connectedChannel, {
         type: "channel/establish-response",
-        identity: { peerId: "test-peer-id" as any, name: "test-peer" },
+        identity: {
+          peerId: "test-peer-id" as any,
+          name: "test-peer",
+          type: "user",
+        },
       })
     }
 

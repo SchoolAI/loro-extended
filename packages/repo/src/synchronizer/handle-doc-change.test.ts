@@ -43,7 +43,7 @@ describe("handle-doc-change", () => {
 
     // Add peer state with subscription and OLD version
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map([
         [
           docId,
@@ -88,7 +88,7 @@ describe("handle-doc-change", () => {
 
     // Add peer state with no document awareness
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -123,7 +123,7 @@ describe("handle-doc-change", () => {
 
     // Add peer state with no-doc awareness
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map([
         [docId, { awareness: "no-doc", lastUpdated: new Date() }],
       ]),
@@ -174,14 +174,22 @@ describe("handle-doc-change", () => {
 
     // Add peer states
     initialModel.peers.set("network-peer" as PeerID, {
-      identity: { peerId: "network-peer" as PeerID, name: "network" },
+      identity: {
+        peerId: "network-peer" as PeerID,
+        name: "network",
+        type: "user",
+      },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
       channels: new Set([networkPeer.channelId]),
     })
     initialModel.peers.set("storage-peer" as PeerID, {
-      identity: { peerId: "storage-peer" as PeerID, name: "storage" },
+      identity: {
+        peerId: "storage-peer" as PeerID,
+        name: "storage",
+        type: "service",
+      },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -230,7 +238,7 @@ describe("handle-doc-change", () => {
 
     // Peer 1: has subscription and OLD version
     initialModel.peers.set("peer-1" as PeerID, {
-      identity: { peerId: "peer-1" as PeerID, name: "peer1" },
+      identity: { peerId: "peer-1" as PeerID, name: "peer1", type: "user" },
       documentAwareness: new Map([
         [
           docId,
@@ -248,7 +256,7 @@ describe("handle-doc-change", () => {
 
     // Peer 2: unknown awareness, no subscription
     initialModel.peers.set("peer-2" as PeerID, {
-      identity: { peerId: "peer-2" as PeerID, name: "peer2" },
+      identity: { peerId: "peer-2" as PeerID, name: "peer2", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),

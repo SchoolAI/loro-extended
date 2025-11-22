@@ -28,7 +28,7 @@ describe("handle-doc-ensure", () => {
 
     // Add peer state
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -112,14 +112,22 @@ describe("handle-doc-ensure", () => {
     initialModel.channels.set(storagePeer.channelId, storagePeer)
 
     initialModel.peers.set("network-peer" as PeerID, {
-      identity: { peerId: "network-peer" as PeerID, name: "network" },
+      identity: {
+        peerId: "network-peer" as PeerID,
+        name: "network",
+        type: "user",
+      },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
       channels: new Set([networkPeer.channelId]),
     })
     initialModel.peers.set("storage-peer" as PeerID, {
-      identity: { peerId: "storage-peer" as PeerID, name: "storage" },
+      identity: {
+        peerId: "storage-peer" as PeerID,
+        name: "storage",
+        type: "service",
+      },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),

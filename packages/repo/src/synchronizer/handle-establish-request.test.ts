@@ -31,7 +31,11 @@ describe("handle-establish-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/establish-request",
-          identity: { peerId: "remote-peer-id" as PeerID, name: "test" },
+          identity: {
+            peerId: "1",
+            name: "test",
+            type: "user",
+          },
         },
       },
     }

@@ -67,6 +67,7 @@ export function handleEstablishRequest(
         // Copy the identity object here to avoid needing mutative's slower `current()` function
         // (Normally objects can't outlive a mutative change, and current gets around that)
         identity: {
+          type: model.identity.type,
           name: model.identity.name,
           peerId: model.identity.peerId,
         },

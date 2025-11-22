@@ -36,7 +36,11 @@ describe("handle-establish-response", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/establish-response",
-          identity: { peerId: "remote-peer-id" as PeerID, name: "test" },
+          identity: {
+            peerId: "remote-peer-id" as PeerID,
+            name: "test",
+            type: "user",
+          },
         },
       },
     }
@@ -70,25 +74,35 @@ describe("handle-establish-response", () => {
       const [newModel, command] = sendEstablishResponse(
         model,
         channel.channelId,
-        "new-peer" as PeerID,
+        "1",
         update,
       )
 
       // Creates peer state
-      expect(newModel.peers.has("new-peer" as PeerID)).toBe(true)
+      expect(newModel.peers.has("1")).toBe(true)
 
-      // Sends directory-request + sync-request
+      // Sends directory-request + sync-request + ready-state-changed for each doc
       expectBatchCommand(command)
-      expect(command.commands).toHaveLength(2)
+      expect(command.commands).toHaveLength(4)
+
       const cmd0 = command.commands[0]
-      const cmd1 = command.commands[1]
       expectCommand(cmd0, "cmd/send-message")
-      expectCommand(cmd1, "cmd/send-message")
       expect(cmd0.envelope.message.type).toBe("channel/directory-request")
+
+      const cmd1 = command.commands[1]
+      expectCommand(cmd1, "cmd/send-message")
       expect(cmd1.envelope.message.type).toBe("channel/sync-request")
       if (cmd1.envelope.message.type === "channel/sync-request") {
         expect(cmd1.envelope.message.docs).toHaveLength(2)
       }
+
+      const cmd2 = command.commands[2]
+      expectCommand(cmd2, "cmd/emit-ready-state-changed")
+      expect(cmd2.docId).toBe("doc-1")
+
+      const cmd3 = command.commands[3]
+      expectCommand(cmd3, "cmd/emit-ready-state-changed")
+      expect(cmd3.docId).toBe("doc-2")
     })
 
     it("skips directory-request for known peer", () => {

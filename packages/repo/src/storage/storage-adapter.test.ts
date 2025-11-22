@@ -80,7 +80,7 @@ describe("StorageAdapter", () => {
     adapterInstance: MockStorageAdapter = adapter,
   ): Promise<ConnectedChannel> {
     adapterInstance._initialize({
-      identity: { peerId: "123", name: "test-peer" },
+      identity: { peerId: "123", name: "test-peer", type: "user" },
       onChannelAdded: () => {},
       onChannelRemoved: () => {},
       onChannelReceive: () => {},
@@ -110,7 +110,7 @@ describe("StorageAdapter", () => {
       let channelCount = 0
 
       adapter._initialize({
-        identity: { peerId: "123", name: "test-peer" },
+        identity: { peerId: "123", name: "test-peer", type: "user" },
         onChannelAdded: () => channelCount++,
         onChannelRemoved: () => channelCount--,
         onChannelReceive: () => {},
@@ -138,7 +138,7 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/establish-request",
-        identity: { peerId: "123", name: "test-peer" },
+        identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
       expect(receivedMessages).toHaveLength(1)

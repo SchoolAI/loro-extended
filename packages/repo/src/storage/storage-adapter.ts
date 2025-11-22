@@ -148,6 +148,7 @@ export abstract class StorageAdapter extends Adapter<void> {
       identity: {
         peerId: this.storagePeerId,
         name: this.adapterId,
+        type: "service",
       },
     })
   }

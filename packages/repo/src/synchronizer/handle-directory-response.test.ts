@@ -29,7 +29,7 @@ describe("handle-directory-response", () => {
 
     // Add peer state
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -66,7 +66,7 @@ describe("handle-directory-response", () => {
 
     // Add peer state with no document awareness
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -124,7 +124,7 @@ describe("handle-directory-response", () => {
 
     // Add peer state
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),

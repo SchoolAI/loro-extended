@@ -1,4 +1,4 @@
-import { LoroDoc, VersionVector } from "loro-crdt"
+import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import type { ChannelMsg } from "./channel.js"
 import {
@@ -138,7 +138,7 @@ describe("Channel JSON Serialization", () => {
       it("should serialize establish-request", () => {
         const msg: ChannelMsg = {
           type: "channel/establish-request",
-          identity: { peerId: "1", name: "Test Peer" },
+          identity: { peerId: "1", name: "Test Peer", type: "user" },
         }
 
         const json = serializeChannelMsg(msg)
@@ -148,7 +148,7 @@ describe("Channel JSON Serialization", () => {
       it("should serialize establish-response", () => {
         const msg: ChannelMsg = {
           type: "channel/establish-response",
-          identity: { peerId: "2", name: "Another Peer" },
+          identity: { peerId: "2", name: "Another Peer", type: "user" },
         }
 
         const json = serializeChannelMsg(msg)
@@ -158,7 +158,7 @@ describe("Channel JSON Serialization", () => {
       it("should round-trip establish-request", () => {
         const original: ChannelMsg = {
           type: "channel/establish-request",
-          identity: { peerId: "1", name: "Test Peer" },
+          identity: { peerId: "1", name: "Test Peer", type: "user" },
         }
 
         const json = serializeChannelMsg(original)

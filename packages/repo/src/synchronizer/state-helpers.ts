@@ -1,3 +1,5 @@
+import type { Channel } from "../channel.js"
+import { isEstablished } from "../channel.js"
 import type {
   ChannelId,
   DocId,
@@ -6,8 +8,6 @@ import type {
   PeerState,
   ReadyState,
 } from "../types.js"
-import type { Channel } from "../channel.js"
-import { isEstablished } from "../channel.js"
 
 /**
  * Get ready states for all channels for a document
@@ -21,7 +21,7 @@ export function getReadyStates(
 ): ReadyState[] {
   const readyStates: ReadyState[] = []
 
-  for (const [channelId, channel] of channels.entries()) {
+  for (const channel of channels.values()) {
     if (!isEstablished(channel)) continue
 
     const peer = peers.get(channel.peerId)
@@ -29,7 +29,7 @@ export function getReadyStates(
 
     // Convert peer awareness to loading state for UI
     let loading: LoadingState
-    
+
     if (!awareness) {
       loading = { state: "initial" }
     } else if (awareness.awareness === "has-doc") {

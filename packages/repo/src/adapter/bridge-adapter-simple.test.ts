@@ -13,7 +13,7 @@ describe("BridgeAdapter Simple Test", () => {
           adapterId: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
     })
 
     const repo2 = new Repo({
@@ -23,7 +23,7 @@ describe("BridgeAdapter Simple Test", () => {
           adapterId: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
     })
 
     // Give it a moment for channels to establish

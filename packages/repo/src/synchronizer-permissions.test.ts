@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
 import type {
   Channel,
@@ -80,17 +80,11 @@ class MockAdapter extends Adapter<{ name: string }> {
 }
 
 describe("Synchronizer - Permissions Integration", () => {
-  let mockAdapter: MockAdapter
-
-  beforeEach(() => {
-    mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
-  })
-
   it("should respect permissions in directory requests", async () => {
     // Create a fresh adapter for this test to avoid reuse issues
     const freshAdapter = new MockAdapter({ adapterId: "test-adapter-2" })
     const restrictiveSync = new Synchronizer({
-      identity: { name: "test" },
+      identity: { peerId: "1", name: "test", type: "user" },
       adapters: [freshAdapter as AnyAdapter],
       permissions: createPermissions({
         canReveal: context => context.docId !== "secret-doc",
@@ -107,7 +101,7 @@ describe("Synchronizer - Permissions Integration", () => {
     // Establish the channel first so getRuleContext works
     freshAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1" as any, name: "requester-peer" },
+      identity: { peerId: "1" as any, name: "requester-peer", type: "user" },
     })
 
     // Clear previous messages

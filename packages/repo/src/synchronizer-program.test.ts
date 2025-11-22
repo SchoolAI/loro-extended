@@ -29,7 +29,11 @@ describe("Synchronizer Program - Integration Tests", () => {
 
   describe("initialization", () => {
     it("should initialize with empty state", () => {
-      const identity = { peerId: "test-peer-id" as PeerID, name: "test-peer" }
+      const identity = {
+        peerId: "test-peer-id" as PeerID,
+        name: "test-peer",
+        type: "user" as const,
+      }
       const [model, command] = programInit(identity)
 
       expect(model.identity).toEqual(identity)
@@ -44,6 +48,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,
         name: "test",
+        type: "user",
       })
 
       const message: SynchronizerMessage = {
@@ -79,7 +84,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const channel = createEstablishedChannel(peerId)
       const initialModel = createModelWithChannel(channel)
       initialModel.peers.set(peerId, {
-        identity: { peerId, name: "test-peer" },
+        identity: { peerId, name: "test-peer", type: "user" },
         documentAwareness: new Map(),
         subscriptions: new Set(),
         lastSeen: new Date(),
@@ -124,7 +129,11 @@ describe("Synchronizer Program - Integration Tests", () => {
           fromChannelId: channel.channelId,
           message: {
             type: "channel/establish-response",
-            identity: { peerId: "remote-peer-id" as PeerID, name: "test" },
+            identity: {
+              peerId: "remote-peer-id" as PeerID,
+              name: "test",
+              type: "user",
+            },
           },
         },
       }
@@ -141,6 +150,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,
         name: "test",
+        type: "user",
       })
       const channel = createMockChannel()
 
@@ -159,6 +169,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,
         name: "test",
+        type: "user",
       })
 
       // This should not generate any commands
@@ -189,6 +200,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,
         name: "test",
+        type: "user",
       })
 
       // Cast to bypass TypeScript checking for unknown message type
@@ -208,6 +220,7 @@ describe("Synchronizer Program - Integration Tests", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,
         name: "test",
+        type: "user",
       })
       const originalChannelsSize = initialModel.channels.size
       const originalDocsSize = initialModel.documents.size
@@ -236,7 +249,7 @@ describe("Synchronizer Program - Integration Tests", () => {
 
       // Add peer state with subscription
       initialModel.peers.set(peerId, {
-        identity: { peerId, name: "test-peer" },
+        identity: { peerId, name: "test-peer", type: "user" },
         documentAwareness: new Map(),
         subscriptions: new Set([docId]),
         lastSeen: new Date(),

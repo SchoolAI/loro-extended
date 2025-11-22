@@ -44,6 +44,14 @@ export class DocHandle<T extends DocContent = DocContent> {
     return docState.doc as LoroDoc<T>
   }
 
+  /**
+   * Get the current ready states for this document.
+   * This provides visibility into the sync status of the document across all channels.
+   */
+  get readyStates(): ReadyState[] {
+    return this.synchronizer.getReadyStates(this.docId)
+  }
+
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // PUBLIC API - Always-available document access
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

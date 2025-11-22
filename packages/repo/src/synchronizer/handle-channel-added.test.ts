@@ -21,6 +21,7 @@ describe("handle-channel-added", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
     const channel = createMockChannel()
 

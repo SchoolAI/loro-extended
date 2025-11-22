@@ -93,7 +93,7 @@ describe("Synchronizer - Event Emission", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -108,7 +108,7 @@ describe("Synchronizer - Event Emission", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
     // Set up event listener
@@ -142,7 +142,7 @@ describe("Synchronizer - Event Emission", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
     // Start waiting for ready state

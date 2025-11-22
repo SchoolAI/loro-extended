@@ -3,12 +3,22 @@ import type { AnyAdapter } from "./adapter/adapter.js"
 import { DocHandle } from "./doc-handle.js"
 import { createPermissions, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
-import type { DocContent, DocId, PeerIdentityDetails } from "./types.js"
+import type {
+  DocContent,
+  DocId,
+  PeerIdentityDetails,
+  ReadyState,
+} from "./types.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
 
+// Add to RepoEvents type
+type RepoEvents = {
+  "ready-state-changed": { docId: string; readyStates: ReadyState[] }
+}
+
 export interface RepoParams {
+  identity: Omit<PeerIdentityDetails, "peerId"> & { peerId?: `${number}` }
   adapters: AnyAdapter[]
-  identity?: Partial<PeerIdentityDetails>
   permissions?: Partial<Rules>
   onUpdate?: HandleUpdateFn
 }
@@ -34,9 +44,7 @@ export class Repo {
 
   constructor({ identity, adapters, permissions, onUpdate }: RepoParams) {
     // Ensure identity has both peerId and name
-    const peerId = identity?.peerId ?? generatePeerId()
-    const name = identity?.name ?? peerId
-    this.identity = { peerId, name }
+    this.identity = { ...identity, peerId: identity.peerId ?? generatePeerId() }
 
     const logger = getLogger(["@loro-extended", "repo"]).with({
       identity: this.identity,

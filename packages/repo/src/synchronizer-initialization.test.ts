@@ -59,7 +59,7 @@ describe("Synchronizer - Initialization", () => {
 
   it("should initialize with provided identity", () => {
     const sync = new Synchronizer({
-      identity: { name: "custom-name" },
+      identity: { peerId: "1", name: "custom-name", type: "user" },
       adapters: [],
     })
 
@@ -68,7 +68,7 @@ describe("Synchronizer - Initialization", () => {
 
   it("should generate identity name if not provided", () => {
     const sync = new Synchronizer({
-      identity: {},
+      identity: { peerId: "1", name: "1", type: "user" },
       adapters: [],
     })
 
@@ -79,7 +79,7 @@ describe("Synchronizer - Initialization", () => {
 
   it("should initialize adapters", () => {
     const synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -91,7 +91,7 @@ describe("Synchronizer - Initialization", () => {
 
   it("should create permissions manager", () => {
     const restrictiveSync = new Synchronizer({
-      identity: { name: "test" },
+      identity: { peerId: "1", name: "test", type: "user" },
       adapters: [],
       permissions: createPermissions({
         canReveal: () => false,
@@ -103,9 +103,9 @@ describe("Synchronizer - Initialization", () => {
 
   it("should set up patch callback if provided", () => {
     const onPatch = vi.fn()
-    
+
     const synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
       onUpdate: onPatch,

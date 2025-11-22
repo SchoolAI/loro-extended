@@ -45,6 +45,8 @@
 import { current } from "mutative"
 import { isEstablished, type Channel } from "../channel.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
+import { getReadyStates } from "./state-helpers.js"
+import { batchAsNeeded } from "./utils.js"
 
 export function handleChannelRemoved(
   msg: { type: "synchronizer/channel-removed"; channel: Channel },
@@ -54,15 +56,19 @@ export function handleChannelRemoved(
   // This stops the channel's internal operations (close connections, etc.)
   const channel = model.channels.get(msg.channel.channelId)
 
-  const deinitChannelCmd: Command = channel
-    ? {
-        type: "cmd/stop-channel",
-        channel: current(channel),
-      }
-    : {
-        type: "cmd/log",
-        message: `channel didn't exist when removing: ${msg.channel.channelId}`,
-      }
+  const commands: Command[] = []
+
+  if (channel) {
+    commands.push({
+      type: "cmd/stop-channel",
+      channel: current(channel),
+    })
+  } else {
+    commands.push({
+      type: "cmd/log",
+      message: `channel didn't exist when removing: ${msg.channel.channelId}`,
+    })
+  }
 
   // Step 2: Update peer state if channel was established
   // We keep the peer state for reconnection optimization
@@ -81,8 +87,14 @@ export function handleChannelRemoved(
   // Step 3: Remove the channel from our model
   model.channels.delete(msg.channel.channelId)
 
-  // Step 4: Channel-specific state cleanup
-  // (No longer needed - peer state persists across channel disconnections)
+  // Emit ready-state-changed for all documents since a channel was removed
+  for (const docId of model.documents.keys()) {
+    commands.push({
+      type: "cmd/emit-ready-state-changed",
+      docId,
+      readyStates: getReadyStates(model.channels, model.peers, docId),
+    })
+  }
 
-  return deinitChannelCmd
+  return batchAsNeeded(...commands)
 }

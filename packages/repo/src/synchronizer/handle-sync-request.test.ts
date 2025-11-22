@@ -31,7 +31,7 @@ describe("handle-sync-request", () => {
 
     // Add peer state
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),

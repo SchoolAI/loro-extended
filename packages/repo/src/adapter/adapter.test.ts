@@ -64,7 +64,7 @@ describe("Adapter", () => {
   beforeEach(() => {
     adapter = new MockAdapter()
     hooks = {
-      identity: { peerId: "0", name: "test-peer" },
+      identity: { peerId: "0", name: "test-peer", type: "user" },
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
       onChannelReceive: vi.fn(),
@@ -262,7 +262,7 @@ describe("Adapter", () => {
       const channel = adapter.testAddChannel("test-context")
       const message: ChannelMsg = {
         type: "channel/establish-request",
-        identity: { peerId: "1", name: "test-peer" },
+        identity: { peerId: "1", name: "test-peer", type: "user" },
       }
 
       channel.onReceive(message)
@@ -296,7 +296,11 @@ describe("Adapter", () => {
 
       // Create new hooks
       const newHooks: AdapterHooks = {
-        identity: { peerId: "0" satisfies PeerID, name: "test-peer" },
+        identity: {
+          peerId: "0" satisfies PeerID,
+          name: "test-peer",
+          type: "user",
+        },
         onChannelAdded: vi.fn(),
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),
@@ -312,7 +316,7 @@ describe("Adapter", () => {
       // (this verifies closure behavior)
       const message: ChannelMsg = {
         type: "channel/establish-request",
-        identity: { peerId: "2", name: "test-peer" },
+        identity: { peerId: "2", name: "test-peer", type: "user" },
       }
 
       // Note: After stop, the old channel is cleared, so we create a new one
@@ -359,12 +363,12 @@ describe("Adapter", () => {
 
       const message1: ChannelMsg = {
         type: "channel/establish-request",
-        identity: { peerId: "1", name: "peer-1" },
+        identity: { peerId: "1", name: "peer-1", type: "user" },
       }
 
       const message2: ChannelMsg = {
         type: "channel/establish-response",
-        identity: { peerId: "2", name: "peer-2" },
+        identity: { peerId: "2", name: "peer-2", type: "user" },
       }
 
       channel1.onReceive(message1)
@@ -634,7 +638,11 @@ describe("Adapter", () => {
 
       const adapter = new OnStartChannelAdapter({ adapterId: "test-adapter" })
       const onStartHooks: AdapterHooks = {
-        identity: { peerId: "0" satisfies PeerID, name: "test-peer" },
+        identity: {
+          peerId: "0" satisfies PeerID,
+          name: "test-peer",
+          type: "user",
+        },
         onChannelAdded: vi.fn(),
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),

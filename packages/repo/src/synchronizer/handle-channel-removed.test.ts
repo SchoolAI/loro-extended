@@ -6,12 +6,10 @@ import {
   init as programInit,
   type SynchronizerMessage,
 } from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
 import {
   createEstablishedChannel,
   createMockChannel,
   createModelWithChannel,
-  createVersionVector,
   expectCommand,
 } from "./test-utils.js"
 
@@ -47,7 +45,7 @@ describe("handle-channel-removed", () => {
 
     // Add peer state with this channel
     initialModel.peers.set(peerId, {
-      identity: { peerId, name: "test-peer" },
+      identity: { peerId, name: "test-peer", type: "user" },
       documentAwareness: new Map(),
       subscriptions: new Set(),
       lastSeen: new Date(),
@@ -69,6 +67,7 @@ describe("handle-channel-removed", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
     const channel = createMockChannel()
 

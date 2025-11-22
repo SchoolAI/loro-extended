@@ -22,6 +22,7 @@ describe("handle-local-doc-delete", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
 
     // Add a document
@@ -39,7 +40,7 @@ describe("handle-local-doc-delete", () => {
 
     // Document should be removed
     expect(newModel.documents.has("test-doc")).toBe(false)
-    // No command should be issued
+    // Should not return any command
     expect(command).toBeUndefined()
   })
 
@@ -47,6 +48,7 @@ describe("handle-local-doc-delete", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
 
     const message: SynchronizerMessage = {
@@ -68,6 +70,7 @@ describe("handle-local-doc-delete", () => {
     const [initialModel] = programInit({
       peerId: "test-id" as PeerID,
       name: "test",
+      type: "user",
     })
 
     // Add a document
@@ -87,6 +90,7 @@ describe("handle-local-doc-delete", () => {
     // Delete again - should just log warning
     const [model2, cmd2] = update(message, model1)
     expect(model2.documents.has("test-doc")).toBe(false)
+
     expectCommand(cmd2, "cmd/log")
   })
 })

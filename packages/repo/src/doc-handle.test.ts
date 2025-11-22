@@ -13,7 +13,7 @@ describe("DocHandle Integration Tests", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
     const storage = new InMemoryStorageAdapter()
     synchronizer = new Synchronizer({
-      identity: { name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
       adapters: [storage],
     })
   })

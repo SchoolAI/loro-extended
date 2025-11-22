@@ -94,7 +94,7 @@ describe("Synchronizer - Command Execution", () => {
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
     synchronizer = new Synchronizer({
-      identity: { name: "test-synchronizer" },
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
       permissions: createPermissions(),
     })
@@ -109,7 +109,7 @@ describe("Synchronizer - Command Execution", () => {
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "test-peer" },
+      identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
     // Add some content to the document
@@ -145,7 +145,7 @@ describe("Synchronizer - Command Execution", () => {
     // Simulate establish request/response to get channel into established state
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "requester-peer" },
+      identity: { peerId: "1", name: "requester-peer", type: "user" },
     })
 
     // Channel should be in established state
@@ -160,7 +160,7 @@ describe("Synchronizer - Command Execution", () => {
     // Simulate establish request which should generate batch command
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
-      identity: { peerId: "1", name: "requester-peer" },
+      identity: { peerId: "1", name: "requester-peer", type: "user" },
     })
 
     // Should have executed multiple commands (establish + send message)

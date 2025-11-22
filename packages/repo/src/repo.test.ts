@@ -13,7 +13,10 @@ describe("Repo", () => {
   beforeEach(() => {
     storage = new InMemoryStorageAdapter()
 
-    repo = new Repo({ adapters: [storage] })
+    repo = new Repo({
+      adapters: [storage],
+      identity: { name: "test-repo", type: "user" },
+    })
   })
 
   it("should create a new document and return a handle", () => {
@@ -60,13 +63,13 @@ describe("Repo", () => {
 
     const networkA = new BridgeAdapter({ adapterId: "network-a", bridge })
     const repoA = new Repo({
-      identity: { name: "repoA" },
+      identity: { name: "repoA", type: "user" },
       adapters: [networkA],
     })
 
     const networkB = new BridgeAdapter({ adapterId: "network-b", bridge })
     const repoB = new Repo({
-      identity: { name: "repoB" },
+      identity: { name: "repoB", type: "user" },
       adapters: [networkB],
     })
 

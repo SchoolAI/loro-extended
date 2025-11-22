@@ -16,11 +16,11 @@ describe("Repo E2E", () => {
   it("should synchronize a document between two repos", async () => {
     const bridge = new Bridge()
     const repo1 = new Repo({
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
     })
     const repo2 = new Repo({
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
     })
 
@@ -62,14 +62,14 @@ describe("Repo E2E", () => {
     let repo1CanWrite = true
 
     const repo1 = new Repo({
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
       permissions: {
         canUpdate: () => repo1CanWrite,
       },
     })
     const repo2 = new Repo({
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
     })
 
@@ -105,12 +105,12 @@ describe("Repo E2E", () => {
   it("should not delete a document if a peer is not allowed to", async () => {
     const bridge = new Bridge()
     const repo1 = new Repo({
-      identity: { name: "repo1" },
+      identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
       permissions: { canDelete: () => false },
     })
     const repo2 = new Repo({
-      identity: { name: "repo2" },
+      identity: { name: "repo2", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
     })
 
@@ -141,7 +141,7 @@ describe("Repo E2E", () => {
 
     it("should reveal all documents when canReveal is always true", async () => {
       repoA = new Repo({
-        identity: { name: "repoA" },
+        identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => true },
       })
@@ -149,7 +149,7 @@ describe("Repo E2E", () => {
       const handle2 = repoA.get(crypto.randomUUID())
 
       repoB = new Repo({
-        identity: { name: "repoB" },
+        identity: { name: "repoB", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
@@ -168,12 +168,12 @@ describe("Repo E2E", () => {
 
     it("should not announce documents when canReveal is false", async () => {
       repoA = new Repo({
-        identity: { name: "repoA" },
+        identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => false },
       })
       repoB = new Repo({
-        identity: { name: "repoB" },
+        identity: { name: "repoB", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
@@ -191,12 +191,12 @@ describe("Repo E2E", () => {
 
     it("should sync a document on direct request even if not announced", async () => {
       repoA = new Repo({
-        identity: { name: "repoA" },
+        identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: { canReveal: () => false },
       })
       repoB = new Repo({
-        identity: { name: "repoB" },
+        identity: { name: "repoB", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
@@ -217,7 +217,7 @@ describe("Repo E2E", () => {
 
     it("should selectively announce documents based on permissions", async () => {
       repoA = new Repo({
-        identity: { name: "repoA" },
+        identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
         permissions: {
           canReveal: context => context.docId.startsWith("allowed"),
@@ -236,7 +236,7 @@ describe("Repo E2E", () => {
 
       // Now create repoB - it should receive announcements based on canReveal
       repoB = new Repo({
-        identity: { name: "repoB" },
+        identity: { name: "repoB", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
       })
 
@@ -255,7 +255,7 @@ describe("Repo E2E", () => {
 
       // Create first repo instance and create a document
       const repo1 = new Repo({
-        identity: { name: "repo1" },
+        identity: { name: "repo1", type: "user" },
         adapters: [storage1],
       })
 
@@ -282,7 +282,7 @@ describe("Repo E2E", () => {
       // Create a second repo instance with a fresh storage adapter that shares the same data
       const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
-        identity: { name: "repo2" },
+        identity: { name: "repo2", type: "user" },
         adapters: [storage2],
       })
 
@@ -308,7 +308,7 @@ describe("Repo E2E", () => {
 
       // First session: create document with initial content
       const repo1 = new Repo({
-        identity: { name: "repo1" },
+        identity: { name: "repo1", type: "user" },
         adapters: [storage1],
       })
 
@@ -329,7 +329,7 @@ describe("Repo E2E", () => {
       // Second session: load document from storage with fresh adapter
       const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
-        identity: { name: "repo2" },
+        identity: { name: "repo2", type: "user" },
         adapters: [storage2],
       })
 
@@ -354,7 +354,7 @@ describe("Repo E2E", () => {
       // Third session: verify all changes are persisted in storage with fresh adapter
       const storage3 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo3 = new Repo({
-        identity: { name: "repo3" },
+        identity: { name: "repo3", type: "user" },
         adapters: [storage3],
       })
 
@@ -372,7 +372,7 @@ describe("Repo E2E", () => {
 
       // Create document with changes
       const repo1 = new Repo({
-        identity: { name: "repo1" },
+        identity: { name: "repo1", type: "user" },
         adapters: [storage1],
       })
 
@@ -407,7 +407,7 @@ describe("Repo E2E", () => {
       // Create new repo and load the document with fresh adapter
       const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
-        identity: { name: "repo2" },
+        identity: { name: "repo2", type: "user" },
         adapters: [storage2],
       })
 
@@ -429,7 +429,7 @@ describe("Repo E2E", () => {
       const storage1 = new InMemoryStorageAdapter()
 
       const repo1 = new Repo({
-        identity: { name: "repo1" },
+        identity: { name: "repo1", type: "user" },
         adapters: [storage1],
       })
 
@@ -482,7 +482,7 @@ describe("Repo E2E", () => {
       // Load in new repo instance with fresh adapter
       const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
       const repo2 = new Repo({
-        identity: { name: "repo2" },
+        identity: { name: "repo2", type: "user" },
         adapters: [storage2],
       })
 

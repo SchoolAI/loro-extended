@@ -56,6 +56,7 @@ export function createModelWithChannel(channel: Channel): SynchronizerModel {
   const [model] = programInit({
     peerId: "test-peer-id" as PeerID,
     name: "test-identity",
+    type: "user",
   })
   model.channels.set(channel.channelId, channel)
   return model
@@ -88,7 +89,7 @@ export function createModelWithKnownPeer(
   )
 
   model.peers.set(peerId, {
-    identity: { peerId, name: "known-peer" },
+    identity: { peerId, name: "known-peer", type: "user" },
     documentAwareness,
     subscriptions: new Set(),
     lastSeen: new Date(Date.now() - 60000),
@@ -121,7 +122,7 @@ export function sendEstablishResponse(
       fromChannelId: channelId,
       message: {
         type: "channel/establish-response",
-        identity: { peerId, name: "peer" },
+        identity: { peerId, name: "peer", type: "user" },
       },
     },
   }
