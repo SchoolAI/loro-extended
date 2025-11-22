@@ -117,6 +117,8 @@ export function createSseExpressRouter(
       Connection: "keep-alive",
     })
     res.flushHeaders()
+    // Send initial comment to ensure headers are flushed and connection is established
+    res.write(": ok\n\n")
 
     const peerId = getPeerIdFromEventsRequest(req)
     if (!peerId) {
@@ -131,6 +133,11 @@ export function createSseExpressRouter(
     connection.setSendFunction((msg: ChannelMsg) => {
       const serialized = serializeChannelMsg(msg)
       res.write(`data: ${JSON.stringify(serialized)}\n\n`)
+      // Flush the response buffer to ensure immediate delivery
+      // Note: 'flush' is added by compression middleware or some environments
+      if (typeof (res as any).flush === "function") {
+        ;(res as any).flush()
+      }
     })
 
     // Set up disconnect handler

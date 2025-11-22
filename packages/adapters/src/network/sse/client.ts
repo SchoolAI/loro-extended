@@ -81,9 +81,6 @@ export class SseClientNetworkAdapter extends Adapter<void> {
         ? this.eventSourceUrl(this.peerId!)
         : this.eventSourceUrl
 
-    // Create single channel for server connection
-    this.serverChannel = this.addChannel(undefined)
-
     this.eventSource = new ReconnectingEventSource(resolvedEventSourceUrl)
 
     this.eventSource.onmessage = event => {
@@ -98,15 +95,25 @@ export class SseClientNetworkAdapter extends Adapter<void> {
 
     this.eventSource.onerror = (_err: Event) => {
       this.logger.warn("SSE connection error")
+      if (this.serverChannel) {
+        this.removeChannel(this.serverChannel.channelId)
+        this.serverChannel = undefined
+      }
     }
 
     this.eventSource.onopen = () => {
       this.logger.debug("SSE connection established")
-    }
 
-    // Establish the channel immediately - don't wait for onopen
-    // The EventSource will handle reconnection if needed
-    this.establishChannel(this.serverChannel.channelId)
+      // If we have an existing channel, remove it first to ensure a fresh handshake
+      if (this.serverChannel) {
+        this.removeChannel(this.serverChannel.channelId)
+        this.serverChannel = undefined
+      }
+
+      this.serverChannel = this.addChannel()
+
+      this.establishChannel(this.serverChannel.channelId)
+    }
   }
 
   async onStop(): Promise<void> {
