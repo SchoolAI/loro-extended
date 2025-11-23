@@ -27,6 +27,8 @@ import type {
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
+const HEARTBEAT_INTERVAL = 15000
+
 // The events that the Synchronizer can emit
 type SynchronizerEvents = {
   "ready-state-changed": {
@@ -60,6 +62,7 @@ export class Synchronizer {
   readonly updateFn: SynchronizerUpdate
 
   readonly ephemeralStores = new Map<DocId, EphemeralStore>()
+  readonly heartbeats = new Map<DocId, ReturnType<typeof setInterval>>()
 
   readonly emitter = new Emittery<SynchronizerEvents>()
 
@@ -189,6 +192,35 @@ export class Synchronizer {
   setEphemeral(docId: DocId, key: string, value: any) {
     const store = this.getOrCreateEphemeralStore(docId)
     store.set(key, value)
+
+    // Manage heartbeat for our own state
+    if (key === this.identity.peerId) {
+      const hasState = value && typeof value === "object" && Object.keys(value).length > 0
+      
+      if (hasState) {
+        if (!this.heartbeats.has(docId)) {
+          const interval = setInterval(() => {
+            const currentStore = this.ephemeralStores.get(docId)
+            if (!currentStore) return
+
+            const allStates = currentStore.getAllStates()
+            const myState = allStates[this.identity.peerId]
+
+            if (myState) {
+              currentStore.set(this.identity.peerId, myState)
+            }
+          }, HEARTBEAT_INTERVAL)
+          this.heartbeats.set(docId, interval)
+        }
+      } else {
+        // Stop heartbeat if state is empty
+        const interval = this.heartbeats.get(docId)
+        if (interval) {
+          clearInterval(interval)
+          this.heartbeats.delete(docId)
+        }
+      }
+    }
   }
 
   getEphemeral(docId: DocId): Record<string, any> {
@@ -577,6 +609,13 @@ export class Synchronizer {
    * Remove a document from the synchronizer and send delete messages to all channels.
    */
   public async removeDocument(docId: DocId): Promise<void> {
+    // Stop heartbeat if exists
+    const interval = this.heartbeats.get(docId)
+    if (interval) {
+      clearInterval(interval)
+      this.heartbeats.delete(docId)
+    }
+
     const docState = this.model.documents.get(docId)
 
     if (!docState) {
@@ -608,6 +647,12 @@ export class Synchronizer {
   }
 
   public async reset() {
+    // Clear all heartbeats
+    for (const interval of this.heartbeats.values()) {
+      clearInterval(interval)
+    }
+    this.heartbeats.clear()
+
     const [initialModel] = programInit(this.model.identity)
 
     // Stop all adapters

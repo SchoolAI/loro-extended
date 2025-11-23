@@ -37,13 +37,6 @@ function App() {
   // Set self presence
   useEffect(() => {
     setSelf({ type: "user", lastSeen: Date.now() })
-    
-    // Keep alive / update timestamp periodically
-    const interval = setInterval(() => {
-      setSelf({ lastSeen: Date.now() })
-    }, 5000)
-    
-    return () => clearInterval(interval)
   }, [setSelf])
 
   const memberCount = Object.values(peers).filter((p: any) => p?.type === "user").length
