@@ -83,6 +83,11 @@ export type ChannelMsgJSON =
       docId: string
       status: "deleted" | "ignored"
     }
+  | {
+      type: "channel/ephemeral"
+      docId: string
+      data: BinaryDataJSON
+    }
 
 /**
  * Utility functions for serialization
@@ -147,6 +152,12 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
         ...msg,
         transmission: serializeSyncTransmission(msg.transmission),
       }
+
+    case "channel/ephemeral":
+      return {
+        ...msg,
+        data: uint8ArrayToJSON(msg.data),
+      }
   }
 }
 
@@ -202,6 +213,12 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
       return {
         ...json,
         transmission: deserializeSyncTransmission(json.transmission),
+      }
+
+    case "channel/ephemeral":
+      return {
+        ...json,
+        data: uint8ArrayFromJSON(json.data),
       }
   }
 }

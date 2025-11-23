@@ -100,6 +100,13 @@ export class DocHandle<T extends DocContent = DocContent> {
   }
 
   /**
+   * Get the peer ID of the local peer.
+   */
+  get peerId(): string {
+    return this.synchronizer.identity.peerId
+  }
+
+  /**
    * Ephemeral state management for presence, cursors, and other transient data.
    */
   public readonly ephemeral: {
