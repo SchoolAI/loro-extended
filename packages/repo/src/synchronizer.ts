@@ -1,6 +1,6 @@
 import { getLogger, type Logger } from "@logtape/logtape"
 import Emittery from "emittery"
-import type { VersionVector } from "loro-crdt"
+import { EphemeralStore, type VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { AdapterManager } from "./adapter/adapter-manager.js"
@@ -24,7 +24,6 @@ import type {
   PeerState,
   ReadyState,
 } from "./types.js"
-import { generatePeerId } from "./utils/generate-peer-id.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
@@ -33,6 +32,9 @@ type SynchronizerEvents = {
   "ready-state-changed": {
     docId: string
     readyStates: ReadyState[]
+  }
+  "ephemeral-change": {
+    docId: string
   }
 }
 
@@ -56,6 +58,8 @@ export class Synchronizer {
 
   model: SynchronizerModel
   readonly updateFn: SynchronizerUpdate
+
+  readonly ephemeralStores = new Map<DocId, EphemeralStore>()
 
   readonly emitter = new Emittery<SynchronizerEvents>()
 
@@ -146,6 +150,52 @@ export class Synchronizer {
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // PUBLIC API
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  getOrCreateEphemeralStore(docId: DocId): EphemeralStore {
+    let store = this.ephemeralStores.get(docId)
+    if (!store) {
+      store = new EphemeralStore()
+      this.ephemeralStores.set(docId, store)
+
+      // Wire up local updates to broadcast
+      store.subscribeLocalUpdates(data => {
+        // Get all channels subscribed to this doc
+        const channelIds: ChannelId[] = []
+        for (const [peerId, peerState] of this.model.peers.entries()) {
+          if (peerState.subscriptions.has(docId)) {
+            channelIds.push(...peerState.channels)
+          }
+        }
+
+        if (channelIds.length > 0) {
+          this.adapters.send({
+            toChannelIds: channelIds,
+            message: {
+              type: "channel/ephemeral",
+              docId,
+              data,
+            },
+          })
+        }
+      })
+
+      // Wire up changes to emit event
+      store.subscribe(() => {
+        this.emitter.emit("ephemeral-change", { docId })
+      })
+    }
+    return store
+  }
+
+  setEphemeral(docId: DocId, key: string, value: any) {
+    const store = this.getOrCreateEphemeralStore(docId)
+    store.set(key, value)
+  }
+
+  getEphemeral(docId: DocId): Record<string, any> {
+    const store = this.getOrCreateEphemeralStore(docId)
+    return store.getAllStates()
+  }
+
   getOrCreateDocumentState(docId: DocId): DocState {
     let docState = this.model.documents.get(docId)
 
@@ -373,6 +423,13 @@ export class Synchronizer {
       // (utility): A command that logs a message
       case "cmd/log": {
         this.logger.info(command.message)
+        break
+      }
+
+      case "cmd/apply-ephemeral": {
+        const store = this.getOrCreateEphemeralStore(command.docId)
+        store.apply(command.data)
+        break
       }
     }
   }
@@ -481,6 +538,20 @@ export class Synchronizer {
     if (sentCount === 0) {
       this.logger.warn(`can't send sync-response to channel`, {
         toChannelId,
+      })
+    }
+
+    // Also send ephemeral state to ensure the peer has the latest presence info
+    const store = this.getOrCreateEphemeralStore(docId)
+    const ephemeralData = store.encodeAll()
+    if (ephemeralData.length > 0) {
+      this.adapters.send({
+        toChannelIds: [toChannelId],
+        message: {
+          type: "channel/ephemeral",
+          docId,
+          data: ephemeralData,
+        },
       })
     }
   }

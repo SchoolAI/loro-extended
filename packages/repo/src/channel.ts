@@ -84,6 +84,12 @@ export type ChannelMsgDeleteResponse = {
   status: "deleted" | "ignored"
 }
 
+export type ChannelMsgEphemeral = {
+  type: "channel/ephemeral"
+  docId: DocId
+  data: Uint8Array
+}
+
 export type AddressedEstablishmentEnvelope = {
   toChannelIds: ChannelId[]
   message: EstablishmentMsg
@@ -132,6 +138,7 @@ export type EstablishedMsg =
   | ChannelMsgDirectoryResponse
   | ChannelMsgDeleteRequest
   | ChannelMsgDeleteResponse
+  | ChannelMsgEphemeral
 
 /** All channel messages */
 export type ChannelMsg = EstablishmentMsg | EstablishedMsg

@@ -35,6 +35,53 @@ export class DocHandle<T extends DocContent = DocContent> {
       docId,
     })
 
+    // Initialize ephemeral handle
+    // We capture 'this' as 'docHandle' to avoid 'this' context issues in getters
+    // biome-ignore lint/style/noNonNullAssertion: initialized in constructor
+    const docHandle = this
+    this.ephemeral = {
+      set: (key: string, value: any) => {
+        const myPeerId = docHandle.synchronizer.identity.peerId
+        const store = docHandle.synchronizer.getEphemeral(docHandle.docId)
+        const currentSelfState = store[myPeerId] || {}
+        const newSelfState = { ...currentSelfState, [key]: value }
+        docHandle.synchronizer.setEphemeral(
+          docHandle.docId,
+          myPeerId,
+          newSelfState,
+        )
+      },
+
+      get: (key: string) => {
+        const myPeerId = docHandle.synchronizer.identity.peerId
+        const store = docHandle.synchronizer.getEphemeral(docHandle.docId)
+        return store[myPeerId]?.[key]
+      },
+
+      get self() {
+        const myPeerId = docHandle.synchronizer.identity.peerId
+        return (
+          docHandle.synchronizer.getEphemeral(docHandle.docId)[myPeerId] || {}
+        )
+      },
+
+      get all() {
+        return docHandle.synchronizer.getEphemeral(docHandle.docId)
+      },
+
+      setRaw: (key: string, value: any) => {
+        docHandle.synchronizer.setEphemeral(docHandle.docId, key, value)
+      },
+
+      subscribe: (cb: () => void) => {
+        return docHandle.synchronizer.emitter.on("ephemeral-change", event => {
+          if (event.docId === docHandle.docId) {
+            cb()
+          }
+        })
+      },
+    }
+
     this.logger.trace("new DocHandle")
   }
 
@@ -50,6 +97,18 @@ export class DocHandle<T extends DocContent = DocContent> {
    */
   get readyStates(): ReadyState[] {
     return this.synchronizer.getReadyStates(this.docId)
+  }
+
+  /**
+   * Ephemeral state management for presence, cursors, and other transient data.
+   */
+  public readonly ephemeral: {
+    set: (key: string, value: any) => void
+    get: (key: string) => any
+    readonly self: any
+    readonly all: any
+    setRaw: (key: string, value: any) => void
+    subscribe: (cb: () => void) => () => void
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

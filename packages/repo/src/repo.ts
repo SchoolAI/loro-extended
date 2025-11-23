@@ -3,18 +3,8 @@ import type { AnyAdapter } from "./adapter/adapter.js"
 import { DocHandle } from "./doc-handle.js"
 import { createPermissions, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
-import type {
-  DocContent,
-  DocId,
-  PeerIdentityDetails,
-  ReadyState,
-} from "./types.js"
+import type { DocContent, DocId, PeerIdentityDetails } from "./types.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
-
-// Add to RepoEvents type
-type RepoEvents = {
-  "ready-state-changed": { docId: string; readyStates: ReadyState[] }
-}
 
 export interface RepoParams {
   identity: Omit<PeerIdentityDetails, "peerId"> & { peerId?: `${number}` }

@@ -173,6 +173,7 @@ export type Command =
 
   // Document operations
   | { type: "cmd/subscribe-doc"; docId: DocId }
+  | { type: "cmd/apply-ephemeral"; docId: DocId; data: Uint8Array }
 
   // Events
   | {
@@ -385,6 +386,13 @@ function mutatingChannelUpdate(
 
     case "channel/directory-response":
       return handleDirectoryResponse(channelMessage, ctx)
+
+    case "channel/ephemeral":
+      return {
+        type: "cmd/apply-ephemeral",
+        docId: channelMessage.docId,
+        data: channelMessage.data,
+      }
   }
   return
 }
