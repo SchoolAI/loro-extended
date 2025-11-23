@@ -1,4 +1,4 @@
-import { useDocument, useRepo, useRoomWithPresence } from "@loro-extended/react"
+import { useDocument, useEphemeral, useRepo } from "@loro-extended/react"
 import type { DocId } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema } from "../shared/types"
@@ -31,8 +31,22 @@ function App() {
     preferences: {},
   })
 
-  // Join the room for presence
-  const { members } = useRoomWithPresence(`room-${docId}`)
+  // Use ephemeral state for presence
+  const { peers, setSelf } = useEphemeral(docId)
+
+  // Set self presence
+  useEffect(() => {
+    setSelf({ type: "user", lastSeen: Date.now() })
+    
+    // Keep alive / update timestamp periodically
+    const interval = setInterval(() => {
+      setSelf({ lastSeen: Date.now() })
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [setSelf])
+
+  const memberCount = Object.values(peers).filter((p: any) => p?.type === "user").length
 
   // Auto-scroll to bottom when messages change
   // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to messages
@@ -116,7 +130,7 @@ function App() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 text-slate-300 text-sm">
               <span>👥</span>
-              <span>{members.filter(m => m.type === "user").length}</span>
+              <span>{memberCount}</span>
             </div>
 
             <div className="flex items-center gap-2">

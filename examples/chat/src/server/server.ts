@@ -146,11 +146,30 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
   const typedDoc = getChatDoc(handle)
 
   // Subscribe to future changes
-  const unsubscribe = handle.doc.subscribe(() => {
+  const unsubscribeDoc = handle.doc.subscribe(() => {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  subscriptions.set(docId, unsubscribe)
+  // Subscribe to ephemeral changes for presence
+  const unsubscribeEphemeral = handle.ephemeral.subscribe(() => {
+    const peers = handle.ephemeral.all
+    const currentCount = Object.keys(peers).length
+    const prevCount = roomMembers.get(docId) ?? 0
+
+    logger.info`Presence update for ${docId}: ${prevCount} -> ${currentCount} members`
+
+    if (prevCount <= 1 && currentCount > 1) {
+      logger.info`Presence transition detected in ${docId}: 1 -> ${currentCount} users. Sending system message.`
+      appendAssistantMessage(typedDoc, "Just @ai mention me if you need me!")
+    }
+
+    roomMembers.set(docId, currentCount)
+  })
+
+  subscriptions.set(docId, () => {
+    unsubscribeDoc()
+    unsubscribeEphemeral()
+  })
 
   // Check current state immediately (in case we missed the initial sync event)
   processDocumentUpdate(docId, typedDoc)
@@ -182,46 +201,6 @@ repo.synchronizer.emitter.on(
     subscribeToDocument(repo, docId)
   },
 )
-
-// Listen for room joins globally to ensure we track presence immediately
-repo.on("room-member-joined", ({ roomId, member }) => {
-  // Check if this is a chat room we care about
-  if (!roomId.startsWith("room-")) return
-
-  const docId = roomId.replace("room-", "")
-
-  const handle = repo.get(docId)
-
-  const typedDoc = getChatDoc(handle)
-
-  // Update member tracking
-  const prevCount = roomMembers.get(roomId) ?? 0
-
-  const room = repo.getRoom(roomId)
-
-  const currentCount = room?.getMembers().length ?? 0
-
-  logger.info`Room member joined: ${roomId} got:${Boolean(room)} ${member.peerId}, ${prevCount} -> ${currentCount} members`
-
-  // Detect transition from 1 -> 2 users
-  if (prevCount <= 1 && currentCount > 1) {
-    logger.info`Presence transition detected in ${roomId}: 1 -> ${currentCount} users. Sending system message.`
-
-    appendAssistantMessage(typedDoc, "Just @ai mention me if you need me!")
-  }
-})
-
-repo.on("room-member-left", ({ roomId, member }) => {
-  if (!roomId.startsWith("room-")) return
-
-  const room = repo.getRoom(roomId)
-
-  const currentCount = room?.getMembers().length ?? 0
-
-  logger.info`Room member left: ${roomId} got:${Boolean(room)} ${member.peerId}, now ${currentCount} members`
-
-  roomMembers.set(roomId, currentCount)
-})
 
 // Create and mount the SSE Express router
 app.use(
