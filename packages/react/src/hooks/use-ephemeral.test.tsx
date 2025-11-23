@@ -63,4 +63,31 @@ describe("useEphemeral", () => {
       expect(result.current.self).toEqual({ name: "Alice", status: "online" })
     })
   })
+
+  it("should support selectors", async () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => {
+        const selected = useEphemeral(documentId, state => state.self.cursor)
+        const full = useEphemeral(documentId)
+        return { selected, full }
+      },
+      {
+        wrapper: RepoWrapper,
+      },
+    )
+
+    // Initially undefined
+    expect(result.current.selected).toBeUndefined()
+
+    act(() => {
+      result.current.full.setSelf({ cursor: { x: 100, y: 200 } })
+    })
+
+    await waitFor(() => {
+      expect(result.current.selected).toEqual({ x: 100, y: 200 })
+    })
+  })
 })
