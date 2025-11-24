@@ -12,7 +12,7 @@ describe("Ephemeral Store Integration", () => {
     const handle = repo.get("test-doc")
 
     // Set local state
-    handle.ephemeral.set("cursor", { x: 10, y: 20 })
+    handle.ephemeral.set({ cursor: { x: 10, y: 20 } })
 
     // Get local state
     expect(handle.ephemeral.get("cursor")).toEqual({ x: 10, y: 20 })
@@ -54,7 +54,7 @@ describe("Ephemeral Store Integration", () => {
     handle2.ephemeral.subscribe(onChange)
 
     // Set state on repo1
-    handle1.ephemeral.set("selection", "start")
+    handle1.ephemeral.set({ selection: "start" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -96,7 +96,7 @@ describe("Ephemeral Store Integration", () => {
 
     const docId = "initial-sync-doc"
     const handle1 = repo1.get(docId)
-    handle1.ephemeral.set("status", "online")
+    handle1.ephemeral.set({ status: "online" })
 
     // Create repo2 AFTER repo1 has set state
     const repo2 = new Repo({

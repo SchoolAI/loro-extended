@@ -107,6 +107,14 @@ export function handleDirectoryResponse(
     // Note: Subscription NOT set yet - they haven't requested from us
     // That will be set when they send sync-request
     setPeerDocumentAwareness(peerState, docId, "has-doc")
+
+    // Since peer has the doc, send our ephemeral state
+    commands.push({
+      type: "cmd/broadcast-ephemeral",
+      docId,
+      toChannelIds: [fromChannelId],
+    })
+
     logger.debug("directory-response: updated peer awareness", {
       peerId: channel.peerId,
       docId,

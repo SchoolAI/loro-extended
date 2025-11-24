@@ -4,7 +4,7 @@ import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 import { useEphemeral } from "./use-ephemeral.js"
 
 describe("useEphemeral", () => {
-  it("should provide self, peers, and others", async () => {
+  it("should provide self and all", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
@@ -13,8 +13,7 @@ describe("useEphemeral", () => {
     })
 
     expect(result.current.self).toEqual({})
-    expect(result.current.peers).toEqual({})
-    expect(result.current.others).toEqual({})
+    expect(result.current.all).toEqual({})
     expect(typeof result.current.setSelf).toBe("function")
   })
 
@@ -34,9 +33,9 @@ describe("useEphemeral", () => {
       expect(result.current.self).toEqual({ cursor: { x: 10, y: 20 } })
     })
     
-    // Peers should also contain self
+    // All should also contain self
     // We need to know the peerId to check the key, but we can check values
-    expect(Object.values(result.current.peers)).toContainEqual({ cursor: { x: 10, y: 20 } })
+    expect(Object.values(result.current.all)).toContainEqual({ cursor: { x: 10, y: 20 } })
   })
 
   it("should handle partial updates", async () => {

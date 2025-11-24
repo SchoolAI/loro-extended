@@ -14,6 +14,7 @@ function App() {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [isCopied, setIsCopied] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
 
   // Get document ID from URL hash, or create new conversation
   const docId = useDocIdFromHash(generateConversationId())
@@ -32,14 +33,18 @@ function App() {
   })
 
   // Use ephemeral state for presence
-  const { peers, setSelf } = useEphemeral(docId)
+  const { all, self, setSelf } = useEphemeral(docId)
 
   // Set self presence
   useEffect(() => {
     setSelf({ type: "user", lastSeen: Date.now() })
   }, [setSelf])
 
-  const memberCount = Object.values(peers).filter((p: any) => p?.type === "user").length
+  console.dir({ self, all }, { depth: null })
+
+  const memberCount = Object.values(all).filter(
+    (p: any) => p?.type === "user",
+  ).length
 
   // Auto-scroll to bottom when messages change
   // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to messages
@@ -92,9 +97,20 @@ function App() {
     })
   }
 
-  const isConnected = handle?.readyStates.some(
-    s => s.channelMeta.kind === "network",
-  )
+  useEffect(() => {
+    if (!handle) return
+
+    const updateConnectionStatus = (readyStates: any[]) => {
+      const connected = readyStates.some(s => s.channelMeta.kind === "network")
+      setIsConnected(connected)
+    }
+
+    // Initial check
+    updateConnectionStatus(handle.readyStates)
+
+    // Subscribe to changes
+    return handle.onReadyStateChange(updateConnectionStatus)
+  }, [handle])
 
   return (
     <div className="flex flex-col h-screen bg-amber-50 text-gray-800 font-sans">
@@ -113,9 +129,7 @@ function App() {
                     isConnected ? "bg-green-400" : "bg-red-400 animate-pulse"
                   }`}
                 />
-                {handle?.readyStates.some(s => s.channelMeta.kind === "network")
-                  ? "Connected"
-                  : "Connecting..."}
+                {isConnected ? "Connected" : "Connecting..."}
               </div>
             </div>
           </div>

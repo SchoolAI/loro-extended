@@ -47,7 +47,7 @@ describe("Ephemeral Heartbeat", () => {
     handle2.ephemeral.subscribe(onChange)
 
     // Set state on repo1
-    handle1.ephemeral.set("status", "active")
+    handle1.ephemeral.set({ status: "active" })
 
     // Wait for initial sync
     await vi.advanceTimersByTimeAsync(100)
@@ -70,7 +70,7 @@ describe("Ephemeral Heartbeat", () => {
     const handle = repo.get("test-doc")
 
     // Set state
-    handle.ephemeral.set("status", "active")
+    handle.ephemeral.set({ status: "active" })
 
     // Advance time to trigger one heartbeat
     // We can't easily check internal interval existence without access to private props,
@@ -87,7 +87,7 @@ describe("Ephemeral Heartbeat", () => {
     // Usually setting to null or undefined is treated as deletion in some KV stores.
     // Let's try setting to null.
     
-    handle.ephemeral.set("status", null)
+    handle.ephemeral.set({ status: null })
     
     // If we advance time, we shouldn't see errors or continued activity.
     // This is hard to test without spying on the interval or the send method.

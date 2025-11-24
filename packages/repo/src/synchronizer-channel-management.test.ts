@@ -118,7 +118,7 @@ describe("Synchronizer - Channel Management", () => {
     expect(connectedChannel).toBeDefined()
 
     if (connectedChannel) {
-      synchronizer.onChannelReceive(connectedChannel, {
+      synchronizer.channelReceive(connectedChannel, {
         type: "channel/establish-response",
         identity: {
           peerId: "test-peer-id" as any,
@@ -134,7 +134,7 @@ describe("Synchronizer - Channel Management", () => {
 
     if (updatedChannel && updatedChannel.type === "established") {
       // Now simulate sync-requests which will add subscriptions
-      synchronizer.onChannelReceive(updatedChannel, {
+      synchronizer.channelReceive(updatedChannel, {
         type: "channel/sync-request",
         docs: [
           {

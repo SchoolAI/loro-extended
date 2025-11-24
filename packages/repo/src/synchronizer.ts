@@ -1,9 +1,9 @@
 import { getLogger, type Logger } from "@logtape/logtape"
 import Emittery from "emittery"
-import { EphemeralStore, type VersionVector } from "loro-crdt"
+import { EphemeralStore, type Value, type VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
-import type { AnyAdapter } from "./adapter/adapter.js"
 import { AdapterManager } from "./adapter/adapter-manager.js"
+import type { AnyAdapter } from "./adapter/adapter.js"
 import type { Channel, ChannelMsg, ConnectedChannel } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
 import { createPermissions, type Rules } from "./rules.js"
@@ -27,7 +27,8 @@ import type {
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
-const HEARTBEAT_INTERVAL = 15000
+// Initiate a synchronizer/heartbeat every N milliseconds; used primarily for ephemeral stores
+const HEARTBEAT_INTERVAL = 10000
 
 // The events that the Synchronizer can emit
 type SynchronizerEvents = {
@@ -53,18 +54,22 @@ type SynchronizerUpdate = (
   model: SynchronizerModel,
 ) => [SynchronizerModel, Command?]
 
+export type ObjectValue = { [key: string]: Value }
+
 export class Synchronizer {
   readonly identity: PeerIdentityDetails
   readonly adapters: AdapterManager
   readonly logger: Logger
 
-  model: SynchronizerModel
   readonly updateFn: SynchronizerUpdate
 
   readonly ephemeralStores = new Map<DocId, EphemeralStore>()
-  readonly heartbeats = new Map<DocId, ReturnType<typeof setInterval>>()
 
   readonly emitter = new Emittery<SynchronizerEvents>()
+
+  model: SynchronizerModel
+
+  heartbeat: ReturnType<typeof setInterval> | undefined
 
   constructor({
     identity,
@@ -108,7 +113,7 @@ export class Synchronizer {
         identity: this.identity,
         onChannelAdded: this.channelAdded.bind(this),
         onChannelRemoved: this.channelRemoved.bind(this),
-        onChannelReceive: this.onChannelReceive.bind(this),
+        onChannelReceive: this.channelReceive.bind(this),
         onChannelEstablish: this.channelEstablish.bind(this),
       })
     }
@@ -118,9 +123,22 @@ export class Synchronizer {
     for (const adapter of adapters) {
       void adapter._start()
     }
+
+    this.startHeartbeat()
   }
 
-  onChannelReceive(channel: Channel, message: ChannelMsg) {
+  startHeartbeat() {
+    this.heartbeat = setInterval(() => {
+      this.#dispatch({ type: "synchronizer/heartbeat" })
+    }, HEARTBEAT_INTERVAL)
+  }
+
+  stopHeartbeat() {
+    clearInterval(this.heartbeat)
+    this.heartbeat = undefined
+  }
+
+  channelReceive(channel: Channel, message: ChannelMsg) {
     this.logger.trace(`onReceive`, { channel, message })
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
@@ -155,77 +173,40 @@ export class Synchronizer {
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   getOrCreateEphemeralStore(docId: DocId): EphemeralStore {
     let store = this.ephemeralStores.get(docId)
+
     if (!store) {
-      store = new EphemeralStore()
+      // Set the timeout to 2x heartbeat, so there is a buffer of time before
+      // ephemeral data is considered outdated and removed
+      store = new EphemeralStore(HEARTBEAT_INTERVAL * 2)
+
       this.ephemeralStores.set(docId, store)
-
-      // Wire up local updates to broadcast
-      store.subscribeLocalUpdates(data => {
-        // Get all channels subscribed to this doc
-        const channelIds: ChannelId[] = []
-        for (const [peerId, peerState] of this.model.peers.entries()) {
-          if (peerState.subscriptions.has(docId)) {
-            channelIds.push(...peerState.channels)
-          }
-        }
-
-        if (channelIds.length > 0) {
-          this.adapters.send({
-            toChannelIds: channelIds,
-            message: {
-              type: "channel/ephemeral",
-              docId,
-              data,
-            },
-          })
-        }
-      })
-
-      // Wire up changes to emit event
-      store.subscribe(() => {
-        this.emitter.emit("ephemeral-change", { docId })
-      })
     }
+
     return store
   }
 
-  setEphemeral(docId: DocId, key: string, value: any) {
+  /**
+   * Sets a bundle of values on our peerId within the EphemeralStore representing this DocId
+   */
+  setEphemeralValues(docId: DocId, values: ObjectValue) {
     const store = this.getOrCreateEphemeralStore(docId)
-    store.set(key, value)
 
-    // Manage heartbeat for our own state
-    if (key === this.identity.peerId) {
-      const hasState = value && typeof value === "object" && Object.keys(value).length > 0
-      
-      if (hasState) {
-        if (!this.heartbeats.has(docId)) {
-          const interval = setInterval(() => {
-            const currentStore = this.ephemeralStores.get(docId)
-            if (!currentStore) return
+    const currentValues = this.getEphemeralValues(docId, this.identity.peerId)
 
-            const allStates = currentStore.getAllStates()
-            const myState = allStates[this.identity.peerId]
+    const newValues = { ...currentValues, ...values }
 
-            if (myState) {
-              currentStore.set(this.identity.peerId, myState)
-            }
-          }, HEARTBEAT_INTERVAL)
-          this.heartbeats.set(docId, interval)
-        }
-      } else {
-        // Stop heartbeat if state is empty
-        const interval = this.heartbeats.get(docId)
-        if (interval) {
-          clearInterval(interval)
-          this.heartbeats.delete(docId)
-        }
-      }
-    }
+    store.set(this.identity.peerId, newValues)
+
+    this.#dispatch({ type: "synchronizer/ephemeral-local-change", docId })
   }
 
-  getEphemeral(docId: DocId): Record<string, any> {
+  /**
+   * Gets the bundle of values for a peerId within the EphemeralStore related to this DocId
+   */
+  getEphemeralValues(docId: DocId, peerId: PeerID): ObjectValue {
     const store = this.getOrCreateEphemeralStore(docId)
-    return store.getAllStates()
+
+    return (store.get(peerId) as ObjectValue) ?? {}
   }
 
   getOrCreateDocumentState(docId: DocId): DocState {
@@ -438,6 +419,39 @@ export class Synchronizer {
         break
       }
 
+      case "cmd/emit-ephemeral-change": {
+        this.emitter.emit("ephemeral-change", { docId: command.docId })
+        break
+      }
+
+      case "cmd/apply-ephemeral": {
+        const store = this.getOrCreateEphemeralStore(command.docId)
+
+        store.apply(command.data)
+
+        this.emitter.emit("ephemeral-change", { docId: command.docId })
+
+        break
+      }
+
+      case "cmd/broadcast-ephemeral": {
+        const store = this.getOrCreateEphemeralStore(command.docId)
+
+        const myEphemeralData = store.encode(this.identity.peerId)
+
+        if (myEphemeralData.length > 0) {
+          this.adapters.send({
+            toChannelIds: command.toChannelIds,
+            message: {
+              type: "channel/ephemeral",
+              docId: command.docId,
+              data: myEphemeralData,
+            },
+          })
+        }
+        break
+      }
+
       // (utility): A command that sends a dispatch back into the program message loop
       case "cmd/dispatch": {
         this.#dispatch(command.dispatch)
@@ -455,12 +469,6 @@ export class Synchronizer {
       // (utility): A command that logs a message
       case "cmd/log": {
         this.logger.info(command.message)
-        break
-      }
-
-      case "cmd/apply-ephemeral": {
-        const store = this.getOrCreateEphemeralStore(command.docId)
-        store.apply(command.data)
         break
       }
     }
@@ -609,13 +617,6 @@ export class Synchronizer {
    * Remove a document from the synchronizer and send delete messages to all channels.
    */
   public async removeDocument(docId: DocId): Promise<void> {
-    // Stop heartbeat if exists
-    const interval = this.heartbeats.get(docId)
-    if (interval) {
-      clearInterval(interval)
-      this.heartbeats.delete(docId)
-    }
-
     const docState = this.model.documents.get(docId)
 
     if (!docState) {
@@ -625,7 +626,7 @@ export class Synchronizer {
 
     // Get all channels whose peers have subscribed to this document
     const channelIds: ChannelId[] = []
-    for (const [peerId, peerState] of this.model.peers.entries()) {
+    for (const peerState of this.model.peers.values()) {
       if (peerState.subscriptions.has(docId)) {
         channelIds.push(...peerState.channels)
       }
@@ -647,11 +648,7 @@ export class Synchronizer {
   }
 
   public async reset() {
-    // Clear all heartbeats
-    for (const interval of this.heartbeats.values()) {
-      clearInterval(interval)
-    }
-    this.heartbeats.clear()
+    // TODO(duane): Should we stop/start the heartbeat? It doesn't seem to add value to do so. Maybe we should have a stop/start function on Synchronizer?
 
     const [initialModel] = programInit(this.model.identity)
 

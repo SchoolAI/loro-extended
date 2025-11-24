@@ -133,6 +133,10 @@ export type SynchronizerModel = {
  * a state transition and may produce commands as side effects.
  */
 export type SynchronizerMessage =
+  // A heartbeat signal given to us from Synchronizer runtime; used for ephemeral store
+  | { type: "synchronizer/heartbeat" }
+  | { type: "synchronizer/ephemeral-local-change"; docId: DocId }
+
   // Channel lifecycle messages
   | { type: "synchronizer/channel-added"; channel: ConnectedChannel }
   | { type: "synchronizer/establish-channel"; channelId: ChannelId }
@@ -174,12 +178,21 @@ export type Command =
   // Document operations
   | { type: "cmd/subscribe-doc"; docId: DocId }
   | { type: "cmd/apply-ephemeral"; docId: DocId; data: Uint8Array }
+  | {
+      type: "cmd/broadcast-ephemeral"
+      docId: DocId
+      toChannelIds: ChannelId[]
+    }
 
   // Events
   | {
       type: "cmd/emit-ready-state-changed"
       docId: DocId
       readyStates: ReadyState[]
+    }
+  | {
+      type: "cmd/emit-ephemeral-change"
+      docId: DocId
     }
 
   // Utilities
@@ -262,6 +275,63 @@ function createSynchronizerLogic(
     // Route synchronizer messages to their handlers
     // Each handler is in its own file under src/synchronizer/
     switch (msg.type) {
+      case "synchronizer/heartbeat": {
+        // Broadcast all ephemeral state for all documents to all peers
+        const commands: Command[] = []
+
+        for (const docId of model.documents.keys()) {
+          const channelIds: ChannelId[] = []
+          for (const [channelId, channel] of model.channels) {
+            if (isEstablished(channel)) {
+              const peerState = model.peers.get(channel.peerId)
+              if (peerState?.subscriptions.has(docId)) {
+                channelIds.push(channelId)
+              }
+            }
+          }
+
+          if (channelIds.length > 0) {
+            commands.push({
+              type: "cmd/broadcast-ephemeral",
+              docId,
+              toChannelIds: channelIds,
+            })
+          }
+        }
+
+        return commands.length > 0
+          ? { type: "cmd/batch", commands }
+          : undefined
+      }
+
+      case "synchronizer/ephemeral-local-change": {
+        // Get all established channels for this document
+        const channelIds: ChannelId[] = []
+        for (const [channelId, channel] of model.channels) {
+          if (isEstablished(channel)) {
+            const peerState = model.peers.get(channel.peerId)
+            if (peerState?.subscriptions.has(msg.docId)) {
+              channelIds.push(channelId)
+            }
+          }
+        }
+
+        return {
+          type: "cmd/batch",
+          commands: [
+            {
+              type: "cmd/emit-ephemeral-change",
+              docId: msg.docId,
+            },
+            {
+              type: "cmd/broadcast-ephemeral",
+              docId: msg.docId,
+              toChannelIds: channelIds,
+            },
+          ],
+        }
+      }
+
       case "synchronizer/channel-added":
         return handleChannelAdded(msg, model)
 

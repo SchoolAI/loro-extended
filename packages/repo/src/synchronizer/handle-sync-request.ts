@@ -35,6 +35,12 @@
  *   |                           |  3. Update peer awareness
  *   |<-- sync-response ---------|  4. Send document data
  *   |   [data or up-to-date]    |
+ *   |                           |
+ *   |<-- sync-response ---------|
+ *   |   [data or up-to-date]    |
+ *   |                           |
+ *   |<-- sync-response ---------|
+ *   |   [data or up-to-date]    |
  * ```
  *
  * ## Storage Adapter Behavior

@@ -52,7 +52,6 @@ export function handleEstablishRequest(
   } satisfies EstablishedChannel)
 
   // 2. Get or create peer state for reconnection optimization
-  // This tracks what the peer knows about our documents
   ensurePeerState(model, message.identity, channel.channelId)
 
   // 3. Send establish-response back to the requester

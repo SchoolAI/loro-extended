@@ -1,6 +1,6 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type { LoroDoc } from "loro-crdt"
-import type { Synchronizer } from "./synchronizer.js"
+import type { LoroDoc, Value } from "loro-crdt"
+import type { ObjectValue, Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocId, LoroDocMutator, ReadyState } from "./types.js"
 
 /** Custom predicate for determining readiness */
@@ -10,6 +10,15 @@ type DocHandleParams = {
   docId: DocId
   synchronizer: Synchronizer
   logger?: Logger
+}
+
+type EphemeralInterface = {
+  set: (values: ObjectValue) => void
+  get: (key: string) => Value
+  readonly self: ObjectValue
+  readonly all: ObjectValue
+  setRaw: (key: string, value: Value) => void
+  subscribe: (cb: (values: ObjectValue) => void) => () => void
 }
 
 /**
@@ -23,8 +32,24 @@ type DocHandleParams = {
  * @typeParam T - The plain JavaScript object schema for the document.
  */
 export class DocHandle<T extends DocContent = DocContent> {
-  private readonly synchronizer: Synchronizer
+  /**
+   * The document ID of the underlying LoroDoc represented by this DocHandle
+   */
   public readonly docId: DocId
+
+  /**
+   * The Synchronizer whose document operations we are wrapping via this DocHandle API
+   */
+  private readonly synchronizer: Synchronizer
+
+  /**
+   * Ephemeral state management for presence, cursors, and other transient data.
+   */
+  public readonly ephemeral: EphemeralInterface
+
+  /**
+   * A LogTape logger for logging
+   */
   private readonly logger: Logger
 
   constructor({ docId, synchronizer, logger }: DocHandleParams) {
@@ -35,54 +60,48 @@ export class DocHandle<T extends DocContent = DocContent> {
       docId,
     })
 
-    // Initialize ephemeral handle
-    // We capture 'this' as 'docHandle' to avoid 'this' context issues in getters
-    // biome-ignore lint/style/noNonNullAssertion: initialized in constructor
-    const docHandle = this
-    this.ephemeral = {
-      set: (key: string, value: any) => {
-        const myPeerId = docHandle.synchronizer.identity.peerId
-        const store = docHandle.synchronizer.getEphemeral(docHandle.docId)
-        const currentSelfState = store[myPeerId] || {}
-        const newSelfState = { ...currentSelfState, [key]: value }
-        docHandle.synchronizer.setEphemeral(
-          docHandle.docId,
-          myPeerId,
-          newSelfState,
-        )
+    this.ephemeral = this.initializeEphemeralInterface()
+
+    this.logger.trace("new DocHandle")
+  }
+
+  initializeEphemeralInterface(): EphemeralInterface {
+    const docId = this.docId
+    const synchronizer = this.synchronizer
+    const myPeerId = this.synchronizer.identity.peerId
+
+    return {
+      set: (values: ObjectValue) => {
+        synchronizer.setEphemeralValues(docId, values)
       },
 
       get: (key: string) => {
-        const myPeerId = docHandle.synchronizer.identity.peerId
-        const store = docHandle.synchronizer.getEphemeral(docHandle.docId)
-        return store[myPeerId]?.[key]
+        return synchronizer.getEphemeralValues(docId, myPeerId)[key]
       },
 
       get self() {
-        const myPeerId = docHandle.synchronizer.identity.peerId
-        return (
-          docHandle.synchronizer.getEphemeral(docHandle.docId)[myPeerId] || {}
-        )
+        return synchronizer.getEphemeralValues(docId, myPeerId)
       },
 
       get all() {
-        return docHandle.synchronizer.getEphemeral(docHandle.docId)
+        return synchronizer.getOrCreateEphemeralStore(docId).getAllStates()
       },
 
-      setRaw: (key: string, value: any) => {
-        docHandle.synchronizer.setEphemeral(docHandle.docId, key, value)
+      setRaw: (key: string, value: Value) => {
+        return synchronizer.getOrCreateEphemeralStore(docId).set(key, value)
       },
 
-      subscribe: (cb: () => void) => {
-        return docHandle.synchronizer.emitter.on("ephemeral-change", event => {
-          if (event.docId === docHandle.docId) {
-            cb()
+      subscribe: (cb: (values: ObjectValue) => void) => {
+        return synchronizer.emitter.on("ephemeral-change", event => {
+          if (event.docId === docId) {
+            const values = synchronizer
+              .getOrCreateEphemeralStore(docId)
+              .getAllStates()
+            cb(values)
           }
         })
       },
     }
-
-    this.logger.trace("new DocHandle")
   }
 
   get doc(): LoroDoc<T> {
@@ -100,22 +119,23 @@ export class DocHandle<T extends DocContent = DocContent> {
   }
 
   /**
+   * Subscribe to ready state changes.
+   * @param cb Callback that receives the new ready states
+   * @returns Unsubscribe function
+   */
+  onReadyStateChange(cb: (readyStates: ReadyState[]) => void): () => void {
+    return this.synchronizer.emitter.on("ready-state-changed", event => {
+      if (event.docId === this.docId) {
+        cb(event.readyStates)
+      }
+    })
+  }
+
+  /**
    * Get the peer ID of the local peer.
    */
   get peerId(): string {
     return this.synchronizer.identity.peerId
-  }
-
-  /**
-   * Ephemeral state management for presence, cursors, and other transient data.
-   */
-  public readonly ephemeral: {
-    set: (key: string, value: any) => void
-    get: (key: string) => any
-    readonly self: any
-    readonly all: any
-    setRaw: (key: string, value: any) => void
-    subscribe: (cb: () => void) => () => void
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

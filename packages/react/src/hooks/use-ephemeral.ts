@@ -1,12 +1,16 @@
 import type { DocId } from "@loro-extended/repo"
+import type { Value } from "loro-crdt"
 import { useMemo, useSyncExternalStore } from "react"
 import { useDocHandleState } from "./use-doc-handle-state.js"
 
 export type EphemeralContext<T> = {
   self: T
-  peers: Record<string, T>
-  others: Record<string, T>
+  all: Record<string, T>
   setSelf: (value: Partial<T>) => void
+}
+
+type ObjectValue = {
+  [key: string]: Value
 }
 
 /**
@@ -15,12 +19,14 @@ export type EphemeralContext<T> = {
  * @param docId The document ID to connect to.
  * @param selector Optional selector function to subscribe to specific parts of the state.
  */
-export function useEphemeral<T = any>(docId: DocId): EphemeralContext<T>
-export function useEphemeral<T = any, R = any>(
+export function useEphemeral<T extends ObjectValue = ObjectValue>(
+  docId: DocId,
+): EphemeralContext<T>
+export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
   docId: DocId,
   selector: (state: EphemeralContext<T>) => R,
 ): R
-export function useEphemeral<T = any, R = any>(
+export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
   docId: DocId,
   selector?: (state: EphemeralContext<T>) => R,
 ) {
@@ -31,8 +37,7 @@ export function useEphemeral<T = any, R = any>(
     if (!handle) {
       const emptyState = {
         self: {} as T,
-        peers: {},
-        others: {},
+        all: {},
         setSelf: () => {},
       }
       return {
@@ -41,19 +46,15 @@ export function useEphemeral<T = any, R = any>(
       }
     }
 
-    const setSelf = (value: Partial<T>) => {
-      Object.entries(value).forEach(([key, val]) => {
-        handle.ephemeral.set(key, val)
-      })
+    const setSelf = (values: Partial<T>) => {
+      handle.ephemeral.set(values)
     }
 
     const computeState = () => {
-      const peers = handle.ephemeral.all
-      const self = peers[handle.peerId] || ({} as T)
-      const others = { ...peers }
-      delete others[handle.peerId]
+      const all = handle.ephemeral.all as Record<string, T>
+      const self = handle.ephemeral.self as T
 
-      return { self, peers, others, setSelf }
+      return { self, all, setSelf }
     }
 
     let cachedState = computeState()
