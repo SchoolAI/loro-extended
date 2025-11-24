@@ -42,6 +42,7 @@
  * @see handle-establish-channel.ts - How channels are established
  */
 
+import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
 import { isEstablished, type Channel } from "../channel.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
@@ -51,6 +52,7 @@ import { batchAsNeeded } from "./utils.js"
 export function handleChannelRemoved(
   msg: { type: "synchronizer/channel-removed"; channel: Channel },
   model: SynchronizerModel,
+  logger: Logger,
 ): Command | undefined {
   // Step 1: De-initialize the channel
   // This stops the channel's internal operations (close connections, etc.)
@@ -64,10 +66,7 @@ export function handleChannelRemoved(
       channel: current(channel),
     })
   } else {
-    commands.push({
-      type: "cmd/log",
-      message: `channel didn't exist when removing: ${msg.channel.channelId}`,
-    })
+    logger.warn(`channel didn't exist when removing: ${msg.channel.channelId}`)
   }
 
   // Step 2: Update peer state if channel was established

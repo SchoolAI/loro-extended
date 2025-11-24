@@ -61,9 +61,7 @@ describe("handle-local-doc-delete", () => {
     // Model should be unchanged
     expect(newModel).toBe(initialModel)
     // Should log warning
-    expectCommand(command, "cmd/log")
-    expect(command.message).toContain("unable to find doc-state")
-    expect(command.message).toContain("nonexistent-doc")
+    expect(command).toBeUndefined()
   })
 
   it("should be idempotent - safe to call multiple times", () => {
@@ -91,6 +89,6 @@ describe("handle-local-doc-delete", () => {
     const [model2, cmd2] = update(message, model1)
     expect(model2.documents.has("test-doc")).toBe(false)
 
-    expectCommand(cmd2, "cmd/log")
+    expect(cmd2).toBeUndefined()
   })
 })

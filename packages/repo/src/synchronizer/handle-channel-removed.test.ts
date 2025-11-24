@@ -78,7 +78,6 @@ describe("handle-channel-removed", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    expectCommand(command, "cmd/log")
-    expect(command.message).toContain("channel didn't exist when removing")
+    expect(command).toBeUndefined()
   })
 })

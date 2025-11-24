@@ -70,18 +70,18 @@ export function handleSyncResponse(
 ): Command | undefined {
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
-    return {
-      type: "cmd/log",
-      message: `rejecting sync-response from non-established channel ${fromChannelId}`,
-    }
+    logger.warn(
+      `rejecting sync-response from non-established channel ${fromChannelId}`,
+    )
+    return
   }
 
   const peerState = model.peers.get(channel.peerId)
   if (!peerState) {
-    return {
-      type: "cmd/log",
-      message: `rejecting sync-response: peer state not found for ${channel.peerId}`,
-    }
+    logger.warn(
+      `rejecting sync-response: peer state not found for ${channel.peerId}`,
+    )
+    return
   }
 
   let docState = model.documents.get(message.docId)
@@ -141,26 +141,22 @@ export function handleSyncResponse(
       // Either full snapshot or delta update
 
       if (!docState) {
-        return {
-          type: "cmd/log",
-          message: `sync-response: docState missing for ${message.docId} (should have been created)`,
-        }
+        logger.warn(
+          `sync-response: docState missing for ${message.docId} (should have been created)`,
+        )
+        return
       }
 
       // Check canUpdate permission before applying data
       // This enforces write permissions and enables read-only replicas
       const context = getRuleContext({ channel, docState, model })
       if (context instanceof Error) {
-        return {
-          type: "cmd/log",
-          message: `can't check canUpdate: ${context.message}`,
-        }
+        logger.warn(`can't check canUpdate: ${context.message}`)
+        return
       }
       if (!permissions.canUpdate(context)) {
-        return {
-          type: "cmd/log",
-          message: `rejecting update from ${context.peerName}`,
-        }
+        logger.warn(`rejecting update from ${context.peerName}`)
+        return
       }
 
       // Apply the document data (snapshot or update)

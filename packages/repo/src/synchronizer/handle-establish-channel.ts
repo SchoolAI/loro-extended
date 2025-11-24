@@ -51,6 +51,7 @@
  * @see handle-establish-response.ts - How we handle their response
  */
 
+import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
 import type { ChannelId } from "../types.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
@@ -58,14 +59,13 @@ import type { Command, SynchronizerModel } from "../synchronizer-program.js"
 export function handleEstablishChannel(
   msg: { type: "synchronizer/establish-channel"; channelId: ChannelId },
   model: SynchronizerModel,
+  logger: Logger,
 ): Command | undefined {
   // Look up the channel
   const channel = model.channels.get(msg.channelId)
   if (!channel) {
-    return {
-      type: "cmd/log",
-      message: `establish-channel: channel ${msg.channelId} not found`,
-    }
+    logger.warn(`establish-channel: channel ${msg.channelId} not found`)
+    return
   }
 
   // Send establish-request to begin handshake

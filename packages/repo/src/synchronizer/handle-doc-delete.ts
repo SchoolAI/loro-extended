@@ -59,12 +59,14 @@
  * @see handle-doc-change.ts - Update document
  */
 
+import type { Logger } from "@logtape/logtape"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
 import type { DocId } from "../types.js"
 
 export function handleDocDelete(
   msg: { type: "synchronizer/doc-delete"; docId: DocId },
   model: SynchronizerModel,
+  logger: Logger,
 ): Command | undefined {
   const { docId } = msg
 
@@ -72,10 +74,8 @@ export function handleDocDelete(
 
   // If document doesn't exist, log warning but don't fail
   if (!docState) {
-    return {
-      type: "cmd/log",
-      message: `doc-delete: unable to find doc-state ${docId}`,
-    }
+    logger.warn(`doc-delete: unable to find doc-state ${docId}`)
+    return
   }
 
   // Remove the document from the model

@@ -198,7 +198,6 @@ export type Command =
   // Utilities
   | { type: "cmd/dispatch"; dispatch: SynchronizerMessage }
   | { type: "cmd/batch"; commands: Command[] }
-  | { type: "cmd/log"; message: string }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // PROGRAM DEFINITION
@@ -299,9 +298,7 @@ function createSynchronizerLogic(
           }
         }
 
-        return commands.length > 0
-          ? { type: "cmd/batch", commands }
-          : undefined
+        return commands.length > 0 ? { type: "cmd/batch", commands } : undefined
       }
 
       case "synchronizer/ephemeral-local-change": {
@@ -336,10 +333,10 @@ function createSynchronizerLogic(
         return handleChannelAdded(msg, model)
 
       case "synchronizer/establish-channel":
-        return handleEstablishChannel(msg, model)
+        return handleEstablishChannel(msg, model, logger)
 
       case "synchronizer/channel-removed":
-        return handleChannelRemoved(msg, model)
+        return handleChannelRemoved(msg, model, logger)
 
       case "synchronizer/doc-ensure":
         return handleDocEnsure(msg, model, permissions)
@@ -348,7 +345,7 @@ function createSynchronizerLogic(
         return handleDocChange(msg, model, permissions, logger)
 
       case "synchronizer/doc-delete":
-        return handleDocDelete(msg, model)
+        return handleDocDelete(msg, model, logger)
 
       case "synchronizer/channel-receive-message":
         // Channel messages are routed through the channel dispatcher
@@ -403,10 +400,10 @@ function mutatingChannelUpdate(
   const channel = model.channels.get(fromChannelId)
 
   if (!channel) {
-    return {
-      type: "cmd/log",
-      message: `channel not found corresponding to from-channel-id: ${fromChannelId}`,
-    }
+    logger.warn(
+      `channel not found corresponding to from-channel-id: ${fromChannelId}`,
+    )
+    return
   }
 
   // Determine sender name for logging

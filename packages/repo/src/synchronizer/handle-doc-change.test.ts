@@ -301,8 +301,6 @@ describe("handle-doc-change", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    expectCommand(command, "cmd/log")
-    expect(command.message).toContain("unable to find doc-state")
-    expect(command.message).toContain("nonexistent-doc")
+    expect(command).toBeUndefined()
   })
 })

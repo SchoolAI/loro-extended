@@ -56,7 +56,6 @@ describe("handle-establish-channel", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    expectCommand(command, "cmd/log")
-    expect(command.message).toContain("channel 999 not found")
+    expect(command).toBeUndefined()
   })
 })

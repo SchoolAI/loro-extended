@@ -75,18 +75,18 @@ export function handleDirectoryResponse(
 ): Command | undefined {
   // Require established channel for directory operations
   if (!isEstablished(channel)) {
-    return {
-      type: "cmd/log",
-      message: `rejecting directory-response from non-established channel ${fromChannelId}`,
-    }
+    logger.warn(
+      `rejecting directory-response from non-established channel ${fromChannelId}`,
+    )
+    return
   }
 
   const peerState = model.peers.get(channel.peerId)
   if (!peerState) {
-    return {
-      type: "cmd/log",
-      message: `rejecting directory-response: peer state not found for ${channel.peerId}`,
-    }
+    logger.warn(
+      `rejecting directory-response: peer state not found for ${channel.peerId}`,
+    )
+    return
   }
 
   const commands: (Command | undefined)[] = []

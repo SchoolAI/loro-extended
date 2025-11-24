@@ -35,7 +35,8 @@ export function handleDirectoryRequest(
 
     // If we can't get context (e.g., missing peer state), log error
     if (context instanceof Error) {
-      return [{ success: false, error: context }]
+      logger.warn(`directory-request error: ${context.message}`)
+      return []
     }
 
     // Check canReveal permission - can we tell this peer about this document?
@@ -52,10 +53,6 @@ export function handleDirectoryRequest(
     result.success ? [result.docId] : [],
   )
 
-  const logCmds: Command[] = docResults.flatMap(result =>
-    result.success ? [] : [{ type: "cmd/log", message: result.error.message }],
-  )
-
   // Send directory-response with filtered list
   const sendMessageCmd: Command = {
     type: "cmd/send-message",
@@ -68,5 +65,5 @@ export function handleDirectoryRequest(
     },
   }
 
-  return batchAsNeeded(...logCmds, sendMessageCmd)
+  return batchAsNeeded(sendMessageCmd)
 }

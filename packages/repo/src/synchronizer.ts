@@ -465,12 +465,6 @@ export class Synchronizer {
         }
         break
       }
-
-      // (utility): A command that logs a message
-      case "cmd/log": {
-        this.logger.info(command.message)
-        break
-      }
     }
   }
 

@@ -76,10 +76,8 @@ export function handleDocChange(
   const docState = model.documents.get(docId)
 
   if (!docState) {
-    return {
-      type: "cmd/log",
-      message: `local-doc-change: unable to find doc-state ${docId}`,
-    }
+    logger.warn(`local-doc-change: unable to find doc-state ${docId}`)
+    return
   }
 
   logger.debug("doc-change processing", {

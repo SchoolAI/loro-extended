@@ -71,18 +71,18 @@ export function handleSyncRequest(
 ): Command | undefined {
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
-    return {
-      type: "cmd/log",
-      message: `rejecting sync-request from non-established channel ${fromChannelId}`,
-    }
+    logger.warn(
+      `rejecting sync-request from non-established channel ${fromChannelId}`,
+    )
+    return
   }
 
   const peerState = model.peers.get(channel.peerId)
   if (!peerState) {
-    return {
-      type: "cmd/log",
-      message: `rejecting sync-request: peer state not found for ${channel.peerId}`,
-    }
+    logger.warn(
+      `rejecting sync-request: peer state not found for ${channel.peerId}`,
+    )
+    return
   }
 
   const { docs } = message
