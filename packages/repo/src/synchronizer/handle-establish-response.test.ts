@@ -94,6 +94,7 @@ describe("handle-establish-response", () => {
       expect(cmd1.envelope.message.type).toBe("channel/sync-request")
       if (cmd1.envelope.message.type === "channel/sync-request") {
         expect(cmd1.envelope.message.docs).toHaveLength(2)
+        expect(cmd1.envelope.message.bidirectional).toBe(true)
       }
 
       const cmd2 = command.commands[2]
@@ -130,6 +131,7 @@ describe("handle-establish-response", () => {
       if (command.envelope.message.type === "channel/sync-request") {
         expect(command.envelope.message.docs).toHaveLength(1)
         expect(command.envelope.message.docs[0].docId).toBe("doc-2")
+        expect(command.envelope.message.bidirectional).toBe(true)
       }
     })
 

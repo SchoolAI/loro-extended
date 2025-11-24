@@ -187,7 +187,11 @@ export function handleEstablishResponse(
         type: "cmd/send-message",
         envelope: {
           toChannelIds: [channel.channelId],
-          message: { type: "channel/sync-request", docs: docsToSync },
+          message: {
+            type: "channel/sync-request",
+            docs: docsToSync,
+            bidirectional: true,
+          },
         },
       }
     } else {
@@ -237,6 +241,7 @@ export function handleEstablishResponse(
         message: {
           type: "channel/sync-request",
           docs,
+          bidirectional: true,
         },
       },
     }

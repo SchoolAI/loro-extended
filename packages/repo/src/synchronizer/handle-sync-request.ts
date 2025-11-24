@@ -85,8 +85,9 @@ export function handleSyncRequest(
     return
   }
 
-  const { docs } = message
+  const { docs, bidirectional = true } = message
   const commands: (Command | undefined)[] = []
+  const reciprocalDocs: ChannelMsgSyncRequest["docs"] = []
 
   // Process each requested document
   for (const { docId, requesterDocVersion } of docs) {
@@ -119,9 +120,39 @@ export function handleSyncRequest(
         docId,
         requesterDocVersion,
       })
+
+      // 2. Collect docs for reciprocal sync-request
+      // If bidirectional is true, we want to ensure we are also subscribed to this document
+      // and have the latest version from the peer.
+      if (bidirectional) {
+        reciprocalDocs.push({
+          docId,
+          requesterDocVersion: docState.doc.version(),
+        })
+      }
     }
     // If we don't have the document, we simply don't respond (yet)
     // But we have recorded their interest, so if we get it later, we'll send it
+  }
+
+  // Send reciprocal sync-request if needed
+  if (reciprocalDocs.length > 0) {
+    logger.debug("sending reciprocal sync-request", {
+      peerId: channel.peerId,
+      docCount: reciprocalDocs.length,
+    })
+
+    commands.push({
+      type: "cmd/send-message",
+      envelope: {
+        toChannelIds: [fromChannelId],
+        message: {
+          type: "channel/sync-request",
+          docs: reciprocalDocs,
+          bidirectional: false, // Prevent infinite loops
+        },
+      },
+    })
   }
 
   return batchAsNeeded(...commands)

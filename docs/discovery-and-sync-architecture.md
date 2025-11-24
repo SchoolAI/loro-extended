@@ -125,6 +125,49 @@ Peer A                                    Peer B
 - Discovery and sync happen in parallel
 - Each peer only sees documents allowed by `canReveal`
 
+## Symmetric Sync and Bidirectional Requests
+
+To ensure both peers are fully synchronized, the system uses a **symmetric sync** model. When a peer requests a document, the receiver not only sends the document data but also checks if it needs to request updates from the sender.
+
+### The `bidirectional` Flag
+
+The `sync-request` message includes an optional `bidirectional` flag:
+
+```typescript
+type ChannelMsgSyncRequest = {
+  type: "channel/sync-request"
+  docs: { docId: DocId, requesterDocVersion: VersionVector }[]
+  bidirectional?: boolean // Default: true
+}
+```
+
+### Protocol Flow
+
+1. **Initial Request**: Peer A sends `sync-request` with `bidirectional: true` (default).
+2. **Response**: Peer B receives the request and:
+   - Sends `sync-response` with document data (snapshot or update).
+   - Checks if it also needs to sync with Peer A (e.g., to get newer updates).
+   - If yes, sends a **reciprocal** `sync-request` back to Peer A.
+3. **Loop Prevention**: The reciprocal request has `bidirectional: false` to prevent an infinite loop of requests.
+
+```
+Peer A                                    Peer B
+  |                                         |
+  |-- sync-request (bidirectional: true) -->|
+  |                                         |
+  |<-- sync-response (data) ----------------|
+  |                                         |
+  |<-- sync-request (bidirectional: false)--| (Reciprocal)
+  |                                         |
+  |-- sync-response (data) ---------------->|
+  |                                         |
+```
+
+This ensures that:
+- Subscriptions are established in both directions.
+- Both peers have the latest version of the document.
+- No infinite loops occur.
+
 ## Peer Awareness and Request Tracking
 
 The system tracks what each peer knows about documents using `PeerDocumentAwareness`:

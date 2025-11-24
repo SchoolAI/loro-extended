@@ -55,6 +55,12 @@ export type ChannelMsgSyncRequest = {
     docId: DocId
     requesterDocVersion: VersionVector
   }[]
+  /**
+   * Whether the receiver should send a reciprocal sync-request back.
+   * Defaults to true if omitted.
+   * Set to false to prevent infinite loops when sending reciprocal requests.
+   */
+  bidirectional?: boolean
 }
 
 export type ChannelMsgSyncResponse = {

@@ -179,7 +179,8 @@ Both peers send [`channel/sync-request`](src/channel.ts:51) messages through the
       docId: "doc-uuid",
       requesterDocVersion: VersionVector // Current version at requester
     }
-  ]
+  ],
+  bidirectional: true // Optional, defaults to true
 }
 ```
 
