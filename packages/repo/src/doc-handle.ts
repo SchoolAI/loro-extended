@@ -22,7 +22,8 @@ type RoomInterface = {
 }
 
 /**
- * A simplified handle to a Loro document that is always available.
+ * A simplified handle to a Loro document (that is always available), and
+ * associated room for ephemeral presence data.
  *
  * This class embraces CRDT semantics where documents are always-mergeable
  * and operations are idempotent. Instead of complex loading states, it
@@ -162,20 +163,6 @@ export class DocHandle<T extends DocContent = DocContent> {
   }
 
   /**
-   * Actively requests the latest version of the document from all
-   * connected peers and storage. This is useful when you want to
-   * ensure you have the most up-to-date version of a document.
-   */
-  // public sync(): DocHandle<T> {
-  //   this.synchronizer.sync(this.docId)
-  //   return this // Useful for chaining
-  // }
-
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // FLEXIBLE READINESS API
-  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-  /**
    * Wait until the document meets custom readiness criteria.
    * @param predicate Function that determines if the document is ready
    * @param timeout Optional timeout in milliseconds
@@ -201,7 +188,6 @@ export class DocHandle<T extends DocContent = DocContent> {
    */
   async waitForNetwork(): Promise<DocHandle<T>> {
     return this.waitUntilReady(readyStates => {
-      this.logger.info("wait-for-network", { readyStates })
       return readyStates.some(
         s => s.channelMeta.kind === "network" && s.loading.state === "found",
       )
