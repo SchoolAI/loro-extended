@@ -108,6 +108,12 @@ export function createSseExpressRouter(
 
   // Endpoint for clients to connect and listen for events FROM the server
   router.get(eventsPath, (req: Request, res: Response) => {
+    const peerId = getPeerIdFromEventsRequest(req)
+    if (!peerId) {
+      res.status(400).end("peerId is required")
+      return
+    }
+
     // Set headers for SSE
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -117,12 +123,6 @@ export function createSseExpressRouter(
     res.flushHeaders()
     // Send initial comment to ensure headers are flushed and connection is established
     res.write(": ok\n\n")
-
-    const peerId = getPeerIdFromEventsRequest(req)
-    if (!peerId) {
-      res.status(400).end("peerId is required")
-      return
-    }
 
     // Register connection with adapter
     const connection = adapter.registerConnection(peerId)

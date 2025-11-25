@@ -1,5 +1,6 @@
 import type { AdapterHooks, ChannelMsg, PeerID } from "@loro-extended/repo"
 import type { Request, Response } from "express"
+import { VersionVector } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createSseExpressRouter, SseServerNetworkAdapter } from "./server"
 
@@ -11,7 +12,7 @@ describe("SseServerNetworkAdapter", () => {
     adapter = new SseServerNetworkAdapter()
 
     hooks = {
-      identity: { peerId: "123", name: "test-server" },
+      identity: { peerId: "123", name: "test-server", type: "service" },
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
       onChannelReceive: vi.fn(),
@@ -52,7 +53,6 @@ describe("SseServerNetworkAdapter", () => {
       const testMessage: ChannelMsg = {
         type: "channel/sync-response",
         docId: "test-doc",
-        hopCount: 0,
         transmission: { type: "up-to-date", version: {} as any },
       }
 
@@ -244,6 +244,7 @@ describe("SseServerNetworkAdapter", () => {
         flushHeaders: vi.fn(),
         status: vi.fn().mockReturnThis(),
         end: vi.fn(),
+        write: vi.fn(),
       } as unknown as Response
 
       const getHandler = (router as any).stack.find(
@@ -277,8 +278,11 @@ describe("SseServerNetworkAdapter", () => {
       const testMessage: ChannelMsg = {
         type: "channel/sync-response",
         docId: "test-doc",
-        hopCount: 0,
-        transmission: { type: "update", data },
+        transmission: {
+          type: "update",
+          data,
+          version: new VersionVector(new Map()),
+        },
       }
 
       connection.send(testMessage)

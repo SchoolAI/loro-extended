@@ -51,7 +51,7 @@ describe("SseClientNetworkAdapter", () => {
 
     const channels: Record<number, Channel> = {}
     hooks = {
-      identity: { peerId: "123", name: "test-client" },
+      identity: { peerId: "123", name: "test-client", type: "user" },
       onChannelAdded: vi.fn((channel: Channel) => {
         channels[channel.channelId] = channel
       }),
@@ -90,6 +90,7 @@ describe("SseClientNetworkAdapter", () => {
   describe("onStart()", () => {
     it("should add a channel and create an EventSource", async () => {
       await adapter._start()
+      mockEventSourceInstance.simulateOpen()
       expect(hooks.onChannelAdded).toHaveBeenCalledTimes(1)
       const MockEventSource = (await import("reconnecting-eventsource")).default
       expect(MockEventSource).toHaveBeenCalledTimes(1)
@@ -97,12 +98,12 @@ describe("SseClientNetworkAdapter", () => {
 
     it("should set up message handler on the EventSource", async () => {
       await adapter._start()
+      mockEventSourceInstance.simulateOpen()
       const serverChannel = (hooks.onChannelAdded as any).mock.calls[0][0]
 
       const testMessage: ChannelMsg = {
         type: "channel/sync-response",
         docId: "test-doc",
-        hopCount: 0,
         transmission: {
           type: "up-to-date",
           version: new VersionVector(new Map()),
@@ -115,7 +116,6 @@ describe("SseClientNetworkAdapter", () => {
         expect.objectContaining({
           type: "channel/sync-response",
           docId: "test-doc",
-          hopCount: 0,
           transmission: expect.objectContaining({
             type: "up-to-date",
           }),
@@ -133,6 +133,7 @@ describe("SseClientNetworkAdapter", () => {
   describe("onStop()", () => {
     it("should close EventSource and remove channel", async () => {
       await adapter._start()
+      mockEventSourceInstance.simulateOpen()
       const serverChannel = (hooks.onChannelAdded as any).mock.calls[0][0]
 
       await adapter._stop()
