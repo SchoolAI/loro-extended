@@ -20,9 +20,12 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
-      wrapper: RepoWrapper,
-    })
+    const { result } = renderHook(
+      () => useDocument(documentId, testSchema, testEmptyState),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
 
     expect(Array.isArray(result.current)).toBe(true)
     expect(result.current).toHaveLength(3)
@@ -38,9 +41,12 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
-      wrapper: RepoWrapper,
-    })
+    const { result } = renderHook(
+      () => useDocument(documentId, testSchema, testEmptyState),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
 
     const [doc, changeDoc, handle] = result.current
 
@@ -60,9 +66,12 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(() => useDocument(documentId, testSchema, testEmptyState), {
-      wrapper: RepoWrapper,
-    })
+    const { result, rerender } = renderHook(
+      () => useDocument(documentId, testSchema, testEmptyState),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
 
     const [, firstChangeDoc] = result.current
 
@@ -78,10 +87,13 @@ describe("useDocument", () => {
     const documentId2 = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(({ docId }) => useDocument(docId, testSchema, testEmptyState), {
-      initialProps: { docId: documentId1 },
-      wrapper: RepoWrapper,
-    })
+    const { result, rerender } = renderHook(
+      ({ docId }) => useDocument(docId, testSchema, testEmptyState),
+      {
+        initialProps: { docId: documentId1 },
+        wrapper: RepoWrapper,
+      },
+    )
 
     const [doc1, changeDoc1, handle1] = result.current
 
@@ -94,7 +106,7 @@ describe("useDocument", () => {
     expect(doc2).toEqual(testEmptyState)
     expect(handle1).not.toBeNull()
     expect(handle2).not.toBeNull()
-    
+
     // They should be different instances
     expect(handle1).not.toBe(handle2)
 

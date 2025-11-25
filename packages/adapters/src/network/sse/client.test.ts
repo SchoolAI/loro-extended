@@ -1,8 +1,4 @@
-import type {
-  AdapterHooks,
-  Channel,
-  ChannelMsg,
-} from "@loro-extended/repo"
+import type { AdapterHooks, Channel, ChannelMsg } from "@loro-extended/repo"
 import { VersionVector } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SseClientNetworkAdapter } from "./client"
@@ -15,7 +11,9 @@ const mockEventSourceInstance = {
   onerror: null as ((error: Event) => void) | null,
   simulateMessage(data: any) {
     if (this.onmessage) {
-      this.onmessage(new MessageEvent("message", { data: JSON.stringify(data) }))
+      this.onmessage(
+        new MessageEvent("message", { data: JSON.stringify(data) }),
+      )
     }
   },
   simulateOpen() {
@@ -105,7 +103,10 @@ describe("SseClientNetworkAdapter", () => {
         type: "channel/sync-response",
         docId: "test-doc",
         hopCount: 0,
-        transmission: { type: "up-to-date", version: new VersionVector(new Map()) },
+        transmission: {
+          type: "up-to-date",
+          version: new VersionVector(new Map()),
+        },
       }
 
       mockEventSourceInstance.simulateMessage(testMessage)
@@ -153,7 +154,12 @@ describe("SseClientNetworkAdapter", () => {
 
       const testMessage: ChannelMsg = {
         type: "channel/sync-request",
-        docs: [{ docId: "test-doc", requesterDocVersion: new VersionVector(new Map()) }],
+        docs: [
+          {
+            docId: "test-doc",
+            requesterDocVersion: new VersionVector(new Map()),
+          },
+        ],
       }
 
       await channel.send(testMessage)

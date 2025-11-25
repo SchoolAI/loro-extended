@@ -44,9 +44,9 @@ export type UseSimpleDocumentReturn = [
  * return (
  *   <div>
  *     {handle?.state === "loading" && <div>Syncing...</div>}
- *     
+ *
  *     <h1>{data.title}</h1>
- *     
+ *
  *     <button onClick={() => changeDoc(doc => {
  *       const titleText = doc.getText("title");
  *       titleText.insert(0, "📝 ");
@@ -57,9 +57,7 @@ export type UseSimpleDocumentReturn = [
  * );
  * ```
  */
-export function useSimpleDocument(
-  documentId: DocId,
-): UseSimpleDocumentReturn {
+export function useSimpleDocument(documentId: DocId): UseSimpleDocumentReturn {
   const { doc, handle } = useRawLoroDoc(documentId)
   const changeDoc = useSimpleDocChanger(handle)
 

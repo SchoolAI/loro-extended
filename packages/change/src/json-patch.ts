@@ -60,7 +60,9 @@ export type JsonPatch = JsonPatchOperation[]
  * Normalize JSON Pointer string to path array
  * Handles RFC 6901 escaping: ~1 -> /, ~0 -> ~
  */
-export function normalizePath(path: string | (string | number)[]): (string | number)[] {
+export function normalizePath(
+  path: string | (string | number)[],
+): (string | number)[] {
   if (Array.isArray(path)) {
     return path
   }
@@ -70,17 +72,19 @@ export function normalizePath(path: string | (string | number)[]): (string | num
     return path
       .slice(1) // Remove leading slash
       .split("/")
-      .map((segment) => {
+      .map(segment => {
         // Handle JSON Pointer escaping
         const unescaped = segment.replace(/~1/g, "/").replace(/~0/g, "~")
         // Try to parse as number for array indices
         const asNumber = Number(unescaped)
-        return Number.isInteger(asNumber) && asNumber >= 0 ? asNumber : unescaped
+        return Number.isInteger(asNumber) && asNumber >= 0
+          ? asNumber
+          : unescaped
       })
   }
 
   // Handle simple dot notation or single segment
-  return path.split(".").map((segment) => {
+  return path.split(".").map(segment => {
     const asNumber = Number(segment)
     return Number.isInteger(asNumber) && asNumber >= 0 ? asNumber : segment
   })
@@ -92,18 +96,18 @@ export function normalizePath(path: string | (string | number)[]): (string | num
  */
 function navigateToPath<T extends DocShape>(
   draft: Draft<T>,
-  path: (string | number)[]
+  path: (string | number)[],
 ): { parent: any; key: string | number } {
   if (path.length === 0) {
     throw new Error("Cannot navigate to empty path")
   }
 
   let current = draft as any
-  
+
   // Navigate to parent of target
   for (let i = 0; i < path.length - 1; i++) {
     const segment = path[i]
-    
+
     if (typeof segment === "string") {
       // Use natural property access - this leverages existing DraftNode lazy creation
       current = current[segment]
@@ -134,7 +138,7 @@ function navigateToPath<T extends DocShape>(
  */
 function getValueAtPath<T extends DocShape>(
   draft: Draft<T>,
-  path: (string | number)[]
+  path: (string | number)[],
 ): any {
   if (path.length === 0) {
     return draft
@@ -168,7 +172,7 @@ function getValueAtPath<T extends DocShape>(
  */
 function handleAdd<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchAddOperation
+  operation: JsonPatchAddOperation,
 ): void {
   const path = normalizePath(operation.path)
   const { parent, key } = navigateToPath(draft, path)
@@ -198,7 +202,7 @@ function handleAdd<T extends DocShape>(
  */
 function handleRemove<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchRemoveOperation
+  operation: JsonPatchRemoveOperation,
 ): void {
   const path = normalizePath(operation.path)
   const { parent, key } = navigateToPath(draft, path)
@@ -227,7 +231,7 @@ function handleRemove<T extends DocShape>(
  */
 function handleReplace<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchReplaceOperation
+  operation: JsonPatchReplaceOperation,
 ): void {
   const path = normalizePath(operation.path)
   const { parent, key } = navigateToPath(draft, path)
@@ -241,9 +245,12 @@ function handleReplace<T extends DocShape>(
     }
   } else if (typeof key === "number") {
     // List operations - delete then insert (follows existing patterns)
-    if (parent.delete && parent.insert &&
-        typeof parent.delete === "function" &&
-        typeof parent.insert === "function") {
+    if (
+      parent.delete &&
+      parent.insert &&
+      typeof parent.delete === "function" &&
+      typeof parent.insert === "function"
+    ) {
       parent.delete(key, 1)
       parent.insert(key, operation.value)
     } else {
@@ -259,31 +266,33 @@ function handleReplace<T extends DocShape>(
  */
 function handleMove<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchMoveOperation
+  operation: JsonPatchMoveOperation,
 ): void {
   const fromPath = normalizePath(operation.from)
   const toPath = normalizePath(operation.path)
-  
+
   // For list moves within the same parent, we need special handling
-  if (fromPath.length === toPath.length &&
-      fromPath.slice(0, -1).every((segment, i) => segment === toPath[i])) {
+  if (
+    fromPath.length === toPath.length &&
+    fromPath.slice(0, -1).every((segment, i) => segment === toPath[i])
+  ) {
     // Same parent container - use list move operation if available
     const fromIndex = fromPath[fromPath.length - 1]
     const toIndex = toPath[toPath.length - 1]
-    
+
     if (typeof fromIndex === "number" && typeof toIndex === "number") {
       const { parent } = navigateToPath(draft, fromPath.slice(0, -1))
-      
+
       // Check if the parent has a move method (like LoroMovableList)
       if (parent.move && typeof parent.move === "function") {
         parent.move(fromIndex, toIndex)
         return
       }
-      
+
       // Otherwise, get value, remove, then add at target index
       const value = getValueAtPath(draft, fromPath)
       handleRemove(draft, { op: "remove", path: operation.from })
-      
+
       // For JSON Patch move semantics, the target index refers to the position
       // in the final array, not the intermediate array after removal.
       // No index adjustment needed - use the original target index.
@@ -303,10 +312,10 @@ function handleMove<T extends DocShape>(
  */
 function handleCopy<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchCopyOperation
+  operation: JsonPatchCopyOperation,
 ): void {
   const fromPath = normalizePath(operation.from)
-  
+
   // Get the value to copy
   const value = getValueAtPath(draft, fromPath)
 
@@ -319,7 +328,7 @@ function handleCopy<T extends DocShape>(
  */
 function handleTest<T extends DocShape>(
   draft: Draft<T>,
-  operation: JsonPatchTestOperation
+  operation: JsonPatchTestOperation,
 ): boolean {
   const path = normalizePath(operation.path)
   const actualValue = getValueAtPath(draft, path)
@@ -365,7 +374,9 @@ export class JsonPatchApplicator<T extends DocShape> {
         break
       default:
         // TypeScript will catch this at compile time with proper discriminated union
-        throw new Error(`Unsupported JSON Patch operation: ${(operation as any).op}`)
+        throw new Error(
+          `Unsupported JSON Patch operation: ${(operation as any).op}`,
+        )
     }
   }
 

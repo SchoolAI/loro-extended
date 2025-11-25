@@ -11,7 +11,6 @@ import { ChannelDirectory } from "../channel-directory.js"
 import type { AdapterId, PeerIdentityDetails } from "../types.js"
 import type { HandleSendFn } from "./types.js"
 
-// biome-ignore lint/suspicious/noExplicitAny: Flexible type for heterogeneous adapter arrays
 export type AnyAdapter = Adapter<any>
 
 type AdapterParams = {

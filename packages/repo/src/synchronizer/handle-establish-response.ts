@@ -71,9 +71,9 @@ import type {
   ChannelMsgSyncRequest,
   EstablishedChannel,
 } from "../channel.js"
-import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import { getReadyStates } from "./state-helpers.js"
+import type { Command } from "../synchronizer-program.js"
 import { ensurePeerState, shouldSyncWithPeer } from "./peer-state-helpers.js"
+import { getReadyStates } from "./state-helpers.js"
 import type { ChannelHandlerContext } from "./types.js"
 import { batchAsNeeded } from "./utils.js"
 

@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: allow for tests */
 
 import {
-  Container,
+  type Container,
   type LoroCounter,
   LoroList,
   type LoroMap,

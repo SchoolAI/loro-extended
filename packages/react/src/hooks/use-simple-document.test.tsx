@@ -49,9 +49,12 @@ describe("useSimpleDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(() => useSimpleDocument(documentId), {
-      wrapper: RepoWrapper,
-    })
+    const { result, rerender } = renderHook(
+      () => useSimpleDocument(documentId),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
 
     const [, firstChangeDoc] = result.current
 
@@ -67,10 +70,13 @@ describe("useSimpleDocument", () => {
     const documentId2 = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result, rerender } = renderHook(({ docId }) => useSimpleDocument(docId), {
-      initialProps: { docId: documentId1 },
-      wrapper: RepoWrapper,
-    })
+    const { result, rerender } = renderHook(
+      ({ docId }) => useSimpleDocument(docId),
+      {
+        initialProps: { docId: documentId1 },
+        wrapper: RepoWrapper,
+      },
+    )
 
     const [doc1, changeDoc1, handle1] = result.current
 
@@ -83,7 +89,7 @@ describe("useSimpleDocument", () => {
     expect(doc2).not.toBeNull()
     expect(handle1).not.toBeNull()
     expect(handle2).not.toBeNull()
-    
+
     // They should be different instances
     expect(doc1).not.toBe(doc2)
     expect(handle1).not.toBe(handle2)
@@ -114,7 +120,7 @@ describe("useSimpleDocument", () => {
     expect(handle).not.toBeNull() // Handle is immediately available
 
     // Users can cast the result when using TypeScript
-    const data = doc!.toJSON() as TodoDoc
+    const data = doc?.toJSON() as TodoDoc
     expect(typeof data).toBe("object")
   })
 })

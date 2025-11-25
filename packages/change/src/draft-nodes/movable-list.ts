@@ -1,5 +1,4 @@
 import type { Container, LoroMovableList } from "loro-crdt"
-import type { InferPlainType } from "../index.js"
 import type { ContainerOrValueShape } from "../shape.js"
 import { ListDraftNodeBase } from "./list-base.js"
 

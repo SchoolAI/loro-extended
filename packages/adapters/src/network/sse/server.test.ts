@@ -1,11 +1,7 @@
-import type {
-  AdapterHooks,
-  ChannelMsg,
-  PeerID,
-} from "@loro-extended/repo"
+import type { AdapterHooks, ChannelMsg, PeerID } from "@loro-extended/repo"
 import type { Request, Response } from "express"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { SseServerNetworkAdapter, createSseExpressRouter } from "./server"
+import { createSseExpressRouter, SseServerNetworkAdapter } from "./server"
 
 describe("SseServerNetworkAdapter", () => {
   let adapter: SseServerNetworkAdapter
@@ -13,7 +9,7 @@ describe("SseServerNetworkAdapter", () => {
 
   beforeEach(() => {
     adapter = new SseServerNetworkAdapter()
-    
+
     hooks = {
       identity: { peerId: "123", name: "test-server" },
       onChannelAdded: vi.fn(),
@@ -50,7 +46,7 @@ describe("SseServerNetworkAdapter", () => {
     it("should log warning when sending to disconnected peer", async () => {
       const peerId: PeerID = "456"
       const channel = (adapter as any).generate(peerId)
-      
+
       const loggerSpy = vi.spyOn(adapter.logger, "warn")
 
       const testMessage: ChannelMsg = {
@@ -78,10 +74,10 @@ describe("SseServerNetworkAdapter", () => {
 
     it("should stop and disconnect all connections", async () => {
       await adapter._start()
-      
+
       const conn1 = adapter.registerConnection("1" as PeerID)
       const conn2 = adapter.registerConnection("2" as PeerID)
-      
+
       const disconnectSpy1 = vi.fn()
       const disconnectSpy2 = vi.fn()
       conn1.setDisconnectHandler(disconnectSpy1)
@@ -110,7 +106,7 @@ describe("SseServerNetworkAdapter", () => {
     it("should route messages to correct connection", () => {
       const router = createSseExpressRouter(adapter)
       const peerId: PeerID = "789"
-      
+
       const connection = adapter.registerConnection(peerId)
       const receiveSpy = vi.spyOn(connection, "receive")
 
@@ -130,7 +126,8 @@ describe("SseServerNetworkAdapter", () => {
       } as unknown as Response
 
       const postHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/sync" && layer.route?.methods?.post
+        (layer: any) =>
+          layer.route?.path === "/sync" && layer.route?.methods?.post,
       )
 
       if (postHandler) {
@@ -154,7 +151,8 @@ describe("SseServerNetworkAdapter", () => {
       } as unknown as Response
 
       const postHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/sync" && layer.route?.methods?.post
+        (layer: any) =>
+          layer.route?.path === "/sync" && layer.route?.methods?.post,
       )
 
       if (postHandler) {
@@ -181,13 +179,16 @@ describe("SseServerNetworkAdapter", () => {
       } as unknown as Response
 
       const postHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/sync" && layer.route?.methods?.post
+        (layer: any) =>
+          layer.route?.path === "/sync" && layer.route?.methods?.post,
       )
 
       if (postHandler) {
         postHandler.route.stack[0].handle(mockReq, mockRes)
         expect(mockRes.status).toHaveBeenCalledWith(404)
-        expect(mockRes.send).toHaveBeenCalledWith({ error: "Peer not connected" })
+        expect(mockRes.send).toHaveBeenCalledWith({
+          error: "Peer not connected",
+        })
       }
     })
   })
@@ -213,16 +214,20 @@ describe("SseServerNetworkAdapter", () => {
       } as unknown as Response
 
       const getHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/events" && layer.route?.methods?.get
+        (layer: any) =>
+          layer.route?.path === "/events" && layer.route?.methods?.get,
       )
 
       if (getHandler) {
         getHandler.route.stack[0].handle(mockReq, mockRes)
-        
+
         expect(adapter.isConnected(peerId)).toBe(true)
-        expect(mockRes.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({
-          "Content-Type": "text/event-stream",
-        }))
+        expect(mockRes.writeHead).toHaveBeenCalledWith(
+          200,
+          expect.objectContaining({
+            "Content-Type": "text/event-stream",
+          }),
+        )
       }
     })
 
@@ -242,7 +247,8 @@ describe("SseServerNetworkAdapter", () => {
       } as unknown as Response
 
       const getHandler = (router as any).stack.find(
-        (layer: any) => layer.route?.path === "/events" && layer.route?.methods?.get
+        (layer: any) =>
+          layer.route?.path === "/events" && layer.route?.methods?.get,
       )
 
       if (getHandler) {
@@ -261,9 +267,9 @@ describe("SseServerNetworkAdapter", () => {
     it("should serialize Uint8Array to base64", () => {
       const peerId: PeerID = "222"
       const connection = adapter.registerConnection(peerId)
-      
+
       const mockWrite = vi.fn()
-      connection.setSendFunction((msg) => {
+      connection.setSendFunction(msg => {
         mockWrite(msg)
       })
 

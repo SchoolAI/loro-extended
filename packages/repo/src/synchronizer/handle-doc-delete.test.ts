@@ -7,7 +7,6 @@ import {
   type SynchronizerMessage,
 } from "../synchronizer-program.js"
 import { createDocState } from "../types.js"
-import { expectCommand } from "./test-utils.js"
 
 describe("handle-local-doc-delete", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

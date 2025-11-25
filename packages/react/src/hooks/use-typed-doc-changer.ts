@@ -1,8 +1,8 @@
 import {
-  TypedDoc,
   type DocShape,
   type Draft,
   type InferPlainType,
+  TypedDoc,
 } from "@loro-extended/change"
 import type { DocHandle } from "@loro-extended/repo"
 import type { LoroDoc } from "loro-crdt"

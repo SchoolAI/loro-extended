@@ -53,8 +53,8 @@
 
 import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
-import type { ChannelId } from "../types.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
+import type { ChannelId } from "../types.js"
 
 export function handleEstablishChannel(
   msg: { type: "synchronizer/establish-channel"; channelId: ChannelId },

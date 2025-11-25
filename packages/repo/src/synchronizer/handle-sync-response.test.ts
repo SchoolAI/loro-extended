@@ -11,7 +11,6 @@ import {
   createMockChannel,
   createModelWithChannel,
   createVersionVector,
-  expectCommand,
 } from "./test-utils.js"
 
 describe("handle-sync-response", () => {

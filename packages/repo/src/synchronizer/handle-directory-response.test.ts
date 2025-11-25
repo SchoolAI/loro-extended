@@ -10,7 +10,6 @@ import {
   createEstablishedChannel,
   createMockChannel,
   createModelWithChannel,
-  expectCommand,
 } from "./test-utils.js"
 
 describe("handle-directory-response", () => {

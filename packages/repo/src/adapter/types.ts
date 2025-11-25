@@ -1,5 +1,5 @@
-import type { Channel, ChannelMsg } from "../channel.js"
-import type { AdapterId, ChannelId, PeerID } from "../types.js"
+import type { ChannelMsg } from "../channel.js"
+import type { AdapterId, ChannelId } from "../types.js"
 
 export type HandleSendFn = (
   adapterId: AdapterId,

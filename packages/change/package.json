@@ -22,6 +22,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "lint": "biome check --write .",
     "test": "vitest",
     "typecheck": "tsc --noEmit --skipLibCheck"
   },

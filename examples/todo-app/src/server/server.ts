@@ -1,7 +1,7 @@
 import { configure, getConsoleSink } from "@logtape/logtape"
 import {
-  SseServerNetworkAdapter,
   createSseExpressRouter,
+  SseServerNetworkAdapter,
 } from "@loro-extended/adapters/network/sse/server"
 import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
 import { Repo } from "@loro-extended/repo"

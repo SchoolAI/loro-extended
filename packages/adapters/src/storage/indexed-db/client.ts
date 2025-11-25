@@ -1,9 +1,9 @@
 import {
-  StorageAdapter,
   type Chunk,
+  StorageAdapter,
   type StorageKey,
 } from "@loro-extended/repo"
-import { openDB, type IDBPDatabase } from "idb"
+import { type IDBPDatabase, openDB } from "idb"
 
 const DB_NAME = "loro-todo-app"
 const DB_VERSION = 1
@@ -47,7 +47,7 @@ export class IndexedDBStorageAdapter extends StorageAdapter {
   async loadRange(keyPrefix: StorageKey): Promise<Chunk[]> {
     const db = await this.#dbPromise
     const prefix = this.keyToString(keyPrefix)
-    const range = IDBKeyRange.bound(prefix, prefix + "\uffff", false, true)
+    const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`, false, true)
     let cursor = await db.transaction(STORE_NAME).store.openCursor(range)
     const chunks: Chunk[] = []
     while (cursor) {
@@ -63,7 +63,7 @@ export class IndexedDBStorageAdapter extends StorageAdapter {
   async removeRange(keyPrefix: StorageKey): Promise<void> {
     const db = await this.#dbPromise
     const prefix = this.keyToString(keyPrefix)
-    const range = IDBKeyRange.bound(prefix, prefix + "\uffff", false, true)
+    const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`, false, true)
     const tx = db.transaction(STORE_NAME, "readwrite")
     let cursor = await tx.store.openCursor(range)
     while (cursor) {

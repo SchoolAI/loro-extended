@@ -1,6 +1,6 @@
 import {
-  StorageAdapter,
   type Chunk,
+  StorageAdapter,
   type StorageKey,
 } from "@loro-extended/repo"
 import { ClassicLevel } from "classic-level"
@@ -49,7 +49,7 @@ export class LevelDBStorageAdapter extends StorageAdapter {
     const chunks: Chunk[] = []
     for await (const [key, data] of this.#db.iterator({
       gte: prefix,
-      lt: prefix + "\xff",
+      lt: `${prefix}\xff`,
     })) {
       chunks.push({
         key: this.stringToKey(key),
@@ -64,7 +64,7 @@ export class LevelDBStorageAdapter extends StorageAdapter {
     const keysToDelete: string[] = []
     for await (const key of this.#db.keys({
       gte: prefix,
-      lt: prefix + "\xff",
+      lt: `${prefix}\xff`,
     })) {
       keysToDelete.push(key)
     }

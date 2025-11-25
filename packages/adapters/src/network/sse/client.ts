@@ -78,7 +78,7 @@ export class SseClientNetworkAdapter extends Adapter<void> {
     // Resolve the eventSourceUrl with the peerId
     const resolvedEventSourceUrl =
       typeof this.eventSourceUrl === "function"
-        ? this.eventSourceUrl(this.peerId!)
+        ? this.eventSourceUrl(this.peerId)
         : this.eventSourceUrl
 
     this.eventSource = new ReconnectingEventSource(resolvedEventSourceUrl)

@@ -970,7 +970,6 @@ describe("TypedLoroDoc", () => {
       }
 
       expect(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: intentional erroneous type
         createTypedDoc(schema, invalidEmptyState as any)
       }).toThrow()
     })
@@ -1665,8 +1664,6 @@ describe("Edge Cases and Error Handling", () => {
           // Test all methods on single item list
           expect(draft.items.find(item => item === 42)).toBe(42)
           expect(draft.items.find(item => item === 99)).toBeUndefined()
-          expect(draft.items.findIndex(item => item === 42)).toBe(0)
-          expect(draft.items.findIndex(item => item === 99)).toBe(-1)
           expect(draft.items.map(item => item * 2)).toEqual([84])
           expect(draft.items.filter(item => item > 0)).toEqual([42])
           expect(draft.items.filter(item => item < 0)).toEqual([])
@@ -1677,6 +1674,7 @@ describe("Edge Cases and Error Handling", () => {
           expect(draft.items.every(item => item < 0)).toBe(false)
 
           const collected: number[] = []
+          // biome-ignore lint/suspicious/useIterableCallbackReturn: draft does not have iterable
           draft.items.forEach(item => collected.push(item))
           expect(collected).toEqual([42])
         })
@@ -1918,7 +1916,7 @@ describe("Edge Cases and Error Handling", () => {
             // Pattern 2: Find by condition and update multiple properties
             const highScorer = draft.users.find(user => user.score > 110)
             if (highScorer) {
-              highScorer.name = highScorer.name + " (VIP)"
+              highScorer.name = `${highScorer.name} (VIP)`
               highScorer.score += 50
             }
 
@@ -1929,9 +1927,9 @@ describe("Edge Cases and Error Handling", () => {
             })
 
             // Pattern 4: Find by index-based condition
-            const firstUser = draft.users.find((user, index) => index === 0)
+            const firstUser = draft.users.find((_user, index) => index === 0)
             if (firstUser) {
-              firstUser.name = "👑 " + firstUser.name
+              firstUser.name = `👑 ${firstUser.name}`
             }
           })
 

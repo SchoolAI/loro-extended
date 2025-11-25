@@ -66,6 +66,7 @@ import type {
 } from "./channel.js"
 import { isEstablished } from "./channel.js"
 import type { Rules } from "./rules.js"
+import { handleEphemeral } from "./synchronizer/handle-ephemeral.js"
 import {
   type ChannelHandlerContext,
   handleChannelAdded,
@@ -90,9 +91,8 @@ import type {
   PeerState,
   ReadyState,
 } from "./types.js"
-import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 import { getEstablishedChannelsForDoc } from "./utils/get-established-channels-for-doc.js"
-import { handleEphemeral } from "./synchronizer/handle-ephemeral.js"
+import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // STATE

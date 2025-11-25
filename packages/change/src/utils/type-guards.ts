@@ -71,8 +71,6 @@ export function isLoroTree(container: Container): container is LoroTree {
 /**
  * Type guard to check if an object is a LoroTreeNode
  * Note: LoroTreeNode is not a Container, so we check for its specific properties
- *
- * biome-ignore lint/suspicious/noExplicitAny: type guard
  */
 export function isLoroTreeNode(obj: any): obj is LoroTreeNode {
   return (

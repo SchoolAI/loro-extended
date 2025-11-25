@@ -112,7 +112,7 @@ describe("makeImmutableUpdate", () => {
 
   it("should handle undefined commands", () => {
     const mutableUpdate = (
-      msg: TestMessage,
+      _msg: TestMessage,
       model: TestModel,
     ): TestCommand | undefined => {
       // This update function doesn't return commands

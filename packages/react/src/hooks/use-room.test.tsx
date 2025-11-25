@@ -32,10 +32,12 @@ describe("useRoom", () => {
     await waitFor(() => {
       expect(result.current.self).toEqual({ cursor: { x: 10, y: 20 } })
     })
-    
+
     // All should also contain self
     // We need to know the peerId to check the key, but we can check values
-    expect(Object.values(result.current.all)).toContainEqual({ cursor: { x: 10, y: 20 } })
+    expect(Object.values(result.current.all)).toContainEqual({
+      cursor: { x: 10, y: 20 },
+    })
   })
 
   it("should handle partial updates", async () => {

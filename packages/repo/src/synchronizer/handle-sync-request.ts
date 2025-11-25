@@ -55,7 +55,6 @@
  * @see handle-local-doc-change.ts - How we send updates to subscribed peers
  */
 
-import { VersionVector } from "loro-crdt"
 import type { ChannelMsgSyncRequest } from "../channel.js"
 import { isEstablished } from "../channel.js"
 import type { Command } from "../synchronizer-program.js"

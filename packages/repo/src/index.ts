@@ -9,4 +9,3 @@ export * from "./storage/in-memory-storage-adapter.js"
 export * from "./storage/storage-adapter.js"
 export * from "./types.js"
 export * from "./utils/generate-peer-id.js"
-

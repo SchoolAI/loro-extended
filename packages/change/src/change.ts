@@ -2,7 +2,12 @@
 
 import { LoroDoc } from "loro-crdt"
 import { DraftDoc } from "./draft-nodes/doc.js"
-import { JsonPatchApplicator, normalizePath, type JsonPatch, type JsonPatchOperation } from "./json-patch.js"
+import {
+  type JsonPatch,
+  JsonPatchApplicator,
+  type JsonPatchOperation,
+  normalizePath,
+} from "./json-patch.js"
 import { overlayEmptyState } from "./overlay.js"
 import type { DocShape } from "./shape.js"
 import type { Draft, InferPlainType } from "./types.js"
@@ -57,9 +62,9 @@ export class TypedDoc<Shape extends DocShape> {
    */
   applyPatch(
     patch: JsonPatch,
-    pathPrefix?: (string | number)[]
+    pathPrefix?: (string | number)[],
   ): InferPlainType<Shape> {
-    return this.change((draft) => {
+    return this.change(draft => {
       const applicator = new JsonPatchApplicator(draft)
 
       // Apply path prefix if provided

@@ -105,7 +105,6 @@ export class RecordDraftNode<
     key: string,
     shape: S,
   ): DraftNodeParams<ContainerShape> {
-    // biome-ignore lint/suspicious/noExplicitAny: prevent excessively deep type errors
     const emptyState = (this.emptyState as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
@@ -114,7 +113,6 @@ export class RecordDraftNode<
       shape,
       emptyState,
       getContainer: () =>
-        // biome-ignore lint/suspicious/noExplicitAny: override
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
     }
   }
@@ -207,7 +205,6 @@ export class RecordDraftNode<
     return this.container.keys()
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: an array of values merges all value types
   values(): any[] {
     return this.container.values()
   }

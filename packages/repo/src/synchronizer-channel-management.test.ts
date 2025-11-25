@@ -121,7 +121,7 @@ describe("Synchronizer - Channel Management", () => {
       synchronizer.channelReceive(connectedChannel, {
         type: "channel/establish-response",
         identity: {
-          peerId: "test-peer-id" as any,
+          peerId: "12345",
           name: "test-peer",
           type: "user",
         },
@@ -140,13 +140,13 @@ describe("Synchronizer - Channel Management", () => {
           {
             docId: docId1,
             requesterDocVersion: synchronizer
-              .getDocumentState(docId1)!
+              .getOrCreateDocumentState(docId1)
               .doc.version(),
           },
           {
             docId: docId2,
             requesterDocVersion: synchronizer
-              .getDocumentState(docId2)!
+              .getOrCreateDocumentState(docId2)
               .doc.version(),
           },
         ],

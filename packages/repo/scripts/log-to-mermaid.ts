@@ -180,7 +180,7 @@ function main() {
     fs.writeFileSync(outputFile, diagram)
     console.log(`Mermaid diagram written to ${outputFile}`)
   } else {
-    console.log("\n" + diagram)
+    console.log(`\n${diagram}`)
   }
 }
 

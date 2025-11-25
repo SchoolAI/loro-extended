@@ -40,26 +40,25 @@ export interface SseExpressRouterOptions {
   getPeerIdFromEventsRequest?: (req: Request) => PeerID | undefined
 }
 
-
 /**
  * Create an Express router for SSE server adapter.
- * 
+ *
  * This factory function creates Express routes that integrate with the
  * SseServerNetworkAdapter. It handles:
  * - POST endpoint for clients to send messages to the server
  * - GET endpoint for clients to establish SSE connections
  * - Heartbeat mechanism to detect stale connections
  * - Message serialization/deserialization
- * 
+ *
  * @param adapter The SseServerNetworkAdapter instance
  * @param options Configuration options for the router
  * @returns An Express Router ready to be mounted
- * 
+ *
  * @example
  * ```typescript
  * const adapter = new SseServerNetworkAdapter()
  * const repo = new Repo({ adapters: [adapter, storageAdapter] })
- * 
+ *
  * app.use("/loro", createSseExpressRouter(adapter, {
  *   syncPath: "/sync",
  *   eventsPath: "/events",
@@ -75,8 +74,8 @@ export function createSseExpressRouter(
     syncPath = "/sync",
     eventsPath = "/events",
     heartbeatInterval = 30000,
-    getPeerIdFromSyncRequest = (req) => req.headers["x-peer-id"] as PeerID,
-    getPeerIdFromEventsRequest = (req) => req.query.peerId as PeerID,
+    getPeerIdFromSyncRequest = req => req.headers["x-peer-id"] as PeerID,
+    getPeerIdFromEventsRequest = req => req.query.peerId as PeerID,
   } = options
 
   const router = express.Router()
@@ -89,7 +88,6 @@ export function createSseExpressRouter(
 
     // Extract peerId from request
     const peerId = getPeerIdFromSyncRequest(req)
-
 
     if (!peerId) {
       res.status(400).send({ error: "Missing peer ID" })
@@ -155,9 +153,11 @@ export function createSseExpressRouter(
       try {
         // Send a heartbeat comment (SSE comments are ignored by clients)
         res.write(": heartbeat\n\n")
-      } catch (err) {
+      } catch (_err) {
         // If we can't write to the response, the connection is dead
-        adapter.logger.warn("Heartbeat failed, cleaning up connection", { peerId })
+        adapter.logger.warn("Heartbeat failed, cleaning up connection", {
+          peerId,
+        })
         adapter.unregisterConnection(peerId)
         clearInterval(heartbeat)
         heartbeats.delete(peerId)

@@ -1,20 +1,25 @@
 import {
-  StorageAdapter,
   type Chunk,
+  StorageAdapter,
   type StorageKey,
 } from "./storage-adapter.js"
 
 export class InMemoryStorageAdapter extends StorageAdapter {
   #data = new Map<string, Uint8Array>()
 
-  constructor(sharedDataOrOptions?: Map<string, Uint8Array> | { sharedData?: Map<string, Uint8Array>; adapterId?: string }) {
+  constructor(
+    sharedDataOrOptions?:
+      | Map<string, Uint8Array>
+      | { sharedData?: Map<string, Uint8Array>; adapterId?: string },
+  ) {
     // Handle both old API (just sharedData) and new API (options object)
-    const options = sharedDataOrOptions instanceof Map
-      ? { sharedData: sharedDataOrOptions, adapterId: "in-memory" }
-      : { adapterId: "in-memory", ...sharedDataOrOptions }
-    
+    const options =
+      sharedDataOrOptions instanceof Map
+        ? { sharedData: sharedDataOrOptions, adapterId: "in-memory" }
+        : { adapterId: "in-memory", ...sharedDataOrOptions }
+
     super({ adapterId: options.adapterId })
-    
+
     if (options.sharedData) {
       this.#data = options.sharedData
     }

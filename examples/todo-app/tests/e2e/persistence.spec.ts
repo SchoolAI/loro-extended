@@ -30,7 +30,7 @@ test.describe("Storage Persistence", () => {
   test("should sync persisted data between clients", async ({ browser }) => {
     // Use the same document ID for both clients to test sync
     const testDocId = generateTestDocumentId()
-    
+
     // First client creates a todo
     const page1 = await browser.newPage()
     await page1.goto(`/#${testDocId}`)

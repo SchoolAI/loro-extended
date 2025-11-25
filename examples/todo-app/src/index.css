@@ -1,5 +1,7 @@
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f4f4f9;
@@ -42,11 +44,21 @@ header h1 {
   color: #888;
 }
 
-.status-ready { color: #28a745; }
-.status-loading, .status-syncing { color: #ffc107; }
-.status-unavailable, .status-deleted { color: #dc3545; }
-.status-idle, .status-searching { color: #6c757d; }
-
+.status-ready {
+  color: #28a745;
+}
+.status-loading,
+.status-syncing {
+  color: #ffc107;
+}
+.status-unavailable,
+.status-deleted {
+  color: #dc3545;
+}
+.status-idle,
+.status-searching {
+  color: #6c757d;
+}
 
 .todo-app {
   margin-top: 1rem;

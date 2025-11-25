@@ -20,11 +20,11 @@ export type { UseDocumentReturn } from "./hooks/use-document.js"
 
 // Typed hooks - require @loro-extended/change
 export { useDocument } from "./hooks/use-document.js"
+export { useRoom } from "./hooks/use-room.js"
 export type { UseSimpleDocumentReturn } from "./hooks/use-simple-document.js"
 export { useSimpleDocument } from "./hooks/use-simple-document.js"
 export type { ChangeFn } from "./hooks/use-typed-doc-changer.js"
 export { useTypedDocChanger } from "./hooks/use-typed-doc-changer.js"
 export { useTypedDocState } from "./hooks/use-typed-doc-state.js"
-export { useRoom } from "./hooks/use-room.js"
 
 export * from "./repo-context.js"

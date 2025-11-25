@@ -226,12 +226,10 @@ export function validateValue(
       }
 
       default:
-        // biome-ignore lint/suspicious/noExplicitAny: impossible state
         throw new Error(`Unknown value type: ${(valueSchema as any).valueType}`)
     }
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: impossible state
   throw new Error(`Unknown schema type: ${(schema as any)._type}`)
 }
 

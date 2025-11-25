@@ -44,7 +44,7 @@
 
 import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
-import { isEstablished, type Channel } from "../channel.js"
+import { type Channel, isEstablished } from "../channel.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
 import { getReadyStates } from "./state-helpers.js"
 import { batchAsNeeded } from "./utils.js"

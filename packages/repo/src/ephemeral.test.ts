@@ -61,7 +61,7 @@ describe("Ephemeral Store Integration", () => {
 
     // Verify repo2 received the update
     expect(onChange).toHaveBeenCalled()
-    
+
     // Check repo2's view of repo1's state
     // We need repo1's peerId
     const peerId1 = repo1.identity.peerId
@@ -161,7 +161,6 @@ describe("Ephemeral Store Integration", () => {
 
     // Disconnect repo1
     // We can simulate this by stopping the adapter
-    // @ts-ignore - accessing private property for test
     repo1.synchronizer.adapters.adapters[0]._stop()
 
     // Wait for disconnect processing

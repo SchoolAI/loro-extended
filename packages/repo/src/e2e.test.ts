@@ -184,7 +184,7 @@ describe("Repo E2E", () => {
       // Note: We can't check handles.size directly as it's private, but we can check specific docIds
       // For this test, we'll just verify that attempting to get a non-existent doc creates a new empty one
       const docCount = Array.from(
-        repoB["synchronizer"].model.documents.keys(),
+        repoB.synchronizer.model.documents.keys(),
       ).length
       expect(docCount).toBe(0)
     }, 500)

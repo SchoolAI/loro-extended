@@ -1,5 +1,5 @@
-import { isEstablished } from "../channel.js"
 import type { EstablishedChannel } from "../channel.js"
+import { isEstablished } from "../channel.js"
 import type { RuleContext } from "../rules.js"
 import type { SynchronizerModel } from "../synchronizer-program.js"
 import type { DocState } from "../types.js"

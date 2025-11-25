@@ -274,9 +274,9 @@ describe("BridgeAdapter Integration Tests", () => {
     const bridge = new Bridge()
 
     // Capture patches for debugging
-    const repo1Patches: any[] = []
-    const repo2Patches: any[] = []
-    const repo3Patches: any[] = []
+    const _repo1Patches: any[] = []
+    const _repo2Patches: any[] = []
+    const _repo3Patches: any[] = []
 
     const repo1 = new Repo({
       adapters: [
