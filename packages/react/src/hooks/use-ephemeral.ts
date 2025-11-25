@@ -69,7 +69,7 @@ export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
     const getSnapshot = () => cachedState
 
     return { subscribe, getSnapshot }
-  }, [handle])
+  }, [handle, docId])
 
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
 

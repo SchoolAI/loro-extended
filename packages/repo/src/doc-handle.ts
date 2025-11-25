@@ -92,6 +92,12 @@ export class DocHandle<T extends DocContent = DocContent> {
       },
 
       subscribe: (cb: (values: ObjectValue) => void) => {
+        // Call immediately with current state
+        const initialValues = synchronizer
+          .getOrCreateEphemeralStore(docId)
+          .getAllStates()
+        cb(initialValues)
+
         return synchronizer.emitter.on("ephemeral-change", event => {
           if (event.docId === docId) {
             const values = synchronizer

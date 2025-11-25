@@ -80,6 +80,15 @@ export function handleChannelRemoved(
       peerState.lastSeen = new Date()
       // IMPORTANT: Keep peer state even if no channels remain
       // This preserves document awareness cache for reconnection
+
+      // If this was the last channel for this peer, we should remove their ephemeral data
+      // This prevents "ghost" cursors/presence from lingering until timeout
+      if (peerState.channels.size === 0) {
+        commands.push({
+          type: "cmd/remove-ephemeral-peer",
+          peerId: channel.peerId,
+        })
+      }
     }
   }
 

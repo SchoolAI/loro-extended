@@ -93,6 +93,7 @@ export type ChannelMsgDeleteResponse = {
 export type ChannelMsgEphemeral = {
   type: "channel/ephemeral"
   docId: DocId
+  hopsRemaining: number
   data: Uint8Array
 }
 

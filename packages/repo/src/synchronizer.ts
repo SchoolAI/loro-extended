@@ -437,17 +437,60 @@ export class Synchronizer {
       case "cmd/broadcast-ephemeral": {
         const store = this.getOrCreateEphemeralStore(command.docId)
 
-        const myEphemeralData = store.encode(this.identity.peerId)
+        const data = command.allPeerData
+          ? store.encodeAll()
+          : store.encode(this.identity.peerId)
 
-        if (myEphemeralData.length > 0) {
+        if (data.length > 0) {
           this.adapters.send({
             toChannelIds: command.toChannelIds,
             message: {
               type: "channel/ephemeral",
               docId: command.docId,
-              data: myEphemeralData,
+              hopsRemaining: command.hopsRemaining,
+              data,
             },
           })
+        }
+        break
+      }
+
+      case "cmd/remove-ephemeral-peer": {
+        // Iterate over all ephemeral stores and remove the peer's data
+        for (const [docId, store] of this.ephemeralStores) {
+          // Delete the peer's data from the local store
+          store.delete(command.peerId)
+
+          // Generate a deletion update to broadcast to other peers
+          const deletionUpdate = store.encode(command.peerId)
+
+          if (deletionUpdate.length > 0) {
+            // Find all channels subscribed to this document
+            const channelIds: ChannelId[] = []
+            for (const [channelId, channel] of this.model.channels) {
+              if (isEstablishedFn(channel)) {
+                const peerState = this.model.peers.get(channel.peerId)
+                if (peerState?.subscriptions.has(docId)) {
+                  channelIds.push(channelId)
+                }
+              }
+            }
+
+            if (channelIds.length > 0) {
+              this.adapters.send({
+                toChannelIds: channelIds,
+                message: {
+                  type: "channel/ephemeral",
+                  docId,
+                  hopsRemaining: 0,
+                  data: deletionUpdate,
+                },
+              })
+            }
+          }
+
+          // Emit local change event so UI updates immediately
+          this.emitter.emit("ephemeral-change", { docId })
         }
         break
       }
@@ -572,20 +615,6 @@ export class Synchronizer {
     if (sentCount === 0) {
       this.logger.warn(`can't send sync-response to channel`, {
         toChannelId,
-      })
-    }
-
-    // Also send ephemeral state to ensure the peer has the latest presence info
-    const store = this.getOrCreateEphemeralStore(docId)
-    const ephemeralData = store.encodeAll()
-    if (ephemeralData.length > 0) {
-      this.adapters.send({
-        toChannelIds: [toChannelId],
-        message: {
-          type: "channel/ephemeral",
-          docId,
-          data: ephemeralData,
-        },
       })
     }
   }

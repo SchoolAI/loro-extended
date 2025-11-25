@@ -126,12 +126,6 @@ export function handleSyncResponse(
         message.transmission.version,
       )
 
-      // Since peer has the doc, send our ephemeral state
-      commands.push({
-        type: "cmd/broadcast-ephemeral",
-        docId: message.docId,
-        toChannelIds: [fromChannelId],
-      })
       break
     }
 
@@ -167,12 +161,6 @@ export function handleSyncResponse(
       const newVersion = docState.doc.version()
       setPeerDocumentAwareness(peerState, message.docId, "has-doc", newVersion)
 
-      // Since peer has the doc, send our ephemeral state
-      commands.push({
-        type: "cmd/broadcast-ephemeral",
-        docId: message.docId,
-        toChannelIds: [fromChannelId],
-      })
       break
     }
 

@@ -112,6 +112,8 @@ export function handleDirectoryResponse(
     commands.push({
       type: "cmd/broadcast-ephemeral",
       docId,
+      allPeerData: true,
+      hopsRemaining: 0,
       toChannelIds: [fromChannelId],
     })
 

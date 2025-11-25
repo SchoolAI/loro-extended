@@ -72,12 +72,12 @@ import {
   handleChannelRemoved,
   handleDirectoryRequest,
   handleDirectoryResponse,
-  handleEstablishChannel,
-  handleEstablishRequest,
-  handleEstablishResponse,
   handleDocChange,
   handleDocDelete,
   handleDocEnsure,
+  handleEstablishChannel,
+  handleEstablishRequest,
+  handleEstablishResponse,
   handleSyncRequest,
   handleSyncResponse,
 } from "./synchronizer/index.js"
@@ -91,6 +91,8 @@ import type {
   ReadyState,
 } from "./types.js"
 import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
+import { getEstablishedChannelsForDoc } from "./utils/get-established-channels-for-doc.js"
+import { handleEphemeral } from "./synchronizer/handle-ephemeral.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // STATE
@@ -181,7 +183,13 @@ export type Command =
   | {
       type: "cmd/broadcast-ephemeral"
       docId: DocId
+      allPeerData: boolean
+      hopsRemaining: number
       toChannelIds: ChannelId[]
+    }
+  | {
+      type: "cmd/remove-ephemeral-peer"
+      peerId: PeerID
     }
 
   // Events
@@ -279,20 +287,18 @@ function createSynchronizerLogic(
         const commands: Command[] = []
 
         for (const docId of model.documents.keys()) {
-          const channelIds: ChannelId[] = []
-          for (const [channelId, channel] of model.channels) {
-            if (isEstablished(channel)) {
-              const peerState = model.peers.get(channel.peerId)
-              if (peerState?.subscriptions.has(docId)) {
-                channelIds.push(channelId)
-              }
-            }
-          }
+          const channelIds = getEstablishedChannelsForDoc(
+            model.channels,
+            model.peers,
+            docId,
+          )
 
           if (channelIds.length > 0) {
             commands.push({
               type: "cmd/broadcast-ephemeral",
               docId,
+              allPeerData: true,
+              hopsRemaining: 0,
               toChannelIds: channelIds,
             })
           }
@@ -302,16 +308,11 @@ function createSynchronizerLogic(
       }
 
       case "synchronizer/ephemeral-local-change": {
-        // Get all established channels for this document
-        const channelIds: ChannelId[] = []
-        for (const [channelId, channel] of model.channels) {
-          if (isEstablished(channel)) {
-            const peerState = model.peers.get(channel.peerId)
-            if (peerState?.subscriptions.has(msg.docId)) {
-              channelIds.push(channelId)
-            }
-          }
-        }
+        const channelIds = getEstablishedChannelsForDoc(
+          model.channels,
+          model.peers,
+          msg.docId,
+        )
 
         return {
           type: "cmd/batch",
@@ -323,6 +324,9 @@ function createSynchronizerLogic(
             {
               type: "cmd/broadcast-ephemeral",
               docId: msg.docId,
+              allPeerData: false,
+              // Allow a hub-and-spoke server to propagate one more hop
+              hopsRemaining: 1,
               toChannelIds: channelIds,
             },
           ],
@@ -455,11 +459,7 @@ function mutatingChannelUpdate(
       return handleDirectoryResponse(channelMessage, ctx)
 
     case "channel/ephemeral":
-      return {
-        type: "cmd/apply-ephemeral",
-        docId: channelMessage.docId,
-        data: channelMessage.data,
-      }
+      return handleEphemeral(channelMessage, ctx)
   }
   return
 }

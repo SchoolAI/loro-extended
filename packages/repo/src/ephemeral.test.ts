@@ -118,4 +118,57 @@ describe("Ephemeral Store Integration", () => {
     const peerState = handle2.ephemeral.all[peerId1]
     expect(peerState).toEqual({ status: "online" })
   })
+
+  it("should remove ephemeral state when peer disconnects", async () => {
+    const bridge = new Bridge()
+
+    const repo1 = new Repo({
+      adapters: [
+        new BridgeAdapter({
+          bridge,
+          adapterId: "bridge-adapter-repo1",
+        }),
+      ],
+      identity: { name: "repo1", type: "user" },
+    })
+
+    const repo2 = new Repo({
+      adapters: [
+        new BridgeAdapter({
+          bridge,
+          adapterId: "bridge-adapter-repo2",
+        }),
+      ],
+      identity: { name: "repo2", type: "user" },
+    })
+
+    const docId = "disconnect-sync-doc"
+    const handle1 = repo1.get(docId)
+    const handle2 = repo2.get(docId)
+
+    // Wait for connection
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Set state on repo1
+    handle1.ephemeral.set({ status: "online" })
+
+    // Wait for sync
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify repo2 has repo1's state
+    const peerId1 = repo1.identity.peerId
+    expect(handle2.ephemeral.all[peerId1]).toEqual({ status: "online" })
+
+    // Disconnect repo1
+    // We can simulate this by stopping the adapter
+    // @ts-ignore - accessing private property for test
+    repo1.synchronizer.adapters.adapters[0]._stop()
+
+    // Wait for disconnect processing
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify repo2 has REMOVED repo1's state
+    // It should be undefined or empty
+    expect(handle2.ephemeral.all[peerId1]).toBeUndefined()
+  })
 })

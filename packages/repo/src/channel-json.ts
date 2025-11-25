@@ -86,6 +86,7 @@ export type ChannelMsgJSON =
   | {
       type: "channel/ephemeral"
       docId: string
+      hopsRemaining: number
       data: BinaryDataJSON
     }
 
