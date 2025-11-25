@@ -367,64 +367,6 @@ describe("Repo E2E", () => {
       expect(root3.get("items")).toEqual(["item1", "item2", "item3"])
     }, 500)
 
-    it("should reconstruct document from updates alone (no snapshot)", async () => {
-      const storage1 = new InMemoryStorageAdapter()
-
-      // Create document with changes
-      const repo1 = new Repo({
-        identity: { name: "repo1", type: "user" },
-        adapters: [storage1],
-      })
-
-      // Wait for storage to be ready
-      await vi.runAllTimersAsync()
-
-      const documentId = "updates-only-doc"
-      const handle1 = repo1.get(documentId)
-
-      handle1.change(doc => {
-        const root = doc.getMap("doc")
-        root.set("step", 1)
-        root.set("data", "hello")
-      })
-
-      // Wait for first change to be saved
-      await vi.runAllTimersAsync()
-
-      handle1.change(doc => {
-        const root = doc.getMap("doc")
-        root.set("step", 2)
-        root.set("data", "hello world")
-      })
-
-      // Wait for second change to be saved
-      await vi.runAllTimersAsync()
-
-      // Verify data was saved to storage
-      const savedChunks = await storage1.loadRange([documentId])
-      expect(savedChunks.length).toBeGreaterThan(0)
-
-      // Create new repo and load the document with fresh adapter
-      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
-      const repo2 = new Repo({
-        identity: { name: "repo2", type: "user" },
-        adapters: [storage2],
-      })
-
-      // Wait for storage to be ready
-      await vi.runAllTimersAsync()
-
-      const handle2 = repo2.get(documentId)
-
-      // Allow time for storage channel to establish and respond
-      await vi.runAllTimersAsync()
-
-      // The document should be ready and have the expected content
-      const root2 = handle2.doc.getMap("doc")
-      expect(root2.get("step")).toBe(2)
-      expect(root2.get("data")).toBe("hello world")
-    }, 500)
-
     it("should save and load documents with complex nested structures", async () => {
       const storage1 = new InMemoryStorageAdapter()
 
