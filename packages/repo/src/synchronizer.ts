@@ -437,6 +437,9 @@ export class Synchronizer {
       case "cmd/broadcast-ephemeral": {
         const store = this.getOrCreateEphemeralStore(command.docId)
 
+        // Reset EphemeralStore timeout for this peer's values
+        store.set(this.identity.peerId, store.get(this.identity.peerId))
+
         const data = command.allPeerData
           ? store.encodeAll()
           : store.encode(this.identity.peerId)

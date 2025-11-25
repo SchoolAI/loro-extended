@@ -97,6 +97,9 @@ export abstract class StorageAdapter extends Adapter<void> {
           return await this.handleDirectoryResponse(msg)
         case "channel/delete-request":
           return await this.handleDeleteRequest(msg)
+        case "channel/ephemeral":
+          // Storage adapters ignore ephemeral messages
+          return
         default:
           this.logger.warn("unhandled message type", { type: msg.type })
       }

@@ -121,30 +121,25 @@ export function handleSyncRequest(
         docId,
         requesterDocVersion,
       })
-    }
 
-    // 2. Since peer has requested the doc, also send the room ephemeral state
-    // We do this even if we don't have the doc yet, as ephemeral state is separate
-    commands.push({
-      type: "cmd/broadcast-ephemeral",
-      docId,
-      allPeerData: true,
-      hopsRemaining: 0,
-      toChannelIds: [fromChannelId],
-    })
-
-    // 3. Collect docs for reciprocal sync-request
-    // If bidirectional is true, we want to ensure we are also subscribed to this document
-    // and have the latest version from the peer.
-    if (bidirectional) {
-      // If we don't have the doc, we send an empty version vector
-      // This tells the peer "I have nothing, please send me what you have"
-      const myVersion = docState ? docState.doc.version() : new VersionVector(null)
-      
-      reciprocalDocs.push({
+      // 2. Since peer has requested the doc, also send the room ephemeral state
+      commands.push({
+        type: "cmd/broadcast-ephemeral",
         docId,
-        requesterDocVersion: myVersion,
+        allPeerData: true,
+        hopsRemaining: 0,
+        toChannelIds: [fromChannelId],
       })
+
+      // 3. Collect docs for reciprocal sync-request
+      // If bidirectional is true, we want to ensure we are also subscribed to this document
+      // and have the latest version from the peer.
+      if (bidirectional) {
+        reciprocalDocs.push({
+          docId,
+          requesterDocVersion: docState.doc.version(),
+        })
+      }
     }
   }
 

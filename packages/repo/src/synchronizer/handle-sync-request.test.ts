@@ -65,14 +65,14 @@ describe("handle-sync-request", () => {
     // Since we have the doc, we expect:
     // 1. send-sync-response (for the requested doc)
     // 2. send-message (reciprocal sync-request)
-    
+
     // The update function returns a single command or a batch command
     if (command && command.type === "cmd/batch") {
       const syncResponse = command.commands.find(
-        (c) => c.type === "cmd/send-sync-response",
+        c => c.type === "cmd/send-sync-response",
       )
       const reciprocalRequest = command.commands.find(
-        (c) => c.type === "cmd/send-message",
+        c => c.type === "cmd/send-message",
       )
 
       expect(syncResponse).toBeDefined()
@@ -85,9 +85,9 @@ describe("handle-sync-request", () => {
         expect(reciprocalRequest.envelope.message.type).toBe(
           "channel/sync-request",
         )
-        expect(
-          (reciprocalRequest.envelope.message as any).bidirectional,
-        ).toBe(false)
+        expect((reciprocalRequest.envelope.message as any).bidirectional).toBe(
+          false,
+        )
       }
     } else {
       // If it's not a batch, it must be just the sync response (if bidirectional was false or failed)
@@ -138,18 +138,18 @@ describe("handle-sync-request", () => {
     expectCommand(command, "cmd/batch")
     if (command && command.type === "cmd/batch") {
       const reciprocalRequest = command.commands.find(
-        (c) =>
+        c =>
           c.type === "cmd/send-message" &&
           c.envelope.message.type === "channel/sync-request",
       )
       expect(reciprocalRequest).toBeDefined()
       if (reciprocalRequest && reciprocalRequest.type === "cmd/send-message") {
-        expect(
-          (reciprocalRequest.envelope.message as any).bidirectional,
-        ).toBe(false)
-        expect(
-          (reciprocalRequest.envelope.message as any).docs[0].docId,
-        ).toBe(docId)
+        expect((reciprocalRequest.envelope.message as any).bidirectional).toBe(
+          false,
+        )
+        expect((reciprocalRequest.envelope.message as any).docs[0].docId).toBe(
+          docId,
+        )
       }
     }
   })
@@ -192,8 +192,26 @@ describe("handle-sync-request", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    // Should only be the sync response, not a batch with reciprocal request
-    expectCommand(command, "cmd/send-sync-response")
+    // Should be a batch because we always send broadcast-ephemeral now
+    expectCommand(command, "cmd/batch")
+
+    if (command && command.type === "cmd/batch") {
+      // Should contain sync-response and broadcast-ephemeral
+      const syncResponse = command.commands.find(
+        c => c.type === "cmd/send-sync-response",
+      )
+      const broadcastEphemeral = command.commands.find(
+        c => c.type === "cmd/broadcast-ephemeral",
+      )
+      const reciprocalRequest = command.commands.find(
+        c => c.type === "cmd/send-message",
+      )
+
+      expect(syncResponse).toBeDefined()
+      expect(broadcastEphemeral).toBeDefined()
+      // Should NOT contain reciprocal request
+      expect(reciprocalRequest).toBeUndefined()
+    }
   })
 
   it("should reject from non-established channel", () => {
