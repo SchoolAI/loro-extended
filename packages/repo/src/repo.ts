@@ -41,7 +41,7 @@ export class Repo {
     })
     this.logger = logger
 
-    logger.debug("new Repo", { identity: this.identity })
+    logger.debug("new Repo: {identity}", { identity: this.identity })
 
     // Instantiate synchronizer
     const synchronizer = new Synchronizer({

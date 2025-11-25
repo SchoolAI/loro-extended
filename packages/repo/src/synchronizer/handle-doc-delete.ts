@@ -74,7 +74,7 @@ export function handleDocDelete(
 
   // If document doesn't exist, log warning but don't fail
   if (!docState) {
-    logger.warn(`doc-delete: unable to find doc-state ${docId}`)
+    logger.warn("doc-delete: unable to find doc-state {docId}", { docId })
     return
   }
 

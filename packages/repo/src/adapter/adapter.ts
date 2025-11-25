@@ -188,10 +188,13 @@ export abstract class Adapter<G> {
 
   async _stop(): Promise<void> {
     if (this.#lifecycle.state !== "started") {
-      this.logger.warn(`Stopping adapter in unexpected state`, {
-        adapterId: this.adapterId,
-        state: this.#lifecycle,
-      })
+      this.logger.warn(
+        "Stopping adapter {adapterId} in unexpected state: {state.state}",
+        {
+          adapterId: this.adapterId,
+          state: this.#lifecycle,
+        },
+      )
     }
     await this.onStop()
     this.channels.reset()

@@ -131,7 +131,7 @@ describe("Adapter", () => {
       await adapter._stop()
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "Stopping adapter in unexpected state",
+        "Stopping adapter {adapterId} in unexpected state: {state.state}",
         expect.objectContaining({
           adapterId: "mock-adapter",
         }),

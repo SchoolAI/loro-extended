@@ -44,7 +44,7 @@ export class Bridge {
     toAdapterId: AdapterId,
     message: ChannelMsg,
   ): void {
-    this.logger.trace(`routeMessage`, {
+    this.logger.trace("routeMessage: {messageType} from {from} to {to}", {
       from: fromAdapterId,
       to: toAdapterId,
       messageType: message.type,
@@ -53,7 +53,7 @@ export class Bridge {
     if (toAdapter) {
       toAdapter.deliverMessage(fromAdapterId, message)
     } else {
-      this.logger.warn(`routeMessage: target adapter not found`, {
+      this.logger.warn("routeMessage: target adapter {toAdapterId} not found", {
         toAdapterId,
       })
     }
@@ -96,13 +96,15 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   }
 
   generate(context: BridgeAdapterContext): GeneratedChannel {
-    this.logger.debug(`generate`, { targetAdapterId: context.targetAdapterId })
+    this.logger.debug("generate channel to {targetAdapterId}", {
+      targetAdapterId: context.targetAdapterId,
+    })
 
     return {
       adapterId: this.adapterId,
       kind: "network",
       send: msg => {
-        this.logger.debug(`channel.send`, {
+        this.logger.debug("channel.send: {messageType} from {from} to {to}", {
           from: this.adapterId,
           to: context.targetAdapterId,
           messageType: msg.type,
@@ -132,7 +134,9 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
     // Tell existing adapters to create channels to us
     for (const [adapterId, adapter] of this.bridge.adapters) {
       if (adapterId !== this.adapterId) {
-        this.logger.trace(`telling ${adapterId} to create channel to us`)
+        this.logger.trace("telling {adapterId} to create channel to us", {
+          adapterId,
+        })
         adapter.createChannelTo(this.adapterId)
       }
     }
@@ -140,7 +144,7 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
     // Create our channels to existing adapters
     for (const adapterId of this.bridge.adapters.keys()) {
       if (adapterId !== this.adapterId) {
-        this.logger.trace(`creating our channel to ${adapterId}`)
+        this.logger.trace("creating our channel to {adapterId}", { adapterId })
         this.createChannelTo(adapterId)
       }
     }
@@ -149,7 +153,7 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
     // Only WE initiate establishment (to existing adapters)
     // This avoids double-establishment since we're the "new" adapter joining
     for (const channelId of this.adapterToChannel.values()) {
-      this.logger.trace(`establishing our channel ${channelId}`)
+      this.logger.trace("establishing our channel {channelId}", { channelId })
       this.establishChannel(channelId)
     }
 
@@ -188,7 +192,9 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
    */
   createChannelTo(targetAdapterId: AdapterId): void {
     if (this.adapterToChannel.has(targetAdapterId)) {
-      this.logger.trace(`channel already exists to ${targetAdapterId}`)
+      this.logger.trace("channel already exists to {targetAdapterId}", {
+        targetAdapterId,
+      })
       return
     }
 
@@ -196,10 +202,13 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
     this.channelToAdapter.set(channel.channelId, targetAdapterId)
     this.adapterToChannel.set(targetAdapterId, channel.channelId)
 
-    this.logger.trace(`channel created (not yet established)`, {
-      targetAdapterId,
-      channelId: channel.channelId,
-    })
+    this.logger.trace(
+      "channel {channelId} created (not yet established) to {targetAdapterId}",
+      {
+        targetAdapterId,
+        channelId: channel.channelId,
+      },
+    )
   }
 
   /**
@@ -210,11 +219,13 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   establishChannelTo(targetAdapterId: AdapterId): void {
     const channelId = this.adapterToChannel.get(targetAdapterId)
     if (!channelId) {
-      this.logger.warn(`no channel found to establish`, { targetAdapterId })
+      this.logger.warn("no channel found to establish to {targetAdapterId}", {
+        targetAdapterId,
+      })
       return
     }
 
-    this.logger.trace(`establishing channel ${channelId}`)
+    this.logger.trace("establishing channel {channelId}", { channelId })
     this.establishChannel(channelId)
   }
 
@@ -225,7 +236,9 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   removeChannelTo(targetAdapterId: AdapterId): void {
     const channelId = this.adapterToChannel.get(targetAdapterId)
     if (channelId) {
-      this.logger.trace(`removing channel to adapter`, { targetAdapterId })
+      this.logger.trace("removing channel to adapter {targetAdapterId}", {
+        targetAdapterId,
+      })
       this.removeChannel(channelId)
       this.channelToAdapter.delete(channelId)
       this.adapterToChannel.delete(targetAdapterId)
@@ -241,20 +254,27 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
     if (channelId) {
       const channel = this.channels.get(channelId)
       if (channel) {
-        this.logger.trace(`delivering message to channel ${channelId}`, {
-          from: fromAdapterId,
-          messageType: message.type,
-        })
+        this.logger.trace(
+          "delivering message {messageType} to channel {channelId} from {from}",
+          {
+            from: fromAdapterId,
+            messageType: message.type,
+            channelId,
+          },
+        )
         // Deliver to the channel's onReceive callback (set by synchronizer)
         channel.onReceive(message)
       } else {
-        this.logger.warn(`channel not found for message delivery`, {
-          fromAdapterId,
-          channelId,
-        })
+        this.logger.warn(
+          "channel {channelId} not found for message delivery from {fromAdapterId}",
+          {
+            fromAdapterId,
+            channelId,
+          },
+        )
       }
     } else {
-      this.logger.warn(`no channel found for adapter`, {
+      this.logger.warn("no channel found for adapter {fromAdapterId}", {
         fromAdapterId,
         availableChannels: Array.from(this.adapterToChannel.keys()),
       })

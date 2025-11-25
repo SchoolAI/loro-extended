@@ -276,7 +276,7 @@ function createSynchronizerLogic(
     // Log all messages except channel-receive-message (too noisy)
     if (msg.type !== "synchronizer/channel-receive-message") {
       const detail = "data" in msg ? { ...msg, data: "[omitted]" } : msg
-      logger.trace(msg.type, detail)
+      logger.trace("{type}", detail)
     }
 
     // Route synchronizer messages to their handlers
@@ -405,7 +405,8 @@ function mutatingChannelUpdate(
 
   if (!channel) {
     logger.warn(
-      `channel not found corresponding to from-channel-id: ${fromChannelId}`,
+      "channel not found corresponding to from-channel-id: {fromChannelId}",
+      { fromChannelId },
     )
     return
   }
@@ -420,7 +421,8 @@ function mutatingChannelUpdate(
         : "unknown"
 
   // Log all channel messages for debugging
-  logger.trace(channelMessage.type, {
+  logger.trace("Received {type} from {from} via {via}", {
+    type: channelMessage.type,
     from,
     to: model.identity.name,
     via: fromChannelId,

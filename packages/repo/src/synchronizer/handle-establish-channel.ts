@@ -64,7 +64,9 @@ export function handleEstablishChannel(
   // Look up the channel
   const channel = model.channels.get(msg.channelId)
   if (!channel) {
-    logger.warn(`establish-channel: channel ${msg.channelId} not found`)
+    logger.warn("establish-channel: channel {channelId} not found", {
+      channelId: msg.channelId,
+    })
     return
   }
 

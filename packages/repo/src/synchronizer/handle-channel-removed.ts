@@ -66,7 +66,9 @@ export function handleChannelRemoved(
       channel: current(channel),
     })
   } else {
-    logger.warn(`channel didn't exist when removing: ${msg.channel.channelId}`)
+    logger.warn("channel didn't exist when removing: {channelId}", {
+      channelId: msg.channel.channelId,
+    })
   }
 
   // Step 2: Update peer state if channel was established

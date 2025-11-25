@@ -76,21 +76,24 @@ export function handleDocChange(
   const docState = model.documents.get(docId)
 
   if (!docState) {
-    logger.warn(`local-doc-change: unable to find doc-state ${docId}`)
+    logger.warn("local-doc-change: unable to find doc-state {docId}", { docId })
     return
   }
 
-  logger.debug("doc-change processing", {
-    docId,
-    channelCount: model.channels.size,
-  })
+  logger.debug(
+    "doc-change processing for {docId} with {channelCount} channels",
+    {
+      docId,
+      channelCount: model.channels.size,
+    },
+  )
 
   const commands: Command[] = []
 
   // Iterate through all established channels to propagate the change
   for (const channel of model.channels.values()) {
     if (!isEstablished(channel)) {
-      logger.debug("skipping non-established channel", {
+      logger.debug("skipping non-established channel {channelId}", {
         channelId: channel.channelId,
       })
       continue
@@ -111,20 +114,23 @@ export function handleDocChange(
       })
 
       if (context instanceof Error || !permissions.canReveal(context)) {
-        logger.debug("skipping channel due to permissions", {
+        logger.debug("skipping channel {channelId} due to permissions", {
           channelId: channel.channelId,
         })
         continue // Not allowed to reveal to this channel
       }
     }
 
-    logger.debug("checking peer for doc-change", {
-      channelId: channel.channelId,
-      peerId: channel.peerId,
-      isSubscribed,
-      awareness: peerAwareness?.awareness,
-      hasPeerState: !!peerState,
-    })
+    logger.debug(
+      "checking peer {peerId} on channel {channelId} for doc-change",
+      {
+        channelId: channel.channelId,
+        peerId: channel.peerId,
+        isSubscribed,
+        awareness: peerAwareness?.awareness,
+        hasPeerState: !!peerState,
+      },
+    )
 
     // Decision tree based on peer's relationship with this document:
 
@@ -169,13 +175,16 @@ export function handleDocChange(
         }
 
         // Send real-time update directly (enables collaboration)
-        logger.debug("sending sync-response due to doc-change", {
-          channelId: channel.channelId,
-          docId,
-          transmissionType: transmission.type,
-          ourVersion: ourVersion.toJSON(),
-          theirVersion: theirVersion?.toJSON(),
-        })
+        logger.debug(
+          "sending sync-response ({transmissionType}) for {docId} to {channelId}",
+          {
+            channelId: channel.channelId,
+            docId,
+            transmissionType: transmission.type,
+            ourVersion: ourVersion.toJSON(),
+            theirVersion: theirVersion?.toJSON(),
+          },
+        )
 
         commands.push({
           type: "cmd/send-message",
@@ -192,12 +201,15 @@ export function handleDocChange(
         // Update peer's known version after sending
         setPeerDocumentAwareness(peerState, docId, "has-doc", ourVersion)
       } else {
-        logger.debug("skipping sync-response - peer is up-to-date", {
-          channelId: channel.channelId,
-          docId,
-          ourVersion: docState.doc.version().toJSON(),
-          theirVersion: peerAwareness?.lastKnownVersion?.toJSON(),
-        })
+        logger.debug(
+          "skipping sync-response for {docId} to {channelId} - peer is up-to-date",
+          {
+            channelId: channel.channelId,
+            docId,
+            ourVersion: docState.doc.version().toJSON(),
+            theirVersion: peerAwareness?.lastKnownVersion?.toJSON(),
+          },
+        )
       }
     } else if (
       !peerAwareness ||
@@ -207,14 +219,17 @@ export function handleDocChange(
     ) {
       // CASE 2: Peer doesn't know about this document yet OR they have it but are behind
       // Send announcement (peer can then decide whether to request)
-      logger.debug("sending directory-response announcement", {
-        channelId: channel.channelId,
-        docId,
-        reason: !peerAwareness ? "no-awareness" : peerAwareness.awareness,
-        shouldSync: peerAwareness
-          ? shouldSyncWithPeer(docState, peerAwareness)
-          : "N/A",
-      })
+      logger.debug(
+        "sending directory-response announcement for {docId} to {channelId} (reason: {reason})",
+        {
+          channelId: channel.channelId,
+          docId,
+          reason: !peerAwareness ? "no-awareness" : peerAwareness.awareness,
+          shouldSync: peerAwareness
+            ? shouldSyncWithPeer(docState, peerAwareness)
+            : "N/A",
+        },
+      )
 
       commands.push({
         type: "cmd/send-message",

@@ -83,7 +83,9 @@ export class Synchronizer {
 
     this.identity = identity
 
-    this.logger.debug(`new Synchronizer`, { identity: this.identity })
+    this.logger.debug("new Synchronizer: {identity}", {
+      identity: this.identity,
+    })
 
     this.adapters = new AdapterManager({
       adapters,
@@ -139,7 +141,10 @@ export class Synchronizer {
   }
 
   channelReceive(channel: Channel, message: ChannelMsg) {
-    this.logger.trace(`onReceive`, { channel, message })
+    this.logger.trace("onReceive: {message.type} from {channel.channelId}", {
+      channel,
+      message,
+    })
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
       envelope: {
@@ -151,12 +156,14 @@ export class Synchronizer {
 
   // Helper functions for adapter callbacks
   channelAdded(channel: ConnectedChannel) {
-    this.logger.debug(`channelAdded`, { channel })
+    this.logger.debug("channelAdded: {channel.channelId}", { channel })
     this.#dispatch({ type: "synchronizer/channel-added", channel })
   }
 
   channelEstablish(channel: ConnectedChannel) {
-    this.logger.debug(`channelEstablish`, { channelId: channel.channelId })
+    this.logger.debug("channelEstablish: {channelId}", {
+      channelId: channel.channelId,
+    })
     this.#dispatch({
       type: "synchronizer/establish-channel",
       channelId: channel.channelId,
@@ -164,7 +171,7 @@ export class Synchronizer {
   }
 
   channelRemoved(channel: Channel) {
-    this.logger.debug(`channelRemoved`, { channel })
+    this.logger.debug("channelRemoved: {channel.channelId}", { channel })
     this.#dispatch({ type: "synchronizer/channel-removed", channel })
   }
 
@@ -288,7 +295,7 @@ export class Synchronizer {
     docId: DocId,
     predicate: (readyStates: ReadyState[]) => boolean,
   ) {
-    this.logger.debug(`wait-until-ready is WAITING`, { docId })
+    this.logger.debug("wait-until-ready is WAITING for {docId}", { docId })
 
     const docState = this.model.documents.get(docId)
 
@@ -304,7 +311,7 @@ export class Synchronizer {
     )
 
     if (predicate(readyStates)) {
-      this.logger.debug(`wait-until-ready is READY (immediate)`, {
+      this.logger.debug("wait-until-ready is READY (immediate) for {docId}", {
         docId,
       })
       return
@@ -319,7 +326,7 @@ export class Synchronizer {
       }
     }
 
-    this.logger.debug(`wait-until-ready is READY`, { docId })
+    this.logger.debug("wait-until-ready is READY for {docId}", { docId })
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- =-=-=-=-=-=-=-=
@@ -349,29 +356,39 @@ export class Synchronizer {
 
       case "cmd/send-establishment-message": {
         // Send establishment messages (these can be sent to non-established channels)
-        this.logger.debug(`executing cmd/send-establishment-message`, {
-          messageType: command.envelope.message.type,
-          toChannelIds: command.envelope.toChannelIds,
-          totalAdapters: this.adapters.adapters.length,
-          adapterChannelCounts: this.adapters.adapters.map(a => ({
-            adapterId: a.adapterId,
-            channelCount: a.channels.size,
-          })),
-        })
+        this.logger.debug(
+          "executing cmd/send-establishment-message: {messageType}",
+          {
+            messageType: command.envelope.message.type,
+            toChannelIds: command.envelope.toChannelIds,
+            totalAdapters: this.adapters.adapters.length,
+            adapterChannelCounts: this.adapters.adapters.map(a => ({
+              adapterId: a.adapterId,
+              channelCount: a.channels.size,
+            })),
+          },
+        )
 
         const sentCount = this.adapters.sendEstablishmentMessage(
           command.envelope,
         )
 
-        this.logger.debug(`cmd/send-establishment-message result`, {
-          sentCount,
-          expectedCount: command.envelope.toChannelIds.length,
-        })
+        this.logger.debug(
+          "cmd/send-establishment-message result: sent {sentCount}/{expectedCount}",
+          {
+            sentCount,
+            expectedCount: command.envelope.toChannelIds.length,
+          },
+        )
 
         if (sentCount < command.envelope.toChannelIds.length) {
           this.logger.warn(
-            `cmd/send-establishment-message could not deliver ${command.envelope.message.type} to all ${command.envelope.toChannelIds.length} channels`,
-            { channelIds: command.envelope.toChannelIds },
+            "cmd/send-establishment-message could not deliver {messageType} to all {expectedCount} channels",
+            {
+              messageType: command.envelope.message.type,
+              expectedCount: command.envelope.toChannelIds.length,
+              channelIds: command.envelope.toChannelIds,
+            },
           )
         }
 
@@ -389,8 +406,12 @@ export class Synchronizer {
 
         if (sentCount < command.envelope.toChannelIds.length) {
           this.logger.warn(
-            `cmd/send-message could not deliver ${command.envelope.message.type} to all ${command.envelope.toChannelIds.length} channels`,
-            { channelIds: command.envelope.toChannelIds },
+            "cmd/send-message could not deliver {messageType} to all {expectedCount} channels",
+            {
+              messageType: command.envelope.message.type,
+              expectedCount: command.envelope.toChannelIds.length,
+              channelIds: command.envelope.toChannelIds,
+            },
           )
         }
 
@@ -518,12 +539,16 @@ export class Synchronizer {
     const channel = this.model.channels.get(channelId)
 
     if (!channel) {
-      this.logger.warn(`Cannot send: channel ${channelId} not found`)
+      this.logger.warn("Cannot send: channel {channelId} not found", {
+        channelId,
+      })
       return false
     }
 
     if (!isEstablishedFn(channel)) {
-      this.logger.warn(`Cannot send: channel ${channelId} not established`)
+      this.logger.warn("Cannot send: channel {channelId} not established", {
+        channelId,
+      })
       return false
     }
 
@@ -537,16 +562,19 @@ export class Synchronizer {
   ) {
     const docState = this.model.documents.get(docId)
     if (!docState) {
-      this.logger.warn(`can't get doc-state, doc not found`, { docId })
+      this.logger.warn("can't get doc-state, doc {docId} not found", { docId })
       return
     }
 
     // No need to check channel state - just verify channel exists
     const channel = this.model.channels.get(toChannelId)
     if (!channel) {
-      this.logger.warn(`can't send sync-response, channel doesn't exist`, {
-        toChannelId,
-      })
+      this.logger.warn(
+        "can't send sync-response, channel {toChannelId} doesn't exist",
+        {
+          toChannelId,
+        },
+      )
       return
     }
 
@@ -561,16 +589,19 @@ export class Synchronizer {
     // If requester version length is 0, they have nothing (send snapshot)
     const isEmpty = requesterDocVersion.length() === 0
 
-    this.logger.info("#executeSendSyncResponse version check", {
-      channelId: toChannelId,
-      docId,
-      requesterDocVersionLength: requesterDocVersion.length(),
-      ourVersionLength: ourVersion.length(),
-      comparison,
-      isEmpty,
-      requesterVersionType: typeof requesterDocVersion,
-      requesterVersionConstructor: requesterDocVersion.constructor.name,
-    })
+    this.logger.info(
+      "#executeSendSyncResponse version check for {docId} on {channelId}",
+      {
+        channelId: toChannelId,
+        docId,
+        requesterDocVersionLength: requesterDocVersion.length(),
+        ourVersionLength: ourVersion.length(),
+        comparison,
+        isEmpty,
+        requesterVersionType: typeof requesterDocVersion,
+        requesterVersionConstructor: requesterDocVersion.constructor.name,
+      },
+    )
 
     // Export the document data to send as sync response
     // If requester has empty version, send full snapshot
@@ -583,7 +614,7 @@ export class Synchronizer {
     const version = docState.doc.version()
 
     this.logger.debug(
-      "sending sync-response due to execute-send-sync-response",
+      "sending sync-response ({transmissionType}) for {docId} to {channelId}",
       {
         channelId: toChannelId,
         docId,
@@ -616,7 +647,7 @@ export class Synchronizer {
     const sentCount = this.adapters.send(messageToSend)
 
     if (sentCount === 0) {
-      this.logger.warn(`can't send sync-response to channel`, {
+      this.logger.warn("can't send sync-response to channel {toChannelId}", {
         toChannelId,
       })
     }
@@ -625,7 +656,7 @@ export class Synchronizer {
   #executeSubscribeDoc(docId: DocId) {
     const docState = this.model.documents.get(docId)
     if (!docState) {
-      this.logger.warn(`can't get doc-state, doc not found`, { docId })
+      this.logger.warn("can't get doc-state, doc {docId} not found", { docId })
       return
     }
 
@@ -646,7 +677,7 @@ export class Synchronizer {
     const docState = this.model.documents.get(docId)
 
     if (!docState) {
-      this.logger.debug(`removeDocument: document not found`, { docId })
+      this.logger.debug("removeDocument: document {docId} not found", { docId })
       return
     }
 
