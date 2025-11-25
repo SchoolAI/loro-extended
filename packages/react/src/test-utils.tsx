@@ -31,7 +31,10 @@ export function createTestRepoConfig(
 ): RepoParams {
   return {
     adapters: [new InMemoryStorageAdapter()],
-    identity: { name: `test-peer-${Math.random().toString(36).substr(2, 9)}` },
+    identity: {
+      name: `test-peer-${Math.random().toString(36).substr(2, 9)}`,
+      type: "user",
+    },
     ...overrides,
   }
 }

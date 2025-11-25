@@ -25,6 +25,6 @@ export { useSimpleDocument } from "./hooks/use-simple-document.js"
 export type { ChangeFn } from "./hooks/use-typed-doc-changer.js"
 export { useTypedDocChanger } from "./hooks/use-typed-doc-changer.js"
 export { useTypedDocState } from "./hooks/use-typed-doc-state.js"
-export { useEphemeral } from "./hooks/use-ephemeral.js"
+export { useRoom } from "./hooks/use-room.js"
 
 export * from "./repo-context.js"

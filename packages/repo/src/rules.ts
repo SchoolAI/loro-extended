@@ -36,6 +36,8 @@ export interface Rules {
    * document is created. If this returns false, the remote peer will not be
    * told about the document.
    *
+   * NOTE: If the remote peer already knows about the document, this has no effect.
+   *
    * @returns `true` if listing the document is permitted, `false` otherwise.
    */
   canReveal(context: RuleContext): boolean

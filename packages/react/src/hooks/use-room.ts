@@ -3,7 +3,7 @@ import type { Value } from "loro-crdt"
 import { useMemo, useSyncExternalStore } from "react"
 import { useDocHandleState } from "./use-doc-handle-state.js"
 
-export type EphemeralContext<T> = {
+export type RoomContext<T> = {
   self: T
   all: Record<string, T>
   setSelf: (value: Partial<T>) => void
@@ -14,25 +14,25 @@ type ObjectValue = {
 }
 
 /**
- * A hook that provides a reactive interface to the ephemeral store (presence).
+ * A hook that provides a reactive interface to the room (presence).
  *
  * @param docId The document ID to connect to.
  * @param selector Optional selector function to subscribe to specific parts of the state.
  */
-export function useEphemeral<T extends ObjectValue = ObjectValue>(
+export function useRoom<T extends ObjectValue = ObjectValue>(
   docId: DocId,
-): EphemeralContext<T>
-export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
+): RoomContext<T>
+export function useRoom<T extends ObjectValue = ObjectValue, R = any>(
   docId: DocId,
-  selector: (state: EphemeralContext<T>) => R,
+  selector: (state: RoomContext<T>) => R,
 ): R
-export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
+export function useRoom<T extends ObjectValue = ObjectValue, R = any>(
   docId: DocId,
-  selector?: (state: EphemeralContext<T>) => R,
+  selector?: (state: RoomContext<T>) => R,
 ) {
   const { handle } = useDocHandleState(docId)
 
-  // Create a stable store that wraps the ephemeral store
+  // Create a stable store that wraps the room
   const store = useMemo(() => {
     if (!handle) {
       const emptyState = {
@@ -47,12 +47,12 @@ export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
     }
 
     const setSelf = (values: Partial<T>) => {
-      handle.ephemeral.set(values)
+      handle.room.set(values)
     }
 
     const computeState = () => {
-      const all = handle.ephemeral.all as Record<string, T>
-      const self = handle.ephemeral.self as T
+      const all = handle.room.all as Record<string, T>
+      const self = handle.room.self as T
 
       return { self, all, setSelf }
     }
@@ -60,7 +60,7 @@ export function useEphemeral<T extends ObjectValue = ObjectValue, R = any>(
     let cachedState = computeState()
 
     const subscribe = (callback: () => void) => {
-      return handle.ephemeral.subscribe(() => {
+      return handle.room.subscribe(() => {
         cachedState = computeState()
         callback()
       })

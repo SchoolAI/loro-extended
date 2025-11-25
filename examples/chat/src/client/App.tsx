@@ -1,4 +1,4 @@
-import { useDocument, useEphemeral, useRepo } from "@loro-extended/react"
+import { useDocument, useRepo, useRoom } from "@loro-extended/react"
 import type { DocId } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema } from "../shared/types"
@@ -33,7 +33,7 @@ function App() {
   })
 
   // Use ephemeral state for presence
-  const { all, self, setSelf } = useEphemeral(docId)
+  const { all, self, setSelf } = useRoom(docId)
 
   // Set self presence
   useEffect(() => {

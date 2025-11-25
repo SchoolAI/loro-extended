@@ -1,14 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { useEphemeral } from "./use-ephemeral.js"
+import { useRoom } from "./use-room.js"
 
-describe("useEphemeral", () => {
+describe("useRoom", () => {
   it("should provide self and all", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useEphemeral(documentId), {
+    const { result } = renderHook(() => useRoom(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -21,7 +21,7 @@ describe("useEphemeral", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useEphemeral(documentId), {
+    const { result } = renderHook(() => useRoom(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -42,7 +42,7 @@ describe("useEphemeral", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useEphemeral(documentId), {
+    const { result } = renderHook(() => useRoom(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -69,8 +69,8 @@ describe("useEphemeral", () => {
 
     const { result } = renderHook(
       () => {
-        const selected = useEphemeral(documentId, state => state.self.cursor)
-        const full = useEphemeral(documentId)
+        const selected = useRoom(documentId, state => state.self.cursor)
+        const full = useRoom(documentId)
         return { selected, full }
       },
       {

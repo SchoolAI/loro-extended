@@ -96,24 +96,27 @@ export function handleDocChange(
       continue
     }
 
-    // Check if we're allowed to reveal this document to this channel
-    // This enforces privacy rules (e.g., tenant isolation, user permissions)
-    const context = getRuleContext({
-      channel,
-      docState,
-      model,
-    })
-
-    if (context instanceof Error || !permissions.canReveal(context)) {
-      logger.debug("skipping channel due to permissions", {
-        channelId: channel.channelId,
-      })
-      continue // Not allowed to reveal to this channel
-    }
-
     const peerState = model.peers.get(channel.peerId)
     const peerAwareness = peerState?.documentAwareness.get(docId)
     const isSubscribed = peerState?.subscriptions.has(docId)
+
+    // Check if we're allowed to reveal this document to this channel
+    // This enforces privacy rules (e.g., tenant isolation, user permissions)
+    // NOTE: If the peer is already subscribed, they know about the document, so we skip this check
+    if (!isSubscribed) {
+      const context = getRuleContext({
+        channel,
+        docState,
+        model,
+      })
+
+      if (context instanceof Error || !permissions.canReveal(context)) {
+        logger.debug("skipping channel due to permissions", {
+          channelId: channel.channelId,
+        })
+        continue // Not allowed to reveal to this channel
+      }
+    }
 
     logger.debug("checking peer for doc-change", {
       channelId: channel.channelId,

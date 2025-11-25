@@ -4,7 +4,7 @@ import {
 } from "@loro-extended/adapters/network/sse/server"
 import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
 import { TypedDoc } from "@loro-extended/change"
-import { DocHandle, type DocId, Repo } from "@loro-extended/repo"
+import { type DocHandle, type DocId, Repo } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
@@ -151,8 +151,8 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
   })
 
   // Subscribe to ephemeral changes for presence
-  const unsubscribeEphemeral = handle.ephemeral.subscribe(() => {
-    const peers = handle.ephemeral.all
+  const unsubscribeEphemeral = handle.room.subscribe(() => {
+    const peers = handle.room.all
     const currentCount = Object.keys(peers).length
     const prevCount = roomMembers.get(docId) ?? 0
 
@@ -183,6 +183,13 @@ const storageAdapter = new LevelDBStorageAdapter("loro-chat-app.db")
 const repo = new Repo({
   identity: { name: "chat-app-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
+  permissions: {
+    canReveal(context) {
+      if (context.channelKind === "storage") return true
+
+      return false
+    },
+  },
 })
 
 // Listen for document discovery via ready-state-changed events

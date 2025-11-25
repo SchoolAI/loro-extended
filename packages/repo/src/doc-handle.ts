@@ -12,7 +12,7 @@ type DocHandleParams = {
   logger?: Logger
 }
 
-type EphemeralInterface = {
+type RoomInterface = {
   set: (values: ObjectValue) => void
   get: (key: string) => Value
   readonly self: ObjectValue
@@ -45,7 +45,7 @@ export class DocHandle<T extends DocContent = DocContent> {
   /**
    * Ephemeral state management for presence, cursors, and other transient data.
    */
-  public readonly ephemeral: EphemeralInterface
+  public readonly room: RoomInterface
 
   /**
    * A LogTape logger for logging
@@ -60,12 +60,12 @@ export class DocHandle<T extends DocContent = DocContent> {
       docId,
     })
 
-    this.ephemeral = this.initializeEphemeralInterface()
+    this.room = this.initializeRoomInterface()
 
     this.logger.trace("new DocHandle")
   }
 
-  initializeEphemeralInterface(): EphemeralInterface {
+  initializeRoomInterface(): RoomInterface {
     const docId = this.docId
     const synchronizer = this.synchronizer
     const myPeerId = this.synchronizer.identity.peerId
