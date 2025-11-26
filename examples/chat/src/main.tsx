@@ -32,9 +32,8 @@ if (!root) {
 // Create the Repo config so it's a singleton.
 // Connect directly to the backend server (no proxy)
 const sseAdapter = new SseClientNetworkAdapter({
-  postUrl: "http://localhost:5170/loro/sync",
-  eventSourceUrl: peerId =>
-    `http://localhost:5170/loro/events?peerId=${peerId}`,
+  postUrl: "/loro/sync",
+  eventSourceUrl: peerId => `/loro/events?peerId=${peerId}`,
 })
 
 // Get or create a persistent peerId
