@@ -11,8 +11,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["loro-crdt"],
   },
-  // Allow serving on ngrok or similar
   server: {
+    // Allow serving on ngrok or similar
     allowedHosts: true,
     proxy: {
       "/loro": {
