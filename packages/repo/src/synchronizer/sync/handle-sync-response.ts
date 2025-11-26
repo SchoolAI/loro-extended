@@ -158,8 +158,14 @@ export function handleSyncResponse(
       docState.doc.import(message.transmission.data)
 
       // Update peer awareness with new version
-      const newVersion = docState.doc.version()
-      setPeerDocumentAwareness(peerState, message.docId, "has-doc", newVersion)
+      // We use the version sent by the peer, not our local version
+      // Our local version might include changes the peer doesn't have yet
+      setPeerDocumentAwareness(
+        peerState,
+        message.docId,
+        "has-doc",
+        message.transmission.version,
+      )
 
       break
     }

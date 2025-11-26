@@ -1,0 +1,29 @@
+{
+  "name": "loro-explorer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "loro-explorer": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.tsx",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "classic-level": "^3.0.0",
+    "date-fns": "^4.1.0",
+    "ink": "^6.5.1",
+    "ink-select-input": "^6.0.0",
+    "loro-crdt": "^1.10.0",
+    "meow": "^14.0.0",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
+  }
+}

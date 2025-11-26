@@ -34,8 +34,11 @@ export function getReadyStates(
       loading = { state: "initial" }
     } else if (awareness.awareness === "has-doc") {
       const version = awareness.lastKnownVersion
-      if (!version) throw new Error("lastKnownVersion not set")
-      loading = { state: "found", version }
+      if (version) {
+        loading = { state: "found", version }
+      } else {
+        loading = { state: "requesting" }
+      }
     } else if (awareness.awareness === "no-doc") {
       loading = { state: "not-found" }
     } else {
