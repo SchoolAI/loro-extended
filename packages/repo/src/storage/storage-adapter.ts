@@ -34,6 +34,8 @@ export type Chunk = {
 export abstract class StorageAdapter extends Adapter<void> {
   protected storageChannel?: ConnectedChannel
   private readonly storagePeerId: PeerID
+  private lastTimestamp = 0
+  private counter = 0
 
   constructor(params: { adapterId: string }) {
     super(params)
@@ -120,7 +122,15 @@ export abstract class StorageAdapter extends Adapter<void> {
     if (transmission.type === "update" || transmission.type === "snapshot") {
       // Generate a unique key for this update
       // Format: [docId, "update", timestamp]
-      const timestamp = Date.now().toString()
+      const now = Date.now()
+      if (now === this.lastTimestamp) {
+        this.counter++
+      } else {
+        this.lastTimestamp = now
+        this.counter = 0
+      }
+
+      const timestamp = `${now}-${this.counter.toString().padStart(4, "0")}`
       const key: StorageKey = [docId, "update", timestamp]
 
       await this.save(key, transmission.data)

@@ -160,7 +160,49 @@ describe("Synchronizer - Sync Functionality", () => {
 
     // Check response
     const syncResponse = mockAdapter.sentMessages.find(
-      (m) => m.message.type === "channel/sync-response"
+      m => m.message.type === "channel/sync-response",
+    )
+
+    expect(syncResponse).toBeDefined()
+    expect(syncResponse.message.transmission.type).toBe("up-to-date")
+  })
+
+  it("should respond with up-to-date when requester is ahead", async () => {
+    await mockAdapter.waitForStart()
+    const docId = "test-doc"
+    const channel = mockAdapter.simulateChannelAdded("test-channel")
+    const docState = synchronizer.getOrCreateDocumentState(docId)
+
+    // Establish the channel first
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "1", name: "test-peer", type: "user" },
+    })
+
+    // Create a version that is ahead
+    const otherDoc = new LoroDoc()
+    otherDoc.getText("test").insert(0, "ahead")
+    otherDoc.commit()
+    const aheadVersion = otherDoc.version()
+
+    // Clear sent messages
+    mockAdapter.sentMessages = []
+
+    // Simulate receiving sync request with ahead version
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-request",
+      docs: [
+        {
+          docId,
+          requesterDocVersion: aheadVersion,
+        },
+      ],
+      bidirectional: false,
+    })
+
+    // Check response
+    const syncResponse = mockAdapter.sentMessages.find(
+      m => m.message.type === "channel/sync-response",
     )
 
     expect(syncResponse).toBeDefined()

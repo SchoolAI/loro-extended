@@ -610,12 +610,14 @@ export class Synchronizer {
 
     let transmission: SyncTransmission
 
-    if (comparison === 0 && !isEmpty) {
+    // If comparison is 0 (equal) or -1 (they are ahead), we have nothing new to send
+    if ((comparison === 0 || comparison === -1) && !isEmpty) {
       this.logger.debug(
         "sending sync-response (up-to-date) for {docId} to {channelId}",
         {
           channelId: toChannelId,
           docId,
+          comparison,
         },
       )
 

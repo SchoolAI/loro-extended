@@ -256,6 +256,31 @@ describe("StorageAdapter", () => {
         transmission: { type: "update" },
       })
     })
+
+    it("prevents timestamp collisions for rapid updates", async () => {
+      const channel = await initializeAdapter()
+      const docId = "test-doc"
+      const updates = 10
+
+      // Simulate rapid updates
+      for (let i = 0; i < updates; i++) {
+        await channel.send({
+          type: "channel/sync-response",
+          docId,
+          transmission: {
+            type: "update",
+            data: new Uint8Array([i]),
+            version: new LoroDoc().version(),
+          },
+        })
+      }
+
+      // Check that all updates were saved with unique keys
+      expect(adapter.saveCalls).toHaveLength(updates)
+      const keys = adapter.saveCalls.map(call => JSON.stringify(call.key))
+      const uniqueKeys = new Set(keys)
+      expect(uniqueKeys.size).toBe(updates)
+    })
   })
 
   describe("Directory Request Translation", () => {
