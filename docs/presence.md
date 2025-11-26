@@ -1,6 +1,6 @@
-# Ephemeral (Room) Data Propagation
+# Ephemeral (Presence) Data Propagation
 
-This document explains the theory and implementation of Ephemeral Store (Room) data propagation in `loro-extended`.
+This document explains the theory and implementation of Ephemeral Store (Presence) data propagation in `loro-extended`.
 
 ## Theory of Intent
 
@@ -95,6 +95,6 @@ We employ a dual-strategy for cleanup:
 
 ## Appendix: Gaps & Future Work
 
-1.  **Scaling**: Sending the full store on heartbeat/handshake is O(N) where N is peers in the room. For very large rooms, this could be optimized to delta updates.
+1.  **Scaling**: Sending the full store on heartbeat/handshake is O(N) where N is peers in the presence. For very large presence groups, this could be optimized to delta updates.
 2.  **Conflict Resolution**: Loro handles CRDT merging, but "last write wins" on wall clock time is the general rule for ephemeral data.
 3.  **Timeouts**: While we have explicit disconnect cleanup, we also rely on a passive timeout (2x heartbeat interval) in `getOrCreateEphemeralStore` to clean up stale data from ungraceful disconnects.

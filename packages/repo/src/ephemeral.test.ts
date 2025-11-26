@@ -12,11 +12,11 @@ describe("Ephemeral Store Integration", () => {
     const handle = repo.get("test-doc")
 
     // Set local state
-    handle.room.set({ cursor: { x: 10, y: 20 } })
+    handle.presence.set({ cursor: { x: 10, y: 20 } })
 
     // Get local state
-    expect(handle.room.get("cursor")).toEqual({ x: 10, y: 20 })
-    expect(handle.room.self).toEqual({ cursor: { x: 10, y: 20 } })
+    expect(handle.presence.get("cursor")).toEqual({ x: 10, y: 20 })
+    expect(handle.presence.self).toEqual({ cursor: { x: 10, y: 20 } })
   })
 
   it("should sync ephemeral state between peers", async () => {
@@ -51,10 +51,10 @@ describe("Ephemeral Store Integration", () => {
 
     // Subscribe to changes on repo2
     const onChange = vi.fn()
-    handle2.room.subscribe(onChange)
+    handle2.presence.subscribe(onChange)
 
     // Set state on repo1
-    handle1.room.set({ selection: "start" })
+    handle1.presence.set({ selection: "start" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -65,7 +65,7 @@ describe("Ephemeral Store Integration", () => {
     // Check repo2's view of repo1's state
     // We need repo1's peerId
     const peerId1 = repo1.identity.peerId
-    const peerState = handle2.room.all[peerId1]
+    const peerState = handle2.presence.all[peerId1]
     expect(peerState).toEqual({ selection: "start" })
   })
 
@@ -76,9 +76,9 @@ describe("Ephemeral Store Integration", () => {
     })
     const handle = repo.get("test-doc")
 
-    handle.room.setRaw("global-key", "global-value")
+    handle.presence.setRaw("global-key", "global-value")
 
-    expect(handle.room.all["global-key"]).toBe("global-value")
+    expect(handle.presence.all["global-key"]).toBe("global-value")
   })
 
   it("should sync ephemeral state on initial sync", async () => {
@@ -96,7 +96,7 @@ describe("Ephemeral Store Integration", () => {
 
     const docId = "initial-sync-doc"
     const handle1 = repo1.get(docId)
-    handle1.room.set({ status: "online" })
+    handle1.presence.set({ status: "online" })
 
     // Create repo2 AFTER repo1 has set state
     const repo2 = new Repo({
@@ -115,7 +115,7 @@ describe("Ephemeral Store Integration", () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     const peerId1 = repo1.identity.peerId
-    const peerState = handle2.room.all[peerId1]
+    const peerState = handle2.presence.all[peerId1]
     expect(peerState).toEqual({ status: "online" })
   })
 
@@ -150,14 +150,14 @@ describe("Ephemeral Store Integration", () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Set state on repo1
-    handle1.room.set({ status: "online" })
+    handle1.presence.set({ status: "online" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Verify repo2 has repo1's state
     const peerId1 = repo1.identity.peerId
-    expect(handle2.room.all[peerId1]).toEqual({ status: "online" })
+    expect(handle2.presence.all[peerId1]).toEqual({ status: "online" })
 
     // Disconnect repo1
     // We can simulate this by stopping the adapter
@@ -168,6 +168,6 @@ describe("Ephemeral Store Integration", () => {
 
     // Verify repo2 has REMOVED repo1's state
     // It should be undefined or empty
-    expect(handle2.room.all[peerId1]).toBeUndefined()
+    expect(handle2.presence.all[peerId1]).toBeUndefined()
   })
 })

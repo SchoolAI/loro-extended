@@ -1,14 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { useRoom } from "./use-room.js"
+import { usePresence } from "./use-presence.js"
 
-describe("useRoom", () => {
+describe("usePresence", () => {
   it("should provide self and all", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useRoom(documentId), {
+    const { result } = renderHook(() => usePresence(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -21,7 +21,7 @@ describe("useRoom", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useRoom(documentId), {
+    const { result } = renderHook(() => usePresence(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -44,7 +44,7 @@ describe("useRoom", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useRoom(documentId), {
+    const { result } = renderHook(() => usePresence(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -71,8 +71,8 @@ describe("useRoom", () => {
 
     const { result } = renderHook(
       () => {
-        const selected = useRoom(documentId, state => state.self.cursor)
-        const full = useRoom(documentId)
+        const selected = usePresence(documentId, state => state.self.cursor)
+        const full = usePresence(documentId)
         return { selected, full }
       },
       {

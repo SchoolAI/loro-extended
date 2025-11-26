@@ -12,7 +12,7 @@ type DocHandleParams = {
   logger?: Logger
 }
 
-type RoomInterface = {
+type PresenceInterface = {
   set: (values: ObjectValue) => void
   get: (key: string) => Value
   readonly self: ObjectValue
@@ -23,7 +23,7 @@ type RoomInterface = {
 
 /**
  * A simplified handle to a Loro document (that is always available), and
- * associated room for ephemeral presence data.
+ * associated presence for ephemeral data.
  *
  * This class embraces CRDT semantics where documents are always-mergeable
  * and operations are idempotent. Instead of complex loading states, it
@@ -46,7 +46,7 @@ export class DocHandle<T extends DocContent = DocContent> {
   /**
    * Ephemeral state management for presence, cursors, and other transient data.
    */
-  public readonly room: RoomInterface
+  public readonly presence: PresenceInterface
 
   /**
    * A LogTape logger for logging
@@ -61,12 +61,12 @@ export class DocHandle<T extends DocContent = DocContent> {
       docId,
     })
 
-    this.room = this.initializeRoomInterface()
+    this.presence = this.initializePresenceInterface()
 
     this.logger.trace("new DocHandle")
   }
 
-  initializeRoomInterface(): RoomInterface {
+  initializePresenceInterface(): PresenceInterface {
     const docId = this.docId
     const synchronizer = this.synchronizer
     const myPeerId = this.synchronizer.identity.peerId

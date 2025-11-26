@@ -121,7 +121,7 @@ export function handleSyncRequest(
         requesterDocVersion,
       })
 
-      // 2. Since peer has requested the doc, also send the room ephemeral state
+      // 2. Since peer has requested the doc, also send the presence ephemeral state
       commands.push({
         type: "cmd/broadcast-ephemeral",
         docId,

@@ -20,7 +20,7 @@ export type { UseDocumentReturn } from "./hooks/use-document.js"
 
 // Typed hooks - require @loro-extended/change
 export { useDocument } from "./hooks/use-document.js"
-export { useRoom } from "./hooks/use-room.js"
+export { usePresence } from "./hooks/use-presence.js"
 export type { UseSimpleDocumentReturn } from "./hooks/use-simple-document.js"
 export { useSimpleDocument } from "./hooks/use-simple-document.js"
 export type { ChangeFn } from "./hooks/use-typed-doc-changer.js"
