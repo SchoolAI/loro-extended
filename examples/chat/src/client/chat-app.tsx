@@ -47,9 +47,26 @@ function ChatApp() {
   ).length
 
   // Auto-scroll to bottom when messages change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to messages
+  const lastMessageLengthRef = useRef(0)
+  const lastMessageContentLengthRef = useRef(0)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const messages = doc.messages
+    const lastMessage = messages[messages.length - 1]
+    const lastMessageContentLength = lastMessage?.content?.length || 0
+
+    const isNewMessage = messages.length > lastMessageLengthRef.current
+    const isStreaming =
+      lastMessageContentLength > lastMessageContentLengthRef.current &&
+      !isNewMessage
+
+    if (isNewMessage) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    } else if (isStreaming) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+    }
+
+    lastMessageLengthRef.current = messages.length
+    lastMessageContentLengthRef.current = lastMessageContentLength
   }, [doc.messages])
 
   const sendMessage = () => {
