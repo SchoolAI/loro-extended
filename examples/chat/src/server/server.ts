@@ -22,9 +22,6 @@ app.use(requestLogger())
 // Track active subscriptions to avoid double-subscribing
 const subscriptions = new Map<DocId, () => void>()
 
-// Track room members for presence-based transitions
-const roomMembers = new Map<string, number>()
-
 // Stream LLM response into a message
 async function streamLLMResponse(
   typedDoc: TypedDoc<typeof ChatSchema>,
@@ -150,25 +147,8 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  // Subscribe to ephemeral changes for presence
-  const unsubscribeEphemeral = handle.room.subscribe(() => {
-    const peers = handle.room.all
-    const currentCount = Object.keys(peers).length
-    const prevCount = roomMembers.get(docId) ?? 0
-
-    logger.info`Presence update for ${docId}: ${prevCount} -> ${currentCount} members`
-
-    if (prevCount <= 1 && currentCount > 1) {
-      logger.info`Presence transition detected in ${docId}: 1 -> ${currentCount} users. Sending system message.`
-      appendAssistantMessage(typedDoc, "Just @ai mention me if you need me!")
-    }
-
-    roomMembers.set(docId, currentCount)
-  })
-
   subscriptions.set(docId, () => {
     unsubscribeDoc()
-    unsubscribeEphemeral()
   })
 
   // Check current state immediately (in case we missed the initial sync event)
