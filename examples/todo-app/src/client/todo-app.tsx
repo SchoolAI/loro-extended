@@ -14,7 +14,7 @@ const schema = Shape.doc({
 // A known, constant ID for our single todo list document
 const DEFAULT_TODO_DOC_ID: DocId = "todos-example-document"
 
-function App() {
+function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
@@ -76,4 +76,4 @@ function App() {
   )
 }
 
-export default App
+export default TodoApp

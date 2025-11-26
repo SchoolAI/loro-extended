@@ -2,7 +2,7 @@ import { configure, getConsoleSink } from "@logtape/logtape"
 import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client"
 import { RepoProvider } from "@loro-extended/react"
 import { createRoot } from "react-dom/client"
-import App from "./client/App.tsx"
+import ChatApp from "./client/chat-app.tsx"
 import "./index.css"
 import { generatePeerId, type RepoParams } from "@loro-extended/repo"
 
@@ -55,6 +55,6 @@ const config: RepoParams = {
 
 createRoot(root).render(
   <RepoProvider config={config}>
-    <App />
+    <ChatApp />
   </RepoProvider>,
 )

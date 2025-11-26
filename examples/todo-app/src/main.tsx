@@ -2,7 +2,7 @@ import { configure, getConsoleSink } from "@logtape/logtape"
 import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client"
 import { RepoProvider } from "@loro-extended/react"
 import { createRoot } from "react-dom/client"
-import App from "./client/app.tsx"
+import TodoApp from "./client/todo-app.tsx"
 import "./index.css"
 import type { RepoParams } from "@loro-extended/repo"
 
@@ -38,11 +38,12 @@ const sseAdapter = new SseClientNetworkAdapter({
 })
 
 const config: RepoParams = {
+  identity: { type: "user", name: "chat" },
   adapters: [sseAdapter],
 }
 
 createRoot(root).render(
   <RepoProvider config={config}>
-    <App />
+    <TodoApp />
   </RepoProvider>,
 )

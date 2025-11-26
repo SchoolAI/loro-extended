@@ -9,7 +9,7 @@ function generateConversationId(): DocId {
   return `chat-${crypto.randomUUID()}`
 }
 
-function App() {
+function ChatApp() {
   const repo = useRepo()
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -289,4 +289,4 @@ function App() {
   )
 }
 
-export default App
+export default ChatApp
