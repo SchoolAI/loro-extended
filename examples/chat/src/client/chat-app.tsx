@@ -2,6 +2,7 @@ import { useDocument, usePresence, useRepo } from "@loro-extended/react"
 import type { DocId } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema } from "../shared/types"
+import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Generate a new conversation ID
@@ -47,27 +48,7 @@ function ChatApp() {
   ).length
 
   // Auto-scroll to bottom when messages change
-  const lastMessageLengthRef = useRef(0)
-  const lastMessageContentLengthRef = useRef(0)
-  useEffect(() => {
-    const messages = doc.messages
-    const lastMessage = messages[messages.length - 1]
-    const lastMessageContentLength = lastMessage?.content?.length || 0
-
-    const isNewMessage = messages.length > lastMessageLengthRef.current
-    const isStreaming =
-      lastMessageContentLength > lastMessageContentLengthRef.current &&
-      !isNewMessage
-
-    if (isNewMessage) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    } else if (isStreaming) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
-    }
-
-    lastMessageLengthRef.current = messages.length
-    lastMessageContentLengthRef.current = lastMessageContentLength
-  }, [doc.messages])
+  useAutoScroll(messagesEndRef, doc.messages)
 
   const sendMessage = () => {
     if (!input.trim()) return
