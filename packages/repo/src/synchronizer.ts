@@ -4,7 +4,12 @@ import { EphemeralStore, type Value, type VersionVector } from "loro-crdt"
 import { create, type Patch } from "mutative"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { AdapterManager } from "./adapter/adapter-manager.js"
-import type { Channel, ChannelMsg, ConnectedChannel } from "./channel.js"
+import type {
+  Channel,
+  ChannelMsg,
+  ConnectedChannel,
+  SyncTransmission,
+} from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
 import { createPermissions, type Rules } from "./rules.js"
 import {
@@ -603,37 +608,52 @@ export class Synchronizer {
       },
     )
 
-    // Export the document data to send as sync response
-    // If requester has empty version, send full snapshot
-    // Otherwise send update delta from their version
-    const data = docState.doc.export({
-      mode: isEmpty ? "snapshot" : "update",
-      from: isEmpty ? undefined : requesterDocVersion,
-    })
+    let transmission: SyncTransmission
 
-    const version = docState.doc.version()
+    if (comparison === 0 && !isEmpty) {
+      this.logger.debug(
+        "sending sync-response (up-to-date) for {docId} to {channelId}",
+        {
+          channelId: toChannelId,
+          docId,
+        },
+      )
 
-    this.logger.debug(
-      "sending sync-response ({transmissionType}) for {docId} to {channelId}",
-      {
-        channelId: toChannelId,
-        docId,
-        isEmpty,
-        transmissionType: isEmpty ? "snapshot" : "update",
-      },
-    )
+      transmission = {
+        type: "up-to-date",
+        version: ourVersion,
+      }
+    } else {
+      // Export the document data to send as sync response
+      // If requester has empty version, send full snapshot
+      // Otherwise send update delta from their version
+      const data = docState.doc.export({
+        mode: isEmpty ? "snapshot" : "update",
+        from: isEmpty ? undefined : requesterDocVersion,
+      })
 
-    const transmission = isEmpty
-      ? {
-          type: "snapshot" as const,
-          data,
-          version,
-        }
-      : {
-          type: "update" as const,
-          data,
-          version,
-        }
+      this.logger.debug(
+        "sending sync-response ({transmissionType}) for {docId} to {channelId}",
+        {
+          channelId: toChannelId,
+          docId,
+          isEmpty,
+          transmissionType: isEmpty ? "snapshot" : "update",
+        },
+      )
+
+      transmission = isEmpty
+        ? {
+            type: "snapshot" as const,
+            data,
+            version: ourVersion,
+          }
+        : {
+            type: "update" as const,
+            data,
+            version: ourVersion,
+          }
+    }
 
     const messageToSend = {
       toChannelIds: [toChannelId],

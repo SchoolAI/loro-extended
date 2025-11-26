@@ -125,4 +125,45 @@ describe("Synchronizer - Sync Functionality", () => {
     const updatedDocState = synchronizer.getDocumentState(docId)
     expect(updatedDocState?.doc.toJSON()).toEqual({ test: "hello world" })
   })
+
+  it("should respond with up-to-date when versions match", async () => {
+    await mockAdapter.waitForStart()
+    const docId = "test-doc"
+    const channel = mockAdapter.simulateChannelAdded("test-channel")
+    const docState = synchronizer.getOrCreateDocumentState(docId)
+
+    // Establish the channel first
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "1", name: "test-peer", type: "user" },
+    })
+
+    // Create some content
+    docState.doc.getText("test").insert(0, "hello world")
+    docState.doc.commit()
+    const currentVersion = docState.doc.version()
+
+    // Clear sent messages
+    mockAdapter.sentMessages = []
+
+    // Simulate receiving sync request with current version
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-request",
+      docs: [
+        {
+          docId,
+          requesterDocVersion: currentVersion,
+        },
+      ],
+      bidirectional: false,
+    })
+
+    // Check response
+    const syncResponse = mockAdapter.sentMessages.find(
+      (m) => m.message.type === "channel/sync-response"
+    )
+
+    expect(syncResponse).toBeDefined()
+    expect(syncResponse.message.transmission.type).toBe("up-to-date")
+  })
 })
