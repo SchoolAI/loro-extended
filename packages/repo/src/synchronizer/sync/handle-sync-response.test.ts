@@ -201,4 +201,63 @@ describe("handle-sync-response", () => {
 
     expect(command).toBeUndefined()
   })
+  it("should update peer awareness with peer's version, not local merged version", () => {
+    const peerId = "test-peer-id" as PeerID
+    const channel = createEstablishedChannel(peerId)
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel)
+
+    // Add peer state
+    initialModel.peers.set(peerId, {
+      identity: { peerId, name: "test-peer", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set(),
+      lastSeen: new Date(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Add document with local changes
+    const docState = createDocState({ docId })
+    docState.doc.getText("text").insert(0, "local")
+    initialModel.documents.set(docId, docState)
+
+    // Create peer document with different changes
+    const peerDoc = new LoroDoc()
+    peerDoc.getText("text").insert(0, "peer")
+    const peerVersion = peerDoc.version()
+    const snapshotData = peerDoc.export({ mode: "snapshot" })
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-response",
+          docId,
+          transmission: {
+            type: "snapshot",
+            data: snapshotData,
+            version: peerVersion,
+          },
+        },
+      },
+    }
+
+    const [newModel, _command] = update(message, initialModel)
+
+    // Should update peer awareness
+    const peerState = newModel.peers.get(peerId)
+    const awareness = peerState?.documentAwareness.get(docId)
+
+    // The peer's last known version should be what they sent us (peerVersion)
+    // It should NOT be the merged version (which would include "local" + "peer")
+    expect(awareness?.lastKnownVersion?.toJSON()).toEqual(peerVersion.toJSON())
+
+    // Verify that local doc has merged changes
+    const updatedDocState = newModel.documents.get(docId)
+    const mergedVersion = updatedDocState?.doc.version()
+
+    // Merged version should be different from peer version (because we had local changes)
+    expect(mergedVersion?.toJSON()).not.toEqual(peerVersion.toJSON())
+  })
 })
