@@ -30,8 +30,8 @@
  * @see handle-channel-removed.ts - Cleanup when channel is removed
  */
 
-import type { ConnectedChannel } from "../channel.js"
-import type { SynchronizerModel } from "../synchronizer-program.js"
+import type { ConnectedChannel } from "../../channel.js"
+import type { SynchronizerModel } from "../../synchronizer-program.js"
 
 export function handleChannelAdded(
   msg: { type: "synchronizer/channel-added"; channel: ConnectedChannel },

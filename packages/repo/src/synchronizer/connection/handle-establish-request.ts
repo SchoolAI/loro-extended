@@ -34,10 +34,10 @@
 import type {
   ChannelMsgEstablishRequest,
   EstablishedChannel,
-} from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { ensurePeerState } from "./peer-state-helpers.js"
-import type { ChannelHandlerContext } from "./types.js"
+} from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { ensurePeerState } from "../peer-state-helpers.js"
+import type { ChannelHandlerContext } from "../types.js"
 
 export function handleEstablishRequest(
   message: ChannelMsgEstablishRequest,

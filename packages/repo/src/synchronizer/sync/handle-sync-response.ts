@@ -54,15 +54,15 @@
  * @see handle-sync-request.ts - How peers respond to our requests
  */
 
-import type { ChannelMsgSyncResponse } from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
-import { setPeerDocumentAwareness } from "./peer-state-helpers.js"
-import { getRuleContext } from "./rule-context.js"
-import { getReadyStates } from "./state-helpers.js"
-import type { ChannelHandlerContext } from "./types.js"
-import { batchAsNeeded } from "./utils.js"
+import type { ChannelMsgSyncResponse } from "../../channel.js"
+import { isEstablished } from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
+import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
+import { getRuleContext } from "../rule-context.js"
+import { getReadyStates } from "../state-helpers.js"
+import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncResponse(
   message: ChannelMsgSyncResponse,

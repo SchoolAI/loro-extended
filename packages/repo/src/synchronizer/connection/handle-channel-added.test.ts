@@ -1,12 +1,12 @@
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createPermissions } from "../rules.js"
+import { createPermissions } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   init as programInit,
   type SynchronizerMessage,
-} from "../synchronizer-program.js"
-import { createMockChannel } from "./test-utils.js"
+} from "../../synchronizer-program.js"
+import { createMockChannel } from "../test-utils.js"
 
 describe("handle-channel-added", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

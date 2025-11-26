@@ -164,6 +164,11 @@ export abstract class StorageAdapter extends Adapter<void> {
    * 2. Reconstructs document in temporary LoroDoc (order doesn't matter - Loro handles it)
    * 3. Uses requesterDocVersion to export only needed changes
    * 4. Enables efficient incremental sync
+   *
+   * WARNING: This implementation loads all chunks for a document into memory at once.
+   * For very large documents or documents with long histories, this could lead to
+   * high memory usage. A future improvement would be to stream chunks or use
+   * a more memory-efficient reconstruction strategy.
    */
   private async handleSyncRequest(msg: ChannelMsgSyncRequest): Promise<void> {
     for (const { docId, requesterDocVersion } of msg.docs) {

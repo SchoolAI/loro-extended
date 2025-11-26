@@ -60,8 +60,8 @@
  */
 
 import type { Logger } from "@logtape/logtape"
-import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import type { DocId } from "../types.js"
+import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
+import type { DocId } from "../../types.js"
 
 export function handleDocDelete(
   msg: { type: "synchronizer/doc-delete"; docId: DocId },

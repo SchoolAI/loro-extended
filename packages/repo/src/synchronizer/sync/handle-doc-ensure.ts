@@ -63,12 +63,12 @@
  */
 
 import type { VersionVector } from "loro-crdt"
-import { isEstablished } from "../channel.js"
-import type { Rules } from "../rules.js"
-import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import { createDocState, type DocId } from "../types.js"
-import { getRuleContext } from "./rule-context.js"
-import { batchAsNeeded } from "./utils.js"
+import { isEstablished } from "../../channel.js"
+import type { Rules } from "../../rules.js"
+import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
+import { createDocState, type DocId } from "../../types.js"
+import { getRuleContext } from "../rule-context.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleDocEnsure(
   msg: { type: "synchronizer/doc-ensure"; docId: DocId },

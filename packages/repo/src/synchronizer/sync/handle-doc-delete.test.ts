@@ -1,12 +1,12 @@
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createPermissions } from "../rules.js"
+import { createPermissions } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   init as programInit,
   type SynchronizerMessage,
-} from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
+} from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
 
 describe("handle-local-doc-delete", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

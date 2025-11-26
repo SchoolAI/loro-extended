@@ -1,9 +1,9 @@
-import type { ChannelMsgDirectoryRequest } from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { getRuleContext } from "./rule-context.js"
-import type { ChannelHandlerContext } from "./types.js"
-import { batchAsNeeded } from "./utils.js"
+import type { ChannelMsgDirectoryRequest } from "../../channel.js"
+import { isEstablished } from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { getRuleContext } from "../rule-context.js"
+import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleDirectoryRequest(
   _message: ChannelMsgDirectoryRequest,

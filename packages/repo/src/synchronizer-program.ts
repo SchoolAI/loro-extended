@@ -53,35 +53,17 @@
  */
 
 import { getLogger, type Logger } from "@logtape/logtape"
-import { omit } from "lodash-es"
 import type { VersionVector } from "loro-crdt"
 import type { Patch } from "mutative"
 import type {
   AddressedEstablishedEnvelope,
   AddressedEstablishmentEnvelope,
   Channel,
-  ChannelMsg,
   ConnectedChannel,
   ReturnEnvelope,
 } from "./channel.js"
-import { isEstablished } from "./channel.js"
 import type { Rules } from "./rules.js"
-import { handleEphemeral } from "./synchronizer/handle-ephemeral.js"
-import {
-  type ChannelHandlerContext,
-  handleChannelAdded,
-  handleChannelRemoved,
-  handleDirectoryRequest,
-  handleDirectoryResponse,
-  handleDocChange,
-  handleDocDelete,
-  handleDocEnsure,
-  handleEstablishChannel,
-  handleEstablishRequest,
-  handleEstablishResponse,
-  handleSyncRequest,
-  handleSyncResponse,
-} from "./synchronizer/index.js"
+import { synchronizerDispatcher } from "./synchronizer/synchronizer-dispatcher.js"
 import type {
   ChannelId,
   DocId,
@@ -91,7 +73,6 @@ import type {
   PeerState,
   ReadyState,
 } from "./types.js"
-import { getEstablishedChannelsForDoc } from "./utils/get-established-channels-for-doc.js"
 import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -279,191 +260,8 @@ function createSynchronizerLogic(
       logger.trace("{type}", detail)
     }
 
-    // Route synchronizer messages to their handlers
-    // Each handler is in its own file under src/synchronizer/
-    switch (msg.type) {
-      case "synchronizer/heartbeat": {
-        // Broadcast all ephemeral state for all documents to all peers
-        const commands: Command[] = []
-
-        for (const docId of model.documents.keys()) {
-          const channelIds = getEstablishedChannelsForDoc(
-            model.channels,
-            model.peers,
-            docId,
-          )
-
-          if (channelIds.length > 0) {
-            commands.push({
-              type: "cmd/broadcast-ephemeral",
-              docId,
-              allPeerData: true,
-              hopsRemaining: 0,
-              toChannelIds: channelIds,
-            })
-          }
-        }
-
-        return commands.length > 0 ? { type: "cmd/batch", commands } : undefined
-      }
-
-      case "synchronizer/ephemeral-local-change": {
-        const channelIds = getEstablishedChannelsForDoc(
-          model.channels,
-          model.peers,
-          msg.docId,
-        )
-
-        return {
-          type: "cmd/batch",
-          commands: [
-            {
-              type: "cmd/emit-ephemeral-change",
-              docId: msg.docId,
-            },
-            {
-              type: "cmd/broadcast-ephemeral",
-              docId: msg.docId,
-              allPeerData: false,
-              // Allow a hub-and-spoke server to propagate one more hop
-              hopsRemaining: 1,
-              toChannelIds: channelIds,
-            },
-          ],
-        }
-      }
-
-      case "synchronizer/channel-added":
-        return handleChannelAdded(msg, model)
-
-      case "synchronizer/establish-channel":
-        return handleEstablishChannel(msg, model, logger)
-
-      case "synchronizer/channel-removed":
-        return handleChannelRemoved(msg, model, logger)
-
-      case "synchronizer/doc-ensure":
-        return handleDocEnsure(msg, model, permissions)
-
-      case "synchronizer/doc-change":
-        return handleDocChange(msg, model, permissions, logger)
-
-      case "synchronizer/doc-delete":
-        return handleDocDelete(msg, model, logger)
-
-      case "synchronizer/channel-receive-message":
-        // Channel messages are routed through the channel dispatcher
-        return mutatingChannelUpdate(
-          msg.envelope.message,
-          model,
-          msg.envelope.fromChannelId,
-          permissions,
-          logger,
-        )
-    }
-    return
+    return synchronizerDispatcher(msg, model, permissions, logger)
   }
-}
-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// CHANNEL MESSAGE DISPATCHER
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-/**
- * Dispatches channel protocol messages to their handlers
- *
- * Channel messages implement the discovery and sync protocol between peers.
- * This function:
- * 1. Validates the channel exists
- * 2. Logs the message for debugging
- * 3. Routes to the appropriate handler based on message type
- *
- * ## Message Types
- *
- * **Establishment** (connection setup):
- * - `establish-request` - Peer wants to connect
- * - `establish-response` - Connection accepted
- *
- * **Discovery** (what documents exist):
- * - `directory-request` - Ask peer what documents they have
- * - `directory-response` - Announce documents (filtered by canReveal)
- *
- * **Sync** (transfer document data):
- * - `sync-request` - Request document data
- * - `sync-response` - Send document data (filtered by canUpdate)
- *
- * @see docs/discovery-and-sync-architecture.md for protocol details
- */
-function mutatingChannelUpdate(
-  channelMessage: ChannelMsg,
-  model: SynchronizerModel,
-  fromChannelId: ChannelId,
-  permissions: Rules,
-  logger: Logger,
-): Command | undefined {
-  const channel = model.channels.get(fromChannelId)
-
-  if (!channel) {
-    logger.warn(
-      "channel not found corresponding to from-channel-id: {fromChannelId}",
-      { fromChannelId },
-    )
-    return
-  }
-
-  // Determine sender name for logging
-  const from = isEstablished(channel)
-    ? model.peers.get(channel.peerId)?.identity.name
-    : channelMessage.type === "channel/establish-request"
-      ? channelMessage.identity.name
-      : channelMessage.type === "channel/establish-response"
-        ? channelMessage.identity.name
-        : "unknown"
-
-  // Log all channel messages for debugging
-  logger.trace("Received {type} from {from} via {via}", {
-    type: channelMessage.type,
-    from,
-    to: model.identity.name,
-    via: fromChannelId,
-    dir: "recv",
-    channelMessage: omit(channelMessage, "type"),
-  })
-
-  // Build context for handlers
-  const ctx: ChannelHandlerContext = {
-    channel,
-    model,
-    fromChannelId,
-    permissions,
-    logger,
-  }
-
-  // Route to appropriate handler
-  // Each handler is in its own file under src/synchronizer/
-  switch (channelMessage.type) {
-    case "channel/establish-request":
-      return handleEstablishRequest(channelMessage, ctx)
-
-    case "channel/establish-response":
-      return handleEstablishResponse(channelMessage, ctx)
-
-    case "channel/sync-request":
-      return handleSyncRequest(channelMessage, ctx)
-
-    case "channel/sync-response":
-      return handleSyncResponse(channelMessage, ctx)
-
-    case "channel/directory-request":
-      return handleDirectoryRequest(channelMessage, ctx)
-
-    case "channel/directory-response":
-      return handleDirectoryResponse(channelMessage, ctx)
-
-    case "channel/ephemeral":
-      return handleEphemeral(channelMessage, ctx)
-  }
-  return
 }
 
 type CreateSynchronizerUpdateParams = {

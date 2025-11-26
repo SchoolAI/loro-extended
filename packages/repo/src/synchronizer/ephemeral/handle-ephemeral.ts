@@ -1,7 +1,7 @@
-import type { ChannelMsgEphemeral } from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { getEstablishedChannelsForDoc } from "../utils/get-established-channels-for-doc.js"
-import type { ChannelHandlerContext } from "./types.js"
+import type { ChannelMsgEphemeral } from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { getEstablishedChannelsForDoc } from "../../utils/get-established-channels-for-doc.js"
+import type { ChannelHandlerContext } from "../types.js"
 
 export function handleEphemeral(
   message: ChannelMsgEphemeral,

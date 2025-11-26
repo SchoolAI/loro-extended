@@ -44,10 +44,10 @@
 
 import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
-import { type Channel, isEstablished } from "../channel.js"
-import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import { getReadyStates } from "./state-helpers.js"
-import { batchAsNeeded } from "./utils.js"
+import { type Channel, isEstablished } from "../../channel.js"
+import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
+import { getReadyStates } from "../state-helpers.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleChannelRemoved(
   msg: { type: "synchronizer/channel-removed"; channel: Channel },

@@ -70,12 +70,12 @@ import type {
   ChannelMsgEstablishResponse,
   ChannelMsgSyncRequest,
   EstablishedChannel,
-} from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { ensurePeerState, shouldSyncWithPeer } from "./peer-state-helpers.js"
-import { getReadyStates } from "./state-helpers.js"
-import type { ChannelHandlerContext } from "./types.js"
-import { batchAsNeeded } from "./utils.js"
+} from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { ensurePeerState, shouldSyncWithPeer } from "../peer-state-helpers.js"
+import { getReadyStates } from "../state-helpers.js"
+import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleEstablishResponse(
   message: ChannelMsgEstablishResponse,

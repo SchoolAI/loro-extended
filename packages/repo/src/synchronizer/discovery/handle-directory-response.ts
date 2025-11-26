@@ -61,13 +61,13 @@
 import type {
   ChannelMsgDirectoryResponse,
   ChannelMsgSyncRequest,
-} from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
-import { setPeerDocumentAwareness } from "./peer-state-helpers.js"
-import type { ChannelHandlerContext } from "./types.js"
-import { batchAsNeeded } from "./utils.js"
+} from "../../channel.js"
+import { isEstablished } from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
+import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
+import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleDirectoryResponse(
   message: ChannelMsgDirectoryResponse,

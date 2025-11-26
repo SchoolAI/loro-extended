@@ -55,15 +55,15 @@
  * @see handle-local-doc-change.ts - How we send updates to subscribed peers
  */
 
-import type { ChannelMsgSyncRequest } from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type { Command } from "../synchronizer-program.js"
+import type { ChannelMsgSyncRequest } from "../../channel.js"
+import { isEstablished } from "../../channel.js"
+import type { Command } from "../../synchronizer-program.js"
 import {
   addPeerSubscription,
   setPeerDocumentAwareness,
-} from "./peer-state-helpers.js"
-import type { ChannelHandlerContext } from "./types.js"
-import { batchAsNeeded } from "./utils.js"
+} from "../peer-state-helpers.js"
+import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncRequest(
   message: ChannelMsgSyncRequest,

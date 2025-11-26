@@ -1,16 +1,16 @@
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createPermissions } from "../rules.js"
+import { createPermissions } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   type SynchronizerMessage,
-} from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
+} from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
 import {
   createEstablishedChannel,
   createMockChannel,
   createModelWithChannel,
-} from "./test-utils.js"
+} from "../test-utils.js"
 
 describe("handle-directory-response", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

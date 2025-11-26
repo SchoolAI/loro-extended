@@ -50,17 +50,17 @@
  */
 
 import type { Logger } from "@logtape/logtape"
-import type { SyncTransmission } from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type { Rules } from "../rules.js"
-import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import type { DocId } from "../types.js"
+import type { SyncTransmission } from "../../channel.js"
+import { isEstablished } from "../../channel.js"
+import type { Rules } from "../../rules.js"
+import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
+import type { DocId } from "../../types.js"
 import {
   setPeerDocumentAwareness,
   shouldSyncWithPeer,
-} from "./peer-state-helpers.js"
-import { getRuleContext } from "./rule-context.js"
-import { batchAsNeeded } from "./utils.js"
+} from "../peer-state-helpers.js"
+import { getRuleContext } from "../rule-context.js"
+import { batchAsNeeded } from "../utils.js"
 
 export function handleDocChange(
   msg: {

@@ -1,12 +1,12 @@
 import { LoroDoc, type PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { isEstablished } from "../channel.js"
-import { createPermissions } from "../rules.js"
+import { isEstablished } from "../../channel.js"
+import { createPermissions } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   type SynchronizerMessage,
-} from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
+} from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
 import {
   createMockChannel,
   createModelWithChannel,
@@ -15,7 +15,7 @@ import {
   expectBatchCommand,
   expectCommand,
   sendEstablishResponse,
-} from "./test-utils.js"
+} from "../test-utils.js"
 
 describe("handle-establish-response", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>
