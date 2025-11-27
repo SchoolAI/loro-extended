@@ -2,7 +2,6 @@ import { LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
 import type {
-  Channel,
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
@@ -117,10 +116,16 @@ describe("Synchronizer - Echo Prevention", () => {
     const version = sourceDoc.version()
     console.log("Source doc version:", JSON.stringify(version.toJSON()))
     console.log("Source doc version length:", version.length())
-    
+
     // Check our doc version before import
-    console.log("Our doc version before import:", JSON.stringify(docState.doc.version().toJSON()))
-    console.log("Our doc version length before import:", docState.doc.version().length())
+    console.log(
+      "Our doc version before import:",
+      JSON.stringify(docState.doc.version().toJSON()),
+    )
+    console.log(
+      "Our doc version length before import:",
+      docState.doc.version().length(),
+    )
 
     // Simulate receiving sync response (update) from peer
     // This should import the data and update peer awareness
@@ -140,7 +145,8 @@ describe("Synchronizer - Echo Prevention", () => {
 
     // Check if we sent any sync-response back
     const echoResponse = mockAdapter.sentMessages.find(
-      m => m.message.type === "channel/sync-response" && m.message.docId === docId
+      m =>
+        m.message.type === "channel/sync-response" && m.message.docId === docId,
     )
 
     // If we sent a response, it means we thought the peer was behind
@@ -149,6 +155,172 @@ describe("Synchronizer - Echo Prevention", () => {
       console.log("Echo response found:", JSON.stringify(echoResponse, null, 2))
     }
 
+    expect(echoResponse).toBeUndefined()
+  })
+
+  it("should update peer awareness to our version after import (not peer's sent version)", async () => {
+    await mockAdapter.waitForStart()
+    const docId = "test-doc-2"
+    const channel = mockAdapter.simulateChannelAdded("test-channel-2")
+    const docState = synchronizer.getOrCreateDocumentState(docId)
+
+    // Establish the channel first
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "3", name: "test-peer-2", type: "user" },
+    })
+
+    // Simulate peer subscription (via sync-request)
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-request",
+      docs: [{ docId, requesterDocVersion: docState.doc.version() }],
+      bidirectional: true,
+    })
+
+    // Clear sent messages
+    mockAdapter.sentMessages = []
+
+    // Create valid document data from peer
+    const sourceDoc = new LoroDoc()
+    sourceDoc.getText("test").insert(0, "hello world")
+    sourceDoc.commit()
+    const data = sourceDoc.export({ mode: "snapshot" })
+    const peerSentVersion = sourceDoc.version()
+
+    // Simulate receiving sync response from peer
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-response",
+      docId,
+      transmission: {
+        type: "snapshot",
+        data,
+        version: peerSentVersion,
+      },
+    })
+
+    // Wait for async operations
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // After import, our version should be the same as what we imported
+    // (since we had no local changes)
+    const ourVersionAfterImport = docState.doc.version()
+    console.log(
+      "Our version after import:",
+      JSON.stringify(ourVersionAfterImport.toJSON()),
+    )
+    console.log("Peer sent version:", JSON.stringify(peerSentVersion.toJSON()))
+
+    // The peer awareness should be updated to our current version (after import)
+    // NOT the version the peer sent (which might be different if we had local changes)
+    const peerState = synchronizer.getPeerState("3")
+    const peerAwareness = peerState?.documentAwareness.get(docId)
+    console.log(
+      "Peer awareness version:",
+      JSON.stringify(peerAwareness?.lastKnownVersion?.toJSON()),
+    )
+
+    // The key check: our version compared to peer awareness should be 0 (equal)
+    // If it's 1 (we're ahead), that would trigger an echo
+    const peerAwarenessVersion = peerAwareness?.lastKnownVersion
+    if (!peerAwarenessVersion) {
+      throw new Error("Peer awareness version should exist")
+    }
+    const comparison = ourVersionAfterImport.compare(peerAwarenessVersion)
+    console.log("Version comparison (our vs peer awareness):", comparison)
+
+    // This should be 0 (equal) - if it's 1, we'd send an echo
+    expect(comparison).toBe(0)
+  })
+
+  it("should NOT echo when we have local changes AND receive peer data", async () => {
+    await mockAdapter.waitForStart()
+    const docId = "test-doc-3"
+    const channel = mockAdapter.simulateChannelAdded("test-channel-3")
+    const docState = synchronizer.getOrCreateDocumentState(docId)
+
+    // Make LOCAL changes first (before receiving peer data)
+    docState.doc.getText("local").insert(0, "local changes")
+    docState.doc.commit()
+    const ourVersionBeforeImport = docState.doc.version()
+    console.log(
+      "Our version BEFORE import (with local changes):",
+      JSON.stringify(ourVersionBeforeImport.toJSON()),
+    )
+
+    // Establish the channel
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "4", name: "test-peer-3", type: "user" },
+    })
+
+    // Simulate peer subscription
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-request",
+      docs: [{ docId, requesterDocVersion: docState.doc.version() }],
+      bidirectional: true,
+    })
+
+    // Clear sent messages
+    mockAdapter.sentMessages = []
+
+    // Create document data from peer (different changes)
+    const sourceDoc = new LoroDoc()
+    sourceDoc.getText("peer").insert(0, "peer changes")
+    sourceDoc.commit()
+    const data = sourceDoc.export({ mode: "snapshot" })
+    const peerSentVersion = sourceDoc.version()
+    console.log("Peer sent version:", JSON.stringify(peerSentVersion.toJSON()))
+
+    // Simulate receiving sync response from peer
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/sync-response",
+      docId,
+      transmission: {
+        type: "snapshot",
+        data,
+        version: peerSentVersion,
+      },
+    })
+
+    // Wait for async operations
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // After import, our version should include BOTH local and peer changes
+    const ourVersionAfterImport = docState.doc.version()
+    console.log(
+      "Our version AFTER import:",
+      JSON.stringify(ourVersionAfterImport.toJSON()),
+    )
+
+    // Check if we sent any sync-response back (echo)
+    const echoResponse = mockAdapter.sentMessages.find(
+      m =>
+        m.message.type === "channel/sync-response" && m.message.docId === docId,
+    )
+
+    if (echoResponse) {
+      console.log(
+        "ECHO DETECTED! Response:",
+        JSON.stringify(echoResponse, null, 2),
+      )
+
+      // Also check the peer awareness
+      const peerState = synchronizer.getPeerState("4")
+      const peerAwareness = peerState?.documentAwareness.get(docId)
+      console.log(
+        "Peer awareness version:",
+        JSON.stringify(peerAwareness?.lastKnownVersion?.toJSON()),
+      )
+
+      // Show the comparison
+      const peerAwarenessVersion = peerAwareness?.lastKnownVersion
+      if (peerAwarenessVersion) {
+        const comparison = ourVersionAfterImport.compare(peerAwarenessVersion)
+        console.log("Version comparison (our vs peer awareness):", comparison)
+      }
+    }
+
+    // This is the key assertion - we should NOT send an echo
     expect(echoResponse).toBeUndefined()
   })
 })
