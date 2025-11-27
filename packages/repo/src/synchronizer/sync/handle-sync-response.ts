@@ -153,10 +153,6 @@ export function handleSyncResponse(
         return
       }
 
-      // Apply the document data (snapshot or update)
-      // Loro's import() handles both cases automatically
-      docState.doc.import(message.transmission.data)
-
       // Update peer awareness with new version
       // We use the version sent by the peer, not our local version
       // Our local version might include changes the peer doesn't have yet
@@ -166,6 +162,18 @@ export function handleSyncResponse(
         "has-doc",
         message.transmission.version,
       )
+
+      // IMPORTANT: Defer the import to a command!
+      // The import must happen AFTER the model update is committed (including the
+      // peer awareness update above). If we import synchronously here, the doc.subscribe()
+      // callback will trigger a doc-change event that runs with the OLD model state
+      // (before peer awareness is updated), causing an echo loop where we think the
+      // peer is behind and send the update back to them.
+      commands.push({
+        type: "cmd/import-doc-data",
+        docId: message.docId,
+        data: message.transmission.data,
+      })
 
       break
     }

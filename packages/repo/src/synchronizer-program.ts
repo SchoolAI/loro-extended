@@ -160,6 +160,7 @@ export type Command =
 
   // Document operations
   | { type: "cmd/subscribe-doc"; docId: DocId }
+  | { type: "cmd/import-doc-data"; docId: DocId; data: Uint8Array }
   | { type: "cmd/apply-ephemeral"; docId: DocId; data: Uint8Array }
   | {
       type: "cmd/broadcast-ephemeral"

@@ -147,8 +147,6 @@ export function handleDocChange(
         shouldSync = shouldSyncWithPeer(docState, peerAwareness)
       }
 
-      // console.log(`handleDocChange: docId=${docId}, peerId=${channel.peerId}, shouldSync=${shouldSync}, awareness=${peerAwareness?.awareness}`)
-
       if (shouldSync) {
         // Export update specifically for this peer based on their version
         const theirVersion = peerAwareness?.lastKnownVersion

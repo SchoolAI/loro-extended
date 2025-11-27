@@ -433,6 +433,11 @@ export class Synchronizer {
         break
       }
 
+      case "cmd/import-doc-data": {
+        this.#executeImportDocData(command.docId, command.data)
+        break
+      }
+
       case "cmd/emit-ready-state-changed": {
         this.emitter.emit("ready-state-changed", {
           docId: command.docId,
@@ -686,6 +691,23 @@ export class Synchronizer {
         docId,
       })
     })
+  }
+
+  #executeImportDocData(docId: DocId, data: Uint8Array) {
+    const docState = this.model.documents.get(docId)
+    if (!docState) {
+      this.logger.warn(
+        "can't import doc data, doc {docId} not found",
+        { docId },
+      )
+      return
+    }
+
+    // Import the document data
+    // This will trigger the doc.subscribe() callback which dispatches doc-change
+    // But now the model has been updated with the peer's awareness, so the
+    // doc-change handler will correctly see that the peer is up-to-date
+    docState.doc.import(data)
   }
 
   /**
