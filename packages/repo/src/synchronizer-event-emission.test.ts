@@ -147,7 +147,7 @@ describe("Synchronizer - Event Emission", () => {
 
     // Start waiting for ready state
     const waitPromise = synchronizer.waitUntilReady(docId, readyStates =>
-      readyStates.some(state => state.loading.state === "found"),
+      readyStates.some(state => state.state === "loaded"),
     )
 
     // Simulate sync response that satisfies the predicate

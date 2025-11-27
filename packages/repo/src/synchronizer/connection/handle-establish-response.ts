@@ -90,8 +90,7 @@ export function handleEstablishResponse(
   } satisfies EstablishedChannel)
 
   // Step 2: Check if this is a reconnection to a known peer
-  const existingPeer = model.peers.get(peerId)
-  const isReconnection = existingPeer !== undefined
+  const isReconnection = model.peers.has(peerId)
 
   // Step 3: Get or create peer state
   const peerState = ensurePeerState(model, message.identity, channel.channelId)
@@ -104,7 +103,6 @@ export function handleEstablishResponse(
       channelId: channel.channelId,
       peerId,
       documentCount: model.documents.size,
-      cachedDocumentAwareness: existingPeer?.documentAwareness.size ?? 0,
     },
   )
 
@@ -114,11 +112,11 @@ export function handleEstablishResponse(
 
   // Emit ready-state-changed for all documents since we have a new established channel
   const readyStateCommands: Command[] = []
-  for (const docId of model.documents.keys()) {
+  for (const docId of peerState.documentAwareness.keys()) {
     readyStateCommands.push({
       type: "cmd/emit-ready-state-changed",
       docId,
-      readyStates: getReadyStates(model.channels, model.peers, docId),
+      readyStates: getReadyStates(model, docId),
     })
   }
 

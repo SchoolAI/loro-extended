@@ -12,10 +12,10 @@ import type {
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
 import { createRules, type Rules } from "./rules.js"
+import { getReadyStates } from "./synchronizer/state-helpers.js"
 import {
   type Command,
   createSynchronizerUpdate,
-  getReadyStates,
   init as programInit,
   type SynchronizerMessage,
   type SynchronizerModel,
@@ -280,7 +280,7 @@ export class Synchronizer {
    * Get the current ready states for a document
    */
   public getReadyStates(docId: DocId): ReadyState[] {
-    return getReadyStates(this.model.channels, this.model.peers, docId)
+    return getReadyStates(this.model, docId)
   }
 
   /**
@@ -309,11 +309,7 @@ export class Synchronizer {
       return
     }
 
-    const readyStates = getReadyStates(
-      this.model.channels,
-      this.model.peers,
-      docId,
-    )
+    const readyStates = getReadyStates(this.model, docId)
 
     if (predicate(readyStates)) {
       this.logger.debug("wait-until-ready is READY (immediate) for {docId}", {

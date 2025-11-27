@@ -187,7 +187,7 @@ export function handleSyncResponse(
 
   // Emit ready-state-changed event
   // This notifies listeners (like waitForNetwork) that the document state has changed
-  const readyStates = getReadyStates(model.channels, model.peers, message.docId)
+  const readyStates = getReadyStates(model, message.docId)
   commands.push({
     type: "cmd/emit-ready-state-changed",
     docId: message.docId,

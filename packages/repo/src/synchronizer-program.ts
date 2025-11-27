@@ -304,6 +304,3 @@ export function createSynchronizerUpdate({
     onUpdate,
   )
 }
-
-// Re-export helpers for backward compatibility
-export { getReadyStates } from "./synchronizer/state-helpers.js"

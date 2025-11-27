@@ -81,9 +81,9 @@ describe("handle-establish-response", () => {
       // Creates peer state
       expect(newModel.peers.has("1")).toBe(true)
 
-      // Sends directory-request + sync-request + ready-state-changed for each doc
+      // Sends directory-request + sync-request
       expectBatchCommand(command)
-      expect(command.commands).toHaveLength(4)
+      expect(command.commands).toHaveLength(2)
 
       const cmd0 = command.commands[0]
       expectCommand(cmd0, "cmd/send-message")
@@ -96,14 +96,6 @@ describe("handle-establish-response", () => {
         expect(cmd1.envelope.message.docs).toHaveLength(2)
         expect(cmd1.envelope.message.bidirectional).toBe(true)
       }
-
-      const cmd2 = command.commands[2]
-      expectCommand(cmd2, "cmd/emit-ready-state-changed")
-      expect(cmd2.docId).toBe("doc-1")
-
-      const cmd3 = command.commands[3]
-      expectCommand(cmd3, "cmd/emit-ready-state-changed")
-      expect(cmd3.docId).toBe("doc-2")
     })
 
     it("skips directory-request for known peer", () => {

@@ -22,17 +22,31 @@ export type PeerIdentityDetails = {
   // publicKey?: Uint8Array // Future: For cryptographic identity
 }
 
-export type LoadingState =
-  | { state: "initial" }
-  | { state: "requesting" }
-  | { state: "found"; version: VersionVector }
-  | { state: "not-found" }
-  | { state: "error"; error: Error }
-
-export type ReadyState = {
-  channelMeta: ChannelMeta
-  loading: LoadingState
+export type ReadyStateChannelMeta = ChannelMeta & {
+  state: "established" | "connected"
 }
+
+type ReadyStateBase = {
+  docId: DocId
+  identity: PeerIdentityDetails
+}
+
+type ReadyStateAware = ReadyStateBase & {
+  state: "aware"
+  channels: ReadyStateChannelMeta[]
+}
+
+type ReadyStateLoaded = ReadyStateBase & {
+  state: "loaded"
+  channels: ReadyStateChannelMeta[]
+  lastKnownVersion: VersionVector
+}
+
+type ReadyStateAbsent = ReadyStateBase & {
+  state: "absent"
+}
+
+export type ReadyState = ReadyStateAware | ReadyStateLoaded | ReadyStateAbsent
 
 // TODO(duane): Refactor this type into discriminated union
 // - fix state-helpers use of `!` to assert existence of lastKnownVersion

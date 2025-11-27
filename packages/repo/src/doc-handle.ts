@@ -178,7 +178,7 @@ export class DocHandle<T extends DocContent = DocContent> {
   async waitForStorage(): Promise<DocHandle<T>> {
     return this.waitUntilReady(readyStates =>
       readyStates.some(
-        s => s.channelMeta.kind === "storage" && s.loading.state === "found",
+        s => s.state === "loaded" && s.channels.some(c => c.kind === "storage"),
       ),
     )
   }
@@ -189,7 +189,7 @@ export class DocHandle<T extends DocContent = DocContent> {
   async waitForNetwork(): Promise<DocHandle<T>> {
     return this.waitUntilReady(readyStates => {
       return readyStates.some(
-        s => s.channelMeta.kind === "network" && s.loading.state === "found",
+        s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
       )
     })
   }

@@ -68,6 +68,7 @@ import type { Rules } from "../../rules.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import { createDocState, type DocId } from "../../types.js"
 import { getRuleContext } from "../rule-context.js"
+import { getReadyStates } from "../state-helpers.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleDocEnsure(
@@ -127,6 +128,13 @@ export function handleDocEnsure(
 
   // Subscribe to changes on this document
   commands.push({ type: "cmd/subscribe-doc", docId })
+
+  // Notify potential ready state changes
+  commands.push({
+    type: "cmd/emit-ready-state-changed",
+    docId,
+    readyStates: getReadyStates(model, docId),
+  })
 
   return batchAsNeeded(...commands)
 }

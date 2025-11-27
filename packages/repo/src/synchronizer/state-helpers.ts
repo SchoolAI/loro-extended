@@ -1,13 +1,5 @@
-import type { Channel } from "../channel.js"
-import { isEstablished } from "../channel.js"
-import type {
-  ChannelId,
-  DocId,
-  LoadingState,
-  PeerID,
-  PeerState,
-  ReadyState,
-} from "../types.js"
+import type { SynchronizerModel } from "src/synchronizer-program.js"
+import type { DocId, ReadyState, ReadyStateChannelMeta } from "../types.js"
 
 /**
  * Get ready states for all channels for a document
@@ -15,43 +7,92 @@ import type {
  * Converts peer-centric state (documentAwareness) to channel-centric UI state (ReadyState[])
  */
 export function getReadyStates(
-  channels: Map<ChannelId, Channel>,
-  peers: Map<PeerID, PeerState>,
+  model: SynchronizerModel,
   docId: DocId,
 ): ReadyState[] {
   const readyStates: ReadyState[] = []
 
-  for (const channel of channels.values()) {
-    if (!isEstablished(channel)) continue
-
-    const peer = peers.get(channel.peerId)
-    const awareness = peer?.documentAwareness.get(docId)
-
-    // Convert peer awareness to loading state for UI
-    let loading: LoadingState
-
-    if (!awareness) {
-      loading = { state: "initial" }
-    } else if (awareness.awareness === "has-doc") {
-      const version = awareness.lastKnownVersion
-      if (version) {
-        loading = { state: "found", version }
-      } else {
-        loading = { state: "requesting" }
-      }
-    } else if (awareness.awareness === "no-doc") {
-      loading = { state: "not-found" }
+  /**
+   * 1. Include ready state of the document in our own repo
+   *
+   * Note: there is no "unknown" state with regard to our own repo--we can always positively conclude that we
+   * either have the document (aware/loaded) or we do not have the document (absent).
+   */
+  const myDoc = model.documents.get(docId)
+  if (!myDoc) {
+    readyStates.push({
+      state: "absent",
+      docId,
+      identity: { ...model.identity },
+    })
+  } else {
+    if (myDoc.doc.opCount() > 0) {
+      readyStates.push({
+        state: "loaded",
+        docId,
+        identity: { ...model.identity },
+        channels: [],
+        lastKnownVersion: myDoc.doc.version(),
+      })
     } else {
-      loading = { state: "initial" }
+      readyStates.push({
+        state: "aware",
+        docId,
+        identity: { ...model.identity },
+        channels: [],
+      })
+    }
+  }
+
+  /**
+   * 2. Include ready state of document in all other repos (peers)
+   */
+  for (const peer of model.peers.values()) {
+    const awareness = peer.documentAwareness.get(docId)
+
+    if (!awareness || awareness.awareness === "unknown") {
+      continue
     }
 
-    readyStates.push({
-      channelMeta: {
-        kind: channel.kind,
-        adapterId: channel.adapterId,
-      },
-      loading,
-    })
+    if (awareness.awareness === "has-doc") {
+      const channels: ReadyStateChannelMeta[] = []
+
+      for (const channelId of peer.channels) {
+        const channel = model.channels.get(channelId)
+        if (!channel) continue
+
+        channels.push({
+          kind: channel.kind,
+          state: channel.type,
+          adapterId: channel.adapterId,
+        })
+      }
+
+      if (awareness.lastKnownVersion) {
+        readyStates.push({
+          state: "loaded",
+          docId,
+          identity: { ...peer.identity },
+          channels,
+          lastKnownVersion: awareness.lastKnownVersion,
+        })
+      } else {
+        readyStates.push({
+          state: "aware",
+          docId,
+          identity: { ...peer.identity },
+          channels,
+        })
+      }
+    } else if (awareness.awareness === "no-doc") {
+      readyStates.push({
+        state: "absent",
+        docId,
+        identity: { ...peer.identity },
+      })
+    } else {
+      throw new Error("invalid awareness state")
+    }
   }
 
   return readyStates

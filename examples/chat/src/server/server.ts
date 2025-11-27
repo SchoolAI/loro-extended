@@ -181,7 +181,7 @@ repo.synchronizer.emitter.on(
     if (subscriptions.has(docId)) return
 
     // Check if the document is available (found in storage or network)
-    const isAvailable = readyStates.some(s => s.loading.state === "found")
+    const isAvailable = readyStates.some(s => s.state === "loaded")
 
     if (!isAvailable) return
 

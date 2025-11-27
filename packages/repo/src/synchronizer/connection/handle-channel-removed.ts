@@ -44,6 +44,7 @@
 
 import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
+import type { DocId } from "src/types.js"
 import { type Channel, isEstablished } from "../../channel.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import { getReadyStates } from "../state-helpers.js"
@@ -71,6 +72,8 @@ export function handleChannelRemoved(
     })
   }
 
+  const affectedDocIds: Set<DocId> = new Set()
+
   // Step 2: Update peer state if channel was established
   // We keep the peer state for reconnection optimization
   if (channel && isEstablished(channel)) {
@@ -78,10 +81,9 @@ export function handleChannelRemoved(
     if (peerState) {
       // Remove this channel from peer's channel set
       peerState.channels.delete(channel.channelId)
+
       // Update last seen timestamp
       peerState.lastSeen = new Date()
-      // IMPORTANT: Keep peer state even if no channels remain
-      // This preserves document awareness cache for reconnection
 
       // If this was the last channel for this peer, we should remove their ephemeral data
       // This prevents "ghost" cursors/presence from lingering until timeout
@@ -91,18 +93,26 @@ export function handleChannelRemoved(
           peerId: channel.peerId,
         })
       }
+
+      // Track which documents may be affected by this channel removal
+      for (const docId of peerState.documentAwareness.keys()) {
+        affectedDocIds.add(docId)
+      }
+
+      // IMPORTANT: Keep peer state even if no channels remain
+      // This preserves document awareness cache for reconnection
     }
   }
 
   // Step 3: Remove the channel from our model
   model.channels.delete(msg.channel.channelId)
 
-  // Emit ready-state-changed for all documents since a channel was removed
-  for (const docId of model.documents.keys()) {
+  // Step 4: Emit ready-state-changed for all potentially affected documents
+  for (const docId of affectedDocIds) {
     commands.push({
       type: "cmd/emit-ready-state-changed",
       docId,
-      readyStates: getReadyStates(model.channels, model.peers, docId),
+      readyStates: getReadyStates(model, docId),
     })
   }
 

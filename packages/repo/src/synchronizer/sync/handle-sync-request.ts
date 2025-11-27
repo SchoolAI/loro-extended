@@ -137,7 +137,7 @@ export function handleSyncRequest(
         })
 
         // Emit ready-state-changed event so listeners know the doc is created
-        const readyStates = getReadyStates(model.channels, model.peers, docId)
+        const readyStates = getReadyStates(model, docId)
         commands.push({
           type: "cmd/emit-ready-state-changed",
           docId,
