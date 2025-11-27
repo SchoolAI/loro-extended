@@ -39,7 +39,6 @@ type ReadyStateAware = ReadyStateBase & {
 type ReadyStateLoaded = ReadyStateBase & {
   state: "loaded"
   channels: ReadyStateChannelMeta[]
-  lastKnownVersion: VersionVector
 }
 
 type ReadyStateAbsent = ReadyStateBase & {

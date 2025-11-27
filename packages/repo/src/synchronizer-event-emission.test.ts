@@ -384,9 +384,10 @@ describe("Synchronizer - Event Emission", () => {
     // Create a document with content (starts as "loaded")
     const docState = synchronizer.getOrCreateDocumentState(docId)
     docState.doc.getText("text").insert(0, "hello")
+    docState.doc.commit()
 
     // Wait for initial events to settle
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     // Collect events from this point forward
     const events: Array<{ docId: string; readyStates: any[] }> = []
@@ -394,24 +395,18 @@ describe("Synchronizer - Event Emission", () => {
       events.push(event)
     })
 
-    // Add more content (state should still be "loaded", no change)
+    // Add more content (state should still be "loaded", no structural change)
     docState.doc.getText("text").insert(5, " world")
+    docState.doc.commit()
 
     // Wait a bit for any potential events
     await new Promise(resolve => setTimeout(resolve, 50))
 
-    // Should NOT have emitted ready-state-changed (state is still "loaded")
-    // Note: The version changed, but the state ("loaded") didn't change
-    // This test verifies we're comparing the full ReadyState including version
+    // Should NOT have emitted ready-state-changed
+    // The document content changed, but the ready state (state="loaded", channels, identity)
+    // did not change. Since lastKnownVersion is no longer part of ReadyState,
+    // content changes should not trigger ready-state-changed events.
     const docEvents = events.filter(e => e.docId === docId)
-
-    // If events were emitted, verify the state is still "loaded"
-    // (The version change IS a valid ready-state change since lastKnownVersion is part of ReadyState)
-    for (const event of docEvents) {
-      const ourState = event.readyStates.find(
-        rs => rs.identity.peerId === synchronizer.identity.peerId,
-      )
-      expect(ourState?.state).toBe("loaded")
-    }
+    expect(docEvents).toHaveLength(0)
   })
 })

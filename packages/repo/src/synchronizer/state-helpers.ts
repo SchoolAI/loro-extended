@@ -32,7 +32,6 @@ export function getReadyStates(
         docId,
         identity: { ...model.identity },
         channels: [],
-        lastKnownVersion: myDoc.doc.version(),
       })
     } else {
       readyStates.push({
@@ -74,7 +73,6 @@ export function getReadyStates(
           docId,
           identity: { ...peer.identity },
           channels,
-          lastKnownVersion: awareness.lastKnownVersion,
         })
       } else {
         readyStates.push({
