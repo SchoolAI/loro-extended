@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapters",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A collection of network and storage adapters for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",
