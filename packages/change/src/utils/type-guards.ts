@@ -196,6 +196,7 @@ export function isValueShape(
       "object",
       "record",
       "array",
+      "union",
     ].includes(schema.valueType)
   )
 }
