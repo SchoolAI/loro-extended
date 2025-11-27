@@ -1,5 +1,5 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
-import type { DocId } from "@loro-extended/repo"
+import type { DocId, ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema } from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
@@ -98,8 +98,10 @@ function ChatApp() {
   useEffect(() => {
     if (!handle) return
 
-    const updateConnectionStatus = (readyStates: any[]) => {
-      const connected = readyStates.some(s => s.channelMeta.kind === "network")
+    const updateConnectionStatus = (readyStates: ReadyState[]) => {
+      const connected = readyStates.some(
+        s => s.state === "aware" && s.channels.some(c => c.kind === "network"),
+      )
       setIsConnected(connected)
     }
 
