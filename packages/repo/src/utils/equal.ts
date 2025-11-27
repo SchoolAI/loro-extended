@@ -2,12 +2,22 @@
 // biome-ignore-all lint/suspicious/noImplicitAnyLet: provided by https://www.npmjs.com/package/fast-deep-equal
 // biome-ignore-all lint/suspicious/noDoubleEquals: original code does this
 
+import { VersionVector } from "loro-crdt"
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function equal(a: any, b: any): boolean {
   if (a === b) return true
 
   if (a && b && typeof a == "object" && typeof b == "object") {
     if (a.constructor !== b.constructor) return false
+
+    // Handle VersionVector from loro-crdt (WASM-backed objects)
+    // These need special handling because their toString() returns "[object Object]"
+    // and they don't have standard valueOf() behavior
+    if (a instanceof VersionVector && b instanceof VersionVector) {
+      // Use toJSON() which returns a Map, then compare the Maps
+      return equal(a.toJSON(), b.toJSON())
+    }
 
     let length: number, i: any, keys: string[]
 

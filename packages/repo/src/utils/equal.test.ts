@@ -1,3 +1,4 @@
+import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { equal } from "./equal.js"
 
@@ -242,6 +243,103 @@ describe("equal", () => {
       expect(equal(new Number(42), new Number(42))).toBe(true)
       // eslint-disable-next-line no-new-wrappers
       expect(equal(new Boolean(true), new Boolean(true))).toBe(true)
+    })
+  })
+
+  describe("VersionVector (loro-crdt)", () => {
+    it("returns true for identical empty VersionVectors", () => {
+      const doc1 = new LoroDoc()
+      const doc2 = new LoroDoc()
+      expect(equal(doc1.version(), doc2.version())).toBe(true)
+    })
+
+    it("returns true for VersionVectors with same content", () => {
+      const doc1 = new LoroDoc()
+      doc1.getText("text").insert(0, "hello")
+      const version1 = doc1.version()
+
+      // Create another doc and import from doc1 to get same version
+      const doc2 = new LoroDoc()
+      doc2.import(doc1.export({ mode: "snapshot" }))
+      const version2 = doc2.version()
+
+      expect(equal(version1, version2)).toBe(true)
+    })
+
+    it("returns false for VersionVectors with different content", () => {
+      const doc1 = new LoroDoc()
+      doc1.getText("text").insert(0, "hello")
+
+      const doc2 = new LoroDoc()
+      doc2.getText("text").insert(0, "world")
+
+      expect(equal(doc1.version(), doc2.version())).toBe(false)
+    })
+
+    it("returns false for empty vs non-empty VersionVector", () => {
+      const doc1 = new LoroDoc()
+      const doc2 = new LoroDoc()
+      doc2.getText("text").insert(0, "hello")
+
+      expect(equal(doc1.version(), doc2.version())).toBe(false)
+    })
+
+    it("handles VersionVector in ReadyState-like objects", () => {
+      const doc1 = new LoroDoc()
+      doc1.getText("text").insert(0, "hello")
+
+      const doc2 = new LoroDoc()
+      doc2.import(doc1.export({ mode: "snapshot" }))
+
+      const readyState1 = {
+        state: "loaded",
+        docId: "test-doc",
+        identity: { peerId: "1", name: "test", type: "user" },
+        channels: [],
+        lastKnownVersion: doc1.version(),
+      }
+
+      const readyState2 = {
+        state: "loaded",
+        docId: "test-doc",
+        identity: { peerId: "1", name: "test", type: "user" },
+        channels: [],
+        lastKnownVersion: doc2.version(),
+      }
+
+      expect(equal(readyState1, readyState2)).toBe(true)
+    })
+
+    it("detects changes in ReadyState arrays (for ready-state-changed emission)", () => {
+      const doc1 = new LoroDoc()
+      doc1.getText("text").insert(0, "hello")
+
+      const doc2 = new LoroDoc()
+      doc2.getText("text").insert(0, "hello")
+      doc2.getText("text").insert(5, " world")
+
+      const readyStates1 = [
+        {
+          state: "loaded",
+          docId: "test-doc",
+          identity: { peerId: "1", name: "test", type: "user" },
+          channels: [],
+          lastKnownVersion: doc1.version(),
+        },
+      ]
+
+      const readyStates2 = [
+        {
+          state: "loaded",
+          docId: "test-doc",
+          identity: { peerId: "1", name: "test", type: "user" },
+          channels: [],
+          lastKnownVersion: doc2.version(),
+        },
+      ]
+
+      // Different versions should be detected
+      expect(equal(readyStates1, readyStates2)).toBe(false)
     })
   })
 })

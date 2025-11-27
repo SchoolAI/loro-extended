@@ -354,7 +354,15 @@ export class Synchronizer {
     }
 
     // After all changes, compare ready-states before and after; emit ready-state-changed
-    for (const docId of this.model.documents.keys()) {
+    // We need to check both:
+    // 1. Documents that exist in the model (may have changed)
+    // 2. Documents that were cached but no longer exist (deleted)
+    const docIdsToCheck = new Set([
+      ...this.model.documents.keys(),
+      ...this.readyStates.keys(),
+    ])
+
+    for (const docId of docIdsToCheck) {
       const oldReadyStates = this.readyStates.get(docId) ?? []
 
       const newReadyStates = getReadyStates(this.model, docId)
@@ -362,7 +370,12 @@ export class Synchronizer {
       if (!equal(oldReadyStates, newReadyStates)) {
         // console.dir({ docId, oldReadyStates, newReadyStates }, { depth: null })
 
-        this.readyStates.set(docId, newReadyStates)
+        // If document was deleted, remove from cache; otherwise update cache
+        if (!this.model.documents.has(docId)) {
+          this.readyStates.delete(docId)
+        } else {
+          this.readyStates.set(docId, newReadyStates)
+        }
 
         this.emitter.emit("ready-state-changed", {
           docId,
