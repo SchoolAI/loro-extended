@@ -57,6 +57,14 @@ export interface Rules {
    * @returns `true` if deletion is permitted, `false` otherwise.
    */
   canDelete(context: RuleContext): boolean
+
+  /**
+   * Determines if a peer is allowed to create a new document.
+   * This is called when a peer requests a document that doesn't exist locally.
+   *
+   * @returns `true` if creation is permitted, `false` otherwise.
+   */
+  canCreate(context: Omit<RuleContext, "doc">): boolean
 }
 
 // Default rule is to "allow" everything
@@ -68,5 +76,6 @@ export function createRules(rules: Partial<Rules> = {}): Rules {
     canReveal: rules?.canReveal ?? defaultAllowed,
     canUpdate: rules?.canUpdate ?? defaultAllowed,
     canDelete: rules?.canDelete ?? defaultAllowed,
+    canCreate: rules?.canCreate ?? defaultAllowed,
   }
 }

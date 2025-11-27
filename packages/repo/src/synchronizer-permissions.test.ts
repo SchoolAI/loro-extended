@@ -2,12 +2,14 @@
 
 import { describe, expect, it, vi } from "vitest"
 import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
+import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import type {
   Channel,
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
 } from "./channel.js"
+import { Repo } from "./repo.js"
 import { createRules } from "./rules.js"
 import { Synchronizer } from "./synchronizer.js"
 import type { ChannelId } from "./types.js"
@@ -119,5 +121,66 @@ describe("Synchronizer - Permissions Integration", () => {
     expect(directoryResponse).toBeDefined()
     expect(directoryResponse.message.docIds).toContain("public-doc")
     expect(directoryResponse.message.docIds).not.toContain("secret-doc")
+  })
+
+  it("should create document on sync-request if allowed", async () => {
+    // Setup bridge for communication
+    const bridge = new Bridge()
+
+    const adapter1 = new BridgeAdapter({ adapterId: "adapter1", bridge })
+    const adapter2 = new BridgeAdapter({ adapterId: "adapter2", bridge })
+
+    const repo1 = new Repo({
+      identity: { name: "Peer 1", type: "user" },
+      adapters: [adapter1],
+    })
+
+    const repo2 = new Repo({
+      identity: { name: "Peer 2", type: "user" },
+      adapters: [adapter2],
+      rules: {
+        canCreate: () => true, // Allow creation
+      },
+    })
+
+    // Repo1 creates a handle (but doesn't change it yet)
+    // This sends a sync-request to Repo2
+    repo1.get("test-doc-1")
+
+    // Wait for sync to happen
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Repo2 should have the document now
+    expect(repo2.has("test-doc-1")).toBe(true)
+  })
+
+  it("should NOT create document on sync-request if NOT allowed", async () => {
+    // Setup bridge for communication
+    const bridge = new Bridge()
+
+    const adapter1 = new BridgeAdapter({ adapterId: "adapter1", bridge })
+    const adapter2 = new BridgeAdapter({ adapterId: "adapter2", bridge })
+
+    const repo1 = new Repo({
+      identity: { name: "Peer 1", type: "user" },
+      adapters: [adapter1],
+    })
+
+    const repo2 = new Repo({
+      identity: { name: "Peer 2", type: "user" },
+      adapters: [adapter2],
+      rules: {
+        canCreate: () => false, // Deny creation
+      },
+    })
+
+    // Repo1 creates a handle
+    repo1.get("test-doc-2")
+
+    // Wait for sync to happen
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Repo2 should NOT have the document
+    expect(repo2.has("test-doc-2")).toBe(false)
   })
 })

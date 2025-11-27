@@ -58,16 +58,18 @@
 import type { ChannelMsgSyncRequest } from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
+import { createDocState } from "../../types.js"
 import {
   addPeerSubscription,
   setPeerDocumentAwareness,
 } from "../peer-state-helpers.js"
+import { getReadyStates } from "../state-helpers.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncRequest(
   message: ChannelMsgSyncRequest,
-  { channel, model, fromChannelId, logger }: ChannelHandlerContext,
+  { channel, model, fromChannelId, logger, rules }: ChannelHandlerContext,
 ): Command | undefined {
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
@@ -97,48 +99,95 @@ export function handleSyncRequest(
     addPeerSubscription(peerState, docId)
     setPeerDocumentAwareness(peerState, docId, "has-doc", requesterDocVersion)
 
-    logger.debug("sync-request: updated peer awareness and subscription", {
-      peerId: channel.peerId,
+    let docState = model.documents.get(docId)
+
+    logger.debug(
+      "sync-request: updated peer {peerId} awareness ({awareness}) and subscription ({docId})",
+      {
+        peerId: channel.peerId,
+        docId,
+        awareness: "has-doc",
+      },
+    )
+
+    // If we don't have the document, create it!
+    // This allows peers to initialize documents on the server just by requesting them
+    if (!docState) {
+      // Check if peer is allowed to create this document
+      const context = {
+        docId,
+        peerName: channel.peerId, // Use peerId as name if name not available
+        channelId: channel.channelId,
+        channelKind: channel.kind,
+      }
+
+      if (rules.canCreate(context)) {
+        logger.debug(
+          "sync-request: creating new document ({docId}) from peer request",
+          {
+            docId,
+            peerId: channel.peerId,
+          },
+        )
+        docState = createDocState({ docId })
+        model.documents.set(docId, docState)
+        commands.push({
+          type: "cmd/subscribe-doc",
+          docId,
+        })
+
+        // Emit ready-state-changed event so listeners know the doc is created
+        const readyStates = getReadyStates(model.channels, model.peers, docId)
+        commands.push({
+          type: "cmd/emit-ready-state-changed",
+          docId,
+          readyStates,
+        })
+      } else {
+        logger.warn(
+          "sync-request: peer {peerId} not allowed to create document {docId}, ignoring request",
+          {
+            docId,
+            peerId: channel.peerId,
+          },
+        )
+        // Skip processing this document since we can't create it
+        continue
+      }
+    }
+
+    logger.debug("sending sync-response due to channel/sync-request", {
       docId,
-      awareness: "has-doc",
+      peerId: channel.peerId,
     })
 
-    const docState = model.documents.get(docId)
+    // 1. Send sync-response with document data
+    // The cmd/send-sync-response command will determine whether to send
+    // a snapshot (full doc) or update (delta) based on requesterDocVersion
+    commands.push({
+      type: "cmd/send-sync-response",
+      toChannelId: fromChannelId,
+      docId,
+      requesterDocVersion,
+    })
 
-    if (docState) {
-      logger.debug("sending sync-response due to channel/sync-request", {
+    // 2. Since peer has requested the doc, also send the presence ephemeral state
+    commands.push({
+      type: "cmd/broadcast-ephemeral",
+      docId,
+      allPeerData: true,
+      hopsRemaining: 0,
+      toChannelIds: [fromChannelId],
+    })
+
+    // 3. Collect docs for reciprocal sync-request
+    // If bidirectional is true, we want to ensure we are also subscribed to this document
+    // and have the latest version from the peer.
+    if (bidirectional) {
+      reciprocalDocs.push({
         docId,
-        peerId: channel.peerId,
+        requesterDocVersion: docState.doc.version(),
       })
-
-      // 1. Send sync-response with document data
-      // The cmd/send-sync-response command will determine whether to send
-      // a snapshot (full doc) or update (delta) based on requesterDocVersion
-      commands.push({
-        type: "cmd/send-sync-response",
-        toChannelId: fromChannelId,
-        docId,
-        requesterDocVersion,
-      })
-
-      // 2. Since peer has requested the doc, also send the presence ephemeral state
-      commands.push({
-        type: "cmd/broadcast-ephemeral",
-        docId,
-        allPeerData: true,
-        hopsRemaining: 0,
-        toChannelIds: [fromChannelId],
-      })
-
-      // 3. Collect docs for reciprocal sync-request
-      // If bidirectional is true, we want to ensure we are also subscribed to this document
-      // and have the latest version from the peer.
-      if (bidirectional) {
-        reciprocalDocs.push({
-          docId,
-          requesterDocVersion: docState.doc.version(),
-        })
-      }
     }
   }
 
