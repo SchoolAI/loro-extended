@@ -71,7 +71,6 @@ import type {
   PeerID,
   PeerIdentityDetails,
   PeerState,
-  ReadyState,
 } from "./types.js"
 import { makeImmutableUpdate } from "./utils/make-immutable-update.js"
 
@@ -186,11 +185,6 @@ export type Command =
 
   // Events
   | {
-      type: "cmd/emit-ready-state-changed"
-      docId: DocId
-      readyStates: ReadyState[]
-    }
-  | {
       type: "cmd/emit-ephemeral-change"
       docId: DocId
     }
@@ -199,16 +193,20 @@ export type Command =
   | { type: "cmd/dispatch"; dispatch: SynchronizerMessage }
   | { type: "cmd/batch"; commands: Command[] }
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// PROGRAM DEFINITION
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-export type Program = {
-  update(
-    message: SynchronizerMessage,
-    model: SynchronizerModel,
-  ): [SynchronizerModel, Command?]
-}
+/**
+ * =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ *
+ * PROGRAM DEFINITION
+ *
+ * Inspired by "The Elm Architecture" (TEA) as a basis for a state machine.
+ *
+ * To understand the pattern that inspired the synchronizer-program, check out raj:
+ *
+ * - https://github.com/andrejewski/raj-by-example
+ * - https://github.com/andrejewski/raj-ts/blob/main/src/runtime.ts
+ *
+ * =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ */
 
 /**
  * Initialize the synchronizer with a peer identity
@@ -227,49 +225,6 @@ export function init(
       peers: new Map(),
     },
   ]
-}
-
-/**
- * Creates the core synchronizer update logic with rules captured in closure
- *
- * This function creates a mutative update function that's easier to write and reason about.
- * The mutative library automatically converts it to an immutable update function.
- *
- * ## Message Routing
- *
- * The synchronizer handles two categories of messages:
- *
- * 1. **Synchronizer Messages** (synchronizer/*):
- *    - Channel lifecycle (added, removed, establish)
- *    - Document lifecycle (ensure, change, delete)
- *    - Handled directly in this switch statement
- *
- * 2. **Channel Messages** (channel/*):
- *    - Protocol messages from peers (establish, sync, directory)
- *    - Routed to mutatingChannelUpdate for dispatch
- *
- * @param rules - Rules for canReveal and canUpdate checks
- * @param synchronizerLogger - Logger for tracing message flow
- * @returns Mutative update function (converted to immutable by makeImmutableUpdate)
- */
-function createSynchronizerLogic(rules: Rules, synchronizerLogger: Logger) {
-  const logger = synchronizerLogger.getChild("program")
-
-  // A mutating update function is easier to read and write, because we need only concern ourselves
-  // with what needs to change, using standard assignment and JS operations. But the machinery
-  // around this function turns it back into an immutable `update` function like raj/TEA expects.
-  return function mutatingUpdate(
-    msg: SynchronizerMessage,
-    model: SynchronizerModel,
-  ): Command | undefined {
-    // Log all messages except channel-receive-message (too noisy)
-    if (msg.type !== "synchronizer/channel-receive-message") {
-      const detail = "data" in msg ? { ...msg, data: "[omitted]" } : msg
-      logger.trace("{type}", detail)
-    }
-
-    return synchronizerDispatcher(msg, model, rules, logger)
-  }
 }
 
 type CreateSynchronizerUpdateParams = {
@@ -300,7 +255,7 @@ type CreateSynchronizerUpdateParams = {
  * @param rules - Rules for canReveal and canUpdate checks
  * @param logger - Optional logger (defaults to @loro-extended/repo logger)
  * @param onUpdate - Optional callback for debugging state changes
- * @returns Immutable update function compatible with raj/TEA pattern
+ * @returns Immutable update function compatible with TEA pattern
  */
 export function createSynchronizerUpdate({
   rules,
@@ -314,4 +269,47 @@ export function createSynchronizerUpdate({
     ),
     onUpdate,
   )
+}
+
+/**
+ * Creates the core synchronizer update logic with rules captured in closure
+ *
+ * This function creates a mutative update function that's easier to write and reason about.
+ * The mutative library automatically converts it to an immutable update function.
+ *
+ * ## Message Routing
+ *
+ * The synchronizer handles two categories of messages:
+ *
+ * 1. **Synchronizer Messages** (synchronizer/*):
+ *    - Channel lifecycle (added, removed, establish)
+ *    - Document lifecycle (ensure, change, delete)
+ *    - Handled directly in this switch statement
+ *
+ * 2. **Channel Messages** (channel/*):
+ *    - Protocol messages from peers (establish, sync, directory)
+ *    - Routed to mutatingChannelUpdate for dispatch
+ *
+ * @param rules - Rules for canReveal and canUpdate checks
+ * @param synchronizerLogger - Logger for tracing message flow
+ * @returns Mutative update function (converted to immutable by makeImmutableUpdate)
+ */
+function createSynchronizerLogic(rules: Rules, synchronizerLogger: Logger) {
+  const logger = synchronizerLogger.getChild("program")
+
+  // A mutating update function is easier to read and write, because we need only concern ourselves
+  // with what needs to change, using standard assignment and JS operations. But the machinery
+  // around this function turns it back into an immutable `update` function like TEA expects.
+  return function mutatingUpdate(
+    msg: SynchronizerMessage,
+    model: SynchronizerModel,
+  ): Command | undefined {
+    // Log all messages except channel-receive-message (too noisy)
+    if (msg.type !== "synchronizer/channel-receive-message") {
+      const detail = "data" in msg ? { ...msg, data: "[omitted]" } : msg
+      logger.trace("{type}", detail)
+    }
+
+    return synchronizerDispatcher(msg, model, rules, logger)
+  }
 }

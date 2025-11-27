@@ -122,7 +122,7 @@ export class DocHandle<T extends DocContent = DocContent> {
    * This provides visibility into the sync status of the document across all channels.
    */
   get readyStates(): ReadyState[] {
-    return this.synchronizer.getReadyStates(this.docId)
+    return this.synchronizer.readyStates.get(this.docId) ?? []
   }
 
   /**

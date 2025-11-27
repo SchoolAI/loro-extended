@@ -50,11 +50,10 @@ describe("handle-doc-ensure", () => {
 
     // Should send sync-request and subscribe
     expectBatchCommand(command)
-    expect(command.commands).toHaveLength(3)
+    expect(command.commands).toHaveLength(2)
 
     const cmd0 = command.commands[0]
     const cmd1 = command.commands[1]
-    const cmd2 = command.commands[2]
 
     expectCommand(cmd0, "cmd/send-message")
     expect(cmd0.envelope.message.type).toBe("channel/sync-request")
@@ -65,9 +64,6 @@ describe("handle-doc-ensure", () => {
 
     expectCommand(cmd1, "cmd/subscribe-doc")
     expect(cmd1.docId).toBe("new-doc")
-
-    expectCommand(cmd2, "cmd/emit-ready-state-changed")
-    expect(cmd2.docId).toBe("new-doc")
   })
 
   it("should do nothing if document already exists", () => {
@@ -147,7 +143,7 @@ describe("handle-doc-ensure", () => {
 
     // Should only send to storage channel
     expectBatchCommand(command)
-    expect(command.commands).toHaveLength(3) // sync-request + subscribe + ready-state-changed
+    expect(command.commands).toHaveLength(2) // sync-request + subscribe
 
     const syncCmd = command.commands[0]
     expectCommand(syncCmd, "cmd/send-message")

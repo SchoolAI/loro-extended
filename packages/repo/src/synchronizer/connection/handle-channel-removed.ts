@@ -47,7 +47,6 @@ import { current } from "mutative"
 import type { DocId } from "src/types.js"
 import { type Channel, isEstablished } from "../../channel.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
-import { getReadyStates } from "../state-helpers.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleChannelRemoved(
@@ -106,15 +105,6 @@ export function handleChannelRemoved(
 
   // Step 3: Remove the channel from our model
   model.channels.delete(msg.channel.channelId)
-
-  // Step 4: Emit ready-state-changed for all potentially affected documents
-  for (const docId of affectedDocIds) {
-    commands.push({
-      type: "cmd/emit-ready-state-changed",
-      docId,
-      readyStates: getReadyStates(model, docId),
-    })
-  }
 
   return batchAsNeeded(...commands)
 }

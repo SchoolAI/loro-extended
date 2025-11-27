@@ -8,7 +8,8 @@
  *
  * ## When This Fires
  *
- * This handler is triggered by doc.subscribe() when `event.by === "local"`.
+ * This handler is triggered by doc.subscribeLocalUpdates()
+ *
  * This means:
  * - User edits via DocHandle.change()
  * - Direct mutations to doc via handle.doc
@@ -16,7 +17,7 @@
  *
  * It does NOT fire for:
  * - Imported changes from peers (handled by handle-doc-imported.ts)
- * - Checkout operations
+ * - Checkout operations (ignored for now)
  *
  * ## Protocol Flows
  *

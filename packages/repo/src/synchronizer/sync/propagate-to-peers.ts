@@ -28,7 +28,7 @@
 import type { Logger } from "@logtape/logtape"
 import type { VersionVector } from "loro-crdt"
 import type { SyncTransmission } from "../../channel.js"
-import { isEstablished, type EstablishedChannel } from "../../channel.js"
+import { type EstablishedChannel, isEstablished } from "../../channel.js"
 import type { Rules } from "../../rules.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import type { DocId, DocState, PeerID } from "../../types.js"
@@ -79,9 +79,12 @@ export function propagateToPeers(options: PropagationOptions): Command[] {
   // Iterate through all established channels to propagate the change
   for (const channel of model.channels.values()) {
     if (!isEstablished(channel)) {
-      logger.debug(`${logPrefix}: skipping non-established channel {channelId}`, {
-        channelId: channel.channelId,
-      })
+      logger.debug(
+        `${logPrefix}: skipping non-established channel {channelId}`,
+        {
+          channelId: channel.channelId,
+        },
+      )
       continue
     }
 
@@ -131,8 +134,16 @@ type PropagateToSinglePeerOptions = {
  * @returns Array of commands to send to this peer
  */
 function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
-  const { channel, docId, docState, ourVersion, model, rules, logger, logPrefix } =
-    options
+  const {
+    channel,
+    docId,
+    docState,
+    ourVersion,
+    model,
+    rules,
+    logger,
+    logPrefix,
+  } = options
 
   const commands: Command[] = []
 
@@ -158,16 +169,13 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     }
   }
 
-  logger.debug(
-    `${logPrefix}: checking peer {peerId} on channel {channelId}`,
-    {
-      channelId: channel.channelId,
-      peerId: channel.peerId,
-      isSubscribed,
-      awareness: peerAwareness?.awareness,
-      hasPeerState: !!peerState,
-    },
-  )
+  logger.debug(`${logPrefix}: checking peer {peerId} on channel {channelId}`, {
+    channelId: channel.channelId,
+    peerId: channel.peerId,
+    isSubscribed,
+    awareness: peerAwareness?.awareness,
+    hasPeerState: !!peerState,
+  })
 
   // Decision tree based on peer's relationship with this document:
 

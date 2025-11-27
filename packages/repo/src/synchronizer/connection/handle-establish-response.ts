@@ -73,7 +73,6 @@ import type {
 } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { ensurePeerState, shouldSyncWithPeer } from "../peer-state-helpers.js"
-import { getReadyStates } from "../state-helpers.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
@@ -109,16 +108,6 @@ export function handleEstablishResponse(
   // Note: We don't set canReveal or subscriptions during establishment
   // - canReveal will be checked on-the-fly when needed
   // - Subscriptions will be set when peer sends sync-request
-
-  // Emit ready-state-changed for all documents since we have a new established channel
-  const readyStateCommands: Command[] = []
-  for (const docId of peerState.documentAwareness.keys()) {
-    readyStateCommands.push({
-      type: "cmd/emit-ready-state-changed",
-      docId,
-      readyStates: getReadyStates(model, docId),
-    })
-  }
 
   if (isReconnection) {
     // ============================================================
@@ -244,10 +233,6 @@ export function handleEstablishResponse(
       },
     }
 
-    return batchAsNeeded(
-      sendDirectoryRequestCmd,
-      sendSyncRequestCmd,
-      ...readyStateCommands,
-    )
+    return batchAsNeeded(sendDirectoryRequestCmd, sendSyncRequestCmd)
   }
 }

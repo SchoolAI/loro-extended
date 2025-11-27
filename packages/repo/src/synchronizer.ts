@@ -29,6 +29,7 @@ import type {
   PeerState,
   ReadyState,
 } from "./types.js"
+import { equal } from "./utils/equal.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
@@ -71,6 +72,8 @@ export class Synchronizer {
   readonly ephemeralStores = new Map<DocId, EphemeralStore>()
 
   readonly emitter = new Emittery<SynchronizerEvents>()
+
+  readonly readyStates = new Map<DocId, ReadyState[]>()
 
   model: SynchronizerModel
 
@@ -340,10 +343,32 @@ export class Synchronizer {
     }
 
     const [newModel, command] = this.updateFn(message, this.model)
+
+    // We update the Synchronizer instance's model here, allowing us access to data
+    // "inside" the TEA program. This is useful because we want the DocHandle class
+    // to be able to wrap the Synchronizer as a public API.
     this.model = newModel
 
     if (command) {
       this.#executeCommand(command)
+    }
+
+    // After all changes, compare ready-states before and after; emit ready-state-changed
+    for (const docId of this.model.documents.keys()) {
+      const oldReadyStates = this.readyStates.get(docId) ?? []
+
+      const newReadyStates = getReadyStates(this.model, docId)
+
+      if (!equal(oldReadyStates, newReadyStates)) {
+        // console.dir({ docId, oldReadyStates, newReadyStates }, { depth: null })
+
+        this.readyStates.set(docId, newReadyStates)
+
+        this.emitter.emit("ready-state-changed", {
+          docId,
+          readyStates: newReadyStates,
+        })
+      }
     }
   }
 
@@ -439,14 +464,6 @@ export class Synchronizer {
           command.data,
           command.fromPeerId,
         )
-        break
-      }
-
-      case "cmd/emit-ready-state-changed": {
-        this.emitter.emit("ready-state-changed", {
-          docId: command.docId,
-          readyStates: command.readyStates,
-        })
         break
       }
 

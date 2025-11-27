@@ -63,7 +63,6 @@ import {
   addPeerSubscription,
   setPeerDocumentAwareness,
 } from "../peer-state-helpers.js"
-import { getReadyStates } from "../state-helpers.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
@@ -134,14 +133,6 @@ export function handleSyncRequest(
         commands.push({
           type: "cmd/subscribe-doc",
           docId,
-        })
-
-        // Emit ready-state-changed event so listeners know the doc is created
-        const readyStates = getReadyStates(model, docId)
-        commands.push({
-          type: "cmd/emit-ready-state-changed",
-          docId,
-          readyStates,
         })
       } else {
         logger.warn(

@@ -60,7 +60,6 @@ import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
 import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
 import { getRuleContext } from "../rule-context.js"
-import { getReadyStates } from "../state-helpers.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
@@ -186,15 +185,6 @@ export function handleSyncResponse(
       break
     }
   }
-
-  // Emit ready-state-changed event
-  // This notifies listeners (like waitForNetwork) that the document state has changed
-  const readyStates = getReadyStates(model, message.docId)
-  commands.push({
-    type: "cmd/emit-ready-state-changed",
-    docId: message.docId,
-    readyStates,
-  })
 
   return batchAsNeeded(...commands)
 }

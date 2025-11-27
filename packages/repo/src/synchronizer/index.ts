@@ -18,7 +18,6 @@ export {
   shouldSyncWithPeer,
 } from "./peer-state-helpers.js"
 export { getRuleContext } from "./rule-context.js"
-export { getReadyStates } from "./state-helpers.js"
 export { handleDocChange } from "./sync/handle-doc-change.js"
 export { handleDocDelete } from "./sync/handle-doc-delete.js"
 export { handleDocEnsure } from "./sync/handle-doc-ensure.js"
