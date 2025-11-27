@@ -25,7 +25,7 @@
  * ## Permission Checking
  *
  * Before applying snapshot/update data, we check `canUpdate` permission:
- * - Enforces write permissions (who can send us data)
+ * - Enforces write rules (who can send us data)
  * - Enables read-only replicas
  * - Prevents unauthorized updates
  *
@@ -44,7 +44,7 @@
  *   |-- sync-request ---------->|
  *   |                           |
  *   |<-- sync-response ---------|  (this handler)
- *   |   [snapshot/update/       |  1. Check permissions
+ *   |   [snapshot/update/       |  1. Check rules
  *   |    up-to-date/unavailable]|  2. Apply data (if any)
  *   |                           |  3. Update peer awareness
  *   |                           |  4. Emit ready-state-changed
@@ -66,7 +66,7 @@ import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncResponse(
   message: ChannelMsgSyncResponse,
-  { channel, model, fromChannelId, permissions, logger }: ChannelHandlerContext,
+  { channel, model, fromChannelId, rules, logger }: ChannelHandlerContext,
 ): Command | undefined {
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
@@ -142,13 +142,13 @@ export function handleSyncResponse(
       }
 
       // Check canUpdate permission before applying data
-      // This enforces write permissions and enables read-only replicas
+      // This enforces write rules and enables read-only replicas
       const context = getRuleContext({ channel, docState, model })
       if (context instanceof Error) {
         logger.warn(`can't check canUpdate: ${context.message}`)
         return
       }
-      if (!permissions.canUpdate(context)) {
+      if (!rules.canUpdate(context)) {
         logger.warn(`rejecting update from ${context.peerName}`)
         return
       }

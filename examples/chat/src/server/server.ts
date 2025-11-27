@@ -163,7 +163,7 @@ const storageAdapter = new LevelDBStorageAdapter("loro-chat-app.db")
 const repo = new Repo({
   identity: { name: "chat-app-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
-  permissions: {
+  rules: {
     canReveal(context) {
       if (context.channelKind === "storage") return true
 

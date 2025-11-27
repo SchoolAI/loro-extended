@@ -10,6 +10,6 @@ export type ChannelHandlerContext = {
   channel: Channel
   model: SynchronizerModel
   fromChannelId: ChannelId
-  permissions: Rules
+  rules: Rules
   logger: Logger
 }

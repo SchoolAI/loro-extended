@@ -11,7 +11,7 @@ import type {
   SyncTransmission,
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
-import { createPermissions, type Rules } from "./rules.js"
+import { createRules, type Rules } from "./rules.js"
 import {
   type Command,
   createSynchronizerUpdate,
@@ -49,7 +49,7 @@ type SynchronizerEvents = {
 type SynchronizerParams = {
   identity: PeerIdentityDetails
   adapters: AnyAdapter[]
-  permissions?: Rules
+  rules?: Rules
   onUpdate?: HandleUpdateFn
   logger?: Logger
 }
@@ -79,7 +79,7 @@ export class Synchronizer {
   constructor({
     identity,
     adapters,
-    permissions,
+    rules,
     onUpdate,
     logger: preferredLogger,
   }: SynchronizerParams) {
@@ -103,7 +103,7 @@ export class Synchronizer {
     })
 
     this.updateFn = createSynchronizerUpdate({
-      permissions: createPermissions(permissions),
+      rules: createRules(rules),
       onUpdate,
       logger,
     })

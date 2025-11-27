@@ -42,7 +42,7 @@ export function channelDispatcher(
   channelMessage: ChannelMsg,
   model: SynchronizerModel,
   fromChannelId: ChannelId,
-  permissions: Rules,
+  rules: Rules,
   logger: Logger,
 ): Command | undefined {
   const channel = model.channels.get(fromChannelId)
@@ -79,7 +79,7 @@ export function channelDispatcher(
     channel,
     model,
     fromChannelId,
-    permissions,
+    rules,
     logger,
   }
 

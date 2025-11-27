@@ -73,7 +73,7 @@ import { batchAsNeeded } from "../utils.js"
 export function handleDocEnsure(
   msg: { type: "synchronizer/doc-ensure"; docId: DocId },
   model: SynchronizerModel,
-  permissions: Rules,
+  rules: Rules,
 ): Command | undefined {
   const { docId } = msg
 
@@ -108,7 +108,7 @@ export function handleDocEnsure(
       })
 
       // Check canReveal permission - can we ask this channel about this document?
-      if (!(context instanceof Error) && permissions.canReveal(context)) {
+      if (!(context instanceof Error) && rules.canReveal(context)) {
         // Send sync-request to load document data
         // Note: When channel responds, it will add to peer's subscriptions
         commands.push({

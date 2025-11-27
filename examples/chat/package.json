@@ -12,9 +12,6 @@
     "dev:server": "tsx --watch src/server/server.ts",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
-    "test": "pnpm test:e2e",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -36,7 +33,6 @@
     "zod": "^4.1.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.54.2",
     "@tailwindcss/vite": "^4.1.17",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

@@ -64,7 +64,7 @@ describe("Repo E2E", () => {
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
-      permissions: {
+      rules: {
         canUpdate: () => repo1CanWrite,
       },
     })
@@ -107,7 +107,7 @@ describe("Repo E2E", () => {
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
-      permissions: { canDelete: () => false },
+      rules: { canDelete: () => false },
     })
     const repo2 = new Repo({
       identity: { name: "repo2", type: "user" },
@@ -143,7 +143,7 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
-        permissions: { canReveal: () => true },
+        rules: { canReveal: () => true },
       })
       const handle1 = repoA.get(crypto.randomUUID())
       const handle2 = repoA.get(crypto.randomUUID())
@@ -170,7 +170,7 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
-        permissions: { canReveal: () => false },
+        rules: { canReveal: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
@@ -193,7 +193,7 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
-        permissions: { canReveal: () => false },
+        rules: { canReveal: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
@@ -219,7 +219,7 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
-        permissions: {
+        rules: {
           canReveal: context => context.docId.startsWith("allowed"),
         },
       })

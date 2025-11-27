@@ -9,7 +9,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "./channel.js"
-import { createPermissions } from "./rules.js"
+import { createRules } from "./rules.js"
 import { Synchronizer } from "./synchronizer.js"
 import type { ChannelId } from "./types.js"
 
@@ -89,7 +89,7 @@ describe("Synchronizer - Sync Functionality", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      permissions: createPermissions(),
+      rules: createRules(),
     })
   })
 
@@ -171,7 +171,7 @@ describe("Synchronizer - Sync Functionality", () => {
     await mockAdapter.waitForStart()
     const docId = "test-doc"
     const channel = mockAdapter.simulateChannelAdded("test-channel")
-    const docState = synchronizer.getOrCreateDocumentState(docId)
+    synchronizer.getOrCreateDocumentState(docId)
 
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {

@@ -17,7 +17,7 @@ import { handleDocEnsure } from "./sync/handle-doc-ensure.js"
 export function synchronizerDispatcher(
   msg: SynchronizerMessage,
   model: SynchronizerModel,
-  permissions: Rules,
+  rules: Rules,
   logger: Logger,
 ): Command | undefined {
   switch (msg.type) {
@@ -82,10 +82,10 @@ export function synchronizerDispatcher(
       return handleChannelRemoved(msg, model, logger)
 
     case "synchronizer/doc-ensure":
-      return handleDocEnsure(msg, model, permissions)
+      return handleDocEnsure(msg, model, rules)
 
     case "synchronizer/doc-change":
-      return handleDocChange(msg, model, permissions, logger)
+      return handleDocChange(msg, model, rules, logger)
 
     case "synchronizer/doc-delete":
       return handleDocDelete(msg, model, logger)
@@ -96,7 +96,7 @@ export function synchronizerDispatcher(
         msg.envelope.message,
         model,
         msg.envelope.fromChannelId,
-        permissions,
+        rules,
         logger,
       )
   }

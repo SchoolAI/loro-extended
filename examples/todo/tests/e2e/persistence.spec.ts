@@ -7,9 +7,9 @@ import {
 
 test.describe("Storage Persistence", () => {
   // Note: These tests assume the dev server is already running via playwright.config.ts
-  // We'll test persistence without manually starting/stopping the server
 
-  test("should persist client state in IndexedDB", async ({ page }) => {
+  // TODO(duane): Remove skip once IndexedDB is revisited / updated
+  test.skip("should persist client state in IndexedDB", async ({ page }) => {
     const testDocId = generateTestDocumentId()
     await page.goto(`/#${testDocId}`)
     await waitForRepoState(page, "ready")

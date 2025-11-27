@@ -68,7 +68,7 @@ export function handleDocChange(
     docId: DocId
   },
   model: SynchronizerModel,
-  permissions: Rules,
+  rules: Rules,
   logger: Logger,
 ): Command | undefined {
   const { docId } = msg
@@ -104,7 +104,7 @@ export function handleDocChange(
     const isSubscribed = peerState?.subscriptions.has(docId)
 
     // Check if we're allowed to reveal this document to this channel
-    // This enforces privacy rules (e.g., tenant isolation, user permissions)
+    // This enforces privacy rules (e.g., tenant isolation, repo rules)
     // NOTE: If the peer is already subscribed, they know about the document, so we skip this check
     if (!isSubscribed) {
       const context = getRuleContext({
@@ -113,8 +113,8 @@ export function handleDocChange(
         model,
       })
 
-      if (context instanceof Error || !permissions.canReveal(context)) {
-        logger.debug("skipping channel {channelId} due to permissions", {
+      if (context instanceof Error || !rules.canReveal(context)) {
+        logger.debug("skipping channel {channelId} due to rules", {
           channelId: channel.channelId,
         })
         continue // Not allowed to reveal to this channel

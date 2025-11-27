@@ -10,7 +10,7 @@ import type {
   GeneratedChannel,
 } from "./channel.js"
 import { isEstablished } from "./channel.js"
-import { createPermissions } from "./rules.js"
+import { createRules } from "./rules.js"
 import { Synchronizer } from "./synchronizer.js"
 import type { ChannelId } from "./types.js"
 
@@ -96,7 +96,7 @@ describe("Synchronizer - Command Execution", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      permissions: createPermissions(),
+      rules: createRules(),
     })
   })
 

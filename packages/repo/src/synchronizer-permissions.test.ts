@@ -8,7 +8,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "./channel.js"
-import { createPermissions } from "./rules.js"
+import { createRules } from "./rules.js"
 import { Synchronizer } from "./synchronizer.js"
 import type { ChannelId } from "./types.js"
 
@@ -86,7 +86,7 @@ describe("Synchronizer - Permissions Integration", () => {
     const restrictiveSync = new Synchronizer({
       identity: { peerId: "1", name: "test", type: "user" },
       adapters: [freshAdapter as AnyAdapter],
-      permissions: createPermissions({
+      rules: createRules({
         canReveal: context => context.docId !== "secret-doc",
       }),
     })

@@ -1,6 +1,6 @@
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createPermissions } from "../../rules.js"
+import { createRules } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   init as programInit,
@@ -13,7 +13,7 @@ describe("handle-channel-added", () => {
 
   beforeEach(() => {
     update = createSynchronizerUpdate({
-      permissions: createPermissions(),
+      rules: createRules(),
     })
   })
 

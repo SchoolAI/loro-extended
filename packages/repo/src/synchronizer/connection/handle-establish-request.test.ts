@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { isEstablished } from "../../channel.js"
-import { createPermissions } from "../../rules.js"
+import { createRules } from "../../rules.js"
 import {
   createSynchronizerUpdate,
   type SynchronizerMessage,
@@ -16,7 +16,7 @@ describe("handle-establish-request", () => {
 
   beforeEach(() => {
     update = createSynchronizerUpdate({
-      permissions: createPermissions(),
+      rules: createRules(),
     })
   })
 

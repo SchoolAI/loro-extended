@@ -129,7 +129,7 @@ export const complexDocSchema = Shape.doc({
         moderators: crdt.list(
           value.object({
             userId: value.string(),
-            permissions: value.array(value.string()),
+            rules: value.array(value.string()),
           }),
         ),
       }),

@@ -14,7 +14,7 @@ export type RuleContext = {
  * Example: Storage always gets updates, network peers only for public docs
  *
  * ```typescript
- * const permissions = {
+ * const rules = {
  *   canReveal: (context) => {
  *     if (context.channelKind === "storage") {
  *       return true  // Storage always receives updates for persistence
@@ -59,13 +59,14 @@ export interface Rules {
   canDelete(context: RuleContext): boolean
 }
 
-const defaultPermission = () => true
+// Default rule is to "allow" everything
+const defaultAllowed = () => true
 
-export function createPermissions(permissions: Partial<Rules> = {}): Rules {
+export function createRules(rules: Partial<Rules> = {}): Rules {
   return {
-    canBeginSync: permissions?.canBeginSync ?? defaultPermission,
-    canReveal: permissions?.canReveal ?? defaultPermission,
-    canUpdate: permissions?.canUpdate ?? defaultPermission,
-    canDelete: permissions?.canDelete ?? defaultPermission,
+    canBeginSync: rules?.canBeginSync ?? defaultAllowed,
+    canReveal: rules?.canReveal ?? defaultAllowed,
+    canUpdate: rules?.canUpdate ?? defaultAllowed,
+    canDelete: rules?.canDelete ?? defaultAllowed,
   }
 }

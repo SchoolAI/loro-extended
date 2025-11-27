@@ -7,7 +7,7 @@ import { batchAsNeeded } from "../utils.js"
 
 export function handleDirectoryRequest(
   _message: ChannelMsgDirectoryRequest,
-  { channel, model, fromChannelId, permissions, logger }: ChannelHandlerContext,
+  { channel, model, fromChannelId, rules, logger }: ChannelHandlerContext,
 ): Command | undefined {
   // Require established channel for directory operations
   if (!isEstablished(channel)) {
@@ -17,7 +17,7 @@ export function handleDirectoryRequest(
     return
   }
 
-  // Filter documents based on canReveal permission
+  // Filter documents based on canReveal rule
   // We use a Result type to track both successes and errors
   type Result =
     | { success: true; docId: string }
@@ -39,8 +39,8 @@ export function handleDirectoryRequest(
       return []
     }
 
-    // Check canReveal permission - can we tell this peer about this document?
-    if (permissions.canReveal(context)) {
+    // Check canReveal rule - can we tell this peer about this document?
+    if (rules.canReveal(context)) {
       return [{ success: true, docId }]
     } else {
       // Permission denied - don't reveal this document

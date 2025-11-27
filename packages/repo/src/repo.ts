@@ -1,7 +1,7 @@
 import { getLogger, type Logger } from "@logtape/logtape"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { DocHandle } from "./doc-handle.js"
-import { createPermissions, type Rules } from "./rules.js"
+import { createRules, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocId, PeerIdentityDetails } from "./types.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
@@ -9,7 +9,7 @@ import { generatePeerId } from "./utils/generate-peer-id.js"
 export interface RepoParams {
   identity: Omit<PeerIdentityDetails, "peerId"> & { peerId?: `${number}` }
   adapters: AnyAdapter[]
-  permissions?: Partial<Rules>
+  rules?: Partial<Rules>
   onUpdate?: HandleUpdateFn
 }
 
@@ -32,7 +32,7 @@ export class Repo {
   readonly #synchronizer: Synchronizer
   readonly #handles: Map<DocId, DocHandle> = new Map()
 
-  constructor({ identity, adapters, permissions, onUpdate }: RepoParams) {
+  constructor({ identity, adapters, rules, onUpdate }: RepoParams) {
     // Ensure identity has both peerId and name
     this.identity = { ...identity, peerId: identity.peerId ?? generatePeerId() }
 
@@ -47,7 +47,7 @@ export class Repo {
     const synchronizer = new Synchronizer({
       identity: this.identity,
       adapters,
-      permissions: createPermissions(permissions),
+      rules: createRules(rules),
       logger,
       onUpdate,
     })

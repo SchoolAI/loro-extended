@@ -2,7 +2,7 @@
 
 import { LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createPermissions } from "./rules.js"
+import { createRules } from "./rules.js"
 import { Synchronizer } from "./synchronizer.js"
 
 describe("Synchronizer - Document Management", () => {
@@ -12,7 +12,7 @@ describe("Synchronizer - Document Management", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [],
-      permissions: createPermissions(),
+      rules: createRules(),
     })
   })
 

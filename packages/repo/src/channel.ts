@@ -28,7 +28,7 @@ export type SyncTransmission =
       version: VersionVector
     }
   | {
-      // A request to sync can be made to a peer, but that peer may decide not to respond (e.g. permissions), or have nothing to respond with
+      // A request to sync can be made to a peer, but that peer may decide not to respond (e.g. due to rules), or have nothing to respond with
       // (e.g. docId is not in storage)
       type: "unavailable"
     }
