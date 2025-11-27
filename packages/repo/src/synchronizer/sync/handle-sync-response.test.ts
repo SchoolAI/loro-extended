@@ -102,16 +102,32 @@ describe("handle-sync-response", () => {
       },
     }
 
-    const [newModel, _command] = update(message, initialModel)
+    const [newModel, command] = update(message, initialModel)
 
-    // Document should have imported the data
+    // Document should exist (not imported yet - that happens via command)
     const updatedDocState = newModel.documents.get(docId)
     expect(updatedDocState?.doc).toBeDefined()
 
-    // Should update peer awareness
+    // Peer awareness is NOT updated in the handler for snapshot/update
+    // It's updated after import via cmd/import-doc-data -> synchronizer/doc-imported
+    // This is intentional to prevent echo loops
     const peerState = newModel.peers.get(peerId)
     const awareness = peerState?.documentAwareness.get(docId)
-    expect(awareness?.awareness).toBe("has-doc")
+    expect(awareness).toBeUndefined()
+
+    // Should return cmd/import-doc-data command
+    expect(command).toBeDefined()
+    expect(command?.type).toBe("cmd/batch")
+    if (command?.type === "cmd/batch") {
+      const importCmd = command.commands.find(
+        c => c.type === "cmd/import-doc-data",
+      )
+      expect(importCmd).toBeDefined()
+      if (importCmd?.type === "cmd/import-doc-data") {
+        expect(importCmd.docId).toBe(docId)
+        expect(importCmd.fromPeerId).toBe(peerId)
+      }
+    }
   })
 
   it("should handle unavailable response", () => {
@@ -201,7 +217,15 @@ describe("handle-sync-response", () => {
 
     expect(command).toBeUndefined()
   })
-  it("should update peer awareness with peer's version, not local merged version", () => {
+  it("should defer peer awareness update to after import (via cmd/import-doc-data)", () => {
+    // This test verifies the new architecture that prevents echo loops:
+    // 1. handle-sync-response does NOT update peer awareness for snapshot/update
+    // 2. It returns cmd/import-doc-data with fromPeerId
+    // 3. After import, synchronizer/doc-imported updates peer awareness to CURRENT version
+    //
+    // This prevents echoes because peer awareness is set to our merged version
+    // (which includes both local and imported changes), not just the peer's sent version.
+
     const peerId = "test-peer-id" as PeerID
     const channel = createEstablishedChannel(peerId)
     const docId = "test-doc"
@@ -243,21 +267,32 @@ describe("handle-sync-response", () => {
       },
     }
 
-    const [newModel, _command] = update(message, initialModel)
+    const [newModel, command] = update(message, initialModel)
 
-    // Should update peer awareness
+    // Peer awareness should NOT be updated in the handler
+    // It will be updated after import via synchronizer/doc-imported
     const peerState = newModel.peers.get(peerId)
     const awareness = peerState?.documentAwareness.get(docId)
+    expect(awareness).toBeUndefined()
 
-    // The peer's last known version should be what they sent us (peerVersion)
-    // It should NOT be the merged version (which would include "local" + "peer")
-    expect(awareness?.lastKnownVersion?.toJSON()).toEqual(peerVersion.toJSON())
+    // Should return cmd/import-doc-data with fromPeerId
+    expect(command).toBeDefined()
+    expect(command?.type).toBe("cmd/batch")
+    if (command?.type === "cmd/batch") {
+      const importCmd = command.commands.find(
+        c => c.type === "cmd/import-doc-data",
+      )
+      expect(importCmd).toBeDefined()
+      if (importCmd?.type === "cmd/import-doc-data") {
+        expect(importCmd.docId).toBe(docId)
+        expect(importCmd.fromPeerId).toBe(peerId)
+        expect(importCmd.data).toEqual(snapshotData)
+      }
+    }
 
-    // Verify that local doc has merged changes
+    // Document should NOT have imported data yet (import happens via command)
     const updatedDocState = newModel.documents.get(docId)
-    const mergedVersion = updatedDocState?.doc.version()
-
-    // Merged version should be different from peer version (because we had local changes)
-    expect(mergedVersion?.toJSON()).not.toEqual(peerVersion.toJSON())
+    // The doc still has only local changes
+    expect(updatedDocState?.doc.getText("text").toString()).toBe("local")
   })
 })

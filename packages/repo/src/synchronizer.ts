@@ -434,7 +434,11 @@ export class Synchronizer {
       }
 
       case "cmd/import-doc-data": {
-        this.#executeImportDocData(command.docId, command.data)
+        this.#executeImportDocData(
+          command.docId,
+          command.data,
+          command.fromPeerId,
+        )
         break
       }
 
@@ -683,31 +687,46 @@ export class Synchronizer {
       return
     }
 
-    // Subscribe to ALL changes (local + imported) to enable multi-hop propagation
-    // The handler will export the right update for each peer based on their version
-    docState.doc.subscribe(() => {
+    /**
+     * Subscribe to local changes, to be handled by local-doc-change.
+     *
+     * NOTE: Remote (imported) changes are handled explicitly in handle-sync-response.
+     */
+    docState.doc.subscribeLocalUpdates(() => {
       this.#dispatch({
-        type: "synchronizer/doc-change",
+        type: "synchronizer/local-doc-change",
         docId,
       })
     })
+    // For "import" events, we don't dispatch local-doc-change here.
+    // The import is triggered by cmd/import-doc-data, which is followed by
+    // a cmd/dispatch for doc-change with proper peer awareness already set.
   }
 
-  #executeImportDocData(docId: DocId, data: Uint8Array) {
+  #executeImportDocData(docId: DocId, data: Uint8Array, fromPeerId: PeerID) {
     const docState = this.model.documents.get(docId)
     if (!docState) {
-      this.logger.warn(
-        "can't import doc data, doc {docId} not found",
-        { docId },
-      )
+      this.logger.warn("can't import doc data, doc {docId} not found", {
+        docId,
+      })
       return
     }
 
     // Import the document data
-    // This will trigger the doc.subscribe() callback which dispatches doc-change
-    // But now the model has been updated with the peer's awareness, so the
-    // doc-change handler will correctly see that the peer is up-to-date
+    // Note: doc.subscribe() only fires for "local" events, so import won't trigger it
     docState.doc.import(data)
+
+    // After import, dispatch a message to:
+    // 1. Update peer awareness to our CURRENT version (prevents echo)
+    // 2. Trigger doc-change for multi-hop propagation to OTHER peers
+    //
+    // We pass fromPeerId so the doc-change handler knows to skip this peer
+    // (they just sent us this data, so they already have it)
+    this.#dispatch({
+      type: "synchronizer/doc-imported",
+      docId,
+      fromPeerId,
+    })
   }
 
   /**

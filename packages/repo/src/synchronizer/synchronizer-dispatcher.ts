@@ -10,9 +10,10 @@ import { channelDispatcher } from "./channel-dispatcher.js"
 import { handleChannelAdded } from "./connection/handle-channel-added.js"
 import { handleChannelRemoved } from "./connection/handle-channel-removed.js"
 import { handleEstablishChannel } from "./connection/handle-establish-channel.js"
-import { handleDocChange } from "./sync/handle-doc-change.js"
 import { handleDocDelete } from "./sync/handle-doc-delete.js"
 import { handleDocEnsure } from "./sync/handle-doc-ensure.js"
+import { handleDocImported } from "./sync/handle-doc-imported.js"
+import { handleLocalDocChange } from "./sync/handle-local-doc-change.js"
 
 export function synchronizerDispatcher(
   msg: SynchronizerMessage,
@@ -84,8 +85,11 @@ export function synchronizerDispatcher(
     case "synchronizer/doc-ensure":
       return handleDocEnsure(msg, model, rules)
 
-    case "synchronizer/doc-change":
-      return handleDocChange(msg, model, rules, logger)
+    case "synchronizer/local-doc-change":
+      return handleLocalDocChange(msg, model, rules, logger)
+
+    case "synchronizer/doc-imported":
+      return handleDocImported(msg, model, rules, logger)
 
     case "synchronizer/doc-delete":
       return handleDocDelete(msg, model, logger)

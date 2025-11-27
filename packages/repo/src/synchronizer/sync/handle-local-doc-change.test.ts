@@ -13,7 +13,7 @@ import {
   expectCommand,
 } from "../test-utils.js"
 
-describe("handle-doc-change", () => {
+describe("handle-local-doc-change", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>
 
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe("handle-doc-change", () => {
     })
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId,
     }
 
@@ -100,7 +100,7 @@ describe("handle-doc-change", () => {
     initialModel.documents.set(docId, docState)
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId,
     }
 
@@ -137,7 +137,7 @@ describe("handle-doc-change", () => {
     initialModel.documents.set(docId, docState)
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId,
     }
 
@@ -201,7 +201,7 @@ describe("handle-doc-change", () => {
     initialModel.documents.set(docId, docState)
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId,
     }
 
@@ -264,7 +264,7 @@ describe("handle-doc-change", () => {
     })
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId,
     }
 
@@ -295,7 +295,7 @@ describe("handle-doc-change", () => {
     const initialModel = createModelWithChannel(channel)
 
     const message: SynchronizerMessage = {
-      type: "synchronizer/doc-change",
+      type: "synchronizer/local-doc-change",
       docId: "nonexistent-doc",
     }
 

@@ -127,8 +127,13 @@ export type SynchronizerMessage =
 
   // Document lifecycle messages
   | { type: "synchronizer/doc-ensure"; docId: DocId }
-  | { type: "synchronizer/doc-change"; docId: DocId }
+  | { type: "synchronizer/local-doc-change"; docId: DocId }
   | { type: "synchronizer/doc-delete"; docId: DocId }
+  | {
+      type: "synchronizer/doc-imported"
+      docId: DocId
+      fromPeerId: PeerID
+    }
 
   // Channel message received (from network or storage)
   | { type: "synchronizer/channel-receive-message"; envelope: ReturnEnvelope }
@@ -160,7 +165,12 @@ export type Command =
 
   // Document operations
   | { type: "cmd/subscribe-doc"; docId: DocId }
-  | { type: "cmd/import-doc-data"; docId: DocId; data: Uint8Array }
+  | {
+      type: "cmd/import-doc-data"
+      docId: DocId
+      data: Uint8Array
+      fromPeerId: PeerID
+    }
   | { type: "cmd/apply-ephemeral"; docId: DocId; data: Uint8Array }
   | {
       type: "cmd/broadcast-ephemeral"
