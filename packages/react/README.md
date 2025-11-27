@@ -61,8 +61,6 @@ function SimpleTodoApp() {
 
   return (
     <div>
-      {handle?.state === "loading" && <div>Syncing...</div>}
-
       <h1>{data.title || "My Todo List"}</h1>
 
       <button
@@ -149,8 +147,6 @@ function TypedTodoApp() {
   // doc is ALWAYS defined - no loading check needed!
   return (
     <div>
-      {handle?.state === "loading" && <div>Syncing...</div>}
-
       <h1>{doc.title}</h1>
 
       <button
@@ -236,7 +232,7 @@ function useSimpleDocument<T = any>(
    - Example: `changeDoc(doc => doc.getText("title").insert(0, "Hello"))`
 
 3. **`handle: DocHandle | null`** - The document handle
-   - Provides access to sync state and events
+   - Provides access to sync state (via `readyStates`) and events
    - `null` initially, then becomes available
 
 ### `useDocument` - Typed API
@@ -278,7 +274,7 @@ function useDocument<T extends DocShape>(
    - See [`@loro-extended/change`](../change/README.md) for operation details
 
 3. **`handle: DocHandle | null`** - The document handle
-   - Provides access to sync state: `"loading" | "ready" | "unavailable"`
+   - Provides access to sync state (via `readyStates`)
    - Emits events for state changes and document updates
    - `null` initially, then becomes available
 
@@ -335,16 +331,14 @@ import { RepoProvider } from "@loro-extended/react";
 import { Repo } from "@loro-extended/repo";
 
 // Configure your adapters (see @loro-extended/repo docs)
-const repo = new Repo({
-  network: [networkAdapter],
-  storage: storageAdapter,
-});
+const config = {
+  identity: { name: "user-1", type: "user" },
+  adapters: [networkAdapter, storageAdapter],
+};
 
 function App() {
   return (
-    <RepoProvider
-      config={{ network: [networkAdapter], storage: storageAdapter }}
-    >
+    <RepoProvider config={config}>
       <YourComponents />
     </RepoProvider>
   );
@@ -423,15 +417,14 @@ function ConditionalDoc({ documentId }: { documentId: string | null }) {
 function DocumentWithStatus() {
   const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
 
-  const syncStatus = {
-    loading: "Connecting to server...",
-    ready: "Connected",
-    unavailable: "Working offline",
-  }[handle?.state || "loading"];
+  // Check readyStates to determine sync status
+  const isSyncing = handle?.readyStates.some(
+    s => s.loading.state === "requesting"
+  );
 
   return (
     <div>
-      <div className="status-bar">{syncStatus}</div>
+      {isSyncing && <div className="status-bar">Syncing...</div>}
       <DocumentContent doc={doc} onChange={changeDoc} />
     </div>
   );
