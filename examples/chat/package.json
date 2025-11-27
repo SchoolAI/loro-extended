@@ -1,7 +1,7 @@
 {
   "name": "chat-app",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
     "build": "pnpm build:client && pnpm build:server",
