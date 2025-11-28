@@ -1,15 +1,14 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
+import { Adapter, type AnyAdapter } from "../adapter/adapter.js"
 import type {
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
-} from "./channel.js"
-import { createRules } from "./rules.js"
-import { Synchronizer } from "./synchronizer.js"
-import type { ChannelId } from "./types.js"
+} from "../channel.js"
+import { Synchronizer } from "../synchronizer.js"
+import type { ChannelId } from "../types.js"
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<{ name: string }> {
@@ -55,35 +54,44 @@ class MockAdapter extends Adapter<{ name: string }> {
   }
 }
 
-describe("Synchronizer - Reset Functionality", () => {
-  let synchronizer: Synchronizer
+describe("Synchronizer - Adapter Integration", () => {
   let mockAdapter: MockAdapter
 
   beforeEach(() => {
     mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
-    synchronizer = new Synchronizer({
-      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
-      adapters: [mockAdapter as AnyAdapter],
-      rules: createRules(),
-    })
   })
 
-  it("should reset synchronizer state", async () => {
+  it("should send messages through adapters", async () => {
+    new Synchronizer({
+      identity: { peerId: "1", name: "test-synchronizer", type: "user" },
+      adapters: [mockAdapter as AnyAdapter],
+    })
+
     await mockAdapter.waitForStart()
-    const docId = "test-doc"
-    const channel = mockAdapter.simulateChannelAdded("test-channel")
-    synchronizer.getOrCreateDocumentState(docId)
+    mockAdapter.simulateChannelAdded("test-channel")
 
-    // Verify initial state
-    expect(synchronizer.getDocumentState(docId)).toBeDefined()
-    expect(synchronizer.getChannel(channel.channelId)).toBeDefined()
+    // Should have sent establish-request message
+    expect(mockAdapter.sentMessages).toHaveLength(1)
+    expect(mockAdapter.sentMessages[0].message.type).toBe(
+      "channel/establish-request",
+    )
+  })
 
-    // Reset (now async)
-    await synchronizer.reset()
+  it("should handle multiple adapters", async () => {
+    const adapter1 = new MockAdapter({ adapterId: "adapter-1" })
+    const adapter2 = new MockAdapter({ adapterId: "adapter-2" })
 
-    // State should be reset
-    expect(synchronizer.getDocumentState(docId)).toBeUndefined()
-    expect(synchronizer.getChannel(channel.channelId)).toBeUndefined()
-    expect(mockAdapter.channels.size).toBe(0)
+    const multiSync = new Synchronizer({
+      identity: { peerId: "2", name: "test", type: "user" },
+      adapters: [adapter1 as AnyAdapter, adapter2 as AnyAdapter],
+    })
+
+    await adapter1.waitForStart()
+    await adapter2.waitForStart()
+    const channel1 = adapter1.simulateChannelAdded("channel-1")
+    const channel2 = adapter2.simulateChannelAdded("channel-2")
+
+    expect(multiSync.getChannel(channel1.channelId)).toBeDefined()
+    expect(multiSync.getChannel(channel2.channelId)).toBeDefined()
   })
 })

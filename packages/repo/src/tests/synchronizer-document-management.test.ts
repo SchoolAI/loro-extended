@@ -2,8 +2,8 @@
 
 import { LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createRules } from "./rules.js"
-import { Synchronizer } from "./synchronizer.js"
+import { createRules } from "../rules.js"
+import { Synchronizer } from "../synchronizer.js"
 
 describe("Synchronizer - Document Management", () => {
   let synchronizer: Synchronizer

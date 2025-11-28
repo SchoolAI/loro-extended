@@ -1,15 +1,15 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
+import { Adapter, type AnyAdapter } from "../adapter/adapter.js"
 import type {
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
-} from "./channel.js"
-import { createRules } from "./rules.js"
-import { Synchronizer } from "./synchronizer.js"
-import type { ChannelId } from "./types.js"
+} from "../channel.js"
+import { createRules } from "../rules.js"
+import { Synchronizer } from "../synchronizer.js"
+import type { ChannelId } from "../types.js"
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<{ name: string }> {

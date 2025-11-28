@@ -2,16 +2,17 @@
 
 import { LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
+import { Adapter, type AnyAdapter } from "../adapter/adapter.js"
 import type {
   Channel,
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
-} from "./channel.js"
-import { createRules } from "./rules.js"
-import { Synchronizer } from "./synchronizer.js"
-import type { ChannelId } from "./types.js"
+} from "../channel.js"
+import { isEstablished } from "../channel.js"
+import { createRules } from "../rules.js"
+import { Synchronizer } from "../synchronizer.js"
+import type { ChannelId } from "../types.js"
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<{ name: string }> {
@@ -86,7 +87,7 @@ function createVersionVector() {
   return doc.version()
 }
 
-describe("Synchronizer - Channel Queries", () => {
+describe("Synchronizer - Command Execution", () => {
   let synchronizer: Synchronizer
   let mockAdapter: MockAdapter
 
@@ -99,14 +100,11 @@ describe("Synchronizer - Channel Queries", () => {
     })
   })
 
-  it("should get document IDs for channel", async () => {
+  it("should execute send-sync-response command", async () => {
     await mockAdapter.waitForStart()
-    const docId1 = "doc-1"
-    const docId2 = "doc-2"
+    const docId = "test-doc"
     const channel = mockAdapter.simulateChannelAdded("test-channel")
-
-    synchronizer.getOrCreateDocumentState(docId1)
-    synchronizer.getOrCreateDocumentState(docId2)
+    const docState = synchronizer.getOrCreateDocumentState(docId)
 
     // Establish the channel first
     mockAdapter.simulateChannelMessage(channel.channelId, {
@@ -114,18 +112,58 @@ describe("Synchronizer - Channel Queries", () => {
       identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
-    // Simulate sync requests to establish subscriptions
+    // Add some content to the document
+    docState.doc.getText("test").insert(0, "hello")
+
+    // Clear previous messages to make counting easier
+    mockAdapter.sentMessages = []
+
+    // Simulate sync request that should trigger sync response
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
       docs: [
-        { docId: docId1, requesterDocVersion: createVersionVector() },
-        { docId: docId2, requesterDocVersion: createVersionVector() },
+        {
+          docId,
+          requesterDocVersion: createVersionVector(),
+        },
       ],
     })
 
-    const docIds = synchronizer.getChannelDocIds(channel.channelId)
-    expect(docIds).toContain(docId1)
-    expect(docIds).toContain(docId2)
-    expect(docIds).toHaveLength(2)
+    // Should have sent sync-response
+    expect(mockAdapter.sentMessages.length).toBeGreaterThanOrEqual(1)
+    const syncResponse = mockAdapter.sentMessages.find(
+      msg => msg.message.type === "channel/sync-response",
+    )
+    expect(syncResponse).toBeDefined()
+    expect(syncResponse.message.docId).toBe(docId)
+  })
+
+  it("should handle establish channel doc command", async () => {
+    await mockAdapter.waitForStart()
+    const channel = mockAdapter.simulateChannelAdded("test-channel")
+
+    // Simulate establish request/response to get channel into established state
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "1", name: "requester-peer", type: "user" },
+    })
+
+    // Channel should be in established state
+    const updatedChannel = synchronizer.getChannel(channel.channelId)
+    expect(updatedChannel && isEstablished(updatedChannel)).toBe(true)
+  })
+
+  it("should handle batch commands", async () => {
+    await mockAdapter.waitForStart()
+    const channel = mockAdapter.simulateChannelAdded("test-channel")
+
+    // Simulate establish request which should generate batch command
+    mockAdapter.simulateChannelMessage(channel.channelId, {
+      type: "channel/establish-request",
+      identity: { peerId: "1", name: "requester-peer", type: "user" },
+    })
+
+    // Should have executed multiple commands (establish + send message)
+    expect(mockAdapter.sentMessages.length).toBeGreaterThan(1)
   })
 })

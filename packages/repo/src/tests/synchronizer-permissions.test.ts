@@ -1,18 +1,18 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
 import { describe, expect, it, vi } from "vitest"
-import { Adapter, type AnyAdapter } from "./adapter/adapter.js"
-import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
+import { Adapter, type AnyAdapter } from "../adapter/adapter.js"
+import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import type {
   Channel,
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
-} from "./channel.js"
-import { Repo } from "./repo.js"
-import { createRules } from "./rules.js"
-import { Synchronizer } from "./synchronizer.js"
-import type { ChannelId } from "./types.js"
+} from "../channel.js"
+import { Repo } from "../repo.js"
+import { createRules } from "../rules.js"
+import { Synchronizer } from "../synchronizer.js"
+import type { ChannelId } from "../types.js"
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<{ name: string }> {

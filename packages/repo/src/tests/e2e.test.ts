@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
-import { Repo } from "./repo.js"
-import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
+import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
+import { Repo } from "../repo.js"
+import { InMemoryStorageAdapter } from "../storage/in-memory-storage-adapter.js"
 
 // Integration test suite for the Repo
 describe("Repo E2E", () => {

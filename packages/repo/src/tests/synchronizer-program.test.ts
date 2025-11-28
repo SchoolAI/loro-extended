@@ -2,7 +2,7 @@
 
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createRules } from "./rules.js"
+import { createRules } from "../rules.js"
 import {
   createEstablishedChannel,
   createMockChannel,
@@ -10,13 +10,13 @@ import {
   createVersionVector,
   expectBatchCommand,
   expectCommand,
-} from "./synchronizer/test-utils.js"
+} from "../synchronizer/test-utils.js"
 import {
   createSynchronizerUpdate,
   init as programInit,
   type SynchronizerMessage,
-} from "./synchronizer-program.js"
-import { createDocState } from "./types.js"
+} from "../synchronizer-program.js"
+import { createDocState } from "../types.js"
 
 describe("Synchronizer Program - Integration Tests", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

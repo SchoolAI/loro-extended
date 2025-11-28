@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
-import { Repo } from "./repo.js"
+import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
+import { Repo } from "../repo.js"
 
 /**
  * Tests for ephemeral/presence in a hub-and-spoke topology.
