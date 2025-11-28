@@ -35,7 +35,7 @@
     "uuid": "^9.0.1"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.9.0"
+    "loro-crdt": "^1.10.2"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",

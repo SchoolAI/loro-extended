@@ -9,8 +9,6 @@ export class TextDraftNode extends DraftNode<TextContainerShape> {
 
   // Text methods
   insert(index: number, content: string): void {
-    // TODO(duane): condition can be removed when https://github.com/loro-dev/loro/issues/872 is addressed
-    if (content.length === 0) return
     this.container.insert(index, content)
   }
 

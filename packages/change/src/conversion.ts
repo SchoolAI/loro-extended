@@ -30,10 +30,7 @@ import {
 function convertTextInput(value: string): LoroText {
   const text = new LoroText()
 
-  // TODO(duane): condition can be removed when https://github.com/loro-dev/loro/issues/872 is addressed
-  if (value.length > 0) {
-    text.insert(0, value)
-  }
+  text.insert(0, value)
 
   return text
 }
