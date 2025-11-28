@@ -107,22 +107,17 @@ function processDocumentUpdate(
     // Only reply if needed
     if (!lastMsg.needsAiReply) return
 
-    setTimeout(() => {
-      typedDoc.change(draft => {
-        const lastMsg = draft.messages.get(draft.messages.length - 1)
-
-        lastMsg.needsAiReply = false
-      })
-    }, 0)
-
-    // Mark as processed immediately
-    // lastMsg.needsAiReply = false
+    // Check this off as taken care of
+    typedDoc.change(draft => {
+      const lastMsg = draft.messages.get(draft.messages.length - 1)
+      lastMsg.needsAiReply = false
+    })
 
     let userCount = 0
     const presence = presences.get(docId)
     if (presence) {
       for (const value of Object.values(presence)) {
-        if ((value as any).type === "user") userCount++
+        if (value && (value as any).type === "user") userCount++
       }
 
       if (userCount >= 2 && !lastMsg.content.toString().includes("@ai")) {
