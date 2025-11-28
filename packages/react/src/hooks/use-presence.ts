@@ -47,13 +47,16 @@ export function usePresence<
 ) {
   const { handle } = useDocHandleState(docId)
 
+  const shape =
+    shapeOrSelector &&
+    typeof shapeOrSelector === "object" &&
+    "_type" in shapeOrSelector
+      ? shapeOrSelector
+      : undefined
+
   // Create a stable store that wraps the presence
   const store = useMemo(() => {
-    const isTyped =
-      shapeOrSelector &&
-      typeof shapeOrSelector === "object" &&
-      "_type" in shapeOrSelector &&
-      emptyState !== undefined
+    const isTyped = shape && emptyState !== undefined
 
     if (!handle) {
       const empty = isTyped
@@ -75,7 +78,7 @@ export function usePresence<
 
     if (isTyped) {
       const typedPresence = handle.typedPresence(
-        shapeOrSelector as S,
+        shape as S,
         emptyState as InferPlainType<S>,
       )
       const setSelf = (values: Partial<InferPlainType<S>>) => {
@@ -126,7 +129,7 @@ export function usePresence<
     const getSnapshot = () => cachedState
 
     return { subscribe, getSnapshot }
-  }, [handle, shapeOrSelector, emptyState])
+  }, [handle, shape, emptyState])
 
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
 
