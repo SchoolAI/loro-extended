@@ -38,26 +38,28 @@ import type {
 import type { Command } from "../../synchronizer-program.js"
 import { ensurePeerState } from "../peer-state-helpers.js"
 import type { ChannelHandlerContext } from "../types.js"
+import { batchAsNeeded, filterAllowedDocs, getAllDocsToSync } from "../utils.js"
 
 export function handleEstablishRequest(
   message: ChannelMsgEstablishRequest,
-  { channel, model, fromChannelId }: ChannelHandlerContext,
+  { channel, model, fromChannelId, rules }: ChannelHandlerContext,
 ): Command | undefined {
+  const commands: Command[] = []
+
   // 1. Extract stable peerId from identity and establish the peer connection
   const peerId = message.identity.peerId
-  Object.assign(channel, {
+  const establishedChannel: EstablishedChannel = {
     ...channel,
     type: "established",
     peerId,
-  } satisfies EstablishedChannel)
+  }
+  Object.assign(channel, establishedChannel)
 
   // 2. Get or create peer state for reconnection optimization
   ensurePeerState(model, message.identity, channel.channelId)
 
   // 3. Send establish-response back to the requester
-  // Note: We only send establish-response here, not sync-request
-  // The client will send sync-request after receiving establish-response
-  return {
+  commands.push({
     type: "cmd/send-establishment-message",
     envelope: {
       toChannelIds: [fromChannelId],
@@ -72,5 +74,31 @@ export function handleEstablishRequest(
         },
       },
     },
+  })
+
+  // 4. Send sync-request for all allowed documents
+  // This ensures the client discovers our documents even without directory-request
+  const allowedDocs = filterAllowedDocs(
+    model.documents,
+    establishedChannel,
+    model,
+    rules,
+  )
+  const docsToSync = getAllDocsToSync(allowedDocs)
+
+  if (docsToSync.length > 0) {
+    commands.push({
+      type: "cmd/send-message",
+      envelope: {
+        toChannelIds: [fromChannelId],
+        message: {
+          type: "channel/sync-request",
+          docs: docsToSync,
+          bidirectional: true,
+        },
+      },
+    })
   }
+
+  return batchAsNeeded(...commands)
 }

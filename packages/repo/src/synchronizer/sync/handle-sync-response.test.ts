@@ -115,13 +115,14 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/import-doc-data command directly (document already exists, so no batch needed)
+    // Should return cmd/import-doc-data
     expect(command).toBeDefined()
     expect(command?.type).toBe("cmd/import-doc-data")
-    expect(command?.type === "cmd/import-doc-data" && command.docId).toBe(docId)
-    expect(command?.type === "cmd/import-doc-data" && command.fromPeerId).toBe(
-      peerId,
-    )
+
+    if (command?.type === "cmd/import-doc-data") {
+      expect(command.docId).toBe(docId)
+      expect(command.fromPeerId).toBe(peerId)
+    }
   })
 
   it("should handle unavailable response", () => {
@@ -269,16 +270,15 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/import-doc-data with fromPeerId directly (document already exists, so no batch needed)
+    // Should return cmd/import-doc-data
     expect(command).toBeDefined()
     expect(command?.type).toBe("cmd/import-doc-data")
-    expect(command?.type === "cmd/import-doc-data" && command.docId).toBe(docId)
-    expect(command?.type === "cmd/import-doc-data" && command.fromPeerId).toBe(
-      peerId,
-    )
-    expect(command?.type === "cmd/import-doc-data" && command.data).toEqual(
-      snapshotData,
-    )
+
+    if (command?.type === "cmd/import-doc-data") {
+      expect(command.docId).toBe(docId)
+      expect(command.fromPeerId).toBe(peerId)
+      expect(command.data).toEqual(snapshotData)
+    }
 
     // Document should NOT have imported data yet (import happens via command)
     const updatedDocState = newModel.documents.get(docId)

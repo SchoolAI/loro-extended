@@ -29,7 +29,7 @@ export function handleEphemeral(
     const toChannelIds = allChannelIds.filter(id => id !== fromChannelId)
 
     if (toChannelIds.length > 0) {
-      // Use cmd/relay-ephemeral to forward the original data unchanged
+      // Use cmd/send-message to forward the original data unchanged
       const relayCommand: Command = {
         type: "cmd/send-message",
         envelope: {

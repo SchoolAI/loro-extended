@@ -12,7 +12,6 @@ import {
   createModelWithChannel,
   createModelWithKnownPeer,
   createVersionVector,
-  expectBatchCommand,
   expectCommand,
   sendEstablishResponse,
 } from "../test-utils.js"
@@ -29,6 +28,8 @@ describe("handle-establish-response", () => {
   it("should establish channel and send discovery messages", () => {
     const channel = createMockChannel()
     const initialModel = createModelWithChannel(channel)
+    // Add a document so we have something to sync
+    initialModel.documents.set("doc-1", createDocState({ docId: "doc-1" }))
 
     const message: SynchronizerMessage = {
       type: "synchronizer/channel-receive-message",
@@ -59,9 +60,8 @@ describe("handle-establish-response", () => {
       expect(peerState?.identity.name).toBe("test")
     }
 
-    // Should return batch command with directory-request and sync-request
-    expectBatchCommand(command)
-    expect(command.commands.length).toBeGreaterThanOrEqual(1)
+    // Should return sync-request
+    expectCommand(command, "cmd/send-message")
   })
 
   describe("reconnection detection", () => {
@@ -81,20 +81,12 @@ describe("handle-establish-response", () => {
       // Creates peer state
       expect(newModel.peers.has("1")).toBe(true)
 
-      // Sends directory-request + sync-request
-      expectBatchCommand(command)
-      expect(command.commands).toHaveLength(2)
-
-      const cmd0 = command.commands[0]
-      expectCommand(cmd0, "cmd/send-message")
-      expect(cmd0.envelope.message.type).toBe("channel/directory-request")
-
-      const cmd1 = command.commands[1]
-      expectCommand(cmd1, "cmd/send-message")
-      expect(cmd1.envelope.message.type).toBe("channel/sync-request")
-      if (cmd1.envelope.message.type === "channel/sync-request") {
-        expect(cmd1.envelope.message.docs).toHaveLength(2)
-        expect(cmd1.envelope.message.bidirectional).toBe(true)
+      // Sends sync-request
+      expectCommand(command, "cmd/send-message")
+      expect(command.envelope.message.type).toBe("channel/sync-request")
+      if (command.envelope.message.type === "channel/sync-request") {
+        expect(command.envelope.message.docs).toHaveLength(2)
+        expect(command.envelope.message.bidirectional).toBe(true)
       }
     })
 
@@ -147,6 +139,7 @@ describe("handle-establish-response", () => {
         update,
       )
 
+      // Now returns sync-request
       expectCommand(command, "cmd/send-message")
       if (command.envelope.message.type === "channel/sync-request") {
         expect(command.envelope.message.docs).toHaveLength(1)
@@ -177,7 +170,8 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      expect(command).toBeUndefined() // No sync needed
+      // No sync needed
+      expect(command).toBeUndefined()
     })
 
     it("skips documents peer doesn't have", () => {
@@ -196,7 +190,8 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      expect(command).toBeUndefined() // Don't sync docs they don't have
+      // Don't sync docs they don't have
+      expect(command).toBeUndefined()
     })
 
     it("handles mixed new, changed, and unchanged docs", () => {

@@ -8,7 +8,6 @@ import {
   createMockChannel,
   createModelWithChannel,
   createVersionVector,
-  expectBatchCommand,
   expectCommand,
 } from "../synchronizer/test-utils.js"
 import {
@@ -118,33 +117,6 @@ describe("Synchronizer Program - Integration Tests", () => {
   })
 
   describe("utility functions and edge cases", () => {
-    it("should handle batch commands correctly", () => {
-      const channel = createMockChannel()
-      const initialModel = createModelWithChannel(channel)
-
-      const message: SynchronizerMessage = {
-        type: "synchronizer/channel-receive-message",
-        envelope: {
-          fromChannelId: channel.channelId,
-          message: {
-            type: "channel/establish-response",
-            identity: {
-              peerId: "remote-peer-id" as PeerID,
-              name: "test",
-              type: "user",
-            },
-          },
-        },
-      }
-
-      const [_newModel, command] = update(message, initialModel)
-
-      // establish-response sends batch with directory-request and sync-request
-      expectBatchCommand(command)
-      expect(command.commands.length).toBeGreaterThanOrEqual(1)
-      expect(command.commands.every(c => c !== undefined)).toBe(true)
-    })
-
     it("should return single command when only one is needed", () => {
       const [initialModel] = programInit({
         peerId: "test-id" as PeerID,

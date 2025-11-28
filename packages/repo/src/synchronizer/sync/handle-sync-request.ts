@@ -162,7 +162,7 @@ export function handleSyncRequest(
       requesterDocVersion,
     })
 
-    // 2. Since peer has requested the doc, also send the presence ephemeral state
+    // 2. Since peer has requested the doc, also send all our ephemeral (presence) state
     commands.push({
       type: "cmd/broadcast-ephemeral",
       docId,
@@ -184,10 +184,13 @@ export function handleSyncRequest(
 
   // Send reciprocal sync-request if needed
   if (reciprocalDocs.length > 0) {
-    logger.debug("sending reciprocal sync-request", {
-      peerId: channel.peerId,
-      docCount: reciprocalDocs.length,
-    })
+    logger.debug(
+      "sending reciprocal sync-request to {peerId} for {docCount} docs",
+      {
+        peerId: channel.peerId,
+        docCount: reciprocalDocs.length,
+      },
+    )
 
     commands.push({
       type: "cmd/send-message",

@@ -497,9 +497,19 @@ export class Synchronizer {
 
       case "cmd/broadcast-ephemeral": {
         const store = this.getOrCreateEphemeralStore(command.docId)
+        const currentValue = store.get(this.identity.peerId)
 
         // Reset EphemeralStore timeout for this peer's values
-        store.set(this.identity.peerId, store.get(this.identity.peerId))
+        // Only if we have a value - otherwise we're setting undefined which causes deletion
+        if (currentValue !== undefined) {
+          store.set(this.identity.peerId, currentValue)
+        }
+
+        // If we are only sending our own data, and we don't have any, skip broadcast
+        // This prevents sending accidental deletions when we haven't set presence yet
+        if (!command.allPeerData && currentValue === undefined) {
+          break
+        }
 
         const data = command.allPeerData
           ? store.encodeAll()
