@@ -1,79 +1,236 @@
-# Loro Extended Utilities
+# Loro Extended
 
-This monorepo contains a collection of packages that extend the functionality of the [Loro](https://github.com/loro-dev/loro) CRDT library.
+**A toolkit for building local-first applications and multi-agent systems with [Loro](https://github.com/loro-dev/loro).**
 
-## What is Loro?
+`@loro-extended` adds a pleasant layer of abstraction--schemas, network synchronization, persistence, and reactivity--to a raw CRDT engine called Loro. It's built to make it easy to focus on distributed application logic, instead of the usual shuttling of state between peers, clients, agents, etc. in a distributed system.
 
-[Loro](https://github.com/loro-dev/loro) is a high-performance CRDT (Conflict-free Replicated Data Type) library that enables real-time collaboration without conflicts. CRDTs allow multiple users to edit the same data simultaneously - changes automatically merge in a consistent way across all peers, even when they're offline.
+---
 
-## Why These Extensions?
+## The "Zero-Plumbing" Philosophy
 
-While Loro provides powerful low-level CRDT operations, building collaborative applications requires additional abstractions:
+Whether you are building a web app or a group of cooperating AI agents, managing state synchronization is often the hardest part. You spend half your time writing "plumbing": API endpoints, WebSocket handlers, retry logic, and conflict resolution.
 
-- **Simpler APIs**: Writing `doc.getMap("root").setContainer("todos", new LoroList())` is verbose. With our extensions, you can write `d.todos = []`.
-- **Document Management**: Syncing CRDTs across peers requires handling network protocols, storage, and peer discovery.
-- **Framework Integration**: React and other frameworks need reactive bindings to automatically update UI when documents change.
+**We think there's a better way.**
 
-These packages will soon provide production-ready solutions to these common needs.
+Instead of treating state as something you _fetch_ and _save_, treat it as something you _have_. You mutate local data, and the system handles the rest—persisting it, syncing it, and merging it.
 
-## 🚀 Quick Start: Building a Collaborative React App
+---
 
-Want to build a real-time collaborative app? With the @loro-extended/react package, it's as simple as:
+## Use Case 1: Modern Web Development
 
-```tsx
-import { useDocument } from "@loro-extended/react";
+For web developers, `@loro-extended` offers a "Local-First" architecture that simplifies your stack while improving user experience.
 
-const [doc, changeDoc, handle] = useDocument<TodoDoc>("document-id");
+### The Problem: API Fatigue
 
-// Make changes with natural JavaScript syntax
-changeDoc((d) => {
-  d.todos.push({ id: "1", text: "Build something amazing", done: false });
+In a traditional app, a simple "Add Todo" feature requires:
+
+1.  Optimistic UI update code.
+2.  A `POST /api/todos` endpoint.
+3.  Database schema and migration.
+4.  WebSocket logic to broadcast the change.
+5.  Client-side logic to merge incoming updates.
+
+### The Solution: Mutation Sync
+
+With `@loro-extended`, the process is:
+
+1.  **You write:** `doc.todos.push(newTodo)`
+2.  **Done.**
+
+The library (optionally) persists the change to IndexedDB for offline support, queues it, and syncs it with peers or servers automatically. You get:
+
+- **Real-time Collaboration:** Multiplayer is default, not a feature add-on.
+- **Offline Capability:** Apps work perfectly without internet and sync when back online.
+- **Instant Load:** No loading spinners; data is available immediately from local storage.
+
+---
+
+## Use Case 2: Agentic Cooperation
+
+For AI engineers, `@loro-extended` provides a shared memory substrate for multi-agent systems.
+
+### The Problem: Context & Coordination
+
+Agents often need "full context" to make good decisions--chat history, current world state, and user intent.
+
+- **Stateless Agents** suffer from amnesia or require massive context windows re-sent with every request.
+- **Database-Backed Agents** are slow, constantly polling or fetching state, leading to race conditions when multiple agents (or users) act simultaneously.
+
+### The Solution: Shared CRDT Memory
+
+By treating agents as "peers" in a CRDT network, you decouple **Execution** (the LLM) from **State** (the Memory).
+
+- **Agents as Observers:** An agent can subscribe to a document. When a user (or another agent) changes the state, the agent is notified immediately with the precise delta.
+- **Concurrent Action:** Multiple agents can work on the same task--one generating code, another fixing bugs, a third updating the UI--without locking the state or overwriting each other.
+- **Resilience:** If an agent process crashes, the state is safe. Another agent can pick up exactly where it left off, because the state lives in the CRDT, not the agent's memory.
+
+---
+
+## Why Loro Extended?
+
+### 1. Schema-First & Type-Safe
+
+Raw CRDTs can feel like "schemaless JSON soup." We bring structure back. Define a `Shape`, and get full TypeScript inference for every mutation.
+
+```typescript
+// Define your schema once
+const schema = Shape.doc({
+  todos: Shape.list(
+    Shape.map({
+      text: Shape.text(),
+      done: Shape.plain.boolean(),
+    })
+  ),
 });
 
-// Your UI automatically updates when any user makes changes!
-// <>{doc.todos.map(...)}</>
+// Get full intellisense and type checking
+doc.change((draft) => {
+  draft.todos.push({ text: "Buy milk", done: false }); // ✅ Type-safe
+  draft.todos.push({ text: 123 }); // ❌ Error: Type 'number' is not assignable to 'string'
+});
 ```
 
-The `useDocument` hook (and accompanying RepoProvider) handles everything:
+### 2. Instant Load (No Spinners)
 
-- ✅ **Automatic synchronization** across all connected users
-- ✅ **Offline support** with automatic reconnection and merge
-- ✅ **Type-safe** mutations with TypeScript
-- ✅ **React-optimized** re-renders only when data changes
+With our **Empty State Overlay**, your app renders immediately with default values while the real data syncs in the background.
 
-This single hook connects all the pieces: `@loro-extended/change` for natural mutations, `@loro-extended/repo` for document management, and network adapters for real-time sync. Check out the [@loro-extended/react package](./packages/react/README.md) to see how easy collaborative apps can be!
+- **Before:** `if (!data) return <Spinner />`
+- **After:** `return <div>{doc.title}</div>` (Renders "Untitled" immediately, then updates)
 
-## Packages
+### 3. Performance
 
-- **`packages/change`**: A utility that provides a simple, Immer-style `change()` method for mutating Loro documents with an `ExtendedLoroDoc` wrapper that hides internal complexity.
+Built on [Loro](https://github.com/loro-dev/loro), which is written in Rust. It is incredibly fast at merging and calculating diffs, capable of handling large documents and long editing sessions that slow other libraries down. In addition, it supports [shallow snapshots and redaction](https://loro.dev/docs/concepts/shallow_snapshots), so you aren't tied to the entire document history forever.
 
-  - [View Package README](./packages/change/README.md)
+---
 
-- **`packages/repo`**: A peer-to-peer document syncing repository with pluggable storage and network adapters. Re-exports all change utilities for convenience.
+## The Stack
 
-  - [View Package README](./packages/repo/README.md)
+This monorepo is a collection of packages designed to work together:
 
-- **`packages/adapters`**: A collection of network and storage adapters including Server-Sent Events for real-time synchronization, IndexedDB for browser storage, and LevelDB for server storage.
+| Package                                              | Description                                                                                                         |
+| :--------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| **[`@loro-extended/change`](./packages/change)**     | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.        |
+| **[`@loro-extended/repo`](./packages/repo)**         | **The Sync Engine.** Manages document lifecycle, storage (IndexedDB), and network sync. It's your local data store. |
+| **[`@loro-extended/react`](./packages/react)**       | **The UI Layer.** Hooks like `useDocument` and `usePresence` that bind your data to your views.                     |
+| **[`@loro-extended/adapters`](./packages/adapters)** | **The Connectors.** Pluggable backends for Network (WebSocket, SSE) and Storage (IndexedDB, LevelDB).               |
 
-  - [View Package README](./packages/adapters/README.md)
+---
 
-- **`packages/react`**: React hooks and utilities for building collaborative applications with automatic synchronization and optimized re-renders.
+## 🚀 Quick Start
 
-  - [View Package README](./packages/react/README.md)
+Here is a complete collaborative "Counter" app in React.
 
-- **`examples/todo-app`**: An example implementation of a React + Vite + ExpressJS app demonstrating real-time collaborative editing.
-  - [View Package README](./examples/todo-app/README.md)
+```tsx
+import { useDocument, Shape } from "@loro-extended/react";
+
+// 1. Define Schema
+const counterSchema = Shape.doc({
+  count: Shape.counter(),
+  users: Shape.list(Shape.plain.string()),
+});
+
+function App() {
+  // 2. Use the hook (Auto-syncs, Auto-persists)
+  const [doc, changeDoc] = useDocument("global-counter", counterSchema, {
+    count: 0,
+    users: [],
+  });
+
+  return (
+    <div>
+      <h1>Count: {doc.count}</h1>
+
+      <button onClick={() => changeDoc((d) => d.count.increment(1))}>+1</button>
+
+      <button onClick={() => changeDoc((d) => d.users.push("New User"))}>
+        Join
+      </button>
+
+      <pre>{JSON.stringify(doc.users, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+### Setting up the RepoProvider
+
+To make the `useDocument` hook work, you need to wrap your application in a `RepoProvider`. This is where you configure your network and storage adapters.
+
+```tsx
+import { RepoProvider } from "@loro-extended/react";
+import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
+import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
+
+// 1. Create your adapters
+const network = new SseClientNetworkAdapter({
+  postUrl: "/sync/post",
+  eventSourceUrl: (peerId) => `/sync/events?peerId=${peerId}`,
+});
+const storage = new IndexedDBStorageAdapter();
+
+// 2. Configure the Repo
+const config = {
+  adapters: [network, storage],
+  identity: { name: "user-123" }, // Optional: Identify this peer
+};
+
+// 3. Wrap your app
+function Root() {
+  return (
+    <RepoProvider config={config}>
+      <App />
+    </RepoProvider>
+  );
+}
+```
+
+### Setting up the Server
+
+To enable real-time sync between users, you need a simple server. We provide an Express middleware that handles the synchronization protocol.
+
+```typescript
+import express from "express";
+import { Repo } from "@loro-extended/repo";
+import {
+  SseServerNetworkAdapter,
+  createSseExpressRouter,
+} from "@loro-extended/adapters/network/sse/server";
+import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server";
+
+const app = express();
+
+// 1. Create adapters
+const network = new SseServerNetworkAdapter();
+const storage = new LevelDBStorageAdapter("./db");
+
+// 2. Create the Repo (binds network <-> storage)
+new Repo({
+  adapters: [network, storage],
+  identity: { name: "server" },
+});
+
+// 3. Mount the sync endpoints
+app.use("/sync", createSseExpressRouter(network));
+
+app.listen(3000);
+```
 
 ## Architecture
 
-This library uses sophisticated patterns for reliable distributed state management:
+We use the **Elm Architecture (TEA)** pattern for our synchronization engine's state machine, ensuring predictable state transitions even in complex network conditions.
 
-- **The Elm Architecture (TEA)**: Pure functional state machines with impure runtime hosts for predictable state transitions
-- **Pluggable Adapter System**: Modular storage and network backends for different environments
-- **Event-Driven Synchronization**: Robust peer-to-peer protocol with automatic conflict resolution
+- [Read about the Repo Architecture](./packages/repo/src/repo.md)
+- [Read about the Sync Protocol](./packages/repo/src/synchronizer.md)
 
-For detailed architectural information, see:
+## What is Loro?
 
-- [Repo Architecture](./packages/repo/src/repo.md) - Overall system design and orchestration
-- [DocHandle State Machine](./packages/repo/src/doc-handle.md) - Document lifecycle management
-- [Synchronizer Protocol](./packages/repo/src/synchronizer.md) - Peer-to-peer synchronization details
+[Loro](https://github.com/loro-dev/loro) is the high-performance CRDT library that powers this stack. It is written in Rust and provides the core mathematical guarantees that allow concurrent editing without conflicts.
+
+While Loro provides the _engine_ (the CRDTs themselves), `@loro-extended` provides the _car_ (the application framework).
+
+- **Loro** gives you: `LoroMap`, `LoroList`, `LoroText`, and the merging algorithms.
+- **Loro Extended** gives you: Schemas, React Hooks, Network Sync, and Persistence.
+
+## License
+
+MIT
