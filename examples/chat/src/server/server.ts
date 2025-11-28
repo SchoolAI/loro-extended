@@ -122,7 +122,7 @@ function processDocumentUpdate(
     const presence = presences.get(docId)
     if (presence) {
       for (const value of Object.values(presence)) {
-        if (value?.type === "user") userCount++
+        if ((value as any).type === "user") userCount++
       }
 
       if (userCount >= 2 && !lastMsg.content.toString().includes("@ai")) {
