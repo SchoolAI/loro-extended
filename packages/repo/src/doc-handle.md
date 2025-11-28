@@ -134,6 +134,9 @@ class DocHandle<T extends DocContent> extends EventEmitter<DocHandleEvents<T>> {
   // Background loading (called automatically by Repo)
   loadFromStorage(): Promise<void>;
   requestFromNetwork(timeout?: number): Promise<void>;
+
+  // Typed Presence
+  typedPresence<S>(shape: S, emptyState: InferPlainType<S>): TypedPresence<S>;
 }
 ```
 

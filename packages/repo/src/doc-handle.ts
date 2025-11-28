@@ -1,6 +1,12 @@
 import { getLogger, type Logger } from "@logtape/logtape"
+import type {
+  ContainerShape,
+  InferPlainType,
+  ValueShape,
+} from "@loro-extended/change"
 import type { LoroDoc, Value } from "loro-crdt"
 import type { ObjectValue, Synchronizer } from "./synchronizer.js"
+import { TypedPresence } from "./typed-presence.js"
 import type { DocContent, DocId, LoroDocMutator, ReadyState } from "./types.js"
 
 /** Custom predicate for determining readiness */
@@ -192,5 +198,16 @@ export class DocHandle<T extends DocContent = DocContent> {
         s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
       )
     })
+  }
+  /**
+   * Get a typed presence interface for this document.
+   * @param shape The shape of the presence data
+   * @param emptyState The default values for the presence data
+   */
+  typedPresence<S extends ContainerShape | ValueShape>(
+    shape: S,
+    emptyState: InferPlainType<S>,
+  ): TypedPresence<S> {
+    return new TypedPresence(shape, emptyState, this)
   }
 }

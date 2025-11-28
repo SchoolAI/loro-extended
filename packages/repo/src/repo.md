@@ -192,6 +192,30 @@ handle.presence.subscribe((peers) => {
 });
 ```
 
+### 3.4. Typed Presence
+
+For type safety and default values, you can use the `typedPresence` API:
+
+```typescript
+import { Shape } from "@loro-extended/change";
+
+const PresenceSchema = Shape.plain.object({
+  name: Shape.plain.string(),
+  cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() }),
+});
+
+const EmptyPresence = {
+  name: "Anonymous",
+  cursor: { x: 0, y: 0 },
+};
+
+const presence = handle.typedPresence(PresenceSchema, EmptyPresence);
+
+// Access typed values with defaults applied
+console.log(presence.self.name); // "Anonymous"
+console.log(presence.all["peer-id"].cursor.x); // 0
+```
+
 ## 4. Testing Strategy
 
 The architecture supports comprehensive testing:

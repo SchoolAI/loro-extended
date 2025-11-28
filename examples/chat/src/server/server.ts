@@ -3,12 +3,16 @@ import {
   SseServerNetworkAdapter,
 } from "@loro-extended/adapters/network/sse/server"
 import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
-import { TypedDoc } from "@loro-extended/change"
+import { type InferPlainType, TypedDoc } from "@loro-extended/change"
 import { type DocHandle, type DocId, Repo } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
-import { ChatSchema } from "../shared/types.js"
+import {
+  ChatSchema,
+  EmptyPresence,
+  PresenceSchema,
+} from "../shared/types.js"
 import { logger, model } from "./config.js"
 import { requestLogger } from "./request-logger.js"
 
@@ -21,7 +25,10 @@ app.use(requestLogger())
 
 // Track active subscriptions to avoid double-subscribing
 const subscriptions = new Map<DocId, () => void>()
-const presences = new Map<DocId, any>()
+const presences = new Map<
+  DocId,
+  Record<string, InferPlainType<typeof PresenceSchema>>
+>()
 
 // Stream LLM response into a message
 async function streamLLMResponse(
@@ -117,7 +124,7 @@ function processDocumentUpdate(
     const presence = presences.get(docId)
     if (presence) {
       for (const value of Object.values(presence)) {
-        if (value && (value as any).type === "user") userCount++
+        if (value.type === "user") userCount++
       }
 
       if (userCount >= 2 && !lastMsg.content.toString().includes("@ai")) {
@@ -164,8 +171,9 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  const unsubscribePresence = handle.presence.subscribe(values => {
-    presences.set(docId, values)
+  const typedPresence = handle.typedPresence(PresenceSchema, EmptyPresence)
+  const unsubscribePresence = typedPresence.subscribe(({ all }) => {
+    presences.set(docId, all)
   })
 
   subscriptions.set(docId, () => {

@@ -131,6 +131,25 @@ handle.doc.getMap("root").set("title", "Direct Access");
 handle.doc.commit(); // Don't forget to commit!
 ```
 
+#### Typed Presence
+
+For type safety and default values, you can use the `typedPresence` API:
+
+```typescript
+import { Shape } from "@loro-extended/change";
+
+const PresenceSchema = Shape.plain.object({
+  name: Shape.plain.string(),
+});
+
+const EmptyPresence = {
+  name: "Anonymous",
+};
+
+const presence = handle.typedPresence(PresenceSchema, EmptyPresence);
+console.log(presence.self.name); // "Anonymous" (default)
+```
+
 ## Adapters
 
 Adapters are the backbone of the synchronization system, providing a pluggable architecture for network and storage.

@@ -1,7 +1,12 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
 import type { DocId, PeerID, ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
-import { ChatSchema, type Message } from "../shared/types"
+import {
+  ChatSchema,
+  EmptyPresence,
+  type Message,
+  PresenceSchema,
+} from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
@@ -47,18 +52,20 @@ function ChatApp() {
   })
 
   // Use ephemeral state for presence
-  const { all, self, setSelf } = usePresence(docId)
+  const { all, self, setSelf } = usePresence(
+    docId,
+    PresenceSchema,
+    EmptyPresence,
+  )
 
   const authors: Map<PeerID, string> = new Map([[repo.identity.peerId, "You"]])
 
   // Set self presence
   useEffect(() => {
-    setSelf({ type: "user", lastSeen: Date.now() })
+    setSelf({ type: "user" })
   }, [setSelf])
 
-  const memberCount = Object.values(all).filter(
-    (p: any) => p?.type === "user",
-  ).length
+  const memberCount = Object.values(all).filter(p => p.type === "user").length
 
   // Auto-scroll to bottom when messages change
   useAutoScroll(messagesEndRef, doc.messages)

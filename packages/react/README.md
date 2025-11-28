@@ -278,6 +278,21 @@ function useDocument<T extends DocShape>(
    - Emits events for state changes and document updates
    - `null` initially, then becomes available
 
+### `usePresence` - Typed Presence
+
+For schema-aware presence with type safety and default values.
+
+```typescript
+const { self, all, setSelf } = usePresence(
+  documentId,
+  presenceSchema,
+  emptyPresence
+);
+
+// self: InferPlainType<PresenceSchema>
+// all: Record<string, InferPlainType<PresenceSchema>>
+```
+
 ## Choosing Between APIs
 
 ### Use Simple API When:

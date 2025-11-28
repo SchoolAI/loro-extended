@@ -85,6 +85,22 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
     case "tree":
       return crdtValue ?? emptyValue ?? []
     default:
+      if (shape._type === "value" && shape.valueType === "object") {
+        const crdtObj = (crdtValue as any) ?? {}
+        const emptyObj = (emptyValue as any) ?? {}
+        const result = { ...emptyObj }
+
+        if (typeof crdtObj !== "object" || crdtObj === null) {
+          return crdtValue ?? emptyValue
+        }
+
+        for (const [key, propShape] of Object.entries(shape.shape)) {
+          const propCrdt = crdtObj[key]
+          const propEmpty = emptyObj[key]
+          result[key] = mergeValue(propShape, propCrdt, propEmpty)
+        }
+        return result
+      }
       return crdtValue ?? emptyValue
   }
 }

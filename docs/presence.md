@@ -93,6 +93,18 @@ We employ a dual-strategy for cleanup:
     - The `EphemeralStore` is initialized with a timeout (e.g., `HEARTBEAT_INTERVAL * 2`).
     - If a peer silently vanishes (crash, network partition) and we miss the disconnect event, their data will automatically expire and be removed by the store's internal logic.
 
+## Typed Presence
+
+To improve developer experience and type safety, `loro-extended` provides a `TypedPresence` API. This allows you to define a schema for your presence data and provides default values for missing fields.
+
+```typescript
+const presence = handle.typedPresence(PresenceSchema, EmptyPresence);
+```
+
+This ensures that:
+1.  **Type Safety**: Accessing `presence.self` or `presence.all` returns strongly typed objects.
+2.  **Default Values**: If a peer hasn't set their presence yet, or if they are missing specific fields, the `EmptyPresence` defaults are automatically applied. This eliminates the need for manual null checks and type casting.
+
 ## Appendix: Gaps & Future Work
 
 1.  **Scaling**: Sending the full store on heartbeat/handshake is O(N) where N is peers in the presence. For very large presence groups, this could be optimized to delta updates.

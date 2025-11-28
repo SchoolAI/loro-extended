@@ -27,3 +27,13 @@ export type Message = {
   timestamp: number
   needsAiReply: false
 }
+
+export const PresenceSchema = Shape.plain.object({
+  type: Shape.plain.string(), // "user" | "ai"
+  name: Shape.plain.string(),
+})
+
+export const EmptyPresence = {
+  type: "user",
+  name: "Anonymous",
+}
