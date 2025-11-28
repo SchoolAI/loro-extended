@@ -8,6 +8,7 @@ import type {
   ObjectValueShape,
   RecordContainerShape,
   RecordValueShape,
+  StringValueShape,
   UnionValueShape,
   ValueShape,
 } from "./shape.js"
@@ -108,13 +109,20 @@ export function validateValue(
     const valueSchema = schema as ValueShape
 
     switch (valueSchema.valueType) {
-      case "string":
+      case "string": {
         if (typeof value !== "string") {
           throw new Error(
             `Expected string at path ${currentPath}, got ${typeof value}`,
           )
         }
+        const stringSchema = valueSchema as StringValueShape
+        if (stringSchema.options && !stringSchema.options.includes(value)) {
+          throw new Error(
+            `Expected one of [${stringSchema.options.join(", ")}] at path ${currentPath}, got "${value}"`,
+          )
+        }
         return value
+      }
 
       case "number":
         if (typeof value !== "number") {

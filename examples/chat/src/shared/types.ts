@@ -3,7 +3,7 @@ import type { PeerID } from "@loro-extended/repo"
 
 export const MessageSchema = Shape.map({
   id: Shape.plain.string(),
-  role: Shape.plain.string(), // 'user' | 'assistant'
+  role: Shape.plain.string("user", "assistant"),
   author: Shape.plain.string(), // peerId or 'ai' for AI
   content: Shape.text(), // LoroText for streaming
   timestamp: Shape.plain.number(),
@@ -29,11 +29,11 @@ export type Message = {
 }
 
 export const PresenceSchema = Shape.plain.object({
-  type: Shape.plain.string(), // "user" | "ai"
+  type: Shape.plain.string("user", "ai"),
   name: Shape.plain.string(),
 })
 
 export const EmptyPresence = {
-  type: "user",
+  type: "user" as const,
   name: "Anonymous",
 }

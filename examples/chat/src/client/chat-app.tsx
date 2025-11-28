@@ -52,11 +52,7 @@ function ChatApp() {
   })
 
   // Use ephemeral state for presence
-  const { all, self, setSelf } = usePresence(
-    docId,
-    PresenceSchema,
-    EmptyPresence,
-  )
+  const { all, setSelf } = usePresence(docId, PresenceSchema, EmptyPresence)
 
   const authors: Map<PeerID, string> = new Map([[repo.identity.peerId, "You"]])
 

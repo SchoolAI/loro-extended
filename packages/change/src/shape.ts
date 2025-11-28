@@ -104,9 +104,11 @@ export type ContainerShape =
 export type ContainerType = ContainerShape["_type"]
 
 // LoroValue shape types - a shape for each of Loro's Value types
-export interface StringValueShape extends Shape<string, string> {
+export interface StringValueShape<T extends string = string>
+  extends Shape<T, T> {
   readonly _type: "value"
   readonly valueType: "string"
+  readonly options?: T[]
 }
 export interface NumberValueShape extends Shape<number, number> {
   readonly _type: "value"
@@ -251,11 +253,14 @@ export const Shape = {
   // "Last Write Wins", meaning there is no subtle convergent behavior here, just taking
   // the most recent value based on the current available information.
   plain: {
-    string: (): StringValueShape => ({
+    string: <T extends string = string>(
+      ...options: T[]
+    ): StringValueShape<T> => ({
       _type: "value" as const,
       valueType: "string" as const,
-      _plain: "",
-      _draft: "",
+      _plain: (options[0] ?? "") as T,
+      _draft: (options[0] ?? "") as T,
+      options: options.length > 0 ? options : undefined,
     }),
 
     number: (): NumberValueShape => ({
