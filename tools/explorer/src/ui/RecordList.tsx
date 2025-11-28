@@ -73,13 +73,15 @@ export const RecordList: React.FC<RecordListProps> = ({
         {visibleRecords.map((record, i) => {
           const actualIndex = start + i
           const isSelected = actualIndex === selectedIndex
-          const date = new Date(parseInt(record.timestamp))
+          const date = new Date(Number.parseInt(record.timestamp, 10))
 
           return (
             <Box key={record.key}>
               <Text color={isSelected ? "green" : "white"} bold={isSelected}>
                 {isSelected ? "> " : "  "}
-                {format(date, "HH:mm:ss")} - {record.type}
+                {format(date, "HH:mm:ss.SSSS")}
+                {" - "}
+                {record.type === "update" ? "U" : "S"}
               </Text>
             </Box>
           )
