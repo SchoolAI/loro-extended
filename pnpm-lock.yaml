@@ -372,9 +372,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.20.6)
-      zod:
-        specifier: ^4.1.4
-        version: 4.1.4
 
 packages:
 
