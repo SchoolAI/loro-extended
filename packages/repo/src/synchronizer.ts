@@ -508,6 +508,10 @@ export class Synchronizer {
         // If we are only sending our own data, and we don't have any, skip broadcast
         // This prevents sending accidental deletions when we haven't set presence yet
         if (!command.allPeerData && currentValue === undefined) {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral: skipping for {docId}",
+            () => ({ docId: command.docId }),
+          )
           break
         }
 
@@ -516,7 +520,7 @@ export class Synchronizer {
           : store.encode(this.identity.peerId)
 
         if (data.length > 0) {
-          this.adapters.send({
+          const sent = this.adapters.send({
             toChannelIds: command.toChannelIds,
             message: {
               type: "channel/ephemeral",
@@ -525,6 +529,15 @@ export class Synchronizer {
               data,
             },
           })
+          this.logger.debug(
+            "cmd/broadcast-ephemeral: sent {docId} to {sent} peers",
+            { docId: command.docId, sent },
+          )
+        } else {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral: skipping for {docId} (no data)",
+            () => ({ docId: command.docId }),
+          )
         }
         break
       }

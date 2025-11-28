@@ -11,6 +11,7 @@ import { handleDirectoryResponse } from "./discovery/handle-directory-response.j
 import { handleEphemeral } from "./ephemeral/handle-ephemeral.js"
 import { handleSyncRequest } from "./sync/handle-sync-request.js"
 import { handleSyncResponse } from "./sync/handle-sync-response.js"
+import { handleSyncUpdate } from "./sync/handle-sync-update.js"
 import type { ChannelHandlerContext } from "./types.js"
 
 /**
@@ -97,6 +98,9 @@ export function channelDispatcher(
 
     case "channel/sync-response":
       return handleSyncResponse(channelMessage, ctx)
+
+    case "channel/update":
+      return handleSyncUpdate(channelMessage, ctx)
 
     case "channel/directory-request":
       return handleDirectoryRequest(channelMessage, ctx)

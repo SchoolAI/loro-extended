@@ -68,7 +68,7 @@ export function handleDocImported(
   const sourcePeerState = model.peers.get(fromPeerId)
   if (sourcePeerState) {
     setPeerDocumentAwareness(sourcePeerState, docId, "has-doc", ourVersion)
-    logger.debug(
+    logger.trace(
       "doc-imported: updated peer awareness for {peerId} to our version",
       {
         docId,
@@ -78,7 +78,7 @@ export function handleDocImported(
     )
   }
 
-  logger.debug(
+  logger.trace(
     "doc-imported processing for {docId} from {fromPeerId} with {channelCount} channels",
     {
       docId,

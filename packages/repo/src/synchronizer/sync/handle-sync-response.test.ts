@@ -115,13 +115,24 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/import-doc-data
+    // Should return cmd/batch containing cmd/import-doc-data and cmd/broadcast-ephemeral
     expect(command).toBeDefined()
-    expect(command?.type).toBe("cmd/import-doc-data")
+    expect(command?.type).toBe("cmd/batch")
 
-    if (command?.type === "cmd/import-doc-data") {
-      expect(command.docId).toBe(docId)
-      expect(command.fromPeerId).toBe(peerId)
+    if (command?.type === "cmd/batch") {
+      const importCmd = command.commands.find(
+        c => c.type === "cmd/import-doc-data",
+      )
+      expect(importCmd).toBeDefined()
+      if (importCmd?.type === "cmd/import-doc-data") {
+        expect(importCmd.docId).toBe(docId)
+        expect(importCmd.fromPeerId).toBe(peerId)
+      }
+
+      const broadcastCmd = command.commands.find(
+        c => c.type === "cmd/broadcast-ephemeral",
+      )
+      expect(broadcastCmd).toBeDefined()
     }
   })
 
@@ -270,14 +281,20 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/import-doc-data
+    // Should return cmd/batch containing cmd/import-doc-data and cmd/broadcast-ephemeral
     expect(command).toBeDefined()
-    expect(command?.type).toBe("cmd/import-doc-data")
+    expect(command?.type).toBe("cmd/batch")
 
-    if (command?.type === "cmd/import-doc-data") {
-      expect(command.docId).toBe(docId)
-      expect(command.fromPeerId).toBe(peerId)
-      expect(command.data).toEqual(snapshotData)
+    if (command?.type === "cmd/batch") {
+      const importCmd = command.commands.find(
+        c => c.type === "cmd/import-doc-data",
+      )
+      expect(importCmd).toBeDefined()
+      if (importCmd?.type === "cmd/import-doc-data") {
+        expect(importCmd.docId).toBe(docId)
+        expect(importCmd.fromPeerId).toBe(peerId)
+        expect(importCmd.data).toEqual(snapshotData)
+      }
     }
 
     // Document should NOT have imported data yet (import happens via command)

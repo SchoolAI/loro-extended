@@ -90,7 +90,7 @@ export function propagateToPeers(options: PropagationOptions): Command[] {
 
     // Skip excluded peer (e.g., the source of an import)
     if (excludePeerId && channel.peerId === excludePeerId) {
-      logger.debug(
+      logger.trace(
         `${logPrefix}: skipping excluded peer {peerId} on channel {channelId}`,
         {
           channelId: channel.channelId,
@@ -233,7 +233,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
         envelope: {
           toChannelIds: [channel.channelId],
           message: {
-            type: "channel/sync-response",
+            type: "channel/update",
             docId,
             transmission,
           },

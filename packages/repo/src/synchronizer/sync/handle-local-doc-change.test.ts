@@ -69,8 +69,8 @@ describe("handle-local-doc-change", () => {
     // Should send sync-response with update
     expectCommand(command, "cmd/send-message")
     expect(command.envelope.toChannelIds).toEqual([1])
-    expect(command.envelope.message.type).toBe("channel/sync-response")
-    if (command.envelope.message.type === "channel/sync-response") {
+    expect(command.envelope.message.type).toBe("channel/update")
+    if (command.envelope.message.type === "channel/update") {
       expect(command.envelope.message.docId).toBe(docId)
       expect(command.envelope.message.transmission.type).toBe("update")
       // Data is now exported per-peer, so we just check it exists
@@ -283,10 +283,7 @@ describe("handle-local-doc-change", () => {
     // One should be sync-response, one should be directory-response
     const messages = [cmd0.envelope.message, cmd1.envelope.message]
     const types = messages.map(m => m.type).sort()
-    expect(types).toEqual([
-      "channel/directory-response",
-      "channel/sync-response",
-    ])
+    expect(types).toEqual(["channel/directory-response", "channel/update"])
   })
 
   it("should log error when document not found", () => {

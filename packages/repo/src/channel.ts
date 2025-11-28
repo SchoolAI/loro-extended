@@ -69,6 +69,12 @@ export type ChannelMsgSyncResponse = {
   transmission: SyncTransmission
 }
 
+export type ChannelMsgUpdate = {
+  type: "channel/update"
+  docId: DocId
+  transmission: SyncTransmission
+}
+
 export type ChannelMsgDirectoryRequest = {
   type: "channel/directory-request"
   docIds?: DocId[]
@@ -141,6 +147,7 @@ export type EstablishmentMsg =
 export type EstablishedMsg =
   | ChannelMsgSyncRequest
   | ChannelMsgSyncResponse
+  | ChannelMsgUpdate
   | ChannelMsgDirectoryRequest
   | ChannelMsgDirectoryResponse
   | ChannelMsgDeleteRequest

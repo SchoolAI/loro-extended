@@ -67,6 +67,11 @@ export type ChannelMsgJSON =
       transmission: SyncTransmissionJSON
     }
   | {
+      type: "channel/update"
+      docId: string
+      transmission: SyncTransmissionJSON
+    }
+  | {
       type: "channel/directory-request"
       docIds?: string[]
     }
@@ -149,6 +154,7 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
       }
 
     case "channel/sync-response":
+    case "channel/update":
       return {
         ...msg,
         transmission: serializeSyncTransmission(msg.transmission),
@@ -211,6 +217,7 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
       }
 
     case "channel/sync-response":
+    case "channel/update":
       return {
         ...json,
         transmission: deserializeSyncTransmission(json.transmission),

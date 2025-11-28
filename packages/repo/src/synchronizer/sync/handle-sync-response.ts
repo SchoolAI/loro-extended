@@ -58,15 +58,16 @@ import type { ChannelMsgSyncResponse } from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
-import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
-import { getRuleContext } from "../rule-context.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
+import { applySyncTransmission } from "./utils.js"
 
 export function handleSyncResponse(
   message: ChannelMsgSyncResponse,
-  { channel, model, fromChannelId, rules, logger }: ChannelHandlerContext,
+  context: ChannelHandlerContext,
 ): Command | undefined {
+  const { channel, model, fromChannelId, logger } = context
+
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
     logger.warn(
@@ -110,80 +111,29 @@ export function handleSyncResponse(
     }
   }
 
-  // Handle different transmission types
-  switch (message.transmission.type) {
-    case "up-to-date": {
-      // CASE 1: Document is already up to date
-      // Peer has the document and our version matches theirs
-      // No data to apply, just update metadata
+  // Apply the sync transmission
+  commands.push(...applySyncTransmission(message, context))
 
-      // Update peer awareness for reconnection optimization
-      setPeerDocumentAwareness(
-        peerState,
-        message.docId,
-        "has-doc",
-        message.transmission.version,
-      )
-
-      break
-    }
-
-    case "snapshot":
-    case "update": {
-      // CASE 2: Peer is sending us document data
-      // Either full snapshot or delta update
-
-      if (!docState) {
-        logger.warn(
-          `sync-response: docState missing for ${message.docId} (should have been created)`,
-        )
-        return
-      }
-
-      // Check canUpdate permission before applying data
-      // This enforces write rules and enables read-only replicas
-      const context = getRuleContext({ channel, docState, model })
-      if (context instanceof Error) {
-        logger.warn(`can't check canUpdate: ${context.message}`)
-        return
-      }
-      if (!rules.canUpdate(context)) {
-        logger.warn(`rejecting update from ${context.peerName}`)
-        return
-      }
-
-      // IMPORTANT: Import and propagation strategy
-      //
-      // We use a two-phase approach to prevent echo loops:
-      // 1. Import the data via cmd/import-doc-data
-      // 2. After import, dispatch doc-imported to propagate to OTHER peers
-      //
-      // Peer awareness is updated AFTER import via cmd/update-peer-awareness-after-import
-      // to ensure we set it to our CURRENT version (which includes both local and imported
-      // changes), preventing the echo loop.
-      commands.push({
-        type: "cmd/import-doc-data",
-        docId: message.docId,
-        data: message.transmission.data,
-        fromPeerId: channel.peerId,
-      })
-
-      break
-    }
-
-    case "unavailable": {
-      // CASE 3: Peer doesn't have the document (yet)
-      // We requested but peer doesn't have it
-      //
-      // IMPORTANT: Don't change subscriptions!
-      // - Keep subscription (we sent sync-request)
-      // - This ensures future updates will be sent when document is created
-      // - Particularly important for storage adapters that request before persisting
-
-      // Update peer awareness - peer explicitly doesn't have this doc
-      setPeerDocumentAwareness(peerState, message.docId, "no-doc")
-      break
-    }
+  // IMPORTANT: Re-broadcast our ephemeral data after initial sync
+  //
+  // This handles the case where presence was set BEFORE sync completed.
+  // When presence is set before any channels are established, the broadcast
+  // goes to 0 peers. Now that sync is complete, we re-broadcast our ephemeral
+  // data so the peer (and any hub relay) knows about our presence.
+  //
+  // We use hopsRemaining: 1 to allow hub-and-spoke relay to propagate
+  // our presence to other peers.
+  if (
+    message.transmission.type === "snapshot" ||
+    message.transmission.type === "update"
+  ) {
+    commands.push({
+      type: "cmd/broadcast-ephemeral",
+      docId: message.docId,
+      allPeerData: false, // Only send our own data
+      hopsRemaining: 1, // Allow relay through hub
+      toChannelIds: [fromChannelId],
+    })
   }
 
   return batchAsNeeded(...commands)

@@ -225,5 +225,67 @@ describe("Ephemeral Store - Timing Issues", () => {
       expect(peerStateA?.subscriptions.has(docId)).toBe(true)
       expect(peerStateB?.subscriptions.has(docId)).toBe(true)
     })
+    describe("Late Joiner Presence Visibility", () => {
+      it("should propagate presence set BEFORE sync completes (React pattern)", async () => {
+        /**
+         * This test simulates what happens in a React app:
+         * 1. Component mounts and immediately calls setSelf()
+         * 2. This happens BEFORE the sync-request/response completes
+         * 3. The broadcast goes to 0 peers because no channels are established yet
+         * 4. When sync completes, the server should still notify existing clients
+         */
+        const docId = "react-pattern-doc"
+
+        // Client A connects first and sets presence
+        const handleA = clientA.get(docId)
+        server.get(docId)
+
+        await wait(100)
+
+        handleA.presence.set({ type: "user", name: "Alice" })
+
+        await wait(100)
+
+        // Now simulate what React does: create client B and IMMEDIATELY set presence
+        // before waiting for sync to complete
+        clientB = new Repo({
+          identity: { name: "clientB", type: "user" },
+          adapters: [
+            new BridgeAdapter({
+              bridge: serverBridgeToB,
+              adapterId: "clientB-adapter",
+            }),
+          ],
+        })
+
+        const handleB = clientB.get(docId)
+
+        // Set presence IMMEDIATELY - before sync completes
+        // This is what React's useEffect does
+        handleB.presence.set({ type: "user", name: "Bob" })
+
+        // Wait for sync to complete and presence to propagate
+        // Using 500ms which is much less than the 10s heartbeat
+        await wait(500)
+
+        const peerIdA = clientA.identity.peerId
+        const peerIdB = clientB.identity.peerId
+
+        // Client B should see Client A's presence (server sends it during sync)
+        const clientBPresenceOfA = handleB.presence.all[peerIdA]
+        expect(clientBPresenceOfA).toBeDefined()
+        expect((clientBPresenceOfA as Record<string, unknown>)?.name).toBe(
+          "Alice",
+        )
+
+        // THIS IS THE KEY ASSERTION:
+        // Client A should see Client B's presence even though B set it before sync completed
+        const clientAPresenceOfB = handleA.presence.all[peerIdB]
+        expect(clientAPresenceOfB).toBeDefined()
+        expect((clientAPresenceOfB as Record<string, unknown>)?.name).toBe(
+          "Bob",
+        )
+      })
+    })
   })
 })
