@@ -1,5 +1,16 @@
 # @loro-extended/react
 
+## 0.4.0
+
+### Minor Changes
+
+- Accurate and fast presence updates
+
+### Patch Changes
+
+- Updated dependencies
+  - @loro-extended/repo@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
