@@ -5,6 +5,7 @@ import { createRules, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocId, PeerIdentityDetails } from "./types.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
+import { validatePeerId } from "./utils/validate-peer-id.js"
 
 export interface RepoParams {
   identity: Omit<PeerIdentityDetails, "peerId"> & { peerId?: `${number}` }
@@ -33,8 +34,12 @@ export class Repo {
   readonly #handles: Map<DocId, DocHandle> = new Map()
 
   constructor({ identity, adapters, rules, onUpdate }: RepoParams) {
+    // Validate peerId if provided, otherwise generate one
+    const peerId = identity.peerId ?? generatePeerId()
+    validatePeerId(peerId)
+
     // Ensure identity has both peerId and name
-    this.identity = { ...identity, peerId: identity.peerId ?? generatePeerId() }
+    this.identity = { ...identity, peerId }
 
     const logger = getLogger(["@loro-extended", "repo"]).with({
       identity: this.identity,
