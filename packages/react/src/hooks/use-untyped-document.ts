@@ -1,12 +1,12 @@
 import type { DocHandle, DocId } from "@loro-extended/repo"
 import type { LoroDoc } from "loro-crdt"
 import type { SimpleChangeFn } from "./use-doc-changer.js"
-import { useSimpleDocChanger } from "./use-doc-changer.js"
+import { useUntypedDocChanger } from "./use-doc-changer.js"
 import type { DocWrapper } from "./use-doc-handle-state.js"
 import { useRawLoroDoc } from "./use-doc-handle-state.js"
 
-/** The return type of the `useSimpleDocument` hook. */
-export type UseSimpleDocumentReturn = [
+/** The return type of the `useUntypedDocument` hook. */
+export type UseUntypedDocumentReturn = [
   /** The current LoroDoc (null when not ready). */
   doc: LoroDoc | null,
   /** A function to change the document directly. */
@@ -32,7 +32,7 @@ export type UseSimpleDocumentReturn = [
  *   todos: Array<{ id: string; text: string; completed: boolean }>;
  * }
  *
- * const [doc, changeDoc, handle] = useSimpleDocument<TodoDoc>("todo-doc");
+ * const [doc, changeDoc, handle] = useUntypedDocument("todo-doc");
  *
  * // Check if doc is ready before using
  * if (!doc) {
@@ -57,9 +57,11 @@ export type UseSimpleDocumentReturn = [
  * );
  * ```
  */
-export function useSimpleDocument(documentId: DocId): UseSimpleDocumentReturn {
+export function useUntypedDocument(
+  documentId: DocId,
+): UseUntypedDocumentReturn {
   const { doc, handle } = useRawLoroDoc(documentId)
-  const changeDoc = useSimpleDocChanger(handle)
+  const changeDoc = useUntypedDocChanger(handle)
 
   return [doc, changeDoc, handle]
 }

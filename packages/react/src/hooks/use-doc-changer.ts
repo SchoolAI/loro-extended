@@ -46,6 +46,6 @@ export function useDocChanger<TInput = LoroDoc>(
  * Simple document changer that works directly with LoroDoc.
  * Built on top of useDocChanger for consistency.
  */
-export function useSimpleDocChanger(handle: DocHandle<DocWrapper> | null) {
+export function useUntypedDocChanger(handle: DocHandle<DocWrapper> | null) {
   return useDocChanger<LoroDoc>(handle)
 }

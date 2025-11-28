@@ -1,5 +1,5 @@
 import { Shape } from "@loro-extended/change"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { DocHandle } from "./doc-handle.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import { Synchronizer } from "./synchronizer.js"

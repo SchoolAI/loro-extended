@@ -42,7 +42,7 @@ pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crd
 For direct LoroDoc access without schema dependencies:
 
 ```tsx
-import { useSimpleDocument } from "@loro-extended/react";
+import { useUntypedDocument } from "@loro-extended/react";
 
 interface TodoDoc {
   title: string;
@@ -50,7 +50,7 @@ interface TodoDoc {
 }
 
 function SimpleTodoApp() {
-  const [doc, changeDoc, handle] = useSimpleDocument("todo-doc");
+  const [doc, changeDoc, handle] = useUntypedDocument("todo-doc");
 
   // Check if doc is ready before using
   if (!doc) {
@@ -198,14 +198,14 @@ function TypedTodoApp() {
 
 ## Core Hooks
 
-### `useSimpleDocument` - Simple API
+### `useUntypedDocument` - Simple API
 
 For direct LoroDoc access without schema dependencies.
 
 #### Signature
 
 ```typescript
-function useSimpleDocument<T = any>(
+function useUntypedDocument<T = any>(
   documentId: string
 ): [
   doc: LoroDoc | null,
@@ -293,6 +293,17 @@ const { self, all, setSelf } = usePresence(
 // all: Record<string, InferPlainType<PresenceSchema>>
 ```
 
+### `useUntypedPresence` - Untyped Presence
+
+For presence without schema validation.
+
+```typescript
+const { self, all, setSelf } = useUntypedPresence(documentId);
+
+// self: any
+// all: Record<string, any>
+```
+
 ## Choosing Between APIs
 
 ### Use Simple API When:
@@ -329,7 +340,7 @@ const { self, all, setSelf } = usePresence(
 
 ```tsx
 // Simple API - requires loading check
-const [doc, changeDoc] = useSimpleDocument("doc-id");
+const [doc, changeDoc] = useUntypedDocument("doc-id");
 if (!doc) return <div>Loading...</div>;
 
 // Typed API - always available
@@ -367,8 +378,8 @@ function App() {
 ```tsx
 // Simple API
 function MultiDocApp() {
-  const [todos, changeTodos] = useSimpleDocument<TodoDoc>("todos");
-  const [notes, changeNotes] = useSimpleDocument<NoteDoc>("notes");
+  const [todos, changeTodos] = useUntypedDocument<TodoDoc>("todos");
+  const [notes, changeNotes] = useUntypedDocument<NoteDoc>("notes");
 
   return (
     <div>
@@ -397,7 +408,7 @@ function MultiDocApp() {
 ```tsx
 // Simple API
 function ConditionalDoc({ documentId }: { documentId: string | null }) {
-  const [doc, changeDoc] = useSimpleDocument(documentId || "default");
+  const [doc, changeDoc] = useUntypedDocument(documentId || "default");
 
   if (!documentId) {
     return <div>Select a document</div>;
@@ -434,7 +445,7 @@ function DocumentWithStatus() {
 
   // Check readyStates to determine sync status
   const isSyncing = handle?.readyStates.some(
-    s => s.loading.state === "requesting"
+    (s) => s.loading.state === "requesting"
   );
 
   return (
@@ -482,7 +493,7 @@ For advanced use cases, you can access the underlying building blocks:
 import {
   useDocHandleState,
   useRawLoroDoc,
-  useDocChanger,
+  useUntypedDocChanger,
   useTypedDocState,
   useTypedDocChanger,
 } from "@loro-extended/react";
@@ -490,7 +501,7 @@ import {
 // Custom hook combining base components
 function useCustomDocument(documentId: string) {
   const { handle } = useDocHandleState(documentId);
-  const changeDoc = useDocChanger(handle);
+  const changeDoc = useUntypedDocChanger(handle);
 
   // Your custom logic here
 

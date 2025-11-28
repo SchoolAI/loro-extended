@@ -1,14 +1,14 @@
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { useSimpleDocument } from "./use-simple-document.js"
+import { useUntypedDocument } from "./use-untyped-document.js"
 
-describe("useSimpleDocument", () => {
+describe("useUntypedDocument", () => {
   it("should return the expected tuple structure", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useSimpleDocument(documentId), {
+    const { result } = renderHook(() => useUntypedDocument(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -23,11 +23,11 @@ describe("useSimpleDocument", () => {
     expect(handle).not.toBeNull() // Handle is immediately available
   })
 
-  it("should compose useSimpleLoroDocState and useSimpleLoroDocChanger correctly", () => {
+  it("should compose useRawLoroDoc and useUntypedDocChanger correctly", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useSimpleDocument(documentId), {
+    const { result } = renderHook(() => useUntypedDocument(documentId), {
       wrapper: RepoWrapper,
     })
 
@@ -50,7 +50,7 @@ describe("useSimpleDocument", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result, rerender } = renderHook(
-      () => useSimpleDocument(documentId),
+      () => useUntypedDocument(documentId),
       {
         wrapper: RepoWrapper,
       },
@@ -71,7 +71,7 @@ describe("useSimpleDocument", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result, rerender } = renderHook(
-      ({ docId }) => useSimpleDocument(docId),
+      ({ docId }) => useUntypedDocument(docId),
       {
         initialProps: { docId: documentId1 },
         wrapper: RepoWrapper,
@@ -108,7 +108,7 @@ describe("useSimpleDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(() => useSimpleDocument(documentId), {
+    const { result } = renderHook(() => useUntypedDocument(documentId), {
       wrapper: RepoWrapper,
     })
 
