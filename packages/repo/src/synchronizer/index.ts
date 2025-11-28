@@ -18,9 +18,9 @@ export {
   shouldSyncWithPeer,
 } from "./peer-state-helpers.js"
 export { getRuleContext } from "./rule-context.js"
-export { handleLocalDocChange } from "./sync/handle-local-doc-change.js"
 export { handleDocDelete } from "./sync/handle-doc-delete.js"
 export { handleDocEnsure } from "./sync/handle-doc-ensure.js"
+export { handleLocalDocChange } from "./sync/handle-local-doc-change.js"
 export { handleSyncRequest } from "./sync/handle-sync-request.js"
 export { handleSyncResponse } from "./sync/handle-sync-response.js"
 // Types
