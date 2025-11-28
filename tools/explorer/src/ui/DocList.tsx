@@ -28,7 +28,7 @@ export const DocList: React.FC<DocListProps> = ({
   }
 
   const items = docIds.map(id => ({
-    label: id,
+    label: `${id}  `,
     value: id,
   }))
 

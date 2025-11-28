@@ -1,4 +1,4 @@
-import { Box, Text } from "ink"
+import { Box, Text, useApp } from "ink"
 import { type default as React, useEffect, useMemo, useState } from "react"
 import { LevelDBReader, type Record } from "../db.js"
 import { DocumentReconstructor } from "../engine.js"
@@ -21,6 +21,8 @@ export const App: React.FC<AppProps> = ({ dbPath }) => {
   const [selectedRecordIndex, setSelectedRecordIndex] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
 
+  const { exit } = useApp()
+
   // Initialize DB
   useEffect(() => {
     const reader = new LevelDBReader(dbPath)
@@ -28,13 +30,18 @@ export const App: React.FC<AppProps> = ({ dbPath }) => {
 
     reader
       .listDocIds()
-      .then(setDocIds)
+      .then(docIds => {
+        if (docIds.length === 0) {
+          exit()
+        }
+        setDocIds(docIds)
+      })
       .catch(err => setError(String(err)))
 
     return () => {
       reader.close().catch(console.error)
     }
-  }, [dbPath])
+  }, [dbPath, exit])
 
   // Load records when doc is selected
   useEffect(() => {
