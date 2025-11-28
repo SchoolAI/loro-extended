@@ -21,6 +21,7 @@ app.use(requestLogger())
 
 // Track active subscriptions to avoid double-subscribing
 const subscriptions = new Map<DocId, () => void>()
+const presences = new Map<DocId, any>()
 
 // Stream LLM response into a message
 async function streamLLMResponse(
@@ -106,8 +107,29 @@ function processDocumentUpdate(
     // Only reply if needed
     if (!lastMsg.needsAiReply) return
 
+    setTimeout(() => {
+      typedDoc.change(draft => {
+        const lastMsg = draft.messages.get(draft.messages.length - 1)
+
+        lastMsg.needsAiReply = false
+      })
+    }, 0)
+
     // Mark as processed immediately
-    lastMsg.needsAiReply = false
+    // lastMsg.needsAiReply = false
+
+    let userCount = 0
+    const presence = presences.get(docId)
+    if (presence) {
+      for (const value of Object.values(presence)) {
+        if (value?.type === "user") userCount++
+      }
+
+      if (userCount >= 2 && !lastMsg.content.toString().includes("@ai")) {
+        // Don't respond as an assistent
+        return
+      }
+    }
 
     // Start with an empty message
     const assistantMsgId = appendAssistantMessage(typedDoc, "")
@@ -132,11 +154,11 @@ function getChatDoc(handle: DocHandle) {
 // Subscribe to a document to react to changes
 function subscribeToDocument(repo: Repo, docId: DocId) {
   if (subscriptions.has(docId)) {
-    logger.warn`Already subscribed to ${docId}`
+    logger.warn("Already subscribed to {docId}", { docId })
     return
   }
 
-  logger.info`Subscribing to document ${docId}`
+  logger.info("Subscribing to document {docId}", { docId })
 
   const handle = repo.get(docId)
 
@@ -147,8 +169,13 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
+  const unsubscribePresence = handle.presence.subscribe(values => {
+    presences.set(docId, values)
+  })
+
   subscriptions.set(docId, () => {
     unsubscribeDoc()
+    unsubscribePresence()
   })
 
   // Check current state immediately (in case we missed the initial sync event)

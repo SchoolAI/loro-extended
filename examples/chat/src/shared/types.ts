@@ -1,4 +1,5 @@
 import { Shape } from "@loro-extended/change"
+import type { PeerID } from "@loro-extended/repo"
 
 export const MessageSchema = Shape.map({
   id: Shape.plain.string(),
@@ -21,7 +22,7 @@ export const ChatSchema = Shape.doc({
 export type Message = {
   id: string
   role: "user" | "assistant"
-  author: string
+  author: PeerID
   content: string
   timestamp: number
   needsAiReply: false
