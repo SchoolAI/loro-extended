@@ -1,13 +1,26 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
-import type { DocId, ReadyState } from "@loro-extended/repo"
+import type { DocId, PeerID, ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
-import { ChatSchema } from "../shared/types"
+import { ChatSchema, type Message } from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Generate a new conversation ID
 function generateConversationId(): DocId {
   return `chat-${crypto.randomUUID()}`
+}
+
+function getAuthorName(message: Message, authors: Map<PeerID, string>) {
+  if (message.role === "assistant") {
+    return "AI Assistant"
+  }
+
+  const author = authors.get(message.author)
+  if (author) {
+    return author
+  }
+
+  return "Someone"
 }
 
 function ChatApp() {
@@ -36,12 +49,12 @@ function ChatApp() {
   // Use ephemeral state for presence
   const { all, self, setSelf } = usePresence(docId)
 
+  const authors: Map<PeerID, string> = new Map([[repo.identity.peerId, "You"]])
+
   // Set self presence
   useEffect(() => {
     setSelf({ type: "user", lastSeen: Date.now() })
   }, [setSelf])
-
-  console.dir({ self, all }, { depth: null })
 
   const memberCount = Object.values(all).filter(
     (p: any) => p?.type === "user",
@@ -86,7 +99,13 @@ function ChatApp() {
   }
 
   const myPeerId = repo.identity.peerId
-  const showTip = doc.preferences[myPeerId]?.showTip !== false
+
+  const tip: "share" | "at-ai" | "none" =
+    doc.preferences[myPeerId]?.showTip !== false
+      ? memberCount >= 2
+        ? "at-ai"
+        : "share"
+      : "none"
 
   const dismissTip = () => {
     changeDoc(d => {
@@ -100,8 +119,9 @@ function ChatApp() {
 
     const updateConnectionStatus = (readyStates: ReadyState[]) => {
       const connected = readyStates.some(
-        s => s.state === "aware" && s.channels.some(c => c.kind === "network"),
+        s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
       )
+
       setIsConnected(connected)
     }
 
@@ -162,13 +182,20 @@ function ChatApp() {
       </header>
 
       {/* Info Banner */}
-      {showTip && (
+      {tip !== "none" && (
         <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 relative">
-          💡 Tip: Share this URL with friends to chat together! Use{" "}
-          <code className="bg-amber-200 px-1 rounded font-mono text-amber-900">
-            @ai
-          </code>{" "}
-          to ask the AI.
+          {tip === "share" && (
+            <>💡 Tip: Share this URL with friends to chat together!</>
+          )}
+          {tip === "at-ai" && (
+            <>
+              Use{" "}
+              <code className="bg-amber-200 px-1 rounded font-mono text-amber-900">
+                @ai
+              </code>{" "}
+              to ask the AI.
+            </>
+          )}
           <button
             type="button"
             onClick={dismissTip}
@@ -226,7 +253,7 @@ function ChatApp() {
                 >
                   <div className="flex items-baseline gap-2 mb-1 px-1">
                     <span className="text-xs font-medium text-gray-500">
-                      {msg.role === "user" ? "You" : "AI Assistant"}
+                      {getAuthorName(msg as Message, authors)}
                     </span>
                     <span className="text-[10px] text-gray-400">
                       {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -262,7 +289,7 @@ function ChatApp() {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Type a message..."
             className="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-full focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-5 shadow-sm transition-all outline-none"
             disabled={!handle}
