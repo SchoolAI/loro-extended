@@ -12,6 +12,7 @@
     "dev:server": "tsx --watch src/server/server.ts",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
+    "test": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
@@ -48,6 +49,8 @@
     "vite": "^7.0.4",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "jsdom": "^26.1.0",
+    "@testing-library/react": "^16.3.0"
   }
 }

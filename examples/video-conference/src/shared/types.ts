@@ -39,30 +39,8 @@ export const EmptyRoom = {
 }
 
 // ============================================================================
-// Signaling Presence Schema (Ephemeral)
+// Presence Types (Ephemeral)
 // ============================================================================
-
-// For presence, we keep it simple - the signals field will hold
-// arbitrary signal data from simple-peer. We use a permissive schema
-// since presence is ephemeral and doesn't need strict validation.
-//
-// NOTE: We intentionally DON'T use Shape.plain.object for the presence
-// because the mergeValue function in @loro-extended/change iterates over
-// schema-defined keys and may not properly handle dynamic keys like peer IDs.
-// Instead, we'll use the untyped presence API directly.
-export const SignalingPresenceSchema = Shape.plain.object({
-  // Display name for this peer
-  name: Shape.plain.string(),
-
-  // Current media preferences
-  wantsAudio: Shape.plain.boolean(),
-  wantsVideo: Shape.plain.boolean(),
-
-  // WebRTC signaling - stored as a generic record
-  // The actual structure is: Record<peerId, SignalData[]>
-  // We use any here because simple-peer signal data is dynamic
-  signals: Shape.plain.record(Shape.plain.array(Shape.plain.object({}))),
-})
 
 // Runtime types (more permissive than schema for actual usage)
 // biome-ignore lint/suspicious/noExplicitAny: simple-peer signal data is dynamic
@@ -70,16 +48,55 @@ export type SignalData = any
 
 export type SignalsMap = Record<string, SignalData[]>
 
-export type SignalingPresence = {
+/**
+ * User presence - stable metadata that changes infrequently.
+ * Used for displaying participant info in the UI.
+ * 
+ * This is separate from signaling to avoid mixing high-frequency signal updates
+ * with stable user metadata.
+ */
+export type UserPresence = {
   name: string
   wantsAudio: boolean
   wantsVideo: boolean
-  signals: SignalsMap
 }
 
-export const EmptySignalingPresence = {
+export const EmptyUserPresence: UserPresence = {
   name: "Anonymous",
   wantsAudio: true,
   wantsVideo: true,
-  signals: {} as SignalsMap,
 }
+
+/**
+ * Signaling presence - high-frequency, transient WebRTC signals.
+ * Used for WebRTC connection establishment.
+ * 
+ * Signals are keyed by target peer ID, with an array of signal data
+ * to send to that peer.
+ */
+export type SignalingPresence = {
+  signals: SignalsMap
+}
+
+export const EmptySignalingPresence: SignalingPresence = {
+  signals: {},
+}
+
+// ============================================================================
+// Presence Schemas (for reference, we use untyped presence API)
+// ============================================================================
+
+// NOTE: We intentionally DON'T use Shape.plain.object for the presence
+// because the mergeValue function in @loro-extended/change iterates over
+// schema-defined keys and may not properly handle dynamic keys like peer IDs.
+// Instead, we'll use the untyped presence API directly.
+
+export const UserPresenceSchema = Shape.plain.object({
+  name: Shape.plain.string(),
+  wantsAudio: Shape.plain.boolean(),
+  wantsVideo: Shape.plain.boolean(),
+})
+
+export const SignalingPresenceSchema = Shape.plain.object({
+  signals: Shape.plain.record(Shape.plain.array(Shape.plain.object({}))),
+})

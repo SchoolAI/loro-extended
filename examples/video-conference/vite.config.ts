@@ -8,7 +8,6 @@ import wasm from "vite-plugin-wasm"
 export default defineConfig({
   clearScreen: false,
   plugins: [react(), wasm(), topLevelAwait(), tailwindcss()],
-  // No need for Node.js polyfills - we use simple-peer/simplepeer.min.js browser build
   optimizeDeps: {
     exclude: ["loro-crdt"],
   },
