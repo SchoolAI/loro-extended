@@ -10,7 +10,7 @@
     "src"
   ],
   "exports": {
-    "./client": {
+    ".": {
       "import": "./dist/client.js",
       "types": "./dist/client.d.ts"
     },
@@ -19,13 +19,14 @@
   "scripts": {
     "build": "tsup",
     "lint": "biome check --write .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
     "idb": "^8.0.3"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

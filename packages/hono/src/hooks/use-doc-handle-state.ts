@@ -1,4 +1,4 @@
-import type { DocHandle, DocId } from "@loro-extended/repo"
+import type { DocContent, DocHandle, DocId } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "hono/jsx"
 import type { LoroDoc, LoroMap } from "loro-crdt"
 import { useRepo } from "../repo-context.js"
@@ -20,6 +20,8 @@ export type DocWrapper = {
  * - Handle lifecycle (creation, cleanup)
  * - Event subscription management
  * - State synchronization with Hono JSX
+ *
+ * @param documentId - The document ID to get/create
  */
 export function useDocHandleState(documentId: DocId) {
   const repo = useRepo()
@@ -36,33 +38,29 @@ export function useDocHandleState(documentId: DocId) {
   }
   const handle = handleRef.current
 
-  // Track the onStoreChange callback so we can call it from useEffect
-  const onStoreChangeRef = useRef<(() => void) | null>(null)
-
   // Event subscription management - subscribe to LoroDoc changes
-  // Note: Hono's useSyncExternalStore doesn't re-subscribe when subscribe callback changes,
-  // so we use useEffect to manage the actual subscription
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
-      onStoreChangeRef.current = onStoreChange
-      // Return a no-op cleanup - actual subscription is managed by useEffect below
-      return () => {}
-    },
-    [], // No dependencies - this is just to capture the callback
-  )
+      if (!handle) return () => {}
+      const unsubscribe = handle.doc.subscribe(() => {
+        onStoreChange()
+      })
 
-  // Manage the actual subscription via useEffect, which properly handles handle changes
-  useEffect(() => {
-    if (!handle) return
-
-    const unsubscribe = handle.doc.subscribe(() => {
-      if (onStoreChangeRef.current) {
-        onStoreChangeRef.current()
+      // Check if the document version has changed since the last snapshot
+      // This handles the gap between render and subscription where an event might be missed
+      if (
+        handle !== null &&
+        snapshotRef.current !== null &&
+        snapshotRef.current.version !== -1 &&
+        snapshotRef.current.version !== handle.doc.opCount()
+      ) {
+        onStoreChange()
       }
-    })
 
-    return unsubscribe
-  }, [handle])
+      return unsubscribe
+    },
+    [handle],
+  )
 
   // State synchronization with stable snapshots
   const snapshotRef = useRef<{

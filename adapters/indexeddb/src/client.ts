@@ -5,7 +5,7 @@ import {
 } from "@loro-extended/repo"
 import { type IDBPDatabase, openDB } from "idb"
 
-const DB_NAME = "loro-todo-app"
+const DB_NAME = "loro-extended-app"
 const DB_VERSION = 1
 const STORE_NAME = "chunks"
 const KEY_SEP = "::"
@@ -34,7 +34,6 @@ export class IndexedDBStorageAdapter extends StorageAdapter {
   }
 
   async save(key: StorageKey, data: Uint8Array): Promise<void> {
-    console.log("save", key, data)
     const db = await this.#dbPromise
     await db.put(STORE_NAME, data, this.keyToString(key))
   }
