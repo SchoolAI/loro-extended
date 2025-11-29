@@ -1,4 +1,4 @@
-import { VideoBubble } from "../video-bubble"
+import { VideoBubble } from "./video-bubble"
 import { CameraIcon, MicIcon } from "./icons"
 
 export type PreJoinScreenProps = {

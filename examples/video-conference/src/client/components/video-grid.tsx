@@ -1,7 +1,7 @@
 import type { PeerID } from "@loro-extended/repo"
 import type { UserPresence } from "../../shared/types"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
-import { VideoBubble } from "../video-bubble"
+import { VideoBubble } from "./video-bubble"
 
 export type Participant = {
   peerId: string

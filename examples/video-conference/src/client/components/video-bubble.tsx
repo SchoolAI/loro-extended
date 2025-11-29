@@ -119,7 +119,7 @@ export function VideoBubble({
 
       {/* Status indicators - positioned absolutely to overlap the bubble bottom edge */}
       {(!hasAudio || !hasVideo) && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5">
           {!hasAudio && (
             <div className="bg-red-500 rounded-full p-1.5 shadow-md">
               <MicOffIcon className="w-3.5 h-3.5 text-white" />
