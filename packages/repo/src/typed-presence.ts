@@ -16,14 +16,14 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
   get self(): InferPlainType<S> {
     return mergeValue(
       this.shape,
-      this.handle.presence.self,
+      this.handle.untypedPresence.self,
       this.emptyState,
     ) as InferPlainType<S>
   }
 
   get all(): Record<string, InferPlainType<S>> {
     const result: Record<string, InferPlainType<S>> = {}
-    const all = this.handle.presence.all
+    const all = this.handle.untypedPresence.all
     for (const peerId of Object.keys(all)) {
       result[peerId] = mergeValue(
         this.shape,
@@ -35,7 +35,7 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
   }
 
   set(value: Partial<InferPlainType<S>>) {
-    this.handle.presence.set(value as any)
+    this.handle.untypedPresence.set(value as any)
   }
 
   subscribe(
@@ -47,7 +47,7 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
     // Initial call
     cb({ self: this.self, all: this.all })
 
-    return this.handle.presence.subscribe(() => {
+    return this.handle.untypedPresence.subscribe(() => {
       cb({ self: this.self, all: this.all })
     })
   }

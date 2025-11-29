@@ -52,7 +52,7 @@ export class DocHandle<T extends DocContent = DocContent> {
   /**
    * Ephemeral state management for presence, cursors, and other transient data.
    */
-  public readonly presence: PresenceInterface
+  public readonly untypedPresence: PresenceInterface
 
   /**
    * A LogTape logger for logging
@@ -67,7 +67,7 @@ export class DocHandle<T extends DocContent = DocContent> {
       docId,
     })
 
-    this.presence = this.initializePresenceInterface()
+    this.untypedPresence = this.initializePresenceInterface()
 
     this.logger.trace("new DocHandle")
   }
@@ -204,7 +204,7 @@ export class DocHandle<T extends DocContent = DocContent> {
    * @param shape The shape of the presence data
    * @param emptyState The default values for the presence data
    */
-  typedPresence<S extends ContainerShape | ValueShape>(
+  presence<S extends ContainerShape | ValueShape>(
     shape: S,
     emptyState: InferPlainType<S>,
   ): TypedPresence<S> {
