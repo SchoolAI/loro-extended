@@ -107,15 +107,15 @@ Built on [Loro](https://github.com/loro-dev/loro), which is written in Rust. It 
 
 This monorepo is a collection of packages designed to work together:
 
-| Package                                                        | Description                                                                                                         |
-| :------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| **[`@loro-extended/change`](./packages/change)**               | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.        |
-| **[`@loro-extended/repo`](./packages/repo)**                   | **The Sync Engine.** Manages document lifecycle, storage (IndexedDB), and network sync. It's your local data store. |
-| **[`@loro-extended/react`](./packages/react)**                 | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views.               |
-| **[`@loro-extended/hono`](./packages/hono)**                   | **The UI Layer.** Hono JSX hooks and utilities for working with Hono and Loro.                                      |
-| **[`@loro-extended/adapter-indexeddb`](./adapters/indexeddb)** | **Storage Adapter.** IndexedDB storage for browser-based persistence.                                               |
-| **[`@loro-extended/adapter-leveldb`](./adapters/leveldb)**     | **Storage Adapter.** LevelDB storage for server-side persistence.                                                   |
-| **[`@loro-extended/adapter-sse`](./adapters/sse)**             | **Network Adapter.** Server-Sent Events (SSE) for real-time client-server sync.                                     |
+| Package                                                                                       | Description                                                                                                         |
+| :-------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| **[`@loro-extended/change`](./packages/change)**                                              | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.        |
+| **[`@loro-extended/repo`](./packages/repo)**                                                  | **The Sync Engine.** Manages document lifecycle, storage (IndexedDB), and network sync. It's your local data store. |
+| **[`@loro-extended/react`](./packages/react)**                                                | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views.               |
+| **[`@loro-extended/hono`](./packages/hono)**                                                  | **The UI Layer.** Hono JSX hooks and utilities for working with Hono and Loro.                                      |
+| **[`@loro-extended/`](./adapters/indexeddb)** **[`adapter-indexeddb`](./adapters/indexeddb)** | **Storage Adapter.** IndexedDB storage for browser-based persistence.                                               |
+| **[`@loro-extended/`](./adapters/leveldb)** **[`adapter-leveldb`](./adapters/leveldb)**       | **Storage Adapter.** LevelDB storage for server-side persistence.                                                   |
+| **[`@loro-extended/`](./adapters/sse)** **[`adapter-sse`](./adapters/sse)**                   | **Network Adapter.** Server-Sent Events (SSE) for real-time client-server sync.                                     |
 
 ---
 
