@@ -6,7 +6,7 @@ import type { ParticipantConnectionStatus } from "../hooks/use-connection-status
 import { VideoGrid, type Participant } from "./video-grid"
 
 // Mock the VideoBubble component to simplify testing
-vi.mock("../video-bubble", () => ({
+vi.mock("./video-bubble", () => ({
   VideoBubble: ({
     label,
     hasAudio,
