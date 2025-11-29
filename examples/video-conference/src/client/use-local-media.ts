@@ -62,6 +62,10 @@ export function useLocalMedia(
   // Track if we've already requested media
   const hasRequestedRef = useRef(false)
 
+  // Store stream in a ref for cleanup access
+  // This ensures we can stop tracks even after unmount
+  const streamRef = useRef<MediaStream | null>(null)
+
   const requestMedia = useCallback(async () => {
     // Prevent duplicate requests
     if (hasRequestedRef.current && state.stream) {
@@ -92,6 +96,9 @@ export function useLocalMedia(
         track.enabled = wantsVideo
       })
 
+      // Store in ref for cleanup
+      streamRef.current = stream
+
       setState({
         stream,
         error: null,
@@ -116,15 +123,15 @@ export function useLocalMedia(
     requestMedia()
 
     // Cleanup: stop all tracks when unmounting
+    // Use ref to access stream directly (not via setState callback)
+    // This ensures cleanup runs synchronously on unmount
     return () => {
-      setState(prev => {
-        if (prev.stream) {
-          for (const track of prev.stream.getTracks()) {
-            track.stop()
-          }
+      if (streamRef.current) {
+        for (const track of streamRef.current.getTracks()) {
+          track.stop()
         }
-        return { ...prev, stream: null, isMediaReady: false }
-      })
+        streamRef.current = null
+      }
     }
   }, [])
 

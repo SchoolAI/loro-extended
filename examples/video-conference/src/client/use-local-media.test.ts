@@ -36,29 +36,52 @@ describe("useLocalMedia", () => {
   })
 
   describe("initial state", () => {
-    it("starts with wantsAudio and wantsVideo based on initial props", () => {
+    it("starts with wantsAudio and wantsVideo based on initial props", async () => {
       const { result } = renderHook(() => useLocalMedia(true, false))
 
+      // Check synchronous initial state
       expect(result.current.wantsAudio).toBe(true)
       expect(result.current.wantsVideo).toBe(false)
+
+      // Wait for async media request to complete to avoid act() warning
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
     })
 
-    it("starts with isMediaReady false", () => {
+    it("starts with isMediaReady false", async () => {
       const { result } = renderHook(() => useLocalMedia())
 
+      // Check synchronous initial state
       expect(result.current.isMediaReady).toBe(false)
+
+      // Wait for async media request to complete
+      await waitFor(() => {
+        expect(result.current.isMediaReady).toBe(true)
+      })
     })
 
-    it("starts with isLoading true (auto-requests media)", () => {
+    it("starts with isLoading true (auto-requests media)", async () => {
       const { result } = renderHook(() => useLocalMedia())
 
+      // Check synchronous initial state
       expect(result.current.isLoading).toBe(true)
+
+      // Wait for async media request to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
     })
   })
 
   describe("user preferences (wantsAudio/wantsVideo)", () => {
     it("toggleAudio toggles wantsAudio immediately", async () => {
       const { result } = renderHook(() => useLocalMedia(true, true))
+
+      // Wait for initial media request to complete
+      await waitFor(() => {
+        expect(result.current.isMediaReady).toBe(true)
+      })
 
       expect(result.current.wantsAudio).toBe(true)
 
@@ -78,6 +101,11 @@ describe("useLocalMedia", () => {
     it("toggleVideo toggles wantsVideo immediately", async () => {
       const { result } = renderHook(() => useLocalMedia(true, true))
 
+      // Wait for initial media request to complete
+      await waitFor(() => {
+        expect(result.current.isMediaReady).toBe(true)
+      })
+
       expect(result.current.wantsVideo).toBe(true)
 
       act(() => {
@@ -93,8 +121,13 @@ describe("useLocalMedia", () => {
       expect(result.current.wantsVideo).toBe(true)
     })
 
-    it("setWantsAudio sets wantsAudio directly", () => {
+    it("setWantsAudio sets wantsAudio directly", async () => {
       const { result } = renderHook(() => useLocalMedia(true, true))
+
+      // Wait for initial media request to complete
+      await waitFor(() => {
+        expect(result.current.isMediaReady).toBe(true)
+      })
 
       act(() => {
         result.current.setWantsAudio(false)
@@ -103,8 +136,13 @@ describe("useLocalMedia", () => {
       expect(result.current.wantsAudio).toBe(false)
     })
 
-    it("setWantsVideo sets wantsVideo directly", () => {
+    it("setWantsVideo sets wantsVideo directly", async () => {
       const { result } = renderHook(() => useLocalMedia(true, true))
+
+      // Wait for initial media request to complete
+      await waitFor(() => {
+        expect(result.current.isMediaReady).toBe(true)
+      })
 
       act(() => {
         result.current.setWantsVideo(false)
@@ -235,16 +273,42 @@ describe("useLocalMedia", () => {
 
   describe("cleanup", () => {
     it("stops all tracks on unmount", async () => {
+      // Create a mock with stop tracking
+      const audioTrack = {
+        enabled: true,
+        stop: vi.fn(),
+        kind: "audio",
+      }
+      const videoTrack = {
+        enabled: true,
+        stop: vi.fn(),
+        kind: "video",
+      }
+      const stream = {
+        getTracks: () => [audioTrack, videoTrack],
+        getAudioTracks: () => [audioTrack],
+        getVideoTracks: () => [videoTrack],
+      }
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        stream as unknown as MediaStream,
+      )
+
       const { result, unmount } = renderHook(() => useLocalMedia(true, true))
 
       await waitFor(() => {
         expect(result.current.isMediaReady).toBe(true)
       })
 
+      // Verify stream is set
+      expect(result.current.stream).toBe(stream)
+
+      // Unmount - cleanup should run synchronously via ref
       unmount()
 
-      expect(mockAudioTrack.stop).toHaveBeenCalled()
-      expect(mockVideoTrack.stop).toHaveBeenCalled()
+      // Tracks should be stopped immediately (not via setState)
+      expect(audioTrack.stop).toHaveBeenCalled()
+      expect(videoTrack.stop).toHaveBeenCalled()
     })
   })
 })
