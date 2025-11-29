@@ -43,22 +43,22 @@ export function PreJoinScreen({
         />
       </div>
 
-      {/* Media error */}
-      {mediaError && (
-        <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm">
-          Camera/microphone error: {mediaError.message}
-          <button type="button" onClick={onRequestMedia} className="ml-2 underline">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Media loading */}
-      {mediaLoading && (
-        <div className="text-gray-500 text-sm">
-          Requesting camera and microphone...
-        </div>
-      )}
+      {/* Status message area - fixed height to prevent layout shift */}
+      <div className="h-8 flex items-center justify-center">
+        {mediaError && (
+          <div className="bg-red-100 text-red-700 px-4 py-1 rounded-lg text-sm">
+            Camera/microphone error: {mediaError.message}
+            <button type="button" onClick={onRequestMedia} className="ml-2 underline">
+              Retry
+            </button>
+          </div>
+        )}
+        {!mediaError && mediaLoading && (
+          <div className="text-gray-500 text-sm">
+            Requesting camera and microphone...
+          </div>
+        )}
+      </div>
 
       {/* Media controls */}
       <div className="flex gap-4">

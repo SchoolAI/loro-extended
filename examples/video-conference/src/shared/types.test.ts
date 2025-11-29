@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
   EmptyRoom,
-  EmptyUserPresence,
   EmptySignalingPresence,
-  type UserPresence,
+  EmptyUserPresence,
   type SignalingPresence,
   type SignalsMap,
+  type UserPresence,
 } from "./types"
 
 describe("Room Schema", () => {
@@ -128,7 +128,10 @@ describe("SignalsMap", () => {
     }
 
     // Append a new signal
-    signals["peer-1"] = [...signals["peer-1"], { type: "candidate", candidate: "..." }]
+    signals["peer-1"] = [
+      ...signals["peer-1"],
+      { type: "candidate", candidate: "..." },
+    ]
 
     expect(signals["peer-1"]).toHaveLength(2)
   })

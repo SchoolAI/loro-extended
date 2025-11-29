@@ -1,7 +1,7 @@
 import type { PeerID } from "@loro-extended/repo"
 import { VideoBubble } from "../video-bubble"
 import type { UserPresence } from "../../shared/types"
-import type { ConnectionState } from "../hooks/use-peer-manager"
+import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
 
 export type Participant = {
   peerId: string
@@ -16,8 +16,40 @@ export type VideoGridProps = {
   hasVideo: boolean
   otherParticipants: Participant[]
   remoteStreams: Map<PeerID, MediaStream>
-  connectionStates: Map<PeerID, ConnectionState>
   userPresence: Record<string, UserPresence>
+  getPeerStatus: (peerId: PeerID) => ParticipantConnectionStatus
+}
+
+/**
+ * Get display text for a peer's connection status.
+ */
+function getStatusText(status: ParticipantConnectionStatus): string | null {
+  switch (status) {
+    case "connected":
+      return null
+    case "reconnecting":
+      return "Reconnecting..."
+    case "peer-disconnected":
+      return "Appears offline"
+    case "self-disconnected":
+      return "You're offline"
+  }
+}
+
+/**
+ * Get CSS classes for status badge styling.
+ */
+function getStatusClasses(status: ParticipantConnectionStatus): string {
+  switch (status) {
+    case "connected":
+      return ""
+    case "reconnecting":
+      return "text-yellow-600"
+    case "peer-disconnected":
+      return "text-red-500"
+    case "self-disconnected":
+      return "text-orange-500"
+  }
 }
 
 export function VideoGrid({
@@ -27,8 +59,8 @@ export function VideoGrid({
   hasVideo,
   otherParticipants,
   remoteStreams,
-  connectionStates,
   userPresence,
+  getPeerStatus,
 }: VideoGridProps) {
   return (
     <div className="flex flex-wrap justify-center gap-6 p-4">
@@ -45,8 +77,10 @@ export function VideoGrid({
       {/* Remote videos */}
       {otherParticipants.map(participant => {
         const stream = remoteStreams.get(participant.peerId as PeerID)
-        const state = connectionStates.get(participant.peerId as PeerID)
         const presence = userPresence[participant.peerId]
+        const status = getPeerStatus(participant.peerId as PeerID)
+        const statusText = getStatusText(status)
+        const statusClasses = getStatusClasses(status)
 
         return (
           <div key={participant.peerId} className="relative">
@@ -58,10 +92,10 @@ export function VideoGrid({
               hasAudio={presence?.wantsAudio ?? true}
               hasVideo={presence?.wantsVideo ?? true}
             />
-            {/* Connection state indicator */}
-            {state && state !== "connected" && (
-              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-gray-500">
-                {state === "connecting" ? "Connecting..." : "Failed"}
+            {/* Connection status indicator */}
+            {statusText && (
+              <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs ${statusClasses}`}>
+                {statusText}
               </div>
             )}
           </div>

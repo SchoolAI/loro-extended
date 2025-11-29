@@ -310,6 +310,9 @@ describe("useWebRtcMesh", () => {
     })
 
     it("sets state to failed when peer emits error event", async () => {
+      // Suppress expected console.error from the error handler
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
       const { result } = renderHook(() =>
         useWebRtcMesh(
           "100000000000000000000000000000" as PeerID,
@@ -338,6 +341,9 @@ describe("useWebRtcMesh", () => {
           ),
         ).toBe("failed")
       })
+
+      // Restore console.error
+      consoleErrorSpy.mockRestore()
     })
   })
 

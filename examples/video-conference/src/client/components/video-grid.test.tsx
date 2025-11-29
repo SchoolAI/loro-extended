@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react"
 import { VideoGrid, type Participant } from "./video-grid"
 import type { PeerID } from "@loro-extended/repo"
 import type { UserPresence } from "../../shared/types"
+import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
 
 // Mock the VideoBubble component to simplify testing
 vi.mock("../video-bubble", () => ({
@@ -27,6 +28,9 @@ vi.mock("../video-bubble", () => ({
 }))
 
 describe("VideoGrid", () => {
+  // Default getPeerStatus that returns "connected" for all peers
+  const defaultGetPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "connected"
+
   const defaultProps = {
     localStream: null,
     displayName: "Local User",
@@ -34,8 +38,8 @@ describe("VideoGrid", () => {
     hasVideo: true,
     otherParticipants: [] as Participant[],
     remoteStreams: new Map<PeerID, MediaStream>(),
-    connectionStates: new Map(),
     userPresence: {} as Record<string, UserPresence>,
+    getPeerStatus: defaultGetPeerStatus,
   }
 
   describe("local video", () => {
@@ -134,41 +138,59 @@ describe("VideoGrid", () => {
     })
   })
 
-  describe("connection states", () => {
-    it("shows connecting indicator for connecting peers", () => {
+  describe("connection status", () => {
+    it("shows reconnecting indicator for reconnecting peers", () => {
       const participants: Participant[] = [
         { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
       ]
 
-      const connectionStates = new Map([["peer-1" as PeerID, "connecting" as const]])
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "reconnecting"
 
       render(
         <VideoGrid
           {...defaultProps}
           otherParticipants={participants}
-          connectionStates={connectionStates}
+          getPeerStatus={getPeerStatus}
         />,
       )
 
-      expect(screen.getByText("Connecting...")).toBeDefined()
+      expect(screen.getByText("Reconnecting...")).toBeDefined()
     })
 
-    it("shows failed indicator for failed peers", () => {
+    it("shows offline indicator for peer-disconnected peers", () => {
       const participants: Participant[] = [
         { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
       ]
 
-      const connectionStates = new Map([["peer-1" as PeerID, "failed" as const]])
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "peer-disconnected"
 
       render(
         <VideoGrid
           {...defaultProps}
           otherParticipants={participants}
-          connectionStates={connectionStates}
+          getPeerStatus={getPeerStatus}
         />,
       )
 
-      expect(screen.getByText("Failed")).toBeDefined()
+      expect(screen.getByText("Appears offline")).toBeDefined()
+    })
+
+    it("shows self-disconnected indicator when we're offline", () => {
+      const participants: Participant[] = [
+        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+      ]
+
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "self-disconnected"
+
+      render(
+        <VideoGrid
+          {...defaultProps}
+          otherParticipants={participants}
+          getPeerStatus={getPeerStatus}
+        />,
+      )
+
+      expect(screen.getByText("You're offline")).toBeDefined()
     })
 
     it("hides indicator for connected peers", () => {
@@ -176,18 +198,19 @@ describe("VideoGrid", () => {
         { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
       ]
 
-      const connectionStates = new Map([["peer-1" as PeerID, "connected" as const]])
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "connected"
 
       render(
         <VideoGrid
           {...defaultProps}
           otherParticipants={participants}
-          connectionStates={connectionStates}
+          getPeerStatus={getPeerStatus}
         />,
       )
 
-      expect(screen.queryByText("Connecting...")).toBeNull()
-      expect(screen.queryByText("Failed")).toBeNull()
+      expect(screen.queryByText("Reconnecting...")).toBeNull()
+      expect(screen.queryByText("Appears offline")).toBeNull()
+      expect(screen.queryByText("You're offline")).toBeNull()
     })
   })
 })

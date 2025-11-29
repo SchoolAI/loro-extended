@@ -10,7 +10,8 @@ import {
 import { useLocalMedia } from "./use-local-media"
 import { useRoomIdFromHash } from "./use-room-id-from-hash"
 import { useWebRtcMesh } from "./use-webrtc-mesh"
-import { Header, PreJoinScreen, InCallScreen } from "./components"
+import { Header, PreJoinScreen, InCallScreen, OfflineBanner } from "./components"
+import { useConnectionStatus, useParticipantCleanup } from "./hooks"
 
 // Generate a new room ID
 function generateRoomId(): DocId {
@@ -62,6 +63,9 @@ export default function VideoConferenceApp({
     stream: localStream,
     error: mediaError,
     isLoading: mediaLoading,
+    isMediaReady,
+    wantsAudio,
+    wantsVideo,
     hasAudio,
     hasVideo,
     toggleAudio,
@@ -82,13 +86,14 @@ export default function VideoConferenceApp({
   )
 
   // Update user presence with media preferences
+  // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
   useEffect(() => {
     setUserPresence({
       name: displayName,
-      wantsAudio: hasAudio,
-      wantsVideo: hasVideo,
+      wantsAudio: wantsAudio,
+      wantsVideo: wantsVideo,
     })
-  }, [displayName, hasAudio, hasVideo, setUserPresence])
+  }, [displayName, wantsAudio, wantsVideo, setUserPresence])
 
   // Join room
   const joinRoom = useCallback(() => {
@@ -116,19 +121,58 @@ export default function VideoConferenceApp({
     setHasJoined(false)
   }, [myPeerId, changeDoc])
 
+  // Remove a participant from the document (used by cleanup hook)
+  const removeParticipant = useCallback((peerId: string) => {
+    changeDoc(draft => {
+      const index = draft.participants.findIndex(p => p.peerId === peerId)
+      if (index !== -1) {
+        draft.participants.delete(index, 1)
+      }
+    })
+  }, [changeDoc])
+
+  // Connection status monitoring
+  const { isOnline, getPeerStatus } = useConnectionStatus(
+    userPresence,
+    connectionStates,
+    participantPeerIds,
+    myPeerId,
+  )
+
+  // Automatic cleanup of stale participants
+  useParticipantCleanup(
+    doc.participants,
+    userPresence,
+    myPeerId,
+    isOnline,
+    removeParticipant,
+  )
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (hasJoined) {
-        changeDoc(draft => {
-          const index = draft.participants.findIndex(p => p.peerId === myPeerId)
-          if (index !== -1) {
-            draft.participants.delete(index, 1)
-          }
-        })
+        removeParticipant(myPeerId)
       }
     }
-  }, [hasJoined, myPeerId, changeDoc])
+  }, [hasJoined, myPeerId, removeParticipant])
+
+  // Cleanup on beforeunload (browser close, navigation)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasJoined) {
+        // Use synchronous approach for beforeunload
+        // The changeDoc will be queued but may not complete
+        // The presence-based cleanup will handle it if this fails
+        removeParticipant(myPeerId)
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
+  }, [hasJoined, myPeerId, removeParticipant])
 
   const startNewRoom = useCallback(() => {
     const newId = generateRoomId()
@@ -147,6 +191,9 @@ export default function VideoConferenceApp({
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
+      {/* Offline banner */}
+      {!isOnline && <OfflineBanner />}
+
       <Header
         roomId={roomId}
         participantCount={doc.participants.length}
@@ -161,15 +208,15 @@ export default function VideoConferenceApp({
             <PreJoinScreen
               localStream={localStream}
               displayName={displayName}
-              hasAudio={hasAudio}
-              hasVideo={hasVideo}
+              hasAudio={wantsAudio}
+              hasVideo={wantsVideo}
               mediaError={mediaError}
               mediaLoading={mediaLoading}
               onToggleAudio={toggleAudio}
               onToggleVideo={toggleVideo}
               onRequestMedia={requestMedia}
               onJoin={joinRoom}
-              canJoin={!!handle}
+              canJoin={!!handle && isMediaReady}
             />
           )}
 
@@ -183,6 +230,7 @@ export default function VideoConferenceApp({
               remoteStreams={remoteStreams}
               connectionStates={connectionStates}
               userPresence={userPresence}
+              getPeerStatus={getPeerStatus}
               onToggleAudio={toggleAudio}
               onToggleVideo={toggleVideo}
               onLeave={leaveRoom}
