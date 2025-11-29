@@ -257,6 +257,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: new LoroDoc().oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       expect(adapter.loadRangeCalls).toHaveLength(1)
@@ -278,6 +279,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: new LoroDoc().oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       // Now sends 2 messages: sync-response (unavailable) + reciprocal sync-request for subscription
@@ -310,6 +312,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: doc.oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
@@ -339,6 +342,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: new LoroDoc().oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
@@ -567,6 +571,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: new LoroDoc().oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       // Now sends 2 messages: sync-response (unavailable) + reciprocal sync-request for subscription
@@ -604,6 +609,7 @@ describe("StorageAdapter", () => {
             requesterDocVersion: new LoroDoc().oplogVersion(),
           },
         ],
+        bidirectional: false,
       })
 
       // Now sends 2 messages: sync-response + reciprocal sync-request for subscription

@@ -295,9 +295,12 @@ export abstract class StorageAdapter extends Adapter<void> {
         if (chunks.length === 0) {
           // Document not found in storage yet
           // Send "unavailable" to indicate we don't have the data
-          this.logger.debug("handleSyncRequest: document not found in storage", {
-            docId,
-          })
+          this.logger.debug(
+            "handleSyncRequest: document not found in storage",
+            {
+              docId,
+            },
+          )
           this.replyUnavailable(docId)
 
           // Even though we don't have the document, we want to receive future updates
@@ -449,6 +452,7 @@ export abstract class StorageAdapter extends Adapter<void> {
     this.reply({
       type: "channel/sync-request",
       docs,
+      bidirectional: false,
     })
   }
 

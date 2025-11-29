@@ -121,6 +121,7 @@ describe("Synchronizer - Channel Queries", () => {
         { docId: docId1, requesterDocVersion: createVersionVector() },
         { docId: docId2, requesterDocVersion: createVersionVector() },
       ],
+      bidirectional: false,
     })
 
     const docIds = synchronizer.getChannelDocIds(channel.channelId)

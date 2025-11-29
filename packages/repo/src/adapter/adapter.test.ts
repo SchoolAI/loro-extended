@@ -345,6 +345,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       channel.onReceive(message)
@@ -474,6 +475,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       const sentCount = adapter._send({
@@ -501,6 +503,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       const sentCount = adapter._send({
@@ -521,6 +524,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       const sentCount = adapter._send({
@@ -542,6 +546,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       adapter._send({
@@ -565,6 +570,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       expect(() =>
@@ -740,6 +746,7 @@ describe("Adapter", () => {
       const message: ChannelMsg = {
         type: "channel/sync-request",
         docs: [],
+        bidirectional: false,
       }
 
       const sentCount = adapter._send({

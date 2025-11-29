@@ -156,6 +156,7 @@ describe("Synchronizer Program - Integration Tests", () => {
                 requesterDocVersion: createVersionVector(),
               },
             ],
+            bidirectional: false,
           },
         },
       }

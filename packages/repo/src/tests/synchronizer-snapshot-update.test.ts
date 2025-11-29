@@ -130,6 +130,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: emptyVersion,
         },
       ],
+      bidirectional: false,
     })
 
     // Should have sent sync-response with snapshot
@@ -175,6 +176,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: nonEmptyVersion,
         },
       ],
+      bidirectional: false,
     })
 
     // Should have sent sync-response with update
@@ -215,6 +217,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: createVersionVector(),
         },
       ],
+      bidirectional: false,
     })
 
     // Get the sync response
@@ -261,6 +264,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: nonEmptyVersion,
         },
       ],
+      bidirectional: false,
     })
 
     // Get the sync response
@@ -302,6 +306,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: createVersionVector(),
         },
       ],
+      bidirectional: false,
     })
 
     // Should send snapshot with all data
@@ -350,6 +355,7 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
           requesterDocVersion: clientVersion,
         },
       ],
+      bidirectional: false,
     })
 
     // Should send update (not snapshot)

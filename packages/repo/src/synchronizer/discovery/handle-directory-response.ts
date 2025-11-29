@@ -141,6 +141,7 @@ export function handleDirectoryResponse(
         message: {
           type: "channel/sync-request",
           docs: docsToSync,
+          bidirectional: true,
         },
       },
     })

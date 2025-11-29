@@ -60,6 +60,7 @@ export type ChannelMsgJSON =
         docId: string
         requesterDocVersion: VersionVectorJSON
       }[]
+      bidirectional: boolean
     }
   | {
       type: "channel/sync-response"

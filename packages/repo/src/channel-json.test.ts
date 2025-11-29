@@ -181,6 +181,7 @@ describe("Channel JSON Serialization", () => {
               requesterDocVersion: doc.version(),
             },
           ],
+          bidirectional: false,
         }
 
         const json = serializeChannelMsg(msg)
@@ -207,6 +208,7 @@ describe("Channel JSON Serialization", () => {
             { docId: "doc-1", requesterDocVersion: doc1.version() },
             { docId: "doc-2", requesterDocVersion: doc2.version() },
           ],
+          bidirectional: false,
         }
 
         const json = serializeChannelMsg(msg)
@@ -318,6 +320,7 @@ describe("Channel JSON Serialization", () => {
         const original: ChannelMsg = {
           type: "channel/sync-request",
           docs: [{ docId: "doc-1", requesterDocVersion: doc.version() }],
+          bidirectional: false,
         }
 
         const json = serializeChannelMsg(original)
@@ -479,6 +482,7 @@ describe("Channel JSON Serialization", () => {
       const original: ChannelMsg = {
         type: "channel/sync-request",
         docs: [{ docId: "doc-1", requesterDocVersion: doc.version() }],
+        bidirectional: false,
       }
 
       const json = serializeChannelMsg(original)

@@ -118,6 +118,7 @@ export function handleDocEnsure(
             message: {
               type: "channel/sync-request",
               docs,
+              bidirectional: true,
             },
           },
         })

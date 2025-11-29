@@ -54,6 +54,7 @@ describe("handle-sync-request", () => {
               requesterDocVersion: createVersionVector(),
             },
           ],
+          bidirectional: true,
         },
       },
     }
@@ -230,6 +231,7 @@ describe("handle-sync-request", () => {
               requesterDocVersion: createVersionVector(),
             },
           ],
+          bidirectional: false,
         },
       },
     }

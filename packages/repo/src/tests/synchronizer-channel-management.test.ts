@@ -150,6 +150,7 @@ describe("Synchronizer - Channel Management", () => {
               .doc.version(),
           },
         ],
+        bidirectional: false,
       })
     }
 

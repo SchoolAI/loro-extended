@@ -127,6 +127,7 @@ describe("Synchronizer - Command Execution", () => {
           requesterDocVersion: createVersionVector(),
         },
       ],
+      bidirectional: false,
     })
 
     // Should have sent sync-response

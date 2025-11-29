@@ -57,10 +57,12 @@ export type ChannelMsgSyncRequest = {
   }[]
   /**
    * Whether the receiver should send a reciprocal sync-request back.
-   * Defaults to true if omitted.
+   * - initiating sync-request should set bidirectional to `true`
+   * - reciprocal sync-request should set bidirectional to `false`
+   *
    * Set to false to prevent infinite loops when sending reciprocal requests.
    */
-  bidirectional?: boolean
+  bidirectional: boolean
 }
 
 export type ChannelMsgSyncResponse = {
