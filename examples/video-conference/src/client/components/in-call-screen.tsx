@@ -3,7 +3,7 @@ import type { UserPresence } from "../../shared/types"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
 import type { ConnectionState } from "../hooks/use-peer-manager"
 import { ControlBar } from "./control-bar"
-import { VideoGrid, type Participant } from "./video-grid"
+import { type Participant, VideoGrid } from "./video-grid"
 
 export type InCallScreenProps = {
   localStream: MediaStream | null

@@ -487,11 +487,11 @@ export abstract class StorageAdapter extends Adapter<void> {
       for (const chunk of chunks) {
         const docId = chunk.key[0]
 
-        if (!docVersions.has(docId)) {
-          docVersions.set(docId, { versionMap: new Map(), hasError: false })
+        let docInfo = docVersions.get(docId)
+        if (!docInfo) {
+          docInfo = { versionMap: new Map(), hasError: false }
+          docVersions.set(docId, docInfo)
         }
-
-        const docInfo = docVersions.get(docId)!
 
         // Skip if we already had an error with this doc
         if (docInfo.hasError) continue

@@ -97,7 +97,7 @@ describe("webrtc-protocol", () => {
 
     it("handles large strings efficiently", () => {
       // Simulate a large SDP offer
-      const largeSdp = "v=0\r\n" + "a=candidate:".repeat(1000)
+      const largeSdp = `v=0\r\n${"a=candidate:".repeat(1000)}`
       const hash = fastHash(largeSdp)
       expect(hash).toHaveLength(14)
     })

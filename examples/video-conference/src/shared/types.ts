@@ -43,7 +43,6 @@ export const EmptyRoom = {
 // ============================================================================
 
 // Runtime types (more permissive than schema for actual usage)
-// biome-ignore lint/suspicious/noExplicitAny: simple-peer signal data is dynamic
 export type SignalData = any
 
 export type SignalsMap = Record<string, SignalData[]>

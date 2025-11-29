@@ -512,7 +512,9 @@ describe("Repo E2E", () => {
       class DelayedStorageAdapter extends InMemoryStorageAdapter {
         private delay = 10 // ms
 
-        async loadRange(keyPrefix: string[]): Promise<{ key: string[]; data: Uint8Array }[]> {
+        async loadRange(
+          keyPrefix: string[],
+        ): Promise<{ key: string[]; data: Uint8Array }[]> {
           await new Promise(resolve => setTimeout(resolve, this.delay))
           return super.loadRange(keyPrefix)
         }

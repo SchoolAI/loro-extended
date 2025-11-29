@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { UserPresence } from "../../shared/types"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
-import { VideoGrid, type Participant } from "./video-grid"
+import { type Participant, VideoGrid } from "./video-grid"
 
 // Mock the VideoBubble component to simplify testing
 vi.mock("./video-bubble", () => ({

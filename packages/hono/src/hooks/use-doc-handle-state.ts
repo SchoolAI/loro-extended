@@ -1,5 +1,5 @@
-import type { DocContent, DocHandle, DocId } from "@loro-extended/repo"
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "hono/jsx"
+import type { DocHandle, DocId } from "@loro-extended/repo"
+import { useCallback, useRef, useSyncExternalStore } from "hono/jsx"
 import type { LoroDoc, LoroMap } from "loro-crdt"
 import { useRepo } from "../repo-context.js"
 

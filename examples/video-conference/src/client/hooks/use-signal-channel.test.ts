@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: fine for testing */
 import type { PeerID } from "@loro-extended/repo"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"

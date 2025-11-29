@@ -674,7 +674,8 @@ describe("StorageAdapter", () => {
 
         // The requesterDocVersion should match the stored document's version
         // (not be empty)
-        const requestedVersion = docRequest!.requesterDocVersion
+        if (!docRequest) throw new Error(`docRequest can't be null`)
+        const requestedVersion = docRequest.requesterDocVersion
         const storedVersion = doc.oplogVersion()
 
         // Verify the version is NOT empty

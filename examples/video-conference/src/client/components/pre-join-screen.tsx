@@ -1,5 +1,5 @@
-import { VideoBubble } from "./video-bubble"
 import { CameraIcon, MicIcon } from "./icons"
+import { VideoBubble } from "./video-bubble"
 
 export type PreJoinScreenProps = {
   localStream: MediaStream | null

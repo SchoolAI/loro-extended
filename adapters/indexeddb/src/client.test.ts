@@ -1,8 +1,8 @@
 import "fake-indexeddb/auto"
+import type { StorageKey } from "@loro-extended/repo"
 import { IDBFactory } from "fake-indexeddb"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { IndexedDBStorageAdapter } from "./client.js"
-import type { StorageKey } from "@loro-extended/repo"
 
 describe("IndexedDBStorageAdapter", () => {
   let adapter: IndexedDBStorageAdapter
