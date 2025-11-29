@@ -171,7 +171,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  const typedPresence = handle.typedPresence(PresenceSchema, EmptyPresence)
+  const typedPresence = handle.presence(PresenceSchema, EmptyPresence)
   const unsubscribePresence = typedPresence.subscribe(({ all }) => {
     presences.set(docId, all)
   })
