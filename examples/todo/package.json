@@ -4,7 +4,7 @@
   "version": "0.0.3",
   "type": "module",
   "scripts": {
-    "build": "pnpm build:client && pnpm build:server",
+    "build:all": "pnpm build:client && pnpm build:server",
     "build:client": "vite build",
     "build:server": "tsc --project tsconfig.node.json",
     "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",

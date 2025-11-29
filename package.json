@@ -8,6 +8,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
+    "build:all": "pnpm -r build && pnpm -r build:all",
     "format": "pnpm -r format",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
