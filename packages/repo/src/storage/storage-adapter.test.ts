@@ -1,4 +1,4 @@
-import { LoroDoc } from "loro-crdt"
+import { decodeImportBlobMeta, LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ChannelMsg, ConnectedChannel, ReceiveFn } from "../channel.js"
 import {
@@ -628,6 +628,175 @@ describe("StorageAdapter", () => {
         reconstructed.import(response.transmission.data)
         expect(reconstructed.getText("text").toString()).toBe("Hello World")
       }
+    })
+  })
+
+  describe("Page Refresh / Reconnection Behavior", () => {
+    it("sends sync-request with correct stored version (not empty)", async () => {
+      // This test verifies the FIX for the duplicate chunks bug.
+      //
+      // The fix ensures that when the storage adapter sends a sync-request
+      // after page refresh, it includes the ACTUAL stored version (not empty).
+      // This allows the Repo to respond with "up-to-date" instead of sending
+      // redundant data.
+
+      // Step 1: Create initial document and save it (simulating first page load)
+      const doc = new LoroDoc()
+      doc.getText("text").insert(0, "Hello World")
+      const snapshot = doc.export({ mode: "snapshot" })
+      await adapter.save(["test-doc", "update", "initial"], snapshot)
+
+      // Verify we have 1 chunk
+      const chunksBeforeRefresh = await adapter.loadRange(["test-doc"])
+      expect(chunksBeforeRefresh).toHaveLength(1)
+
+      // Step 2: Simulate page refresh - establish channel and trigger sync
+      const channel = await initializeAdapter()
+
+      // Send establish-request (this triggers requestStoredDocuments)
+      await channel.send({
+        type: "channel/establish-request",
+        identity: { peerId: "123", name: "test-peer", type: "user" },
+      })
+
+      // The storage adapter should have sent a sync-request for "test-doc"
+      const syncRequest = receivedMessages.find(
+        m => m.type === "channel/sync-request",
+      )
+      expect(syncRequest).toBeDefined()
+      expect(syncRequest?.type).toBe("channel/sync-request")
+
+      // Step 3: VERIFY THE FIX - the sync-request should contain the stored version
+      // NOT an empty version!
+      if (syncRequest?.type === "channel/sync-request") {
+        const docRequest = syncRequest.docs.find(d => d.docId === "test-doc")
+        expect(docRequest).toBeDefined()
+
+        // The requesterDocVersion should match the stored document's version
+        // (not be empty)
+        const requestedVersion = docRequest!.requesterDocVersion
+        const storedVersion = doc.oplogVersion()
+
+        // Verify the version is NOT empty
+        expect(requestedVersion.length()).toBeGreaterThan(0)
+
+        // Verify the version matches what's stored
+        // The comparison should be 0 (equal) or -1 (stored is subset of requested)
+        const comparison = requestedVersion.compare(storedVersion)
+        expect(comparison).toBe(0) // Versions should be equal
+      }
+
+      // Step 4: Simulate Repo responding with "up-to-date" (correct behavior)
+      // When the Repo receives a sync-request with the correct version,
+      // it responds with "up-to-date" instead of sending data
+      await channel.send({
+        type: "channel/sync-response",
+        docId: "test-doc",
+        transmission: {
+          type: "up-to-date",
+          version: doc.oplogVersion(),
+        },
+      })
+
+      // Step 5: Verify no new chunks were created
+      const chunksAfterRefresh = await adapter.loadRange(["test-doc"])
+      expect(chunksAfterRefresh).toHaveLength(1)
+    })
+
+    it("should only save NEW data when storage is behind", async () => {
+      // This tests the correct behavior: only save when there's actually new data
+
+      // Step 1: Create initial document and save it
+      const doc = new LoroDoc()
+      doc.getText("text").insert(0, "Hello")
+      const snapshot = doc.export({ mode: "snapshot" })
+      await adapter.save(["test-doc", "update", "initial"], snapshot)
+
+      const initialSaveCount = adapter.saveCalls.length
+
+      // Step 2: Simulate page refresh
+      const channel = await initializeAdapter()
+
+      await channel.send({
+        type: "channel/establish-request",
+        identity: { peerId: "123", name: "test-peer", type: "user" },
+      })
+
+      // Step 3: Simulate Repo having NEW data (document was modified elsewhere)
+      doc.getText("text").insert(5, " World")
+      const newUpdate = doc.export({
+        mode: "update",
+        from: new LoroDoc().oplogVersion(),
+      })
+
+      await channel.send({
+        type: "channel/sync-response",
+        docId: "test-doc",
+        transmission: {
+          type: "update",
+          data: newUpdate,
+          version: doc.oplogVersion(),
+        },
+      })
+
+      // Step 4: Verify exactly 1 new save occurred (for the new data)
+      const savesAfterRefresh = adapter.saveCalls.length - initialSaveCount
+      expect(savesAfterRefresh).toBe(1)
+
+      // Verify we now have 2 chunks (original + new update)
+      const chunks = await adapter.loadRange(["test-doc"])
+      expect(chunks).toHaveLength(2)
+    })
+
+    describe("Version Extraction with decodeImportBlobMeta", () => {
+      it("extracts and merges versions from multiple chunks without full reconstruction", async () => {
+        // This test verifies that decodeImportBlobMeta can extract version vectors
+        // from stored chunks, which is used by requestStoredDocuments() to send
+        // the correct version in sync-requests.
+
+        // Create chunks from different peers (simulating multi-peer collaboration)
+        const doc1 = new LoroDoc()
+        doc1.setPeerId("1")
+        doc1.getText("text").insert(0, "Hello")
+        doc1.commit()
+        const chunk1 = doc1.export({ mode: "snapshot" })
+
+        const doc2 = new LoroDoc()
+        doc2.setPeerId("2")
+        doc2.getText("text").insert(0, "World")
+        doc2.commit()
+        const chunk2 = doc2.export({ mode: "update" })
+
+        // Extract metadata from each chunk WITHOUT full import
+        const meta1 = decodeImportBlobMeta(chunk1, false)
+        const meta2 = decodeImportBlobMeta(chunk2, false)
+
+        // Verify we can extract versions
+        expect(meta1.partialEndVersionVector.length()).toBeGreaterThan(0)
+        expect(meta2.partialEndVersionVector.length()).toBeGreaterThan(0)
+
+        // Merge the version vectors (same algorithm as requestStoredDocuments)
+        const mergedVersionMap = new Map<string, number>()
+        const v1 = meta1.partialEndVersionVector.toJSON()
+        const v2 = meta2.partialEndVersionVector.toJSON()
+
+        for (const [peer, counter] of v1.entries()) {
+          const existing = mergedVersionMap.get(peer) ?? 0
+          if (counter > existing) {
+            mergedVersionMap.set(peer, counter)
+          }
+        }
+        for (const [peer, counter] of v2.entries()) {
+          const existing = mergedVersionMap.get(peer) ?? 0
+          if (counter > existing) {
+            mergedVersionMap.set(peer, counter)
+          }
+        }
+
+        // Verify the merged version has both peers
+        expect(mergedVersionMap.has("1")).toBe(true)
+        expect(mergedVersionMap.has("2")).toBe(true)
+      })
     })
   })
 })

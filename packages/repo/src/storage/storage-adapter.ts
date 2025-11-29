@@ -1,4 +1,9 @@
-import { LoroDoc, type VersionVector } from "loro-crdt"
+import {
+  decodeImportBlobMeta,
+  LoroDoc,
+  type PeerID,
+  VersionVector,
+} from "loro-crdt"
 import { Adapter } from "../adapter/adapter.js"
 import type {
   ChannelMsg,
@@ -8,7 +13,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import type { DocId, PeerID } from "../types.js"
+import type { DocId } from "../types.js"
 import { generatePeerId } from "../utils/generate-peer-id.js"
 
 export type StorageKey = string[]
@@ -303,8 +308,22 @@ export abstract class StorageAdapter extends Adapter<void> {
 
     const { docId, transmission } = msg
 
+    this.logger.debug("handleSyncResponse: received", {
+      docId,
+      transmissionType: transmission.type,
+      dataLength: "data" in transmission ? transmission.data.length : 0,
+    })
+
     // Only save if we received actual data
     if (transmission.type === "update" || transmission.type === "snapshot") {
+      this.logger.debug(
+        "handleSyncResponse: about to save data (this creates a new chunk!)",
+        {
+          docId,
+          transmissionType: transmission.type,
+          dataLength: transmission.data.length,
+        },
+      )
       await this.saveDocumentData(docId, transmission.data)
     }
   }
@@ -318,8 +337,22 @@ export abstract class StorageAdapter extends Adapter<void> {
 
     const { docId, transmission } = msg
 
+    this.logger.debug("handleUpdate: received", {
+      docId,
+      transmissionType: transmission.type,
+      dataLength: "data" in transmission ? transmission.data.length : 0,
+    })
+
     // Only save if we received actual data
     if (transmission.type === "update" || transmission.type === "snapshot") {
+      this.logger.debug(
+        "handleUpdate: about to save data (this creates a new chunk!)",
+        {
+          docId,
+          transmissionType: transmission.type,
+          dataLength: transmission.data.length,
+        },
+      )
       await this.saveDocumentData(docId, transmission.data)
     }
   }
@@ -431,30 +464,116 @@ export abstract class StorageAdapter extends Adapter<void> {
    * Send sync-request for all documents stored in this adapter.
    * This is called after channel establishment to enable document discovery.
    * The bidirectional flag ensures the Repo sends a reciprocal sync-request.
+   *
+   * IMPORTANT: We send the actual stored version (not empty version) to prevent
+   * the Repo from sending back data we already have. This avoids creating
+   * duplicate chunks on page refresh.
+   *
+   * OPTIMIZATION: We use decodeImportBlobMeta() to extract version vectors from
+   * chunks WITHOUT full reconstruction. This avoids doubling memory usage.
    */
   private async requestStoredDocuments(): Promise<void> {
     try {
       // Load all chunks to discover stored documents
       const chunks = await this.loadRange([])
 
-      // Extract unique docIds from chunks (each doc may have multiple chunks)
-      const docIds = Array.from(new Set(chunks.map(chunk => chunk.key[0])))
+      // Single-pass: extract version vectors and group by docId
+      // Using decodeImportBlobMeta() avoids full document reconstruction
+      const docVersions = new Map<
+        DocId,
+        { versionMap: Map<PeerID, number>; hasError: boolean }
+      >()
+
+      for (const chunk of chunks) {
+        const docId = chunk.key[0]
+
+        if (!docVersions.has(docId)) {
+          docVersions.set(docId, { versionMap: new Map(), hasError: false })
+        }
+
+        const docInfo = docVersions.get(docId)!
+
+        // Skip if we already had an error with this doc
+        if (docInfo.hasError) continue
+
+        try {
+          // Extract version from chunk metadata WITHOUT full import
+          const metadata = decodeImportBlobMeta(chunk.data, false)
+          const chunkVersion = metadata.partialEndVersionVector.toJSON()
+
+          // Merge this chunk's version into the doc's version (take max per peer)
+          for (const [peer, counter] of chunkVersion.entries()) {
+            const existing = docInfo.versionMap.get(peer) ?? 0
+            if (counter > existing) {
+              docInfo.versionMap.set(peer, counter)
+            }
+          }
+        } catch (error) {
+          // If we can't decode metadata, mark this doc as having an error
+          // We'll use empty version as fallback
+          this.logger.warn(
+            "requestStoredDocuments: failed to decode chunk metadata for {docId}",
+            { docId, error },
+          )
+          docInfo.hasError = true
+        }
+      }
+
+      const docIds = Array.from(docVersions.keys())
 
       this.logger.debug(
-        "requestStoredDocuments: loading {count} chunks for {docIds}",
+        "requestStoredDocuments: extracted versions from {count} chunks for {docCount} docs",
         {
           count: chunks.length,
+          docCount: docIds.length,
           docIds,
         },
       )
 
       if (docIds.length > 0) {
-        const docs = docIds.map(docId => ({
-          docId,
-          // Use empty version - we want the Repo to send us a reciprocal request
-          // so we can respond with our stored data
-          requesterDocVersion: new LoroDoc().oplogVersion(),
-        }))
+        // Build the docs array with extracted versions
+        const docs: Array<{
+          docId: DocId
+          requesterDocVersion: VersionVector
+        }> = []
+
+        for (const [docId, docInfo] of docVersions) {
+          let version: VersionVector
+
+          if (!docInfo.hasError && docInfo.versionMap.size > 0) {
+            // Create VersionVector directly from the merged Map
+            version = new VersionVector(docInfo.versionMap)
+
+            this.logger.debug(
+              "requestStoredDocuments: extracted version for {docId} with {peerCount} peers",
+              {
+                docId,
+                peerCount: docInfo.versionMap.size,
+                version: Object.fromEntries(docInfo.versionMap),
+              },
+            )
+          } else {
+            // Use empty version as fallback
+            version = new VersionVector(null)
+            this.logger.debug(
+              "requestStoredDocuments: using empty version for {docId} (error or no chunks)",
+              { docId },
+            )
+          }
+
+          docs.push({
+            docId,
+            requesterDocVersion: version,
+          })
+        }
+
+        this.logger.debug(
+          "requestStoredDocuments: sending sync-request with extracted versions",
+          {
+            docIds,
+            bidirectional: true,
+          },
+        )
 
         // Send sync-request with bidirectional=true; this tells the Repo to send
         // a reciprocal sync-request back to us
