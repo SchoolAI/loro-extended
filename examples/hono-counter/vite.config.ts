@@ -1,15 +1,15 @@
-import devServer, { defaultOptions } from "@hono/vite-dev-server";
-import { defineConfig } from "vite";
-import wasm from "vite-plugin-wasm";
+import devServer, { defaultOptions } from "@hono/vite-dev-server"
+import { defineConfig } from "vite"
+import wasm from "vite-plugin-wasm"
 
 // Change the import to use your runtime specific build
-import build from "@hono/vite-build/node";
+import build from "@hono/vite-build/node"
 
 export default defineConfig(({ mode }) => {
   // Common optimizeDeps config for loro-crdt WASM
   const optimizeDeps = {
     exclude: ["loro-crdt"],
-  };
+  }
 
   if (mode === "client")
     return {
@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-    };
+    }
 
   return {
     optimizeDeps,
@@ -48,5 +48,9 @@ export default defineConfig(({ mode }) => {
         ],
       }),
     ],
-  };
-});
+    build: {
+      // loro-crdt WASM is ~3MB, so we need to increase the chunk size warning limit
+      chunkSizeWarningLimit: 4000,
+    },
+  }
+})

@@ -8,6 +8,7 @@
       "@loro-extended/adapter-leveldb",
       "@loro-extended/adapter-indexeddb",
       "@loro-extended/change",
+      "@loro-extended/hono",
       "@loro-extended/react",
       "@loro-extended/repo"
     ]

@@ -1,7 +1,8 @@
 {
-  "name": "@loro-extended/example-hono-counter",
-  "type": "module",
+  "name": "example-hono-counter",
   "private": true,
+  "version": "0.0.1",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build --mode client && vite build"

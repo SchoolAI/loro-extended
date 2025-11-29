@@ -11,6 +11,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["loro-crdt"],
   },
+  build: {
+    // loro-crdt WASM is ~3MB, so we need to increase the chunk size warning limit
+    chunkSizeWarningLimit: 4000,
+  },
   server: {
     // Allow serving on ngrok or similar
     allowedHosts: true,
