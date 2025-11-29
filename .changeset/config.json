@@ -4,9 +4,10 @@
   "commit": false,
   "fixed": [
     [
-      "@loro-extended/adapter-sse",
-      "@loro-extended/adapter-leveldb",
+      "@loro-extended/adapter-http-polling",
       "@loro-extended/adapter-indexeddb",
+      "@loro-extended/adapter-leveldb",
+      "@loro-extended/adapter-sse",
       "@loro-extended/change",
       "@loro-extended/hono",
       "@loro-extended/react",
