@@ -4,8 +4,8 @@ import type {
   ValueShape,
 } from "@loro-extended/change"
 import type { DocId } from "@loro-extended/repo"
-import type { Value } from "loro-crdt"
 import { useMemo, useSyncExternalStore } from "hono/jsx"
+import type { Value } from "loro-crdt"
 import { useDocHandleState } from "./use-doc-handle-state.js"
 
 export type PresenceContext<T> = {
@@ -52,12 +52,12 @@ export function useUntypedPresence<
     }
 
     const setSelf = (values: Partial<T>) => {
-      handle.presence.set(values)
+      handle.untypedPresence.set(values)
     }
 
     const computeState = () => {
-      const all = handle.presence.all as Record<string, T>
-      const self = handle.presence.self as T
+      const all = handle.untypedPresence.all as Record<string, T>
+      const self = handle.untypedPresence.self as T
 
       return { self, all, setSelf }
     }
@@ -65,7 +65,7 @@ export function useUntypedPresence<
     let cachedState = computeState()
 
     const subscribe = (callback: () => void) => {
-      return handle.presence.subscribe(() => {
+      return handle.untypedPresence.subscribe(() => {
         cachedState = computeState()
         callback()
       })
@@ -126,7 +126,7 @@ export function usePresence<S extends ContainerShape | ValueShape, R = any>(
       }
     }
 
-    const typedPresence = handle.typedPresence(shape, emptyState)
+    const typedPresence = handle.presence(shape, emptyState)
     const setSelf = (values: Partial<InferPlainType<S>>) => {
       typedPresence.set(values)
     }
