@@ -5,12 +5,9 @@ import {
   type PeerID,
   type RepoParams,
 } from "@loro-extended/repo"
-import { hc } from "hono/client"
-import { useMemo, useState } from "hono/jsx"
+import { useMemo } from "hono/jsx"
 import { render } from "hono/jsx/dom"
-import type { AppType } from "./index.js"
-
-const client = hc<AppType>("/")
+import "./style.css"
 
 // Define the counter document schema using Shape.counter() which is a CRDT
 const counterSchema = Shape.doc({
@@ -39,11 +36,11 @@ function App() {
 
   return (
     <RepoProvider config={config}>
-      <h1>Loro + Hono Counter</h1>
-      <h2>Synced Counter (using useDocument)</h2>
-      <SyncedCounter />
-      <h2>Server Time (API example)</h2>
-      <ClockButton />
+      <div className="card">
+        <h1>Loro + Hono Counter</h1>
+        <h2>Synced Counter</h2>
+        <SyncedCounter />
+      </div>
     </RepoProvider>
   )
 }
@@ -66,48 +63,17 @@ function SyncedCounter() {
 
   return (
     <div>
-      <p>
-        Count: <strong>{doc.count}</strong>
-      </p>
-      <p>
-        <button type="button" onClick={decrement}>
-          -
-        </button>{" "}
-        <button type="button" onClick={increment}>
+      <div className="counter">
+        {doc.count}
+      </div>
+      <div className="btn-group">
+        <button type="button" className="btn btn-primary" onClick={decrement}>
+          &ndash; 
+        </button>
+        <button type="button" className="btn btn-primary" onClick={increment}>
           +
         </button>
-      </p>
-    </div>
-  )
-}
-
-const ClockButton = () => {
-  const [response, setResponse] = useState<string | null>(null)
-
-  const handleClick = async () => {
-    const response = await client.api.clock.$get()
-    const data = await response.json()
-    const headers = (
-      Array.from(response.headers.entries()) as [string, string][]
-    ).reduce<Record<string, string>>((acc, [key, value]) => {
-      acc[key] = value
-      return acc
-    }, {})
-    const fullResponse = {
-      url: response.url,
-      status: response.status,
-      headers,
-      body: data,
-    }
-    setResponse(JSON.stringify(fullResponse, null, 2))
-  }
-
-  return (
-    <div>
-      <button type="button" onClick={handleClick}>
-        Get Server Time
-      </button>
-      {response && <pre>{response}</pre>}
+      </div>
     </div>
   )
 }

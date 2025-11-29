@@ -21,13 +21,6 @@ const app = new Hono()
 
 // API routes
 const routes = app
-  // Example traditional API endpoint
-  .get("/api/clock", c => {
-    return c.json({
-      time: new Date().toLocaleTimeString(),
-    })
-  })
-
   // SSE endpoint for Loro sync - client subscribes here
   .get("/sync/subscribe", async c => {
     const peerId = c.req.query("peerId") as PeerID | undefined
@@ -101,10 +94,6 @@ app.get("/", c => {
       <head>
         <meta charSet="utf-8" />
         <meta content="width=device-width, initial-scale=1" name="viewport" />
-        <link
-          rel="stylesheet"
-          href="https://cdn.simplecss.org/simple.min.css"
-        />
         {import.meta.env.PROD ? (
           <script type="module" src="/static/client.js" />
         ) : (
