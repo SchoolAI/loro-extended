@@ -1,8 +1,9 @@
 node_modules
+.roo/
+impl/
 **/dist
 **/*.db
 playwright-report
 test-results
-.roo/
 *.jsonl
 .env
