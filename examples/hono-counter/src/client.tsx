@@ -1,3 +1,4 @@
+import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb"
 import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
 import { RepoProvider, Shape, useDocument } from "@loro-extended/hono"
 import {
@@ -23,6 +24,9 @@ const peerId = generatePeerId()
 const repoConfig: RepoParams = {
   identity: { name: "hono-counter-client", type: "user", peerId },
   adapters: [
+    // IndexedDB for local persistence
+    new IndexedDBStorageAdapter(),
+    // SSE for network sync
     new SseClientNetworkAdapter({
       postUrl: (_peerId: PeerID) => `/sync/post`,
       eventSourceUrl: (peerId: PeerID) => `/sync/subscribe?peerId=${peerId}`,
@@ -63,12 +67,10 @@ function SyncedCounter() {
 
   return (
     <div>
-      <div className="counter">
-        {doc.count}
-      </div>
+      <div className="counter">{doc.count}</div>
       <div className="btn-group">
         <button type="button" className="btn btn-primary" onClick={decrement}>
-          &ndash; 
+          &ndash;
         </button>
         <button type="button" className="btn btn-primary" onClick={increment}>
           +

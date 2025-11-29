@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.12.2",
+    "@loro-extended/adapter-indexeddb": "workspace:^",
     "@loro-extended/adapter-sse": "workspace:^",
     "@loro-extended/change": "workspace:^",
     "@loro-extended/hono": "workspace:^",
