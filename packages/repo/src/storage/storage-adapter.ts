@@ -19,43 +19,41 @@ export type Chunk = {
 }
 
 /**
- * An adapter for persisting Loro documents and repo metadata.
+ * A base class for storage adapters.
  *
  * This base class extends Adapter<void> and handles all channel communication
- * behind the scenes. Subclasses only need to implement the storage operations
- * (load, save, remove, loadRange, removeRange) without any knowledge of channels.
+ * behind the scenes. Subclasses only need to implement the following storage
+ * operations, and do not need specialized knowledge of Adapter message protocol:
+ * - load, save, remove
+ * - loadRange, removeRange
  *
  * The base class automatically:
  * - Creates a single channel for storage operations
  * - Responds to channel establishment requests
+ * - Responds to document sync requests
  * - Translates channel messages into storage operations
- * - Sends appropriate responses back through the channel
+ *
+ * The StorageAdapter essentially mimics what would happen if there were another
+ * repo to communicate with, but instead intercepts and responds with appropriate
+ * messages itself.
  */
 export abstract class StorageAdapter extends Adapter<void> {
   protected storageChannel?: ConnectedChannel
-  private readonly storagePeerId: PeerID
   private lastTimestamp = 0
   private counter = 0
 
-  constructor(params: { adapterId: string }) {
-    super(params)
-    // Generate a cryptographically random peerId for this storage adapter instance
-    this.storagePeerId = generatePeerId()
-  }
+  // Since a StorageAdapter mimics the behavior of a peer, we need a PeerId
+  private readonly storagePeerId: PeerID = generatePeerId()
 
   /**
-   * Generate the base channel for this storage adapter.
-   * This is called by the ChannelDirectory when creating the channel.
-   * The channel is ready to use immediately.
+   * The Adapter superclass requires that we be able to generate a channel
    */
   protected generate(): GeneratedChannel {
     return {
       kind: "storage",
       adapterId: this.adapterId,
       send: this.handleChannelMessage.bind(this),
-      stop: () => {
-        // Cleanup if needed
-      },
+      stop: () => {},
     }
   }
 
@@ -65,6 +63,7 @@ export abstract class StorageAdapter extends Adapter<void> {
    */
   async onStart(): Promise<void> {
     this.storageChannel = this.addChannel()
+
     // Establish the channel to trigger the establishment handshake
     this.establishChannel(this.storageChannel.channelId)
   }
@@ -89,12 +88,14 @@ export abstract class StorageAdapter extends Adapter<void> {
       switch (msg.type) {
         case "channel/establish-request":
           return await this.handleEstablishRequest()
+        case "channel/establish-response":
+          // Nothing to do
+          break
         case "channel/sync-request":
           return await this.handleSyncRequest(msg)
         case "channel/sync-response":
           return await this.handleSyncResponse(msg)
         case "channel/update":
-          // Handle ongoing updates from subscribed documents
           return await this.handleUpdate(msg)
         case "channel/directory-request":
           return await this.handleDirectoryRequest(msg)
@@ -102,80 +103,25 @@ export abstract class StorageAdapter extends Adapter<void> {
           return await this.handleDirectoryResponse(msg)
         case "channel/delete-request":
           return await this.handleDeleteRequest(msg)
+        case "channel/delete-response":
+          // Nothing to do
+          break
         case "channel/ephemeral":
           // Storage adapters ignore ephemeral messages
           return
         default:
-          this.logger.warn("unhandled message type", { type: msg.type })
+          this.logger.warn("unhandled message type", {
+            type: (msg as ChannelMsg).type,
+          })
       }
     } catch (error) {
       this.logger.error("error handling channel message", { error, msg })
     }
   }
 
-  /**
-   * Handle sync responses by saving document updates to storage.
-   * This is called once in response to a sync-request.
-   */
-  private async handleSyncResponse(msg: ChannelMsg): Promise<void> {
-    if (msg.type !== "channel/sync-response") return
-
-    const { docId, transmission } = msg
-
-    // Only save if we received actual data
-    if (transmission.type === "update" || transmission.type === "snapshot") {
-      await this.saveDocumentData(docId, transmission.data)
-    }
-  }
-
-  /**
-   * Handle ongoing updates from subscribed documents.
-   * This is called when a document changes after the initial sync.
-   */
-  private async handleUpdate(msg: ChannelMsg): Promise<void> {
-    if (msg.type !== "channel/update") return
-
-    const { docId, transmission } = msg
-
-    // Only save if we received actual data
-    if (transmission.type === "update" || transmission.type === "snapshot") {
-      await this.saveDocumentData(docId, transmission.data)
-    }
-  }
-
-  /**
-   * Save document data to storage with a unique timestamped key.
-   */
-  private async saveDocumentData(
-    docId: DocId,
-    data: Uint8Array,
-  ): Promise<void> {
-    // Generate a unique key for this update
-    // Format: [docId, "update", timestamp]
-    const now = Date.now()
-    if (now === this.lastTimestamp) {
-      this.counter++
-    } else {
-      this.lastTimestamp = now
-      this.counter = 0
-    }
-
-    const timestamp = `${now}-${this.counter.toString().padStart(4, "0")}`
-    const key: StorageKey = [docId, "update", timestamp]
-
-    await this.save(key, data)
-  }
-
-  /**
-   * Send a reply message through the storage channel.
-   * Throws an error if the channel is not properly initialized.
-   */
-  private reply(msg: ChannelMsg): void {
-    if (!this.storageChannel) {
-      throw new Error("Cannot reply: storage channel not initialized")
-    }
-    this.storageChannel.onReceive(msg)
-  }
+  // ==========================================================================
+  // Message Handlers
+  // ==========================================================================
 
   /**
    * Automatically respond to establishment requests.
@@ -201,57 +147,7 @@ export abstract class StorageAdapter extends Adapter<void> {
     // 1. We send sync-request with our stored docIds
     // 2. Repo creates documents and sends reciprocal sync-request
     // 3. We respond with stored data via handleSyncRequest
-    this.logger.debug("handleEstablishRequest: requesting stored documents")
     await this.requestStoredDocuments()
-    this.logger.debug("handleEstablishRequest: done")
-  }
-
-  /**
-   * Send sync-request for all documents stored in this adapter.
-   * This is called after channel establishment to enable document discovery.
-   * The bidirectional flag ensures the Repo sends a reciprocal sync-request.
-   */
-  private async requestStoredDocuments(): Promise<void> {
-    try {
-      this.logger.debug("requestStoredDocuments: loading all chunks...")
-      // Load all chunks to discover stored documents
-      const chunks = await this.loadRange([])
-      this.logger.debug("requestStoredDocuments: loaded chunks", {
-        count: chunks.length,
-      })
-
-      // Extract unique docIds from chunks (each doc may have multiple chunks)
-      const docIds = Array.from(new Set(chunks.map(chunk => chunk.key[0])))
-      this.logger.debug("requestStoredDocuments: unique docIds", {
-        count: docIds.length,
-        docIds,
-      })
-
-      if (docIds.length > 0) {
-        this.logger.debug("requesting stored documents from repo", {
-          count: docIds.length,
-          docIds,
-        })
-
-        // Send sync-request with bidirectional=true
-        // This tells the Repo to send a reciprocal sync-request back to us
-        this.reply({
-          type: "channel/sync-request",
-          docs: docIds.map(docId => ({
-            docId,
-            // Use empty version - we want the Repo to send us a reciprocal request
-            // so we can respond with our stored data
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          })),
-          bidirectional: true,
-        })
-        this.logger.debug("requestStoredDocuments: sent sync-request")
-      } else {
-        this.logger.debug("requestStoredDocuments: no stored documents found")
-      }
-    } catch (error) {
-      this.logger.error("failed to request stored documents", { error })
-    }
   }
 
   /**
@@ -394,11 +290,37 @@ export abstract class StorageAdapter extends Adapter<void> {
           docIds: docsForReciprocalRequest.map(d => d.docId),
         },
       )
-      this.reply({
-        type: "channel/sync-request",
-        docs: docsForReciprocalRequest,
-        bidirectional: false, // Prevent infinite loop
-      })
+      this.replyWithSyncRequest(docsForReciprocalRequest, false)
+    }
+  }
+
+  /**
+   * Handle sync responses by saving document updates to storage.
+   * This is called once in response to a sync-request.
+   */
+  private async handleSyncResponse(msg: ChannelMsg): Promise<void> {
+    if (msg.type !== "channel/sync-response") return
+
+    const { docId, transmission } = msg
+
+    // Only save if we received actual data
+    if (transmission.type === "update" || transmission.type === "snapshot") {
+      await this.saveDocumentData(docId, transmission.data)
+    }
+  }
+
+  /**
+   * Handle ongoing updates from subscribed documents.
+   * This is called when a document changes after the initial sync.
+   */
+  private async handleUpdate(msg: ChannelMsg): Promise<void> {
+    if (msg.type !== "channel/update") return
+
+    const { docId, transmission } = msg
+
+    // Only save if we received actual data
+    if (transmission.type === "update" || transmission.type === "snapshot") {
+      await this.saveDocumentData(docId, transmission.data)
     }
   }
 
@@ -449,11 +371,7 @@ export abstract class StorageAdapter extends Adapter<void> {
       requesterDocVersion: new LoroDoc().version(),
     }))
 
-    this.reply({
-      type: "channel/sync-request",
-      docs,
-      bidirectional: false,
-    })
+    this.replyWithSyncRequest(docs, false)
   }
 
   /**
@@ -468,6 +386,84 @@ export abstract class StorageAdapter extends Adapter<void> {
     } catch (error) {
       this.logger.warn("delete failed", { docId: msg.docId, error })
       this.replyWithDeleteResponse(msg.docId, "ignored")
+    }
+  }
+
+  // ==========================================================================
+  // Helper methods
+  // ==========================================================================
+
+  /**
+   * Save document data to storage with a unique timestamped key.
+   */
+  private async saveDocumentData(
+    docId: DocId,
+    data: Uint8Array,
+  ): Promise<void> {
+    // Generate a unique key for this update
+    // Format: [docId, "update", timestamp]
+    const now = Date.now()
+    if (now === this.lastTimestamp) {
+      this.counter++
+    } else {
+      this.lastTimestamp = now
+      this.counter = 0
+    }
+
+    const timestamp = `${now}-${this.counter.toString().padStart(4, "0")}`
+    const key: StorageKey = [docId, "update", timestamp]
+
+    await this.save(key, data)
+  }
+
+  /**
+   * Send a reply message through the storage channel.
+   * Throws an error if the channel is not properly initialized.
+   */
+  private reply(msg: ChannelMsg): void {
+    if (!this.storageChannel) {
+      throw new Error("Cannot reply: storage channel not initialized")
+    }
+    this.storageChannel.onReceive(msg)
+  }
+
+  /**
+   * Send sync-request for all documents stored in this adapter.
+   * This is called after channel establishment to enable document discovery.
+   * The bidirectional flag ensures the Repo sends a reciprocal sync-request.
+   */
+  private async requestStoredDocuments(): Promise<void> {
+    try {
+      // Load all chunks to discover stored documents
+      const chunks = await this.loadRange([])
+
+      // Extract unique docIds from chunks (each doc may have multiple chunks)
+      const docIds = Array.from(new Set(chunks.map(chunk => chunk.key[0])))
+
+      this.logger.debug(
+        "requestStoredDocuments: loading {count} chunks for {docIds}",
+        {
+          count: chunks.length,
+          docIds,
+        },
+      )
+
+      if (docIds.length > 0) {
+        const docs = docIds.map(docId => ({
+          docId,
+          // Use empty version - we want the Repo to send us a reciprocal request
+          // so we can respond with our stored data
+          requesterDocVersion: new LoroDoc().oplogVersion(),
+        }))
+
+        // Send sync-request with bidirectional=true; this tells the Repo to send
+        // a reciprocal sync-request back to us
+        this.replyWithSyncRequest(docs, true)
+      } else {
+        this.logger.debug("requestStoredDocuments: no stored documents found")
+      }
+    } catch (error) {
+      this.logger.error("failed to request stored documents", { error })
     }
   }
 
@@ -487,6 +483,20 @@ export abstract class StorageAdapter extends Adapter<void> {
       }
     }
     return available
+  }
+
+  /**
+   * Reply with a sync request containing document data.
+   */
+  private replyWithSyncRequest(
+    docs: ChannelMsgSyncRequest["docs"],
+    bidirectional: boolean,
+  ): void {
+    this.reply({
+      type: "channel/sync-request",
+      docs,
+      bidirectional,
+    })
   }
 
   /**
