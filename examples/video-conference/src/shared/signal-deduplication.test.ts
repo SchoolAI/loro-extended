@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest"
 import type { PeerID } from "@loro-extended/repo"
+import { describe, expect, it } from "vitest"
 
 /**
  * Signal deduplication strategy tests.
- * 
+ *
  * The current implementation uses JSON.stringify for deduplication which:
  * - Creates large strings for each signal
  * - Has unbounded memory growth in processedSignalsRef
- * 
+ *
  * The improved implementation should use sequence numbers for:
  * - O(1) deduplication
  * - Bounded memory (just one number per peer)
@@ -69,12 +69,12 @@ describe("Signal Deduplication", () => {
      */
     function processSignalsWithSeq(
       signals: SignalWithSeq[],
-      lastProcessedSeq: number
+      lastProcessedSeq: number,
     ): { newSignals: SignalWithSeq[]; newLastSeq: number } {
-      const newSignals = signals.filter((s) => s.seq > lastProcessedSeq)
+      const newSignals = signals.filter(s => s.seq > lastProcessedSeq)
       const newLastSeq =
         newSignals.length > 0
-          ? Math.max(...newSignals.map((s) => s.seq))
+          ? Math.max(...newSignals.map(s => s.seq))
           : lastProcessedSeq
 
       return { newSignals, newLastSeq }

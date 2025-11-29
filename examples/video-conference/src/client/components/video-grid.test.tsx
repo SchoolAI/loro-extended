@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
-import { VideoGrid, type Participant } from "./video-grid"
 import type { PeerID } from "@loro-extended/repo"
+import { render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
 import type { UserPresence } from "../../shared/types"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
+import { VideoGrid, type Participant } from "./video-grid"
 
 // Mock the VideoBubble component to simplify testing
 vi.mock("../video-bubble", () => ({
@@ -29,7 +29,8 @@ vi.mock("../video-bubble", () => ({
 
 describe("VideoGrid", () => {
   // Default getPeerStatus that returns "connected" for all peers
-  const defaultGetPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "connected"
+  const defaultGetPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus =>
+    "connected"
 
   const defaultProps = {
     localStream: null,
@@ -71,7 +72,11 @@ describe("VideoGrid", () => {
 
     it("hides waiting message when participants exist", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
       render(<VideoGrid {...defaultProps} otherParticipants={participants} />)
@@ -83,7 +88,11 @@ describe("VideoGrid", () => {
   describe("remote participants", () => {
     it("renders video bubble for each participant", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
         { peerId: "peer-2" as unknown as PeerID, name: "Bob", joinedAt: 2000 },
       ]
 
@@ -95,7 +104,11 @@ describe("VideoGrid", () => {
 
     it("uses presence data for remote participant audio/video state", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
       const userPresence: Record<string, UserPresence> = {
@@ -121,7 +134,11 @@ describe("VideoGrid", () => {
 
     it("defaults to audio/video on when presence is missing", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
       // No presence data for peer-1
@@ -141,10 +158,15 @@ describe("VideoGrid", () => {
   describe("connection status", () => {
     it("shows reconnecting indicator for reconnecting peers", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
-      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "reconnecting"
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus =>
+        "reconnecting"
 
       render(
         <VideoGrid
@@ -159,10 +181,15 @@ describe("VideoGrid", () => {
 
     it("shows offline indicator for peer-disconnected peers", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
-      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "peer-disconnected"
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus =>
+        "peer-disconnected"
 
       render(
         <VideoGrid
@@ -177,10 +204,15 @@ describe("VideoGrid", () => {
 
     it("shows self-disconnected indicator when we're offline", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
-      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "self-disconnected"
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus =>
+        "self-disconnected"
 
       render(
         <VideoGrid
@@ -195,10 +227,15 @@ describe("VideoGrid", () => {
 
     it("hides indicator for connected peers", () => {
       const participants: Participant[] = [
-        { peerId: "peer-1" as unknown as PeerID, name: "Alice", joinedAt: 1000 },
+        {
+          peerId: "peer-1" as unknown as PeerID,
+          name: "Alice",
+          joinedAt: 1000,
+        },
       ]
 
-      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus => "connected"
+      const getPeerStatus = (_peerId: PeerID): ParticipantConnectionStatus =>
+        "connected"
 
       render(
         <VideoGrid

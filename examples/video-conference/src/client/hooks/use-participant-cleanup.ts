@@ -16,13 +16,13 @@ type Participant = {
 
 /**
  * Hook to clean up stale participants based on presence.
- * 
+ *
  * When a peer's presence disappears (they disconnected), we wait 30s
  * then remove them from the participant list. This handles:
  * - Network disconnections
  * - Browser crashes
  * - Any case where beforeunload didn't fire
- * 
+ *
  * IMPORTANT: Only cleans up if WE are still connected to the server.
  * If we're offline, we don't know if they're really gone.
  */
@@ -34,8 +34,10 @@ export function useParticipantCleanup(
   removeParticipant: (peerId: string) => void,
 ) {
   // Track pending cleanup timers
-  const cleanupTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-  
+  const cleanupTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  )
+
   // Track when we last saw each peer's presence
   const lastSeenRef = useRef<Map<string, number>>(new Map())
 
@@ -47,7 +49,7 @@ export function useParticipantCleanup(
     // Update last seen time for peers with presence
     for (const peerId of presentPeerIds) {
       lastSeenRef.current.set(peerId, now)
-      
+
       // Cancel any pending cleanup for this peer (they're back!)
       const existingTimer = cleanupTimersRef.current.get(peerId)
       if (existingTimer) {

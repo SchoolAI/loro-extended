@@ -16,12 +16,12 @@ export type UseSignalChannelReturn = {
 
 /**
  * Hook to manage WebRTC signal routing and deduplication.
- * 
+ *
  * This hook handles:
  * - Accumulating outgoing signals for each target peer
  * - Deduplicating incoming signals to avoid reprocessing
  * - Clearing signals after connection is established
- * 
+ *
  * It does NOT handle:
  * - Actual peer connections (use usePeerManager)
  * - Presence integration (handled by parent hook)
@@ -37,17 +37,17 @@ export function useSignalChannel(): UseSignalChannelReturn {
   // Queue an outgoing signal for a target peer
   const queueOutgoingSignal = useCallback(
     (targetPeerId: PeerID, signal: SignalData) => {
-      setOutgoingSignals((prev) => ({
+      setOutgoingSignals(prev => ({
         ...prev,
         [targetPeerId]: [...(prev[targetPeerId] || []), signal],
       }))
     },
-    []
+    [],
   )
 
   // Clear outgoing signals for a peer (after connection established)
   const clearOutgoingSignals = useCallback((targetPeerId: PeerID) => {
-    setOutgoingSignals((prev) => {
+    setOutgoingSignals(prev => {
       const next = { ...prev }
       delete next[targetPeerId]
       return next
@@ -71,7 +71,7 @@ export function useSignalChannel(): UseSignalChannelReturn {
 
       return newSignals
     },
-    []
+    [],
   )
 
   return {

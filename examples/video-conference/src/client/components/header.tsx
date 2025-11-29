@@ -23,7 +23,9 @@ export function Header({
             <span className="text-xl">📹</span>
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-tight">Video Conference</h1>
+            <h1 className="font-bold text-lg leading-tight">
+              Video Conference
+            </h1>
             <div className="text-xs text-slate-400">
               Room: {roomId.slice(0, 20)}...
             </div>

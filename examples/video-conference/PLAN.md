@@ -3,6 +3,7 @@
 ## Overview
 
 A simple WebRTC-based video conference app using `simple-peer` and `loro-extended`. This app demonstrates how to use:
+
 - **CRDT documents** for persistent room state (participants, metadata)
 - **Typed presence** for ephemeral WebRTC signaling (SDP offers/answers, ICE candidates)
 - **SSE + HTTP POST** for all communication (no WebSockets)
@@ -19,7 +20,7 @@ From the simple-peer documentation:
 
 4. **Stream**: Pass `stream` option from `getUserMedia` to send video/audio. The remote peer receives it via the `stream` event.
 
-5. **Full Mesh**: For N peers, each peer maintains N-1 connections. Total connections = N*(N-1)/2.
+5. **Full Mesh**: For N peers, each peer maintains N-1 connections. Total connections = N\*(N-1)/2.
 
 ## Architecture
 
@@ -32,13 +33,13 @@ graph TB
         A_Peer[simple-peer instances]
         A_Media[MediaStream]
     end
-    
+
     subgraph "Server"
         S_Repo[Loro Repo]
         S_SSE[SSE Adapter]
         S_Storage[LevelDB Storage]
     end
-    
+
     subgraph "Client B"
         B_UI[React UI]
         B_Doc[Room Document]
@@ -46,12 +47,12 @@ graph TB
         B_Peer[simple-peer instances]
         B_Media[MediaStream]
     end
-    
+
     A_Doc <-->|CRDT Sync| S_Repo
     B_Doc <-->|CRDT Sync| S_Repo
     A_Presence <-->|Ephemeral| S_Repo
     B_Presence <-->|Ephemeral| S_Repo
-    
+
     A_Peer <-->|WebRTC Media| B_Peer
 ```
 
@@ -64,7 +65,7 @@ const RoomSchema = Shape.doc({
   // Room metadata
   name: Shape.text(),
   createdAt: Shape.plain.number(),
-  
+
   // Participant list - who has joined the room
   participants: Shape.list(
     Shape.map({
@@ -73,7 +74,7 @@ const RoomSchema = Shape.doc({
       joinedAt: Shape.plain.number(),
     })
   ),
-})
+});
 ```
 
 ### Signaling Presence (Ephemeral)
@@ -83,20 +84,20 @@ const SignalingPresenceSchema = Shape.plain.object({
   // Current media preferences
   wantsAudio: Shape.plain.boolean(),
   wantsVideo: Shape.plain.boolean(),
-  
+
   // WebRTC signaling - keyed by target peerId
   // Each entry contains the signal data to send to that peer
   signals: Shape.plain.object({
     // Dynamic keys: targetPeerId -> signal data
     // Signal data is the simple-peer signal object (SDP or ICE candidate)
   }),
-})
+});
 
 const EmptySignalingPresence = {
   wantsAudio: true,
   wantsVideo: true,
   signals: {},
-}
+};
 ```
 
 ## Signaling Flow via Presence
@@ -121,6 +122,7 @@ The key insight is that presence is **per-peer** and **ephemeral**. Each peer pu
 ### Signal Accumulation Strategy
 
 Since trickle ICE is enabled by default, multiple signals fire in sequence:
+
 1. SDP offer/answer (contains initial ICE candidates gathered before timeout)
 2. Additional ICE candidates as they're discovered
 
@@ -133,6 +135,7 @@ signals: {
 ```
 
 **Signal Flow:**
+
 1. Peer A's simple-peer emits `signal` event with offer
 2. Peer A appends to `presence.signals[peerB_id]`
 3. Presence propagates via loro-extended SSE
@@ -174,6 +177,7 @@ examples/video-conference/
 ## Implementation Milestones
 
 ### Milestone 1: Project Setup & Room Document
+
 **Goal**: Basic app structure with room document sync (no WebRTC yet)
 
 - [ ] Create project structure based on chat example
@@ -184,6 +188,7 @@ examples/video-conference/
 - [ ] Implement join/leave room functionality via CRDT
 
 ### Milestone 2: Local Media & UI
+
 **Goal**: Capture and display local video/audio
 
 - [ ] Create `useLocalMedia` hook for getUserMedia
@@ -193,6 +198,7 @@ examples/video-conference/
 - [ ] Update presence with `wantsAudio`/`wantsVideo`
 
 ### Milestone 3: WebRTC Signaling via Presence
+
 **Goal**: Exchange WebRTC signals through loro-extended presence
 
 - [ ] Create `useWebRtcMesh` hook
@@ -202,6 +208,7 @@ examples/video-conference/
 - [ ] Test signaling flow between two peers
 
 ### Milestone 4: simple-peer Integration
+
 **Goal**: Establish actual WebRTC connections
 
 - [ ] Install and configure simple-peer
@@ -211,6 +218,7 @@ examples/video-conference/
 - [ ] Handle peer cleanup on disconnect
 
 ### Milestone 5: Polish & Edge Cases
+
 **Goal**: Production-ready experience
 
 - [ ] Handle reconnection scenarios
@@ -227,7 +235,7 @@ examples/video-conference/
 To avoid double-negotiation, use deterministic initiator selection:
 
 ```typescript
-const isInitiator = myPeerId < remotePeerId
+const isInitiator = myPeerId < remotePeerId;
 ```
 
 The peer with the lexicographically smaller peerId initiates the connection.
@@ -238,15 +246,15 @@ Signals accumulate in presence until processed:
 
 ```typescript
 // In useWebRtcMesh
-const [processedSignals, setProcessedSignals] = useState<Set<string>>()
+const [processedSignals, setProcessedSignals] = useState<Set<string>>();
 
 // When reading signals from other peers' presence
 for (const [fromPeerId, signals] of Object.entries(otherPeerPresence.signals)) {
   for (const signal of signals) {
-    const signalId = `${fromPeerId}:${JSON.stringify(signal)}`
+    const signalId = `${fromPeerId}:${JSON.stringify(signal)}`;
     if (!processedSignals.has(signalId)) {
-      peer.signal(signal)
-      setProcessedSignals(prev => new Set([...prev, signalId]))
+      peer.signal(signal);
+      setProcessedSignals((prev) => new Set([...prev, signalId]));
     }
   }
 }
@@ -257,27 +265,25 @@ for (const [fromPeerId, signals] of Object.entries(otherPeerPresence.signals)) {
 ```typescript
 // When participant list changes
 useEffect(() => {
-  const currentPeerIds = new Set(peers.keys())
+  const currentPeerIds = new Set(peers.keys());
   const participantPeerIds = new Set(
-    doc.participants
-      .map(p => p.peerId)
-      .filter(id => id !== myPeerId)
-  )
-  
+    doc.participants.map((p) => p.peerId).filter((id) => id !== myPeerId)
+  );
+
   // Create peers for new participants
   for (const peerId of participantPeerIds) {
     if (!currentPeerIds.has(peerId)) {
-      createPeer(peerId)
+      createPeer(peerId);
     }
   }
-  
+
   // Destroy peers for removed participants
   for (const peerId of currentPeerIds) {
     if (!participantPeerIds.has(peerId)) {
-      destroyPeer(peerId)
+      destroyPeer(peerId);
     }
   }
-}, [doc.participants])
+}, [doc.participants]);
 ```
 
 ### ICE Servers
@@ -287,15 +293,15 @@ simple-peer defaults include Google STUN servers. For production, add TURN serve
 ```typescript
 const config = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
     // Add TURN servers for production NAT traversal
     // { urls: 'turn:your-turn-server.com', username: '...', credential: '...' }
-  ]
-}
+  ],
+};
 
 // Pass to simple-peer
-new Peer({ initiator, stream, config })
+new Peer({ initiator, stream, config });
 ```
 
 ### simple-peer Instance Management
@@ -303,48 +309,48 @@ new Peer({ initiator, stream, config })
 ```typescript
 // Create peer for remote participant
 function createPeer(remotePeerId: string, localStream: MediaStream) {
-  const isInitiator = myPeerId < remotePeerId
-  
+  const isInitiator = myPeerId < remotePeerId;
+
   const peer = new Peer({
     initiator: isInitiator,
     stream: localStream,
-    trickle: true,  // Enable trickle ICE for faster connections
-    config: { iceServers }
-  })
-  
+    trickle: true, // Enable trickle ICE for faster connections
+    config: { iceServers },
+  });
+
   // When simple-peer wants to send signaling data
-  peer.on('signal', (data) => {
+  peer.on("signal", (data) => {
     // Append to our presence for this target peer
-    setSelf(prev => ({
+    setSelf((prev) => ({
       ...prev,
       signals: {
         ...prev.signals,
-        [remotePeerId]: [...(prev.signals[remotePeerId] || []), data]
-      }
-    }))
-  })
-  
+        [remotePeerId]: [...(prev.signals[remotePeerId] || []), data],
+      },
+    }));
+  });
+
   // When we receive the remote stream
-  peer.on('stream', (remoteStream) => {
-    setRemoteStreams(prev => new Map(prev).set(remotePeerId, remoteStream))
-  })
-  
+  peer.on("stream", (remoteStream) => {
+    setRemoteStreams((prev) => new Map(prev).set(remotePeerId, remoteStream));
+  });
+
   // Connection established
-  peer.on('connect', () => {
-    console.log(`Connected to ${remotePeerId}`)
+  peer.on("connect", () => {
+    console.log(`Connected to ${remotePeerId}`);
     // Optionally clear signals from presence once connected
-  })
-  
-  peer.on('close', () => {
-    cleanupPeer(remotePeerId)
-  })
-  
-  peer.on('error', (err) => {
-    console.error(`Peer error with ${remotePeerId}:`, err)
-    cleanupPeer(remotePeerId)
-  })
-  
-  return peer
+  });
+
+  peer.on("close", () => {
+    cleanupPeer(remotePeerId);
+  });
+
+  peer.on("error", (err) => {
+    console.error(`Peer error with ${remotePeerId}:`, err);
+    cleanupPeer(remotePeerId);
+  });
+
+  return peer;
 }
 ```
 
@@ -383,7 +389,7 @@ function createPeer(remotePeerId: string, localStream: MediaStream) {
 
 1. **Unit tests**: Test signal queue logic, initiator determination
 2. **Integration tests**: Test presence propagation with multiple repos
-3. **Manual testing**: 
+3. **Manual testing**:
    - Open app in 2-3 browser tabs
    - Verify video/audio streams connect
    - Test join/leave scenarios
@@ -391,26 +397,29 @@ function createPeer(remotePeerId: string, localStream: MediaStream) {
 
 ## simple-peer Events Reference
 
-| Event | Description | Our Usage |
-|-------|-------------|-----------|
-| `signal` | Signaling data to send to remote peer | Publish to presence |
-| `connect` | Data channel ready | Log, optionally clear signals |
-| `data` | Received data channel message | Not used (video only) |
-| `stream` | Received remote media stream | Display in VideoBubble |
-| `track` | Received individual track | Alternative to stream |
-| `close` | Connection closed | Cleanup peer instance |
-| `error` | Fatal error occurred | Cleanup and log |
+| Event     | Description                           | Our Usage                     |
+| --------- | ------------------------------------- | ----------------------------- |
+| `signal`  | Signaling data to send to remote peer | Publish to presence           |
+| `connect` | Data channel ready                    | Log, optionally clear signals |
+| `data`    | Received data channel message         | Not used (video only)         |
+| `stream`  | Received remote media stream          | Display in VideoBubble        |
+| `track`   | Received individual track             | Alternative to stream         |
+| `close`   | Connection closed                     | Cleanup peer instance         |
+| `error`   | Fatal error occurred                  | Cleanup and log               |
 
 ## Open Questions
 
 1. **Signal cleanup**: When should we clear processed signals from presence?
+
    - **Recommendation**: Clear after `connect` event fires. Presence timeout (30s) provides safety net.
 
 2. **Renegotiation**: How to handle adding/removing tracks after connection?
+
    - simple-peer supports `addTrack`/`removeTrack` which triggers new `signal` events
    - Same presence-based signaling flow applies
 
 3. **Large rooms**: For >5 participants, consider SFU architecture instead of mesh.
+
    - Out of scope for this example
    - Mesh scales as O(n²) connections
 

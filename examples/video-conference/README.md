@@ -62,6 +62,7 @@ pnpm dev
 ```
 
 This starts:
+
 - **Vite dev server** on http://localhost:5173 (client)
 - **Express server** on http://localhost:5171 (loro-extended backend)
 
@@ -98,12 +99,14 @@ src/
 ### `shared/types.ts`
 
 Defines the data model:
+
 - `RoomSchema` - CRDT document for persistent room state
 - `SignalingPresenceSchema` - Ephemeral presence for WebRTC signals
 
 ### `client/use-webrtc-mesh.ts`
 
 The core WebRTC logic:
+
 - Creates `simple-peer` instances for each participant
 - Publishes signals via presence
 - Processes incoming signals from other peers' presence
@@ -112,6 +115,7 @@ The core WebRTC logic:
 ### `client/video-conference-app.tsx`
 
 The main React component:
+
 - Uses `useDocument` for room state
 - Uses `usePresence` for signaling
 - Renders video bubbles for local and remote streams

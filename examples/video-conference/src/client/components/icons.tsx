@@ -11,7 +11,10 @@ type IconProps = {
 /**
  * Microphone icon with optional diagonal strikethrough
  */
-export function MicIcon({ className = "w-6 h-6", disabled = false }: IconProps) {
+export function MicIcon({
+  className = "w-6 h-6",
+  disabled = false,
+}: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +46,10 @@ export function MicIcon({ className = "w-6 h-6", disabled = false }: IconProps) 
 /**
  * Camera/video icon with optional diagonal strikethrough
  */
-export function CameraIcon({ className = "w-6 h-6", disabled = false }: IconProps) {
+export function CameraIcon({
+  className = "w-6 h-6",
+  disabled = false,
+}: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +79,9 @@ export function CameraIcon({ className = "w-6 h-6", disabled = false }: IconProp
 /**
  * Phone/hangup icon for leaving the call
  */
-export function PhoneIcon({ className = "w-6 h-6" }: Omit<IconProps, "disabled">) {
+export function PhoneIcon({
+  className = "w-6 h-6",
+}: Omit<IconProps, "disabled">) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react"
 // Use the minified browser build to avoid Node.js polyfill issues
 import Peer from "simple-peer/simplepeer.min.js"
 import type { SignalData } from "../../shared/types"
-import { shouldInitiate, ICE_SERVERS } from "../../shared/webrtc-protocol"
+import { ICE_SERVERS, shouldInitiate } from "../../shared/webrtc-protocol"
 
 export type ConnectionState = "connecting" | "connected" | "failed"
 
@@ -36,13 +36,13 @@ export type UsePeerManagerReturn = {
 
 /**
  * Hook to manage WebRTC peer connections using simple-peer.
- * 
+ *
  * This hook handles:
  * - Creating and destroying peer connections
  * - Managing connection states
  * - Collecting remote streams
  * - Forwarding signals to the appropriate peer
- * 
+ *
  * It does NOT handle:
  * - Signal routing/deduplication (use useSignalChannel)
  * - Presence integration (handled by parent hook)
@@ -58,7 +58,7 @@ export function usePeerManager({
 
   // Remote streams for rendering
   const [remoteStreams, setRemoteStreams] = useState<Map<PeerID, MediaStream>>(
-    new Map()
+    new Map(),
   )
 
   // Connection states for UI
@@ -72,12 +72,12 @@ export function usePeerManager({
     if (connection) {
       connection.peer.destroy()
       peersRef.current.delete(remotePeerId)
-      setRemoteStreams((prev) => {
+      setRemoteStreams(prev => {
         const next = new Map(prev)
         next.delete(remotePeerId)
         return next
       })
-      setConnectionStates((prev) => {
+      setConnectionStates(prev => {
         const next = new Map(prev)
         next.delete(remotePeerId)
         return next
@@ -109,7 +109,7 @@ export function usePeerManager({
       }
 
       peersRef.current.set(remotePeerId, connection)
-      setConnectionStates((prev) => new Map(prev).set(remotePeerId, "connecting"))
+      setConnectionStates(prev => new Map(prev).set(remotePeerId, "connecting"))
 
       // Handle signaling data from simple-peer
       peer.on("signal", (data: SignalData) => {
@@ -119,13 +119,15 @@ export function usePeerManager({
       // Handle incoming remote stream
       peer.on("stream", (stream: MediaStream) => {
         connection.stream = stream
-        setRemoteStreams((prev) => new Map(prev).set(remotePeerId, stream))
+        setRemoteStreams(prev => new Map(prev).set(remotePeerId, stream))
       })
 
       // Handle connection established
       peer.on("connect", () => {
         connection.connected = true
-        setConnectionStates((prev) => new Map(prev).set(remotePeerId, "connected"))
+        setConnectionStates(prev =>
+          new Map(prev).set(remotePeerId, "connected"),
+        )
       })
 
       // Handle connection closed
@@ -136,26 +138,23 @@ export function usePeerManager({
       // Handle errors
       peer.on("error", (err: Error) => {
         console.error(`WebRTC peer error with ${remotePeerId}:`, err)
-        setConnectionStates((prev) => new Map(prev).set(remotePeerId, "failed"))
+        setConnectionStates(prev => new Map(prev).set(remotePeerId, "failed"))
       })
     },
-    [myPeerId, localStream, onSignal, destroyPeer]
+    [myPeerId, localStream, onSignal, destroyPeer],
   )
 
   // Pass a signal to a peer
-  const signalPeer = useCallback(
-    (remotePeerId: PeerID, signal: SignalData) => {
-      const connection = peersRef.current.get(remotePeerId)
-      if (connection) {
-        try {
-          connection.peer.signal(signal)
-        } catch (err) {
-          console.error(`Error processing WebRTC signal:`, err)
-        }
+  const signalPeer = useCallback((remotePeerId: PeerID, signal: SignalData) => {
+    const connection = peersRef.current.get(remotePeerId)
+    if (connection) {
+      try {
+        connection.peer.signal(signal)
+      } catch (err) {
+        console.error(`Error processing WebRTC signal:`, err)
       }
-    },
-    []
-  )
+    }
+  }, [])
 
   // Check if a peer connection exists
   const hasPeer = useCallback((remotePeerId: PeerID) => {

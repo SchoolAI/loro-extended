@@ -1,4 +1,4 @@
-import { MicIcon, CameraIcon, PhoneIcon } from "./icons"
+import { CameraIcon, MicIcon, PhoneIcon } from "./icons"
 
 export type ControlBarProps = {
   hasAudio: boolean

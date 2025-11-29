@@ -28,12 +28,12 @@ export type UseConnectionStatusReturn = {
 
 /**
  * Hook to monitor connection status for self and peers.
- * 
+ *
  * Combines multiple signals to determine whose network is unstable:
  * 1. Server connectivity (via navigator.onLine + custom checks)
  * 2. WebRTC connection state (from usePeerManager)
  * 3. Presence visibility (from useUntypedPresence)
- * 
+ *
  * Logic:
  * - If we're offline → self-disconnected for all peers
  * - If peer's presence is gone but we're online → peer-disconnected
@@ -48,7 +48,7 @@ export function useConnectionStatus(
 ): UseConnectionStatusReturn {
   // Track online status using navigator.onLine
   const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
+    typeof navigator !== "undefined" ? navigator.onLine : true,
   )
 
   // Listen for online/offline events
@@ -69,7 +69,7 @@ export function useConnectionStatus(
   const offlinePeers = useMemo(() => {
     const presentPeerIds = new Set(Object.keys(userPresence))
     return participantPeerIds.filter(
-      peerId => peerId !== myPeerId && !presentPeerIds.has(peerId)
+      peerId => peerId !== myPeerId && !presentPeerIds.has(peerId),
     )
   }, [userPresence, participantPeerIds, myPeerId])
 

@@ -1,17 +1,22 @@
-import { useDocument, useUntypedPresence, useRepo } from "@loro-extended/react"
+import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
 import type { DocId, PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useState } from "react"
 import {
   EmptyRoom,
   RoomSchema,
-  type UserPresence,
   type SignalingPresence,
+  type UserPresence,
 } from "../shared/types"
+import {
+  Header,
+  InCallScreen,
+  OfflineBanner,
+  PreJoinScreen,
+} from "./components"
+import { useConnectionStatus, useParticipantCleanup } from "./hooks"
 import { useLocalMedia } from "./use-local-media"
 import { useRoomIdFromHash } from "./use-room-id-from-hash"
 import { useWebRtcMesh } from "./use-webrtc-mesh"
-import { Header, PreJoinScreen, InCallScreen, OfflineBanner } from "./components"
-import { useConnectionStatus, useParticipantCleanup } from "./hooks"
 
 // Generate a new room ID
 function generateRoomId(): DocId {
@@ -46,17 +51,22 @@ export default function VideoConferenceApp({
   // ============================================================================
   // Separated Presence Channels (Phase 3)
   // ============================================================================
-  
+
   // User presence - stable metadata (name, audio/video preferences)
   // Uses the main room ID as the presence channel
-  const { all: rawUserPresence, setSelf: setUserPresence } = useUntypedPresence(roomId)
+  const { all: rawUserPresence, setSelf: setUserPresence } =
+    useUntypedPresence(roomId)
   const userPresence = rawUserPresence as Record<string, UserPresence>
-  
+
   // Signaling presence - high-frequency WebRTC signals
   // Uses a separate channel to avoid mixing with user metadata
   const signalingChannelId = `${roomId}:signaling` as DocId
-  const { all: rawSignalingPresence, setSelf: setSignalingPresence } = useUntypedPresence(signalingChannelId)
-  const signalingPresence = rawSignalingPresence as Record<string, SignalingPresence>
+  const { all: rawSignalingPresence, setSelf: setSignalingPresence } =
+    useUntypedPresence(signalingChannelId)
+  const signalingPresence = rawSignalingPresence as Record<
+    string,
+    SignalingPresence
+  >
 
   // Local media (camera/microphone)
   const {
@@ -122,14 +132,17 @@ export default function VideoConferenceApp({
   }, [myPeerId, changeDoc])
 
   // Remove a participant from the document (used by cleanup hook)
-  const removeParticipant = useCallback((peerId: string) => {
-    changeDoc(draft => {
-      const index = draft.participants.findIndex(p => p.peerId === peerId)
-      if (index !== -1) {
-        draft.participants.delete(index, 1)
-      }
-    })
-  }, [changeDoc])
+  const removeParticipant = useCallback(
+    (peerId: string) => {
+      changeDoc(draft => {
+        const index = draft.participants.findIndex(p => p.peerId === peerId)
+        if (index !== -1) {
+          draft.participants.delete(index, 1)
+        }
+      })
+    },
+    [changeDoc],
+  )
 
   // Connection status monitoring
   const { isOnline, getPeerStatus } = useConnectionStatus(

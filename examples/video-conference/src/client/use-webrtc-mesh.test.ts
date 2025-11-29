@@ -99,7 +99,13 @@ describe("useWebRtcMesh", () => {
 
     it("does not create peers when participant list is empty", () => {
       renderHook(() =>
-        useWebRtcMesh(myPeerId, mockLocalStream, [], {}, mockSetSignalingPresence),
+        useWebRtcMesh(
+          myPeerId,
+          mockLocalStream,
+          [],
+          {},
+          mockSetSignalingPresence,
+        ),
       )
 
       expect(mockPeerInstances).toHaveLength(0)
@@ -311,7 +317,9 @@ describe("useWebRtcMesh", () => {
 
     it("sets state to failed when peer emits error event", async () => {
       // Suppress expected console.error from the error handler
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {})
 
       const { result } = renderHook(() =>
         useWebRtcMesh(

@@ -1,7 +1,7 @@
 import type { PeerID } from "@loro-extended/repo"
-import { VideoBubble } from "../video-bubble"
 import type { UserPresence } from "../../shared/types"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
+import { VideoBubble } from "../video-bubble"
 
 export type Participant = {
   peerId: string
@@ -94,7 +94,9 @@ export function VideoGrid({
             />
             {/* Connection status indicator */}
             {statusText && (
-              <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs ${statusClasses}`}>
+              <div
+                className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs ${statusClasses}`}
+              >
                 {statusText}
               </div>
             )}

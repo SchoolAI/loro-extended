@@ -51,7 +51,7 @@ export type SignalsMap = Record<string, SignalData[]>
 /**
  * User presence - stable metadata that changes infrequently.
  * Used for displaying participant info in the UI.
- * 
+ *
  * This is separate from signaling to avoid mixing high-frequency signal updates
  * with stable user metadata.
  */
@@ -70,7 +70,7 @@ export const EmptyUserPresence: UserPresence = {
 /**
  * Signaling presence - high-frequency, transient WebRTC signals.
  * Used for WebRTC connection establishment.
- * 
+ *
  * Signals are keyed by target peer ID, with an array of signal data
  * to send to that peer.
  */

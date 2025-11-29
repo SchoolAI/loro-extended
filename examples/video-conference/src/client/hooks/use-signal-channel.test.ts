@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook, act } from "@testing-library/react"
 import type { PeerID } from "@loro-extended/repo"
+import { act, renderHook } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
 import { useSignalChannel } from "./use-signal-channel"
 
 describe("useSignalChannel", () => {
@@ -12,7 +12,10 @@ describe("useSignalChannel", () => {
       const { result } = renderHook(() => useSignalChannel())
 
       act(() => {
-        result.current.queueOutgoingSignal(peerA, { type: "offer", sdp: "test" })
+        result.current.queueOutgoingSignal(peerA, {
+          type: "offer",
+          sdp: "test",
+        })
       })
 
       expect(result.current.outgoingSignals[peerA]).toHaveLength(1)
@@ -26,9 +29,18 @@ describe("useSignalChannel", () => {
       const { result } = renderHook(() => useSignalChannel())
 
       act(() => {
-        result.current.queueOutgoingSignal(peerA, { type: "offer", sdp: "offer" })
-        result.current.queueOutgoingSignal(peerA, { type: "candidate", candidate: "ice1" })
-        result.current.queueOutgoingSignal(peerA, { type: "candidate", candidate: "ice2" })
+        result.current.queueOutgoingSignal(peerA, {
+          type: "offer",
+          sdp: "offer",
+        })
+        result.current.queueOutgoingSignal(peerA, {
+          type: "candidate",
+          candidate: "ice1",
+        })
+        result.current.queueOutgoingSignal(peerA, {
+          type: "candidate",
+          candidate: "ice2",
+        })
       })
 
       expect(result.current.outgoingSignals[peerA]).toHaveLength(3)
@@ -38,8 +50,14 @@ describe("useSignalChannel", () => {
       const { result } = renderHook(() => useSignalChannel())
 
       act(() => {
-        result.current.queueOutgoingSignal(peerA, { type: "offer", sdp: "offerA" })
-        result.current.queueOutgoingSignal(peerB, { type: "offer", sdp: "offerB" })
+        result.current.queueOutgoingSignal(peerA, {
+          type: "offer",
+          sdp: "offerA",
+        })
+        result.current.queueOutgoingSignal(peerB, {
+          type: "offer",
+          sdp: "offerB",
+        })
       })
 
       expect(result.current.outgoingSignals[peerA]).toHaveLength(1)

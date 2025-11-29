@@ -5,7 +5,7 @@ import { shouldInitiate } from "../shared/webrtc-protocol"
 import { usePeerManager } from "./hooks/use-peer-manager"
 import { useSignalChannel } from "./hooks/use-signal-channel"
 
-export type { PeerConnection, ConnectionState } from "./hooks/use-peer-manager"
+export type { ConnectionState, PeerConnection } from "./hooks/use-peer-manager"
 
 export type UseWebRtcMeshReturn = {
   remoteStreams: Map<PeerID, MediaStream>
@@ -17,15 +17,15 @@ export type UseWebRtcMeshReturn = {
 
 /**
  * Hook to manage WebRTC mesh connections using simple-peer.
- * 
+ *
  * This hook orchestrates:
  * - usePeerManager: Manages peer connections and streams
  * - useSignalChannel: Handles signal routing and deduplication
- * 
+ *
  * It also handles:
  * - Participant lifecycle (creating/destroying peers based on participant list)
  * - Presence integration (reading signals from presence, publishing to presence)
- * 
+ *
  * Note: This hook only handles SignalingPresence (signals), not UserPresence
  * (name, wantsAudio, wantsVideo). User presence is handled separately.
  */
@@ -80,7 +80,7 @@ export function useWebRtcMesh(
         signalPeer(fromPeerId, signal)
       }
     },
-    [filterNewSignals, hasPeer, createPeer, signalPeer]
+    [filterNewSignals, hasPeer, createPeer, signalPeer],
   )
 
   // Track current peer IDs for cleanup logic
@@ -92,7 +92,7 @@ export function useWebRtcMesh(
   // IMPORTANT: Only create initiator peers when we have our local stream ready
   useEffect(() => {
     const targetPeerIds = new Set(
-      participantPeerIds.filter((id) => id !== myPeerId)
+      participantPeerIds.filter(id => id !== myPeerId),
     )
 
     // Create peers for new participants (only if we're the initiator AND we have our stream)
@@ -119,7 +119,14 @@ export function useWebRtcMesh(
         }
       }
     }
-  }, [participantPeerIds, myPeerId, localStream, hasPeer, createPeer, destroyPeer])
+  }, [
+    participantPeerIds,
+    myPeerId,
+    localStream,
+    hasPeer,
+    createPeer,
+    destroyPeer,
+  ])
 
   // Process incoming signals from other peers' signaling presence
   useEffect(() => {
@@ -155,7 +162,7 @@ export function useWebRtcMesh(
     const currentPeerIds = currentPeerIdsRef.current
     const signalCreatedPeers = signalCreatedPeersRef.current
     const destroy = destroyPeerRef.current
-    
+
     return () => {
       for (const peerId of currentPeerIds) {
         destroy(peerId)

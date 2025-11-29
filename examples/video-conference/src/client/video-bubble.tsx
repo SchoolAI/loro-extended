@@ -80,6 +80,8 @@ export function VideoBubble({
 }: VideoBubbleProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
+  // Set up video stream - re-run when stream or hasVideo changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hasVideo triggers re-play when video is re-enabled
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
@@ -87,7 +89,7 @@ export function VideoBubble({
         console.warn("Video autoplay failed:", err)
       })
     }
-  }, [stream])
+  }, [stream, hasVideo /* needed to re-trigger play() on re-enable */])
 
   return (
     <div className="relative flex flex-col items-center">
@@ -97,16 +99,19 @@ export function VideoBubble({
           isLocal ? "ring-2 ring-blue-500" : "ring-2 ring-gray-300"
         }`}
       >
-        {stream && hasVideo ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={muted || isLocal}
-            className="w-full h-full object-cover scale-x-[-1]"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+        {/* Always render video element to maintain srcObject, but hide when video is off */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={muted || isLocal}
+          className={`w-full h-full object-cover scale-x-[-1] ${
+            stream && hasVideo ? "block" : "hidden"
+          }`}
+        />
+        {/* Show placeholder when video is off or no stream */}
+        {(!stream || !hasVideo) && (
+          <div className="absolute inset-0 bg-gray-700 flex items-center justify-center">
             <span className="text-4xl">👤</span>
           </div>
         )}

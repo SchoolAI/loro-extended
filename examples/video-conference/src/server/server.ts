@@ -51,7 +51,5 @@ app.use(
 
 const PORT = process.env.PORT || 5171
 app.listen(PORT, () => {
-  console.log(
-    `Video Conference Server listening on http://localhost:${PORT}`,
-  )
+  console.log(`Video Conference Server listening on http://localhost:${PORT}`)
 })

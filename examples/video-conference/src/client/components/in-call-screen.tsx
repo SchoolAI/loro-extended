@@ -1,7 +1,7 @@
 import type { PeerID } from "@loro-extended/repo"
 import type { UserPresence } from "../../shared/types"
-import type { ConnectionState } from "../hooks/use-peer-manager"
 import type { ParticipantConnectionStatus } from "../hooks/use-connection-status"
+import type { ConnectionState } from "../hooks/use-peer-manager"
 import { ControlBar } from "./control-bar"
 import { VideoGrid, type Participant } from "./video-grid"
 
