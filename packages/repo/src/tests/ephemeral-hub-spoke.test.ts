@@ -85,13 +85,16 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // Subscribe to presence changes on clientB
       const onChangeB = vi.fn()
-      handleB.presence.subscribe(onChangeB)
+      handleB.untypedPresence.subscribe(onChangeB)
 
       // Clear the initial call from subscribe
       onChangeB.mockClear()
 
       // ClientA sets presence
-      handleA.presence.set({ status: "online", cursor: { x: 100, y: 200 } })
+      handleA.untypedPresence.set({
+        status: "online",
+        cursor: { x: 100, y: 200 },
+      })
 
       // Wait for propagation through server to clientB
       // This should be nearly instant, not require waiting for heartbeat
@@ -99,7 +102,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // ClientB should have received clientA's presence
       const peerIdA = clientA.identity.peerId
-      const clientAPresenceOnB = handleB.presence.all[peerIdA]
+      const clientAPresenceOnB = handleB.untypedPresence.all[peerIdA]
 
       expect(clientAPresenceOnB).toEqual({
         status: "online",
@@ -121,8 +124,8 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Both clients set presence
-      handleA.presence.set({ user: "Alice" })
-      handleB.presence.set({ user: "Bob" })
+      handleA.untypedPresence.set({ user: "Alice" })
+      handleB.untypedPresence.set({ user: "Bob" })
 
       // Wait for propagation
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -131,10 +134,10 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const peerIdB = clientB.identity.peerId
 
       // ClientA should see ClientB's presence
-      expect(handleA.presence.all[peerIdB]).toEqual({ user: "Bob" })
+      expect(handleA.untypedPresence.all[peerIdB]).toEqual({ user: "Bob" })
 
       // ClientB should see ClientA's presence
-      expect(handleB.presence.all[peerIdA]).toEqual({ user: "Alice" })
+      expect(handleB.untypedPresence.all[peerIdA]).toEqual({ user: "Alice" })
     })
   })
 
@@ -150,7 +153,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // ClientA sets presence while B is not yet connected
-      handleA.presence.set({ status: "active", name: "Alice" })
+      handleA.untypedPresence.set({ status: "active", name: "Alice" })
 
       // Wait a bit for the presence to be stored on server
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -163,7 +166,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // ClientB should have received ClientA's presence via the sync-request handler
       const peerIdA = clientA.identity.peerId
-      const clientAPresenceOnB = handleB.presence.all[peerIdA]
+      const clientAPresenceOnB = handleB.untypedPresence.all[peerIdA]
 
       expect(clientAPresenceOnB).toEqual({ status: "active", name: "Alice" })
     })
@@ -175,8 +178,8 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // Helper to count users with presence
       const countUsers = (handle: ReturnType<typeof clientA.get>) => {
-        return Object.keys(handle.presence.all).filter(
-          key => handle.presence.all[key] != null,
+        return Object.keys(handle.untypedPresence.all).filter(
+          key => handle.untypedPresence.all[key] != null,
         ).length
       }
 
@@ -185,12 +188,12 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       server.get(docId)
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      handleA.presence.set({ type: "user" })
+      handleA.untypedPresence.set({ type: "user" })
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // ClientB connects
       const handleB = clientB.get(docId)
-      handleB.presence.set({ type: "user" })
+      handleB.untypedPresence.set({ type: "user" })
 
       // Wait for sync
       await new Promise(resolve => setTimeout(resolve, 200))
@@ -228,12 +231,12 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      handle1.presence.set({ direct: true })
+      handle1.untypedPresence.set({ direct: true })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const peerId1 = peer1.identity.peerId
-      expect(handle2.presence.all[peerId1]).toEqual({ direct: true })
+      expect(handle2.untypedPresence.all[peerId1]).toEqual({ direct: true })
 
       // Cleanup
       peer1.synchronizer.stopHeartbeat()

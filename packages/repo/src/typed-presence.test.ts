@@ -26,7 +26,7 @@ describe("TypedPresence", () => {
       cursor: { x: 0, y: 0 },
     }
 
-    const presence = handle.typedPresence(PresenceSchema, EmptyPresence)
+    const presence = handle.presence(PresenceSchema, EmptyPresence)
 
     // Check default values
     expect(presence.self).toEqual(EmptyPresence)
@@ -43,7 +43,7 @@ describe("TypedPresence", () => {
 
     // Simulate peer presence
     const peerId = "peer-2"
-    handle.presence.setRaw(peerId, { name: "Bob" })
+    handle.untypedPresence.setRaw(peerId, { name: "Bob" })
 
     expect(presence.all[peerId]).toEqual({
       name: "Bob",
