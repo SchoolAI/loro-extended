@@ -5,8 +5,8 @@ import {
   TypedDoc,
 } from "@loro-extended/change"
 import type { DocHandle } from "@loro-extended/repo"
-import type { LoroDoc } from "loro-crdt"
 import { useCallback } from "hono/jsx"
+import type { LoroDoc } from "loro-crdt"
 import { useDocChanger } from "./use-doc-changer.js"
 import type { DocWrapper } from "./use-doc-handle-state.js"
 

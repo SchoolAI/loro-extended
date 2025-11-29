@@ -1,11 +1,6 @@
 import type { DocHandle, DocId } from "@loro-extended/repo"
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "hono/jsx"
 import type { LoroDoc, LoroMap } from "loro-crdt"
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-} from "hono/jsx"
 import { useRepo } from "../repo-context.js"
 
 export type DocWrapper = {
@@ -28,11 +23,11 @@ export type DocWrapper = {
  */
 export function useDocHandleState(documentId: DocId) {
   const repo = useRepo()
-  
+
   // Keep a ref to the handle so getSnapshot can access it without stale closures
   // Initialize synchronously to ensure document exists before SSE connection establishes
   const handleRef = useRef<DocHandle<DocWrapper> | null>(null)
-  
+
   // Get handle synchronously during render - repo.get() is synchronous
   // This ensures the document exists in the model before the SSE connection
   // sends its initial sync-request
@@ -89,7 +84,11 @@ export function useDocHandleState(documentId: DocId) {
       }
     }
 
-    return snapshotRef.current!
+    if (!snapshotRef.current) {
+      throw new Error(`snapshotRef is required`)
+    }
+
+    return snapshotRef.current
   }, []) // No dependencies - reads from refs
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
