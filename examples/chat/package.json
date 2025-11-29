@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",
-    "@loro-extended/adapters": "workspace:^",
+    "@loro-extended/adapter-leveldb": "workspace:^",
+    "@loro-extended/adapter-sse": "workspace:^",
     "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",

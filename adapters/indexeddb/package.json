@@ -1,0 +1,33 @@
+{
+  "name": "@loro-extended/adapter-indexeddb",
+  "version": "0.1.0",
+  "description": "IndexedDB storage adapter for @loro-extended/repo",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^",
+    "idb": "^8.0.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,4 +1,4 @@
-import { SseServerNetworkAdapter } from "@loro-extended/adapters/network/sse/server"
+import { SseServerNetworkAdapter } from "@loro-extended/adapter-sse/server"
 import {
   deserializeChannelMsg,
   type PeerID,

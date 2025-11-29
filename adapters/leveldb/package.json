@@ -1,0 +1,33 @@
+{
+  "name": "@loro-extended/adapter-leveldb",
+  "version": "0.1.0",
+  "description": "LevelDB storage adapter for @loro-extended/repo",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^",
+    "classic-level": "^1.4.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

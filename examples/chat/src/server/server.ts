@@ -1,8 +1,8 @@
 import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
-} from "@loro-extended/adapters/network/sse/server"
-import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
+} from "@loro-extended/adapter-sse/server"
+import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import { type InferPlainType, TypedDoc } from "@loro-extended/change"
 import { type DocHandle, type DocId, Repo } from "@loro-extended/repo"
 import { streamText } from "ai"

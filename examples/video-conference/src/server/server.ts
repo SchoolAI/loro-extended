@@ -1,8 +1,8 @@
 import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
-} from "@loro-extended/adapters/network/sse/server"
-import { LevelDBStorageAdapter } from "@loro-extended/adapters/storage/level-db/server"
+} from "@loro-extended/adapter-sse/server"
+import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import { Repo } from "@loro-extended/repo"
 import cors from "cors"
 import express from "express"

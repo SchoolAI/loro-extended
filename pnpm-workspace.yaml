@@ -1,6 +1,8 @@
 packages:
-  - packages/*
+  - adapters/*
   - examples/*
+  - packages/*
+  - tools/*
 
 onlyBuiltDependencies:
   - classic-level

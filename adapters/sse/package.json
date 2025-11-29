@@ -1,0 +1,46 @@
+{
+  "name": "@loro-extended/adapter-sse",
+  "version": "0.1.0",
+  "description": "SSE (Server-Sent Events) network adapter for @loro-extended/repo",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^",
+    "reconnecting-eventsource": "^1.6.4"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.23",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

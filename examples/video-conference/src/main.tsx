@@ -1,5 +1,5 @@
 import { configure, getConsoleSink } from "@logtape/logtape"
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client"
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
 import { RepoProvider } from "@loro-extended/react"
 import { createRoot } from "react-dom/client"
 import VideoConferenceApp from "./client/video-conference-app.tsx"

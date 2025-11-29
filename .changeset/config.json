@@ -4,7 +4,9 @@
   "commit": false,
   "fixed": [
     [
-      "@loro-extended/adapters",
+      "@loro-extended/adapter-sse",
+      "@loro-extended/adapter-leveldb",
+      "@loro-extended/adapter-indexeddb",
       "@loro-extended/change",
       "@loro-extended/react",
       "@loro-extended/repo"

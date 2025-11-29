@@ -1,4 +1,4 @@
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client"
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
 import { RepoProvider, Shape, useDocument } from "@loro-extended/hono"
 import {
   generatePeerId,
