@@ -1,3 +1,5 @@
+import { MicIcon, CameraIcon, PhoneIcon } from "./icons"
+
 export type ControlBarProps = {
   hasAudio: boolean
   hasVideo: boolean
@@ -19,34 +21,34 @@ export function ControlBar({
         <button
           type="button"
           onClick={onToggleAudio}
-          className={`p-4 rounded-full ${
+          className={`p-4 rounded-full transition-colors ${
             hasAudio
-              ? "bg-gray-200 hover:bg-gray-300"
+              ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
               : "bg-red-500 text-white hover:bg-red-600"
           }`}
           title={hasAudio ? "Mute" : "Unmute"}
         >
-          {hasAudio ? "🎤" : "🔇"}
+          <MicIcon disabled={!hasAudio} />
         </button>
         <button
           type="button"
           onClick={onToggleVideo}
-          className={`p-4 rounded-full ${
+          className={`p-4 rounded-full transition-colors ${
             hasVideo
-              ? "bg-gray-200 hover:bg-gray-300"
+              ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
               : "bg-red-500 text-white hover:bg-red-600"
           }`}
           title={hasVideo ? "Turn off camera" : "Turn on camera"}
         >
-          {hasVideo ? "📷" : "📷"}
+          <CameraIcon disabled={!hasVideo} />
         </button>
         <button
           type="button"
           onClick={onLeave}
-          className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600"
+          className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors rotate-[135deg]"
           title="Leave room"
         >
-          📞
+          <PhoneIcon />
         </button>
       </div>
     </div>

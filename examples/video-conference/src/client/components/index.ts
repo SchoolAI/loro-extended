@@ -1,5 +1,6 @@
 export { ControlBar, type ControlBarProps } from "./control-bar"
 export { Header, type HeaderProps } from "./header"
+export { CameraIcon, MicIcon, PhoneIcon } from "./icons"
 export { InCallScreen, type InCallScreenProps } from "./in-call-screen"
 export { OfflineBanner } from "./offline-banner"
 export { PreJoinScreen, type PreJoinScreenProps } from "./pre-join-screen"

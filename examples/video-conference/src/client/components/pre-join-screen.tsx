@@ -1,4 +1,5 @@
 import { VideoBubble } from "../video-bubble"
+import { CameraIcon, MicIcon } from "./icons"
 
 export type PreJoinScreenProps = {
   localStream: MediaStream | null
@@ -48,7 +49,11 @@ export function PreJoinScreen({
         {mediaError && (
           <div className="bg-red-100 text-red-700 px-4 py-1 rounded-lg text-sm">
             Camera/microphone error: {mediaError.message}
-            <button type="button" onClick={onRequestMedia} className="ml-2 underline">
+            <button
+              type="button"
+              onClick={onRequestMedia}
+              className="ml-2 underline"
+            >
               Retry
             </button>
           </div>
@@ -65,26 +70,26 @@ export function PreJoinScreen({
         <button
           type="button"
           onClick={onToggleAudio}
-          className={`p-3 rounded-full ${
+          className={`p-3 rounded-full transition-colors ${
             hasAudio
-              ? "bg-gray-200 hover:bg-gray-300"
+              ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
               : "bg-red-500 text-white hover:bg-red-600"
           }`}
           title={hasAudio ? "Mute" : "Unmute"}
         >
-          {hasAudio ? "🎤" : "🔇"}
+          <MicIcon disabled={!hasAudio} />
         </button>
         <button
           type="button"
           onClick={onToggleVideo}
-          className={`p-3 rounded-full ${
+          className={`p-3 rounded-full transition-colors ${
             hasVideo
-              ? "bg-gray-200 hover:bg-gray-300"
+              ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
               : "bg-red-500 text-white hover:bg-red-600"
           }`}
           title={hasVideo ? "Turn off camera" : "Turn on camera"}
         >
-          {hasVideo ? "📷" : "📷"}
+          <CameraIcon disabled={!hasVideo} />
         </button>
       </div>
 

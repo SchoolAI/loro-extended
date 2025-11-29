@@ -10,6 +10,64 @@ export type VideoBubbleProps = {
 }
 
 /**
+ * Microphone icon with strikethrough for muted state
+ */
+function MicOffIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <title>Microphone Off</title>
+      {/* Microphone body */}
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+      {/* Microphone stand */}
+      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+      {/* Diagonal strikethrough */}
+      <line
+        x1="3"
+        y1="3"
+        x2="21"
+        y2="21"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * Camera icon with strikethrough for off state
+ */
+function CameraOffIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <title>Camera Off</title>
+      {/* Camera body */}
+      <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+      {/* Diagonal strikethrough */}
+      <line
+        x1="3"
+        y1="3"
+        x2="21"
+        y2="21"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
  * A circular video bubble component for displaying video streams
  */
 export function VideoBubble({
@@ -52,37 +110,23 @@ export function VideoBubble({
             <span className="text-4xl">👤</span>
           </div>
         )}
-
-        {/* Audio indicator */}
-        {!hasAudio && (
-          <div className="absolute bottom-2 right-2 bg-red-500 rounded-full p-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4 text-white"
-            >
-              <title>Muted</title>
-              <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06zM17.78 9.22a.75.75 0 10-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 001.06 1.06l1.72-1.72 1.72 1.72a.75.75 0 101.06-1.06L20.56 12l1.72-1.72a.75.75 0 00-1.06-1.06l-1.72 1.72-1.72-1.72z" />
-            </svg>
-          </div>
-        )}
-
-        {/* Video off indicator */}
-        {!hasVideo && (
-          <div className="absolute bottom-2 left-2 bg-red-500 rounded-full p-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4 text-white"
-            >
-              <title>Video Off</title>
-              <path d="M3.53 2.47a.75.75 0 00-1.06 1.06l18 18a.75.75 0 101.06-1.06l-18-18zM22.5 17.69c0 .471-.202.86-.504 1.124l-4.746-4.746V7.939l2.69-2.689c.944-.945 2.56-.276 2.56 1.06v11.38zM15.75 7.5v5.068L7.682 4.5h5.068a3 3 0 013 3zM1.5 7.5c0-.782.3-1.494.79-2.028l12.846 12.846A2.995 2.995 0 0112.75 19.5H4.5a3 3 0 01-3-3v-9z" />
-            </svg>
-          </div>
-        )}
       </div>
+
+      {/* Status indicators - positioned absolutely to overlap the bubble bottom edge */}
+      {(!hasAudio || !hasVideo) && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {!hasAudio && (
+            <div className="bg-red-500 rounded-full p-1.5 shadow-md">
+              <MicOffIcon className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+          {!hasVideo && (
+            <div className="bg-red-500 rounded-full p-1.5 shadow-md">
+              <CameraOffIcon className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Label */}
       <div className="mt-2 text-sm font-medium text-gray-700 truncate max-w-[120px]">
