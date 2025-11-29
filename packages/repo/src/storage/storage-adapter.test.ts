@@ -141,7 +141,7 @@ describe("StorageAdapter", () => {
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      expect(receivedMessages.length).toBeGreaterThanOrEqual(1)
       expect(receivedMessages[0].type).toBe("channel/establish-response")
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/establish-response",
@@ -150,6 +150,88 @@ describe("StorageAdapter", () => {
           name: "mock-storage",
         },
       })
+    })
+
+    it("sends sync-request for stored documents after establishment", async () => {
+      // Pre-populate storage with documents
+      const doc1 = new LoroDoc()
+      doc1.getText("text").insert(0, "Doc 1")
+      await adapter.save(
+        ["doc1", "update", "1"],
+        doc1.export({ mode: "snapshot" }),
+      )
+
+      const doc2 = new LoroDoc()
+      doc2.getText("text").insert(0, "Doc 2")
+      await adapter.save(
+        ["doc2", "update", "1"],
+        doc2.export({ mode: "snapshot" }),
+      )
+
+      const channel = await initializeAdapter()
+
+      // Send establish-request to trigger the flow
+      await channel.send({
+        type: "channel/establish-request",
+        identity: { peerId: "123", name: "test-peer", type: "user" },
+      })
+
+      // Should receive establish-response followed by sync-request
+      expect(receivedMessages.length).toBe(2)
+      expect(receivedMessages[0].type).toBe("channel/establish-response")
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
+
+      // Verify sync-request contains both stored documents
+      const syncRequest = receivedMessages[1]
+      if (syncRequest.type === "channel/sync-request") {
+        expect(syncRequest.docs).toHaveLength(2)
+        const docIds = syncRequest.docs.map(d => d.docId)
+        expect(docIds).toContain("doc1")
+        expect(docIds).toContain("doc2")
+        expect(syncRequest.bidirectional).toBe(true)
+      }
+    })
+
+    it("does not send sync-request when storage is empty", async () => {
+      // Don't pre-populate storage
+      const channel = await initializeAdapter()
+
+      await channel.send({
+        type: "channel/establish-request",
+        identity: { peerId: "123", name: "test-peer", type: "user" },
+      })
+
+      // Should only receive establish-response, no sync-request
+      expect(receivedMessages).toHaveLength(1)
+      expect(receivedMessages[0].type).toBe("channel/establish-response")
+    })
+
+    it("sends sync-request with unique docIds when documents have multiple chunks", async () => {
+      // Simulate a document with multiple update chunks
+      await adapter.save(["doc1", "update", "1"], new Uint8Array([1]))
+      await adapter.save(["doc1", "update", "2"], new Uint8Array([2]))
+      await adapter.save(["doc1", "update", "3"], new Uint8Array([3]))
+      await adapter.save(["doc2", "update", "1"], new Uint8Array([4]))
+
+      const channel = await initializeAdapter()
+
+      await channel.send({
+        type: "channel/establish-request",
+        identity: { peerId: "123", name: "test-peer", type: "user" },
+      })
+
+      // Should receive establish-response followed by sync-request
+      expect(receivedMessages.length).toBe(2)
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
+
+      // Verify sync-request contains unique docIds (not one per chunk)
+      const syncRequest = receivedMessages[1]
+      if (syncRequest.type === "channel/sync-request") {
+        expect(syncRequest.docs).toHaveLength(2) // Not 4!
+        const docIds = syncRequest.docs.map(d => d.docId)
+        expect(docIds).toContain("doc1")
+        expect(docIds).toContain("doc2")
+      }
     })
   })
 
@@ -179,8 +261,10 @@ describe("StorageAdapter", () => {
 
       expect(adapter.loadRangeCalls).toHaveLength(1)
       expect(adapter.loadRangeCalls[0]).toEqual(["test-doc"])
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0].type).toBe("channel/sync-response")
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
     })
 
     it("sends unavailable when document not found", async () => {
@@ -196,11 +280,17 @@ describe("StorageAdapter", () => {
         ],
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response (unavailable) + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/sync-response",
         docId: "nonexistent-doc",
         transmission: { type: "unavailable" },
+      })
+      // Reciprocal sync-request to get added to subscriptions
+      expect(receivedMessages[1]).toMatchObject({
+        type: "channel/sync-request",
+        bidirectional: false,
       })
     })
 
@@ -222,12 +312,14 @@ describe("StorageAdapter", () => {
         ],
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/sync-response",
         docId: "test-doc",
         transmission: { type: "up-to-date" },
       })
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
     })
 
     it("sends update when requester is behind", async () => {
@@ -249,12 +341,14 @@ describe("StorageAdapter", () => {
         ],
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/sync-response",
         docId: "test-doc",
         transmission: { type: "update" },
       })
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
     })
 
     it("prevents timestamp collisions for rapid updates", async () => {
@@ -280,6 +374,60 @@ describe("StorageAdapter", () => {
       const keys = adapter.saveCalls.map(call => JSON.stringify(call.key))
       const uniqueKeys = new Set(keys)
       expect(uniqueKeys.size).toBe(updates)
+    })
+
+    it("handles channel/update messages for ongoing document changes", async () => {
+      const channel = await initializeAdapter()
+      const docId = "test-doc"
+
+      // Send an update message (used for ongoing changes after initial sync)
+      await channel.send({
+        type: "channel/update",
+        docId,
+        transmission: {
+          type: "update",
+          data: new Uint8Array([1, 2, 3]),
+          version: new LoroDoc().version(),
+        },
+      })
+
+      // Verify the update was saved
+      expect(adapter.saveCalls).toHaveLength(1)
+      expect(adapter.saveCalls[0].key[0]).toBe(docId)
+      expect(adapter.saveCalls[0].key[1]).toBe("update")
+      expect(adapter.saveCalls[0].data).toEqual(new Uint8Array([1, 2, 3]))
+    })
+
+    it("handles both sync-response and update messages", async () => {
+      const channel = await initializeAdapter()
+      const docId = "test-doc"
+
+      // First, a sync-response (initial sync)
+      await channel.send({
+        type: "channel/sync-response",
+        docId,
+        transmission: {
+          type: "snapshot",
+          data: new Uint8Array([1]),
+          version: new LoroDoc().version(),
+        },
+      })
+
+      // Then, an update message (ongoing change)
+      await channel.send({
+        type: "channel/update",
+        docId,
+        transmission: {
+          type: "update",
+          data: new Uint8Array([2]),
+          version: new LoroDoc().version(),
+        },
+      })
+
+      // Both should be saved
+      expect(adapter.saveCalls).toHaveLength(2)
+      expect(adapter.saveCalls[0].data).toEqual(new Uint8Array([1]))
+      expect(adapter.saveCalls[1].data).toEqual(new Uint8Array([2]))
     })
   })
 
@@ -421,11 +569,13 @@ describe("StorageAdapter", () => {
         ],
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response (unavailable) + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0]).toMatchObject({
         type: "channel/sync-response",
         transmission: { type: "unavailable" },
       })
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
     })
   })
 
@@ -456,8 +606,10 @@ describe("StorageAdapter", () => {
         ],
       })
 
-      expect(receivedMessages).toHaveLength(1)
+      // Now sends 2 messages: sync-response + reciprocal sync-request for subscription
+      expect(receivedMessages).toHaveLength(2)
       expect(receivedMessages[0].type).toBe("channel/sync-response")
+      expect(receivedMessages[1].type).toBe("channel/sync-request")
 
       // Verify the response contains the full document
       const response = receivedMessages[0]

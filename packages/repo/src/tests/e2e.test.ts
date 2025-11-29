@@ -454,5 +454,106 @@ describe("Repo E2E", () => {
       expect(commentsArray[1].get("author")).toBe("Charlie")
       expect(commentsArray[1].get("text")).toBe("Thanks!")
     }, 500)
+
+    it("should load stored documents when app creates document after storage establishes", async () => {
+      // This test replicates the hono-counter scenario:
+      // 1. Storage has a document with data
+      // 2. App starts and creates the document via repo.get()
+      // 3. App should see the stored data
+
+      const storage1 = new InMemoryStorageAdapter()
+
+      // First session: create document with content
+      const repo1 = new Repo({
+        identity: { name: "repo1", type: "user" },
+        adapters: [storage1],
+      })
+
+      await vi.runAllTimersAsync()
+
+      const documentId = "counter"
+      const handle1 = repo1.get(documentId)
+
+      handle1.change(doc => {
+        const root = doc.getMap("doc")
+        root.set("count", 42)
+      })
+
+      await vi.runAllTimersAsync()
+
+      // Verify data was saved
+      const root1 = handle1.doc.getMap("doc")
+      expect(root1.get("count")).toBe(42)
+
+      // Second session: new repo with same storage, app creates document
+      // This simulates the hono-counter scenario where useDocument calls repo.get()
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
+      const repo2 = new Repo({
+        identity: { name: "repo2", type: "user" },
+        adapters: [storage2],
+      })
+
+      // App creates the document (like useDocument does)
+      const handle2 = repo2.get(documentId)
+
+      // Wait for storage to establish and sync
+      await vi.runAllTimersAsync()
+
+      // The document should have the stored data
+      const root2 = handle2.doc.getMap("doc")
+      expect(root2.get("count")).toBe(42)
+    }, 500)
+
+    it("should load stored documents with async storage operations", async () => {
+      // This test simulates IndexedDB-like async behavior where
+      // storage operations take real time
+
+      // Create a delayed storage adapter that simulates async operations
+      class DelayedStorageAdapter extends InMemoryStorageAdapter {
+        private delay = 10 // ms
+
+        async loadRange(keyPrefix: string[]): Promise<{ key: string[]; data: Uint8Array }[]> {
+          await new Promise(resolve => setTimeout(resolve, this.delay))
+          return super.loadRange(keyPrefix)
+        }
+      }
+
+      const storage1 = new DelayedStorageAdapter()
+
+      // First session: create document with content
+      const repo1 = new Repo({
+        identity: { name: "repo1", type: "user" },
+        adapters: [storage1],
+      })
+
+      await vi.runAllTimersAsync()
+
+      const documentId = "counter"
+      const handle1 = repo1.get(documentId)
+
+      handle1.change(doc => {
+        const root = doc.getMap("doc")
+        root.set("count", 42)
+      })
+
+      await vi.runAllTimersAsync()
+
+      // Second session: new repo with same storage
+      const storage2 = new DelayedStorageAdapter(storage1.getStorage())
+      const repo2 = new Repo({
+        identity: { name: "repo2", type: "user" },
+        adapters: [storage2],
+      })
+
+      // App creates the document immediately (like useDocument does)
+      const handle2 = repo2.get(documentId)
+
+      // Wait for async storage operations to complete
+      await vi.runAllTimersAsync()
+
+      // The document should have the stored data
+      const root2 = handle2.doc.getMap("doc")
+      expect(root2.get("count")).toBe(42)
+    }, 500)
   })
 })

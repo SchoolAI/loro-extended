@@ -98,6 +98,12 @@ describe("Repo", () => {
     // Document should exist in cache
     expect(repo.has(documentId)).toBe(true)
 
+    // Wait for storage adapter to finish its sync-request cycle
+    // This ensures the reciprocal sync-request from storage is processed
+    // before we delete the document
+    // TODO(duane): can we use synthetic time here, to prevent potential flaky test in future?
+    await new Promise(resolve => setTimeout(resolve, 50))
+
     await repo.delete(documentId)
 
     // Document should be removed from cache
