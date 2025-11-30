@@ -234,6 +234,23 @@ app.use("/sync", createSseExpressRouter(network));
 app.listen(3000);
 ```
 
+---
+
+## 📚 Examples
+
+Explore these example applications to see `@loro-extended` in action:
+
+| Example                                               | Description                                                                                                                                             |
+| :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **[`todo`](./examples/todo)**                         | A real-time collaborative todo app using React and SSE. Demonstrates offline-first architecture with automatic conflict resolution.                     |
+| **[`todo-websocket`](./examples/todo-websocket)**     | Same as `todo`, but uses WebSocket instead of SSE for real-time communication.                                                                          |
+| **[`chat`](./examples/chat)**                         | A collaborative chat app with AI streaming. Features reactive server-side AI responses that stream directly into Loro Text containers.                  |
+| **[`video-conference`](./examples/video-conference)** | WebRTC-based video conferencing with peer-to-peer sync. Demonstrates dual-adapter architecture (SSE + WebRTC) for resilient, low-latency collaboration. |
+| **[`hono-counter`](./examples/hono-counter)**         | A simple counter app using Hono's jsx-dom with Vite. Shows how to integrate `@loro-extended/hono` with the Hono framework.                              |
+| **[`postgres`](./examples/postgres)**                 | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database.                                            |
+
+---
+
 ## Architecture
 
 We use the **Elm Architecture (TEA)** pattern for our synchronization engine's state machine, ensuring predictable state transitions even in complex network conditions.
