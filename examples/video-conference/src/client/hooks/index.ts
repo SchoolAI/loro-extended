@@ -5,6 +5,16 @@ export type {
   UseConnectionStatusReturn,
 } from "./use-connection-status"
 export { useConnectionStatus } from "./use-connection-status"
+export type {
+  ChannelInfo,
+  ConnectionSource,
+  DebugInfo,
+  PeerConnectionInfo,
+  PresencePeerInfo,
+  UseDebugInfoOptions,
+  UseDebugInfoReturn,
+} from "./use-debug-info"
+export { truncateId, useDebugInfo } from "./use-debug-info"
 export type { MediaDevices, UseMediaDevicesReturn } from "./use-media-devices"
 export { useMediaDevices } from "./use-media-devices"
 export { useParticipantCleanup } from "./use-participant-cleanup"

@@ -66,7 +66,7 @@ describe("useWebRtcMesh Reconnection", () => {
           }
         },
         signal: vi.fn((data: any) => {
-          // Simulate simple-peer behavior: 
+          // Simulate simple-peer behavior:
           // A non-initiator peer starts in "stable" state waiting for an offer.
           // If it receives an "answer" signal, it throws because you can't set
           // a remote answer when you haven't sent an offer.
@@ -117,7 +117,9 @@ describe("useWebRtcMesh Reconnection", () => {
       const consoleErrorSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {})
-      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => {})
 
       // Scenario: We are the non-initiator (myPeerId > remotePeerId).
       // The remote peer's presence contains an old "answer" signal addressed to us.
@@ -129,7 +131,7 @@ describe("useWebRtcMesh Reconnection", () => {
       // EXPECTED BEHAVIOR: The answer signal should be IGNORED because:
       // - A non-initiator peer should only receive "offer" signals
       // - Receiving an "answer" when you haven't sent an offer is invalid
-      
+
       const staleAnswerSignal: SignalData = {
         type: "answer",
         sdp: "stale-answer-sdp",
@@ -170,7 +172,9 @@ describe("useWebRtcMesh Reconnection", () => {
     })
 
     it("non-initiator succeeds when receiving valid offer signal", async () => {
-      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => {})
 
       // Valid scenario: non-initiator receives an offer (not an answer)
       const validOfferSignal: SignalData = {
@@ -217,7 +221,9 @@ describe("useWebRtcMesh Reconnection", () => {
     })
 
     it("signal deduplication is reset after unmount/remount", async () => {
-      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => {})
 
       const offerSignal: SignalData = {
         type: "offer",
@@ -288,7 +294,9 @@ describe("useWebRtcMesh Reconnection", () => {
       const consoleErrorSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {})
-      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => {})
 
       // Scenario:
       // 1. Initiator and responder connected previously

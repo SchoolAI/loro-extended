@@ -9,12 +9,17 @@ import {
   type UserPresence,
 } from "../shared/types"
 import {
+  DebugPanel,
   Header,
   InCallScreen,
   OfflineBanner,
   PreJoinScreen,
 } from "./components"
-import { useConnectionStatus, useParticipantCleanup } from "./hooks"
+import {
+  useConnectionStatus,
+  useDebugInfo,
+  useParticipantCleanup,
+} from "./hooks"
 import { useLocalMedia } from "./use-local-media"
 import { useRoomIdFromHash } from "./use-room-id-from-hash"
 import { useWebRtcMesh } from "./use-webrtc-mesh"
@@ -93,14 +98,24 @@ export default function VideoConferenceApp({
 
   // WebRTC mesh for video connections - only needs signaling presence
   // Also connects Loro sync via data channels
-  const { remoteStreams, connectionStates } = useWebRtcMesh(
-    myPeerId,
-    localStream,
-    participantPeerIds,
+  const { remoteStreams, connectionStates, outgoingSignals, instanceId } =
+    useWebRtcMesh(
+      myPeerId,
+      localStream,
+      participantPeerIds,
+      signalingPresence,
+      setSignalingPresence,
+      webrtcAdapter,
+    )
+
+  // Debug info for the debug panel
+  const { debugInfo, refresh: refreshDebugInfo } = useDebugInfo({
+    userPresence,
     signalingPresence,
-    setSignalingPresence,
-    webrtcAdapter,
-  )
+    connectionStates,
+    instanceId,
+    outgoingSignals,
+  })
 
   // Update user presence with media preferences
   // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
@@ -260,6 +275,9 @@ export default function VideoConferenceApp({
           )}
         </div>
       </main>
+
+      {/* Debug Panel */}
+      <DebugPanel debugInfo={debugInfo} onRefresh={refreshDebugInfo} />
     </div>
   )
 }

@@ -12,6 +12,7 @@ export type UseWebRtcMeshReturn = {
   remoteStreams: Map<PeerID, MediaStream>
   connectionStates: Map<PeerID, "connecting" | "connected" | "failed">
   outgoingSignals: Record<string, SignalData[]>
+  instanceId: string
   processIncomingSignals: (fromPeerId: PeerID, signals: SignalData[]) => void
   clearOutgoingSignals: (targetPeerId: PeerID) => void
 }
@@ -207,6 +208,7 @@ export function useWebRtcMesh(
     remoteStreams,
     connectionStates,
     outgoingSignals,
+    instanceId: myInstanceId,
     processIncomingSignals,
     clearOutgoingSignals,
   }

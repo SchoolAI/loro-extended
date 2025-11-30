@@ -1,5 +1,6 @@
 export { AudioLevelMeter, type AudioLevelMeterProps } from "./audio-level-meter"
 export { ControlBar, type ControlBarProps } from "./control-bar"
+export { DebugPanel, type DebugPanelProps } from "./debug-panel"
 export {
   DeviceSelector,
   DeviceSelectorGroup,
