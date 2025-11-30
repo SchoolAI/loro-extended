@@ -1,0 +1,34 @@
+{
+  "name": "@loro-extended/adapter-webrtc",
+  "version": "0.1.0",
+  "description": "WebRTC data channel adapter for @loro-extended/repo - enables peer-to-peer document synchronization",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "format": "biome format --write .",
+    "lint": "biome check --write .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
