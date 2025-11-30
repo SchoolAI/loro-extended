@@ -107,18 +107,31 @@ Built on [Loro](https://github.com/loro-dev/loro), which is written in Rust. It 
 
 This monorepo is a collection of packages designed to work together:
 
-| Package                                                                                                | Description                                                                                                                                                                                                                         |
-| :----------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[`@loro-extended/change`](./packages/change)**                                                       | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.                                                                                                                        |
-| **[`@loro-extended/repo`](./packages/repo)**                                                           | **The Sync Engine.** Manages documents lifecycle, storage, and network sync. It's your local data store.                                                                                                                            |
-| **[`@loro-extended/react`](./packages/react)**                                                         | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views. See [`todo`](./examples/todo), [`chat`](./examples/chat), and [`video-conference`](./examples/video-conference) for examples. |
-| **[`@loro-extended/hono`](./packages/hono)**                                                           | **The UI Layer.** Hono JSX hooks and utilities, including `useDocument` and `usePresence`. See [`hono-counter`](./examples/hono-counter) for an example.                                                                            |
-| **[`@loro-extended/`](./adapters/indexeddb)** **[`adapter-indexeddb`](./adapters/indexeddb)**          | **Storage Adapter.** IndexedDB storage for browser-based persistence.                                                                                                                                                               |
-| **[`@loro-extended/`](./adapters/leveldb)** **[`adapter-leveldb`](./adapters/leveldb)**                | **Storage Adapter.** LevelDB storage for server-side persistence.                                                                                                                                                                   |
-| **[`@loro-extended/`](./adapters/postgres)** **[`adapter-postgres`](./adapters/postgres)**             | **Storage Adapter.** PostgreSQL storage for server-side persistence. See [`postgres`](./examples/postgres) for an example.                                                                                                          |
-| **[`@loro-extended/`](./adapters/http-polling)** **[`adapter-http-polling`](./adapters/http-polling)** | **Network Adapter.** HTTP polling network adapter with long-polling support. See [`examples/todo/POLLING.md`](./examples/todo/POLLING.md) for usage.                                                                                |
-| **[`@loro-extended/`](./adapters/sse)** **[`adapter-sse`](./adapters/sse)**                            | **Network Adapter.** Server-Sent Events (SSE) for real-time client-server sync. See [`todo`](./examples/todo) and [`chat`](./examples/chat) for examples.                                                                           |
-| **[`@loro-extended/`](./adapters/websocket)** **[`adapter-websocket`](./adapters/websocket)**          | **Network Adapter.** WebSocket adapter for real-time client-server sync. See [`todo-websocket`](./examples/todo-websocket) for a full example.                                                                                      |
+### Core Packages
+
+| Package                                          | Description                                                                                                                                                                                                                         |
+| :----------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[`@loro-extended/change`](./packages/change)** | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.                                                                                                                        |
+| **[`@loro-extended/repo`](./packages/repo)**     | **The Sync Engine.** Manages documents lifecycle, storage, and network sync. It's your local data store.                                                                                                                            |
+| **[`@loro-extended/react`](./packages/react)**   | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views. See [`todo`](./examples/todo), [`chat`](./examples/chat), and [`video-conference`](./examples/video-conference) for examples. |
+| **[`@loro-extended/hono`](./packages/hono)**     | **The UI Layer.** Hono JSX hooks and utilities, including `useDocument` and `usePresence`. See [`hono-counter`](./examples/hono-counter) for an example.                                                                            |
+
+### Storage Adapters
+
+| Package                                                        | Description                                                                                           |
+| :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- |
+| **[`@loro-extended/adapter-indexeddb`](./adapters/indexeddb)** | IndexedDB storage for browser-based persistence.                                                      |
+| **[`@loro-extended/adapter-leveldb`](./adapters/leveldb)**     | LevelDB storage for server-side persistence.                                                          |
+| **[`@loro-extended/adapter-postgres`](./adapters/postgres)**   | PostgreSQL storage for server-side persistence. See [`postgres`](./examples/postgres) for an example. |
+
+### Network Adapters
+
+| Package                                                              | Description                                                                                                                                  |
+| :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[`@loro-extended/adapter-http-polling`](./adapters/http-polling)** | HTTP polling network adapter with long-polling support. See [`examples/todo/POLLING.md`](./examples/todo/POLLING.md) for usage.              |
+| **[`@loro-extended/adapter-sse`](./adapters/sse)**                   | Server-Sent Events (SSE) for real-time client-server sync. See [`todo`](./examples/todo) and [`chat`](./examples/chat) for examples.         |
+| **[`@loro-extended/adapter-websocket`](./adapters/websocket)**       | WebSocket adapter for real-time client-server sync. See [`todo-websocket`](./examples/todo-websocket) for a full example.                    |
+| **[`@loro-extended/adapter-webrtc`](./adapters/webrtc)**             | WebRTC data channel adapter for peer-to-peer document synchronization. See [`video-conference`](./examples/video-conference) for an example. |
 
 ---
 
