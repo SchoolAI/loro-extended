@@ -62,7 +62,8 @@ function calculateMessageSize(msg: ProtocolMessage): number {
       const roomIdBytes = textEncoder.encode(msg.roomId)
       size += uleb128Size(roomIdBytes.length) + roomIdBytes.length
       size += uleb128Size(msg.authPayload.length) + msg.authPayload.length
-      size += uleb128Size(msg.requesterVersion.length) + msg.requesterVersion.length
+      size +=
+        uleb128Size(msg.requesterVersion.length) + msg.requesterVersion.length
       break
     }
 
@@ -70,7 +71,8 @@ function calculateMessageSize(msg: ProtocolMessage): number {
       const roomIdBytes = textEncoder.encode(msg.roomId)
       size += uleb128Size(roomIdBytes.length) + roomIdBytes.length
       size += 1 // permission byte
-      size += uleb128Size(msg.receiverVersion.length) + msg.receiverVersion.length
+      size +=
+        uleb128Size(msg.receiverVersion.length) + msg.receiverVersion.length
       size += uleb128Size(msg.metadata.length) + msg.metadata.length
       break
     }
@@ -82,7 +84,8 @@ function calculateMessageSize(msg: ProtocolMessage): number {
       size += 1 // error code
       size += uleb128Size(messageBytes.length) + messageBytes.length
       if (msg.code === JOIN_ERROR_CODE.VersionUnknown && msg.receiverVersion) {
-        size += uleb128Size(msg.receiverVersion.length) + msg.receiverVersion.length
+        size +=
+          uleb128Size(msg.receiverVersion.length) + msg.receiverVersion.length
       }
       if (msg.code === JOIN_ERROR_CODE.AppError && msg.appCode !== undefined) {
         size += uleb128Size(msg.appCode)
@@ -106,7 +109,10 @@ function calculateMessageSize(msg: ProtocolMessage): number {
       size += uleb128Size(roomIdBytes.length) + roomIdBytes.length
       size += 1 // error code
       size += uleb128Size(messageBytes.length) + messageBytes.length
-      if (msg.code === UPDATE_ERROR_CODE.AppError && msg.appCode !== undefined) {
+      if (
+        msg.code === UPDATE_ERROR_CODE.AppError &&
+        msg.appCode !== undefined
+      ) {
         size += uleb128Size(msg.appCode)
       }
       break
@@ -175,7 +181,8 @@ export function encodeMessage(msg: ProtocolMessage): Uint8Array {
       offset += roomIdBytes.length
 
       // Permission
-      buffer[offset] = msg.permission === "write" ? PERMISSION.Write : PERMISSION.Read
+      buffer[offset] =
+        msg.permission === "write" ? PERMISSION.Write : PERMISSION.Read
       offset++
 
       // Receiver version
@@ -280,7 +287,10 @@ export function encodeMessage(msg: ProtocolMessage): Uint8Array {
       offset += messageBytes.length
 
       // App code (only for AppError)
-      if (msg.code === UPDATE_ERROR_CODE.AppError && msg.appCode !== undefined) {
+      if (
+        msg.code === UPDATE_ERROR_CODE.AppError &&
+        msg.appCode !== undefined
+      ) {
         const appCodeBytes = encodeULEB128(msg.appCode)
         buffer.set(appCodeBytes, offset)
         offset += appCodeBytes.length

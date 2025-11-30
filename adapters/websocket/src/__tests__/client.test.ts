@@ -1,8 +1,8 @@
+import { LoroDoc } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { WsClientNetworkAdapter } from "../client.js"
-import { decodeMessage, encodeMessage } from "../protocol/index.js"
 import { MESSAGE_TYPE } from "../protocol/constants.js"
-import { LoroDoc } from "loro-crdt"
+import { decodeMessage, encodeMessage } from "../protocol/index.js"
 
 // Mock WebSocket implementation
 class MockWebSocket {
@@ -23,7 +23,7 @@ class MockWebSocket {
       this.readyState = 1 // OPEN
       // We need to defer the event slightly to allow listeners to be attached
       Promise.resolve().then(() => {
-         this.dispatchEvent("open", {})
+        this.dispatchEvent("open", {})
       })
     } else {
       // Simulate connection delay
@@ -187,9 +187,9 @@ describe("WsClientNetworkAdapter", () => {
     const testAdapter = new WsClientNetworkAdapter({
       url: "ws://localhost:3000",
       WebSocket: MockWebSocket as any,
-      reconnect: { enabled: false }
+      reconnect: { enabled: false },
     })
-    
+
     const onChannelReceive = vi.fn()
     testAdapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
@@ -198,7 +198,7 @@ describe("WsClientNetworkAdapter", () => {
       onChannelRemoved: vi.fn(),
       onChannelEstablish: vi.fn(),
     })
-    
+
     await testAdapter._start()
     const socket = MockWebSocket.instances[0]
 
@@ -246,7 +246,7 @@ describe("WsClientNetworkAdapter", () => {
 
     // Start connection
     const startPromise = adapter._start()
-    
+
     // Resolve the connection promise (MockWebSocket uses Promise.resolve().then)
     await Promise.resolve()
     await Promise.resolve()

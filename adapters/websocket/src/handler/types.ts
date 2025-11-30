@@ -100,12 +100,12 @@ export function wrapStandardWebSocket(ws: WebSocket): WsSocket {
     },
 
     onMessage(handler: (data: Uint8Array | string) => void): void {
-      ws.addEventListener("message", (event) => {
+      ws.addEventListener("message", event => {
         if (event.data instanceof ArrayBuffer) {
           handler(new Uint8Array(event.data))
         } else if (event.data instanceof Blob) {
           // Handle Blob data (browser)
-          event.data.arrayBuffer().then((buffer) => {
+          event.data.arrayBuffer().then(buffer => {
             handler(new Uint8Array(buffer))
           })
         } else {
@@ -115,13 +115,13 @@ export function wrapStandardWebSocket(ws: WebSocket): WsSocket {
     },
 
     onClose(handler: (code: number, reason: string) => void): void {
-      ws.addEventListener("close", (event) => {
+      ws.addEventListener("close", event => {
         handler(event.code, event.reason)
       })
     },
 
     onError(handler: (error: Error) => void): void {
-      ws.addEventListener("error", (_event) => {
+      ws.addEventListener("error", _event => {
         handler(new Error("WebSocket error"))
       })
     },

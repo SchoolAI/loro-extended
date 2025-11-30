@@ -3,11 +3,17 @@
  */
 
 import { describe, expect, it } from "vitest"
+import { JOIN_ERROR_CODE, UPDATE_ERROR_CODE } from "../protocol/constants.js"
 import {
   decodeMessage,
   encodeMessage,
   MESSAGE_TYPE,
 } from "../protocol/index.js"
+import {
+  decodeULEB128,
+  encodeULEB128,
+  uleb128Size,
+} from "../protocol/leb128.js"
 import type {
   DocUpdate,
   JoinError,
@@ -16,8 +22,6 @@ import type {
   Leave,
   UpdateError,
 } from "../protocol/types.js"
-import { JOIN_ERROR_CODE, UPDATE_ERROR_CODE } from "../protocol/constants.js"
-import { decodeULEB128, encodeULEB128, uleb128Size } from "../protocol/leb128.js"
 
 describe("LEB128 encoding", () => {
   it("encodes small numbers", () => {
@@ -43,7 +47,9 @@ describe("LEB128 encoding", () => {
     expect(decodeULEB128(new Uint8Array([0x80, 0x01]), 0)).toEqual([128, 2])
     expect(decodeULEB128(new Uint8Array([0xff, 0x01]), 0)).toEqual([255, 2])
     expect(decodeULEB128(new Uint8Array([0xac, 0x02]), 0)).toEqual([300, 2])
-    expect(decodeULEB128(new Uint8Array([0x80, 0x80, 0x01]), 0)).toEqual([16384, 3])
+    expect(decodeULEB128(new Uint8Array([0x80, 0x80, 0x01]), 0)).toEqual([
+      16384, 3,
+    ])
   })
 
   it("decodes from offset", () => {

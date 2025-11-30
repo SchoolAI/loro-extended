@@ -1,15 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { WsServerNetworkAdapter } from "../server-adapter.js"
-import type { WsSocket, WsReadyState } from "../handler/types.js"
 import type { PeerID } from "@loro-extended/repo"
-import { decodeMessage, encodeMessage } from "../protocol/index.js"
-import { MESSAGE_TYPE } from "../protocol/constants.js"
 import { LoroDoc } from "loro-crdt"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { WsReadyState, WsSocket } from "../handler/types.js"
+import { MESSAGE_TYPE } from "../protocol/constants.js"
+import { decodeMessage, encodeMessage } from "../protocol/index.js"
+import { WsServerNetworkAdapter } from "../server-adapter.js"
 
 class MockWsSocket implements WsSocket {
   public sentMessages: (Uint8Array | string)[] = []
   public readyState: WsReadyState = "open"
-  
+
   private messageHandler?: (data: Uint8Array | string) => void
   private closeHandler?: (code: number, reason: string) => void
   private errorHandler?: (error: Error) => void
@@ -53,10 +53,14 @@ describe("WsServerNetworkAdapter", () => {
   beforeEach(() => {
     adapter = new WsServerNetworkAdapter()
     mockSocket = new MockWsSocket()
-    
+
     // Initialize adapter with mock hooks
     adapter._initialize({
-      identity: { peerId: "server-1" as PeerID, name: "server", type: "service" },
+      identity: {
+        peerId: "server-1" as PeerID,
+        name: "server",
+        type: "service",
+      },
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -70,7 +74,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should handle new connection", async () => {
     await adapter._start()
-    
+
     const { connection, start } = adapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
@@ -83,7 +87,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should generate peerId if not provided", async () => {
     await adapter._start()
-    
+
     const { connection, start } = adapter.handleConnection({
       socket: mockSocket,
     })
@@ -96,7 +100,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should unregister connection on socket close", async () => {
     await adapter._start()
-    
+
     const { start } = adapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
@@ -110,7 +114,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should unregister connection on socket error", async () => {
     await adapter._start()
-    
+
     const { start } = adapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
@@ -124,7 +128,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should replace existing connection for same peerId", async () => {
     await adapter._start()
-    
+
     const socket1 = new MockWsSocket()
     const socket2 = new MockWsSocket()
 
@@ -152,7 +156,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should send messages to connected peer", async () => {
     await adapter._start()
-    
+
     const { start } = adapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
@@ -171,11 +175,11 @@ describe("WsServerNetworkAdapter", () => {
         {
           docId: "doc-1",
           requesterDocVersion: new LoroDoc().version(),
-        }
+        },
       ],
       bidirectional: true,
     }
-    
+
     connection!.send(msg)
 
     // Should have sent protocol messages
@@ -186,22 +190,26 @@ describe("WsServerNetworkAdapter", () => {
     // Create a new adapter to avoid re-initialization error
     const testAdapter = new WsServerNetworkAdapter()
     const onChannelReceive = vi.fn()
-    
+
     testAdapter._initialize({
-      identity: { peerId: "server-1" as PeerID, name: "server", type: "service" },
+      identity: {
+        peerId: "server-1" as PeerID,
+        name: "server",
+        type: "service",
+      },
       onChannelReceive,
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
       onChannelEstablish: vi.fn(),
     })
     await testAdapter._start()
-    
+
     const { start } = testAdapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
     })
     start()
-    
+
     // Create a JoinRequest message
     const joinRequest = {
       type: MESSAGE_TYPE.JoinRequest,
@@ -210,7 +218,7 @@ describe("WsServerNetworkAdapter", () => {
       authPayload: new Uint8Array(0),
       requesterVersion: new LoroDoc().version().encode(),
     }
-    
+
     const encoded = encodeMessage(joinRequest)
     mockSocket.simulateMessage(encoded)
 
@@ -222,7 +230,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should handle keepalive ping", async () => {
     await adapter._start()
-    
+
     const { start } = adapter.handleConnection({
       socket: mockSocket,
       peerId: "client-1" as PeerID,
@@ -236,7 +244,7 @@ describe("WsServerNetworkAdapter", () => {
 
   it("should close all connections on stop", async () => {
     await adapter._start()
-    
+
     const socket1 = new MockWsSocket()
     const socket2 = new MockWsSocket()
 

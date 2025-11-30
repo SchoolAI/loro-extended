@@ -1,9 +1,6 @@
 import type { StorageKey } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  PostgresStorageAdapter,
-  type QueryInterface,
-} from "./server.js"
+import { PostgresStorageAdapter, type QueryInterface } from "./server.js"
 
 /**
  * Mock QueryInterface for testing without a real PostgreSQL database
@@ -30,7 +27,11 @@ function createMockClient(): QueryInterface & {
       }
 
       // Handle SELECT (load)
-      if (text.includes("SELECT") && text.includes("WHERE") && text.includes("= $1")) {
+      if (
+        text.includes("SELECT") &&
+        text.includes("WHERE") &&
+        text.includes("= $1")
+      ) {
         const key = values?.[0] as string
         const value = data.get(key)
         if (value) {
@@ -45,7 +46,7 @@ function createMockClient(): QueryInterface & {
         const prefix = pattern.replace(/::%$/, "")
         const rows: Record<string, unknown>[] = []
         for (const [key, value] of data.entries()) {
-          if (key.startsWith(prefix + "::") || key === prefix) {
+          if (key.startsWith(`${prefix}::`) || key === prefix) {
             rows.push({ key, data: value })
           }
         }
@@ -81,7 +82,7 @@ function createMockClient(): QueryInterface & {
         const pattern = values?.[0] as string
         const prefix = pattern.replace(/::%$/, "")
         for (const key of data.keys()) {
-          if (key.startsWith(prefix + "::") || key === prefix) {
+          if (key.startsWith(`${prefix}::`) || key === prefix) {
             data.delete(key)
           }
         }

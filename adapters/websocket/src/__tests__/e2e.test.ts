@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { WebSocketServer } from "ws"
-import { WsServerNetworkAdapter, wrapWsSocket } from "../server.js"
-import { WsClientNetworkAdapter } from "../client.js"
 import { Repo, validatePeerId } from "@loro-extended/repo"
 import { LoroDoc } from "loro-crdt"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { WebSocketServer } from "ws"
+import { WsClientNetworkAdapter } from "../client.js"
+import { WsServerNetworkAdapter, wrapWsSocket } from "../server.js"
 
 describe("WebSocket Adapter E2E", () => {
   let wss: WebSocketServer

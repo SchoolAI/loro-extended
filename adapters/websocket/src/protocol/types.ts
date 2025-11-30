@@ -3,10 +3,10 @@
  */
 
 import {
-  JOIN_ERROR_CODE,
+  type JOIN_ERROR_CODE,
   MESSAGE_TYPE,
-  PERMISSION,
-  UPDATE_ERROR_CODE,
+  type PERMISSION,
+  type UPDATE_ERROR_CODE,
 } from "./constants.js"
 
 /**

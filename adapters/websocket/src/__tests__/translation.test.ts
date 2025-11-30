@@ -2,8 +2,16 @@
  * Tests for the translation layer between loro-extended and Loro Protocol.
  */
 
-import { describe, expect, it } from "vitest"
+import type {
+  ChannelMsgEphemeral,
+  ChannelMsgEstablishRequest,
+  ChannelMsgSyncRequest,
+  ChannelMsgSyncResponse,
+  ChannelMsgUpdate,
+} from "@loro-extended/repo"
 import { LoroDoc } from "loro-crdt"
+import { describe, expect, it } from "vitest"
+import { MESSAGE_TYPE } from "../protocol/constants.js"
 import {
   createTranslationContext,
   fromProtocolMessage,
@@ -14,14 +22,6 @@ import {
   translateEstablishRequest,
   translateJoinResponse,
 } from "../protocol/translation.js"
-import { MESSAGE_TYPE } from "../protocol/constants.js"
-import type {
-  ChannelMsgSyncRequest,
-  ChannelMsgSyncResponse,
-  ChannelMsgUpdate,
-  ChannelMsgEphemeral,
-  ChannelMsgEstablishRequest,
-} from "@loro-extended/repo"
 import type {
   DocUpdate,
   JoinRequest,

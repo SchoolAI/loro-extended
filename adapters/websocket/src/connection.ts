@@ -11,8 +11,8 @@ import { decodeMessage, encodeMessage } from "./protocol/index.js"
 import {
   createTranslationContext,
   fromProtocolMessage,
-  toProtocolMessages,
   type TranslationContext,
+  toProtocolMessages,
 } from "./protocol/translation.js"
 import type { ProtocolMessage } from "./protocol/types.js"
 
@@ -54,7 +54,7 @@ export class WsConnection {
     }
     this.started = true
 
-    this.socket.onMessage((data) => {
+    this.socket.onMessage(data => {
       this.handleMessage(data)
     })
 
@@ -191,17 +191,17 @@ export class WsConnection {
     // Simulate receiving establish-request (if we are server)
     // or establish-response (if we are client)
     // To be safe, we can simulate both directions to ensure state is consistent
-    
+
     // 1. We tell Synchronizer that the remote peer wants to establish
     this.channel.onReceive({
       type: "channel/establish-request",
-      identity: { peerId: remotePeerId, name: "peer", type: "user" }
+      identity: { peerId: remotePeerId, name: "peer", type: "user" },
     })
 
     // 2. We tell Synchronizer that the remote peer accepted our establishment
     this.channel.onReceive({
       type: "channel/establish-response",
-      identity: { peerId: remotePeerId, name: "peer", type: "user" }
+      identity: { peerId: remotePeerId, name: "peer", type: "user" },
     })
   }
 }

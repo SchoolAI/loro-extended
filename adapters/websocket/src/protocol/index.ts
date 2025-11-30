@@ -14,7 +14,18 @@ export {
   PERMISSION,
   UPDATE_ERROR_CODE,
 } from "./constants.js"
-
+export { decodeMessage, decodeVarBytes, decodeVarString } from "./decoder.js"
+// Encoding/Decoding
+export { encodeMessage, encodeVarBytes, encodeVarString } from "./encoder.js"
+// LEB128 utilities
+export { decodeULEB128, encodeULEB128, uleb128Size } from "./leb128.js"
+// Translation layer
+export {
+  fromProtocolMessage,
+  toProtocolMessages,
+  translateEstablishRequest,
+  translateJoinResponse,
+} from "./translation.js"
 // Types
 export type {
   CrdtType,
@@ -31,7 +42,6 @@ export type {
   UpdateError,
   UpdateErrorCode,
 } from "./types.js"
-
 export {
   isDocUpdate,
   isJoinError,
@@ -40,18 +50,3 @@ export {
   isLeave,
   isUpdateError,
 } from "./types.js"
-
-// Encoding/Decoding
-export { encodeMessage, encodeVarBytes, encodeVarString } from "./encoder.js"
-export { decodeMessage, decodeVarBytes, decodeVarString } from "./decoder.js"
-
-// LEB128 utilities
-export { decodeULEB128, encodeULEB128, uleb128Size } from "./leb128.js"
-
-// Translation layer
-export {
-  fromProtocolMessage,
-  toProtocolMessages,
-  translateEstablishRequest,
-  translateJoinResponse,
-} from "./translation.js"

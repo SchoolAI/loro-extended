@@ -370,7 +370,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
     // Exponential backoff with jitter
     const delay = Math.min(
-      reconnectOpts.baseDelay * Math.pow(2, this.reconnectAttempts) +
+      reconnectOpts.baseDelay * 2 ** this.reconnectAttempts +
         Math.random() * 1000,
       reconnectOpts.maxDelay,
     )

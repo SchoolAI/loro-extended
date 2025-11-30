@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsup",
     "lint": "biome check --write .",
-    "test": "vitest"
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^"

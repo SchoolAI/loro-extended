@@ -1,9 +1,9 @@
+import { Buffer } from "node:buffer"
 import {
   type Chunk,
   StorageAdapter,
   type StorageKey,
 } from "@loro-extended/repo"
-import { Buffer } from "node:buffer"
 
 const KEY_SEP = "::"
 
@@ -190,7 +190,11 @@ export class PostgresStorageAdapter extends StorageAdapter {
 
       let dataArray: Uint8Array
       if (Buffer.isBuffer(data)) {
-        dataArray = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+        dataArray = new Uint8Array(
+          data.buffer,
+          data.byteOffset,
+          data.byteLength,
+        )
       } else if (data instanceof Uint8Array) {
         dataArray = data
       } else {
