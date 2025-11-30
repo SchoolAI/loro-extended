@@ -6,7 +6,7 @@ This is a handy guide I made to help me recall the steps I need to take to updat
 
 ### 1. Create a Changeset (Minor Bump)
 
-Run the interactive changeset command:
+Run the interactive changeset command each time you make a commit worthy of note:
 
 ```bash
 pnpm changeset

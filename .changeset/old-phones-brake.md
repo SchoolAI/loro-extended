@@ -1,5 +1,5 @@
 ---
-"video-conference-app": patch
+"example-video-conference": patch
 ---
 
 Moved position of mic/camera icons near video bubble
