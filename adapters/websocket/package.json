@@ -26,8 +26,10 @@
   },
   "scripts": {
     "build": "tsup",
+    "format": "biome format --write .",
     "lint": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
