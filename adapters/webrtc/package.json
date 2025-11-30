@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-webrtc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WebRTC data channel adapter for @loro-extended/repo - enables peer-to-peer document synchronization",
   "author": "Duane Johnson",
   "license": "MIT",

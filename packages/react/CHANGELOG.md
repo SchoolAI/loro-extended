@@ -1,5 +1,13 @@
 # @loro-extended/react
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [9b291dc]
+- Updated dependencies [204fda2]
+  - @loro-extended/repo@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
