@@ -1,5 +1,6 @@
 import { configure, getConsoleSink } from "@logtape/logtape"
 import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
+import { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { RepoProvider } from "@loro-extended/react"
 import { createRoot } from "react-dom/client"
 import VideoConferenceApp from "./client/video-conference-app.tsx"
@@ -36,6 +37,10 @@ const sseAdapter = new SseClientNetworkAdapter({
   eventSourceUrl: peerId => `/loro/events?peerId=${peerId}`,
 })
 
+// WebRTC adapter for peer-to-peer sync
+// Data channels will be attached when WebRTC connections are established
+const webrtcAdapter = new WebRtcDataChannelAdapter()
+
 // Get or create a persistent peerId
 const STORAGE_KEY = "loro-video-conference-peer-id"
 let peerId = localStorage.getItem(STORAGE_KEY) as `${number}` | null
@@ -58,11 +63,14 @@ const config: RepoParams = {
     name: displayName,
     type: "user",
   },
-  adapters: [sseAdapter],
+  adapters: [sseAdapter, webrtcAdapter],
 }
 
 createRoot(root).render(
   <RepoProvider config={config}>
-    <VideoConferenceApp displayName={displayName} />
+    <VideoConferenceApp
+      displayName={displayName}
+      webrtcAdapter={webrtcAdapter}
+    />
   </RepoProvider>,
 )

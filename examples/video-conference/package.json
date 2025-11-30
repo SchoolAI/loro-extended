@@ -21,6 +21,7 @@
     "@logtape/logtape": "^1.1.1",
     "@loro-extended/adapter-leveldb": "workspace:^",
     "@loro-extended/adapter-sse": "workspace:^",
+    "@loro-extended/adapter-webrtc": "workspace:^",
     "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",

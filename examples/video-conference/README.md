@@ -8,7 +8,8 @@ A simple WebRTC-based video conference app using `simple-peer` and `loro-extende
 - **Room-based** - share a link to invite others
 - **CRDT-synced participant list** - see who's in the room
 - **Presence-based signaling** - WebRTC signals flow through loro-extended's ephemeral presence system
-- **No WebSocket server** - uses SSE + HTTP POST for all communication
+- **Dual-adapter sync** - SSE for server communication + WebRTC data channels for peer-to-peer sync
+- **Offline resilient** - if the server goes down, peers continue syncing directly via WebRTC
 
 ## Architecture
 
@@ -16,24 +17,41 @@ This example demonstrates how to use loro-extended for both:
 
 1. **Persistent state (CRDT document)**: Room metadata and participant list
 2. **Ephemeral state (typed presence)**: WebRTC signaling data (SDP offers/answers, ICE candidates)
+3. **Multi-adapter sync**: Redundant sync paths for resilience
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Server                                │
-│  ┌─────────────────┐  ┌─────────────────┐                   │
-│  │  Loro Repo      │  │  LevelDB        │                   │
-│  │  (SSE Adapter)  │  │  Storage        │                   │
-│  └────────┬────────┘  └─────────────────┘                   │
-│           │                                                  │
-└───────────┼──────────────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│                   Server                   │
+│  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Loro Repo      │  │  LevelDB        │  │
+│  │  (SSE Adapter)  │  │  Storage        │  │
+│  └────────┬────────┘  └─────────────────┘  │
+└───────────┼────────────────────────────────┘
             │ SSE + HTTP POST
     ┌───────┴───────┐
     │               │
 ┌───┴───┐       ┌───┴───┐
-│Client │       │Client │
-│   A   │◄─────►│   B   │  WebRTC (video/audio)
+│Client │◄─────►│Client │  WebRTC (video/audio + Loro sync)
+│   A   │       │   B   │
 └───────┘       └───────┘
+    │               │
+    └───────────────┘
+    WebRTC Data Channel
+    (loro-extended sync)
 ```
+
+### Dual-Adapter Sync
+
+This example uses **two network adapters** simultaneously:
+
+1. **SSE Adapter** - Communicates with the server for reliable, persistent sync
+2. **WebRTC Data Channel Adapter** - Peer-to-peer sync directly between browsers
+
+When both adapters are active, loro-extended automatically applies messages idempotently, and the same peer connected via multiple channels is tracked as a single peer. This provides:
+
+- **Redundancy**: If the server goes down, peers continue syncing via WebRTC
+- **Lower latency**: Direct peer-to-peer updates don't need to round-trip through the server
+- **Offline resilience**: As long as peers are connected via WebRTC, collaboration continues
 
 ## How Signaling Works
 
@@ -131,4 +149,50 @@ The main React component:
 - `simple-peer` - WebRTC abstraction library
 - `@loro-extended/repo` - CRDT document synchronization
 - `@loro-extended/react` - React hooks for loro-extended
-- `@loro-extended/adapters` - SSE network adapter
+- `@loro-extended/adapter-sse` - SSE network adapter for server communication
+- `@loro-extended/adapter-webrtc` - WebRTC data channel adapter for peer-to-peer sync
+
+## WebRTC Data Channel Sync
+
+The WebRTC data channel adapter enables peer-to-peer document synchronization alongside the video/audio streams. Here's how it works:
+
+### Setup
+
+```typescript
+// main.tsx
+import { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
+
+const sseAdapter = new SseClientNetworkAdapter({ ... })
+const webrtcAdapter = new WebRtcDataChannelAdapter()
+
+const config = {
+  identity: { peerId, name, type: "user" },
+  adapters: [sseAdapter, webrtcAdapter], // Both adapters!
+}
+```
+
+### Attaching Data Channels
+
+When a WebRTC connection is established via simple-peer, we create a dedicated data channel for Loro sync:
+
+```typescript
+// use-peer-manager.ts
+peer.on("connect", () => {
+  // Create dedicated data channel for Loro sync
+  const pc = peer._pc as RTCPeerConnection;
+  const loroChannel = pc.createDataChannel("loro-sync", { ordered: true });
+  webrtcAdapter.attachDataChannel(remotePeerId, loroChannel);
+});
+
+peer.on("close", () => {
+  webrtcAdapter.detachDataChannel(remotePeerId);
+});
+```
+
+### Benefits
+
+1. **Server independence**: Once peers are connected via WebRTC, they can sync documents directly without the server
+2. **Automatic deduplication**: loro-extended handles the same peer being connected via multiple adapters
+3. **Seamless failover**: If SSE connection drops, WebRTC sync continues; if WebRTC drops, SSE continues
+4. **Lower latency**: Direct peer-to-peer updates are faster than server round-trips

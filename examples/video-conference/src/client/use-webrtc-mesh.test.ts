@@ -1,3 +1,4 @@
+import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import type { PeerID } from "@loro-extended/repo"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -36,6 +37,7 @@ describe("useWebRtcMesh", () => {
 
   let mockSetSignalingPresence: ReturnType<typeof vi.fn>
   let mockLocalStream: MediaStream
+  let mockWebrtcAdapter: WebRtcDataChannelAdapter
 
   beforeEach(() => {
     // Clear the instances array
@@ -80,6 +82,13 @@ describe("useWebRtcMesh", () => {
       getAudioTracks: () => [],
       getVideoTracks: () => [],
     } as unknown as MediaStream
+    // Create a mock WebRTC adapter
+    mockWebrtcAdapter = {
+      attachDataChannel: vi.fn(),
+      detachDataChannel: vi.fn(),
+      hasDataChannel: vi.fn(() => false),
+      getAttachedPeerIds: vi.fn(() => []),
+    } as unknown as WebRtcDataChannelAdapter
   })
 
   afterEach(() => {
@@ -89,7 +98,14 @@ describe("useWebRtcMesh", () => {
   describe("initialization", () => {
     it("returns empty maps initially", () => {
       const { result } = renderHook(() =>
-        useWebRtcMesh(myPeerId, null, [], {}, mockSetSignalingPresence),
+        useWebRtcMesh(
+          myPeerId,
+          null,
+          [],
+          {},
+          mockSetSignalingPresence,
+          mockWebrtcAdapter,
+        ),
       )
 
       expect(result.current.remoteStreams.size).toBe(0)
@@ -105,6 +121,7 @@ describe("useWebRtcMesh", () => {
           [],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -124,6 +141,7 @@ describe("useWebRtcMesh", () => {
           [smallerPeerId, largerPeerId],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -145,6 +163,7 @@ describe("useWebRtcMesh", () => {
           [smallerPeerId, largerPeerId],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -172,6 +191,7 @@ describe("useWebRtcMesh", () => {
           [myPeerId, remotePeerId],
           signalingPresence,
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -202,6 +222,7 @@ describe("useWebRtcMesh", () => {
             [myPeerId, remotePeerId],
             presence,
             mockSetSignalingPresence,
+            mockWebrtcAdapter,
           ),
         { initialProps: { presence: signalingPresence } },
       )
@@ -235,6 +256,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -272,6 +294,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -295,6 +318,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -331,6 +355,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -367,6 +392,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -400,6 +426,7 @@ describe("useWebRtcMesh", () => {
             participants,
             {},
             mockSetSignalingPresence,
+            mockWebrtcAdapter,
           ),
         {
           initialProps: {
@@ -446,6 +473,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -471,6 +499,7 @@ describe("useWebRtcMesh", () => {
           ],
           {},
           mockSetSignalingPresence,
+          mockWebrtcAdapter,
         ),
       )
 
@@ -490,6 +519,7 @@ describe("useWebRtcMesh", () => {
             ],
             {},
             mockSetSignalingPresence,
+            mockWebrtcAdapter,
           ),
         { initialProps: { stream: null as MediaStream | null } },
       )

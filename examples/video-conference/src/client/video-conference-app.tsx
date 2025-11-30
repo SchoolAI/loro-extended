@@ -1,3 +1,4 @@
+import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
 import type { DocId, PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useState } from "react"
@@ -25,10 +26,12 @@ function generateRoomId(): DocId {
 
 type VideoConferenceAppProps = {
   displayName: string
+  webrtcAdapter: WebRtcDataChannelAdapter
 }
 
 export default function VideoConferenceApp({
   displayName,
+  webrtcAdapter,
 }: VideoConferenceAppProps) {
   const repo = useRepo()
   const myPeerId = repo.identity.peerId
@@ -87,12 +90,14 @@ export default function VideoConferenceApp({
   const participantPeerIds = doc.participants.map(p => p.peerId as PeerID)
 
   // WebRTC mesh for video connections - only needs signaling presence
+  // Also connects Loro sync via data channels
   const { remoteStreams, connectionStates } = useWebRtcMesh(
     myPeerId,
     localStream,
     participantPeerIds,
     signalingPresence,
     setSignalingPresence,
+    webrtcAdapter,
   )
 
   // Update user presence with media preferences

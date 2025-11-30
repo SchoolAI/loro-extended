@@ -1,3 +1,4 @@
+import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import type { PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef } from "react"
 import type { SignalData, SignalingPresence } from "../shared/types"
@@ -35,6 +36,7 @@ export function useWebRtcMesh(
   participantPeerIds: PeerID[],
   signalingPresence: Record<string, SignalingPresence>,
   setSignalingPresence: (update: Partial<SignalingPresence>) => void,
+  webrtcAdapter: WebRtcDataChannelAdapter,
 ): UseWebRtcMeshReturn {
   // Track which peers were created from incoming signals (non-initiator)
   // These should NOT be destroyed by the participant lifecycle effect
@@ -60,6 +62,7 @@ export function useWebRtcMesh(
     myPeerId,
     localStream,
     onSignal: queueOutgoingSignal,
+    webrtcAdapter,
   })
 
   // Process incoming signals from another peer's presence
