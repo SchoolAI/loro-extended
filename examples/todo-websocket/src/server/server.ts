@@ -1,13 +1,13 @@
+import { createServer } from "node:http"
 import { configure, getConsoleSink } from "@logtape/logtape"
+import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import {
   WsServerNetworkAdapter,
   wrapWsSocket,
 } from "@loro-extended/adapter-websocket/server"
-import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
-import { Repo, type PeerID } from "@loro-extended/repo"
+import { type PeerID, Repo } from "@loro-extended/repo"
 import cors from "cors"
 import express from "express"
-import { createServer } from "node:http"
 import { WebSocketServer } from "ws"
 
 // Configure LogTape for server-side logging

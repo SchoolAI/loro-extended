@@ -31,16 +31,19 @@ This example is identical to the `todo` example, but uses WebSocket instead of S
 ## Running the Example
 
 1. Install dependencies from the repository root:
+
    ```bash
    pnpm install
    ```
 
 2. Build the workspace packages:
+
    ```bash
    pnpm build
    ```
 
 3. Start the development server:
+
    ```bash
    cd examples/todo-websocket
    pnpm dev
@@ -55,12 +58,12 @@ This example is identical to the `todo` example, but uses WebSocket instead of S
 Uses `WsClientNetworkAdapter` instead of `SseClientNetworkAdapter`:
 
 ```typescript
-import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client"
+import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client";
 
 const wsAdapter = new WsClientNetworkAdapter({
-  url: peerId => `/ws?peerId=${peerId}`,
+  url: (peerId) => `/ws?peerId=${peerId}`,
   reconnect: { enabled: true },
-})
+});
 ```
 
 ### Server (`src/server/server.ts`)
@@ -68,22 +71,25 @@ const wsAdapter = new WsClientNetworkAdapter({
 Uses `WsServerNetworkAdapter` with the `ws` library:
 
 ```typescript
-import { WebSocketServer } from "ws"
-import { WsServerNetworkAdapter, wrapWsSocket } from "@loro-extended/adapter-websocket/server"
+import { WebSocketServer } from "ws";
+import {
+  WsServerNetworkAdapter,
+  wrapWsSocket,
+} from "@loro-extended/adapter-websocket/server";
 
-const wsAdapter = new WsServerNetworkAdapter()
-const wss = new WebSocketServer({ server, path: "/ws" })
+const wsAdapter = new WsServerNetworkAdapter();
+const wss = new WebSocketServer({ server, path: "/ws" });
 
 wss.on("connection", (ws, req) => {
-  const url = new URL(req.url!, `http://${req.headers.host}`)
-  const peerId = url.searchParams.get("peerId")
-  
+  const url = new URL(req.url!, `http://${req.headers.host}`);
+  const peerId = url.searchParams.get("peerId");
+
   const { start } = wsAdapter.handleConnection({
     socket: wrapWsSocket(ws),
     peerId: peerId as PeerID | undefined,
-  })
-  start()
-})
+  });
+  start();
+});
 ```
 
 ### Vite Config (`vite.config.ts`)
@@ -103,20 +109,22 @@ server: {
 
 ## WebSocket vs SSE
 
-| Feature | WebSocket | SSE |
-|---------|-----------|-----|
-| Direction | Bidirectional | Server → Client only |
-| Protocol | Binary or text | Text only |
-| Connection | Single persistent | HTTP long-polling |
-| Reconnection | Manual | Automatic |
-| Browser Support | All modern | All modern |
+| Feature         | WebSocket         | SSE                  |
+| --------------- | ----------------- | -------------------- |
+| Direction       | Bidirectional     | Server → Client only |
+| Protocol        | Binary or text    | Text only            |
+| Connection      | Single persistent | HTTP long-polling    |
+| Reconnection    | Manual            | Automatic            |
+| Browser Support | All modern        | All modern           |
 
 WebSocket is generally preferred when:
+
 - You need bidirectional communication
 - You want lower latency
 - You're sending binary data
 
 SSE is simpler when:
+
 - You only need server-to-client updates
 - You want automatic reconnection
 - You prefer HTTP-based infrastructure

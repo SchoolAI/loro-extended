@@ -14,11 +14,13 @@ This directory contains end-to-end tests for the Todo App (WebSocket version) us
 ### Prerequisites
 
 1. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 2. Install Playwright browsers:
+
 ```bash
 pnpm exec playwright install
 ```
@@ -26,11 +28,13 @@ pnpm exec playwright install
 ### Running the Tests
 
 1. Start the development server (if not already running):
+
 ```bash
 pnpm dev
 ```
 
 2. In another terminal, run the tests:
+
 ```bash
 # Run all tests
 pnpm test:e2e
@@ -53,11 +57,13 @@ pnpm exec playwright test --debug
 The tests cover:
 
 1. **Basic Functionality**
+
    - Creating todos
    - Toggling todo completion
    - Deleting todos
 
 2. **Persistence**
+
    - Client-side persistence via IndexedDB
    - Server-side persistence via LevelDB
    - Data synchronization between clients
@@ -81,6 +87,7 @@ await expect(element).toBeVisible({ timeout: 10000 });
 ### Port Conflicts
 
 If you see port conflict errors, make sure:
+
 - No other process is using port 5173 (client)
 - No other process is using port 5170 (server)
 
@@ -104,14 +111,15 @@ When writing new tests:
 Example:
 
 ```typescript
-import { test, expect } from '@playwright/test';
-import { createTodo, waitForRepoState } from './fixtures/test-helpers';
+import { test, expect } from "@playwright/test";
+import { createTodo, waitForRepoState } from "./fixtures/test-helpers";
 
-test('my new test', async ({ page }) => {
-  await page.goto('/');
-  await waitForRepoState(page, 'ready');
-  
-  await createTodo(page, 'Test Todo');
-  
+test("my new test", async ({ page }) => {
+  await page.goto("/");
+  await waitForRepoState(page, "ready");
+
+  await createTodo(page, "Test Todo");
+
   // Your test assertions here
 });
+```

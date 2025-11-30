@@ -24,8 +24,8 @@ pnpm add @loro-extended/adapter-websocket
 ### Client
 
 ```typescript
-import { Repo } from "@loro-extended/repo"
-import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client"
+import { Repo } from "@loro-extended/repo";
+import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client";
 
 const adapter = new WsClientNetworkAdapter({
   url: "ws://localhost:3000/ws",
@@ -36,95 +36,95 @@ const adapter = new WsClientNetworkAdapter({
     maxDelay: 30000,
   },
   keepaliveInterval: 30000,
-})
+});
 
 const repo = new Repo({
   peerId: "client-1",
   adapters: [adapter],
-})
+});
 ```
 
 ### Server with Express + ws
 
 ```typescript
-import express from "express"
-import { createServer } from "http"
-import { WebSocketServer } from "ws"
-import { Repo } from "@loro-extended/repo"
+import express from "express";
+import { createServer } from "http";
+import { WebSocketServer } from "ws";
+import { Repo } from "@loro-extended/repo";
 import {
   WsServerNetworkAdapter,
   wrapWsSocket,
-} from "@loro-extended/adapter-websocket/server"
+} from "@loro-extended/adapter-websocket/server";
 
-const app = express()
-const server = createServer(app)
-const wss = new WebSocketServer({ server })
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
 
-const adapter = new WsServerNetworkAdapter()
+const adapter = new WsServerNetworkAdapter();
 
 const repo = new Repo({
   peerId: "server",
   adapters: [adapter],
-})
+});
 
 wss.on("connection", (ws, req) => {
   // Extract peer ID from query string
-  const url = new URL(req.url!, `http://${req.headers.host}`)
-  const peerId = url.searchParams.get("peerId")
+  const url = new URL(req.url!, `http://${req.headers.host}`);
+  const peerId = url.searchParams.get("peerId");
 
   const { connection, start } = adapter.handleConnection({
     socket: wrapWsSocket(ws),
     peerId: peerId || undefined,
-  })
+  });
 
-  start()
-})
+  start();
+});
 
-server.listen(3000)
+server.listen(3000);
 ```
 
 ### Server with Hono
 
 ```typescript
-import { Hono } from "hono"
-import { upgradeWebSocket } from "hono/cloudflare-workers" // or your runtime
-import { Repo } from "@loro-extended/repo"
+import { Hono } from "hono";
+import { upgradeWebSocket } from "hono/cloudflare-workers"; // or your runtime
+import { Repo } from "@loro-extended/repo";
 import {
   WsServerNetworkAdapter,
   wrapStandardWebSocket,
-} from "@loro-extended/adapter-websocket/server"
+} from "@loro-extended/adapter-websocket/server";
 
-const app = new Hono()
-const adapter = new WsServerNetworkAdapter()
+const app = new Hono();
+const adapter = new WsServerNetworkAdapter();
 
 const repo = new Repo({
   peerId: "server",
   adapters: [adapter],
-})
+});
 
 app.get(
   "/ws",
   upgradeWebSocket((c) => {
-    let connection: ReturnType<typeof adapter.handleConnection>["connection"]
+    let connection: ReturnType<typeof adapter.handleConnection>["connection"];
 
     return {
       onOpen(evt, ws) {
-        const peerId = c.req.query("peerId")
+        const peerId = c.req.query("peerId");
         const result = adapter.handleConnection({
           socket: wrapStandardWebSocket(ws.raw as WebSocket),
           peerId: peerId || undefined,
-        })
-        connection = result.connection
-        result.start()
+        });
+        connection = result.connection;
+        result.start();
       },
       onClose() {
         // Connection cleanup is handled automatically
       },
-    }
-  }),
-)
+    };
+  })
+);
 
-export default app
+export default app;
 ```
 
 ## Protocol
@@ -133,14 +133,14 @@ This adapter implements the [Loro Syncing Protocol](https://loro.dev/docs/protoc
 
 ### Message Types
 
-| Code | Type           | Description                          |
-| ---- | -------------- | ------------------------------------ |
-| 0x00 | JoinRequest    | Request to join a room               |
-| 0x01 | JoinResponseOk | Successful join response             |
-| 0x02 | JoinError      | Join failed                          |
-| 0x03 | DocUpdate      | Document update data                 |
-| 0x06 | UpdateError    | Update failed                        |
-| 0x07 | Leave          | Leave a room                         |
+| Code | Type           | Description              |
+| ---- | -------------- | ------------------------ |
+| 0x00 | JoinRequest    | Request to join a room   |
+| 0x01 | JoinResponseOk | Successful join response |
+| 0x02 | JoinError      | Join failed              |
+| 0x03 | DocUpdate      | Document update data     |
+| 0x06 | UpdateError    | Update failed            |
+| 0x07 | Leave          | Leave a room             |
 
 ### CRDT Types (Magic Bytes)
 
@@ -161,21 +161,21 @@ The client sends `ping` text frames every 30 seconds (configurable). The server 
 ```typescript
 interface WsClientOptions {
   /** WebSocket URL to connect to */
-  url: string | ((peerId: PeerID) => string)
+  url: string | ((peerId: PeerID) => string);
 
   /** Optional: Custom WebSocket implementation (for Node.js) */
-  WebSocket?: typeof WebSocket
+  WebSocket?: typeof WebSocket;
 
   /** Reconnection options */
   reconnect?: {
-    enabled: boolean
-    maxAttempts?: number
-    baseDelay?: number
-    maxDelay?: number
-  }
+    enabled: boolean;
+    maxAttempts?: number;
+    baseDelay?: number;
+    maxDelay?: number;
+  };
 
   /** Keepalive interval in ms (default: 30000) */
-  keepaliveInterval?: number
+  keepaliveInterval?: number;
 }
 ```
 
@@ -184,22 +184,22 @@ interface WsClientOptions {
 ```typescript
 class WsServerNetworkAdapter {
   /** Handle a new WebSocket connection */
-  handleConnection(options: WsConnectionOptions): WsConnectionResult
+  handleConnection(options: WsConnectionOptions): WsConnectionResult;
 
   /** Get an active connection by peer ID */
-  getConnection(peerId: PeerID): WsConnection | undefined
+  getConnection(peerId: PeerID): WsConnection | undefined;
 
   /** Get all active connections */
-  getAllConnections(): WsConnection[]
+  getAllConnections(): WsConnection[];
 
   /** Check if a peer is connected */
-  isConnected(peerId: PeerID): boolean
+  isConnected(peerId: PeerID): boolean;
 
   /** Broadcast a message to all connected peers */
-  broadcast(msg: ChannelMsg): void
+  broadcast(msg: ChannelMsg): void;
 
   /** Number of connected peers */
-  readonly connectionCount: number
+  readonly connectionCount: number;
 }
 ```
 
@@ -209,12 +209,12 @@ To integrate with any WebSocket library, implement this interface:
 
 ```typescript
 interface WsSocket {
-  send(data: Uint8Array | string): void
-  close(code?: number, reason?: string): void
-  onMessage(handler: (data: Uint8Array | string) => void): void
-  onClose(handler: (code: number, reason: string) => void): void
-  onError(handler: (error: Error) => void): void
-  readonly readyState: "connecting" | "open" | "closing" | "closed"
+  send(data: Uint8Array | string): void;
+  close(code?: number, reason?: string): void;
+  onMessage(handler: (data: Uint8Array | string) => void): void;
+  onClose(handler: (code: number, reason: string) => void): void;
+  onError(handler: (error: Error) => void): void;
+  readonly readyState: "connecting" | "open" | "closing" | "closed";
 }
 ```
 

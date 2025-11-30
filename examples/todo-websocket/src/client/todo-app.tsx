@@ -60,7 +60,9 @@ function TodoApp() {
     <div className="app-container">
       <header>
         <h1>Loro Todo (WebSocket)</h1>
-        <div className={`connection-status ${handle ? "status-ready" : "status-initializing"}`}>
+        <div
+          className={`connection-status ${handle ? "status-ready" : "status-initializing"}`}
+        >
           {handle ? "Connected" : "Initializing..."}
         </div>
       </header>
