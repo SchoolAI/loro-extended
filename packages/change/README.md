@@ -318,18 +318,23 @@ const schema = Shape.doc({
 - `Shape.text()` - Collaborative text editing
 - `Shape.counter()` - Collaborative increment/decrement counters
 - `Shape.list(itemSchema)` - Collaborative ordered lists
-- `Shape.movableList(itemSchema)` - Collaborative Reorderable lists
-- `Shape.map(shape)` - Collaborative key-value maps
+- `Shape.movableList(itemSchema)` - Collaborative reorderable lists
+- `Shape.map(shape)` - Collaborative key-value maps with fixed keys
+- `Shape.record(valueSchema)` - Collaborative key-value maps with dynamic string keys
 - `Shape.tree(shape)` - Collaborative hierarchical tree structures (Note: incomplete implementation)
 
 #### Value Types
 
-- `Shape.plain.string()` - String values
+- `Shape.plain.string()` - String values (optionally with literal union types)
 - `Shape.plain.number()` - Number values
 - `Shape.plain.boolean()` - Boolean values
 - `Shape.plain.null()` - Null values
-- `Shape.plain.object(shape)` - Object values
+- `Shape.plain.undefined()` - Undefined values
+- `Shape.plain.uint8Array()` - Binary data values
+- `Shape.plain.object(shape)` - Object values with fixed keys
+- `Shape.plain.record(valueShape)` - Object values with dynamic string keys
 - `Shape.plain.array(itemShape)` - Array values
+- `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
 
 ### TypedDoc Methods
 
@@ -404,20 +409,20 @@ Lists support familiar JavaScript array methods for filtering and finding items:
 
 ```typescript
 // Find items (returns mutable draft objects)
-const foundItem = draft.todos.find(todo => todo.completed);
-const foundIndex = draft.todos.findIndex(todo => todo.id === "123");
+const foundItem = draft.todos.find((todo) => todo.completed);
+const foundIndex = draft.todos.findIndex((todo) => todo.id === "123");
 
 // Filter items (returns array of mutable draft objects)
-const completedTodos = draft.todos.filter(todo => todo.completed);
-const activeTodos = draft.todos.filter(todo => !todo.completed);
+const completedTodos = draft.todos.filter((todo) => todo.completed);
+const activeTodos = draft.todos.filter((todo) => !todo.completed);
 
 // Transform items (returns plain array, not mutable)
-const todoTexts = draft.todos.map(todo => todo.text);
-const todoIds = draft.todos.map(todo => todo.id);
+const todoTexts = draft.todos.map((todo) => todo.text);
+const todoIds = draft.todos.map((todo) => todo.id);
 
 // Check conditions
-const hasCompleted = draft.todos.some(todo => todo.completed);
-const allCompleted = draft.todos.every(todo => todo.completed);
+const hasCompleted = draft.todos.some((todo) => todo.completed);
+const allCompleted = draft.todos.every((todo) => todo.completed);
 
 // Iterate over items
 draft.todos.forEach((todo, index) => {
@@ -430,15 +435,15 @@ draft.todos.forEach((todo, index) => {
 ```typescript
 doc.change((draft) => {
   // Find and mutate pattern - very common!
-  const todo = draft.todos.find(t => t.id === "123");
+  const todo = draft.todos.find((t) => t.id === "123");
   if (todo) {
     todo.completed = true; // ✅ This mutation will persist!
     todo.text = "Updated text"; // ✅ This too!
   }
 
   // Filter and modify multiple items
-  const activeTodos = draft.todos.filter(t => !t.completed);
-  activeTodos.forEach(todo => {
+  const activeTodos = draft.todos.filter((t) => !t.completed);
+  activeTodos.forEach((todo) => {
     todo.priority = "high"; // ✅ All mutations persist!
   });
 });

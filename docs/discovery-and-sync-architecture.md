@@ -7,11 +7,13 @@ This document describes the architectural design for document discovery and sync
 ## Core Principles
 
 1. **Separation of Concerns**
+
+   - `establish-request/response` = Connection setup only
    - `directory-request/response` = Discovery mechanism
    - `sync-request/response` = Data transfer mechanism
-   - `establish-request/response` = Connection setup only
 
 2. **Privacy by Design**
+
    - `canReveal` controls what documents are discoverable
    - `canUpdate` controls what data can be transferred
    - Rules are checked at every decision point
@@ -44,6 +46,7 @@ Client                                    Server
 ```
 
 **Key Points:**
+
 - Client discovers documents via directory-request
 - Server filters response using `canReveal` rule
 - Client requests discovered documents with empty versions
@@ -72,6 +75,7 @@ Peer A                                    Peer B (or Storage)
 ```
 
 **Key Points:**
+
 - New documents trigger directory-response as an **announcement**
 - Announcement sent to all channels where `canReveal=true` and peer awareness is "unknown"
 - Peer decides whether to request the document
@@ -93,6 +97,7 @@ Peer A                                    Peer B
 ```
 
 **Key Points:**
+
 - If peer has explicitly requested the document (via sync-request), send updates directly
 - Tracked via `PeerDocumentAwareness` state (awareness = "has-doc")
 - Enables real-time collaboration after initial sync
@@ -120,6 +125,7 @@ Peer A                                    Peer B
 ```
 
 **Key Points:**
+
 - Both sides send directory-request after establishment
 - Both sides sync their own documents immediately
 - Discovery and sync happen in parallel
@@ -135,10 +141,10 @@ The `sync-request` message includes an optional `bidirectional` flag:
 
 ```typescript
 type ChannelMsgSyncRequest = {
-  type: "channel/sync-request"
-  docs: { docId: DocId, requesterDocVersion: VersionVector }[]
-  bidirectional?: boolean // Default: true
-}
+  type: "channel/sync-request";
+  docs: { docId: DocId; requesterDocVersion: VersionVector }[];
+  bidirectional?: boolean; // Default: true
+};
 ```
 
 ### Protocol Flow
@@ -164,6 +170,7 @@ Peer A                                    Peer B
 ```
 
 This ensures that:
+
 - Subscriptions are established in both directions.
 - Both peers have the latest version of the document.
 - No infinite loops occur.
@@ -174,10 +181,10 @@ The system tracks what each peer knows about documents using `PeerDocumentAwaren
 
 ```typescript
 type PeerDocumentAwareness = {
-  awareness: "unknown" | "has-doc" | "no-doc"
-  lastKnownVersion?: VersionVector
-  lastUpdated: Date
-}
+  awareness: "unknown" | "has-doc" | "no-doc";
+  lastKnownVersion?: VersionVector;
+  lastUpdated: Date;
+};
 ```
 
 ### Awareness States
@@ -185,11 +192,9 @@ type PeerDocumentAwareness = {
 - **`"unknown"`**: We don't know if the peer has this document
   - Initial state for all documents
   - Triggers directory-response announcement on local changes
-  
 - **`"has-doc"`**: Peer has explicitly requested this document
   - Set when peer sends sync-request
   - Triggers sync-response on local changes (real-time updates)
-  
 - **`"no-doc"`**: Peer explicitly doesn't have this document
   - Set when peer responds with "unavailable"
   - No messages sent for this document
@@ -204,6 +209,7 @@ The architecture is fundamentally **pull-based**:
 4. **Updates**: Future changes sent to peers who requested
 
 This model:
+
 - Respects peer autonomy (peers choose what to sync)
 - Saves bandwidth (no unsolicited data)
 - Works uniformly for all channel types
@@ -212,6 +218,7 @@ This model:
 ### Storage Adapters as Eager Peers
 
 Storage adapters are simply peers that:
+
 - Request all documents they're announced (via directory-response)
 - Immediately send sync-request for new documents
 - Save all sync-response data they receive
@@ -225,20 +232,22 @@ The synchronizer doesn't treat storage specially - storage adapters implement "e
 Controls **discovery** - whether a peer should know a document exists.
 
 **Use Cases:**
+
 - Storage adapters: Always return `true` (storage sees everything)
 - Network peers: Check document ownership/permissions
 - Multi-tenant: Filter by user/tenant ID
 
 **Example:**
+
 ```typescript
 canReveal: (context) => {
   // Storage always sees everything
-  if (context.channelKind === "storage") return true
-  
+  if (context.channelKind === "storage") return true;
+
   // Network peers only see their own documents
-  const userId = extractUserIdFromPeer(context.peerName)
-  return context.docId.startsWith(`user-${userId}-`)
-}
+  const userId = extractUserIdFromPeer(context.peerName);
+  return context.docId.startsWith(`user-${userId}-`);
+};
 ```
 
 ### canUpdate(context): boolean
@@ -246,19 +255,21 @@ canReveal: (context) => {
 Controls **data transfer** - whether to accept sync data from a peer.
 
 **Use Cases:**
+
 - Read-only peers: Return `false` for certain documents
 - Write permissions: Check user roles
 - Validation: Verify document state before accepting
 
 **Example:**
+
 ```typescript
 canUpdate: (context) => {
   // Storage always accepts updates
-  if (context.channelKind === "storage") return true
-  
+  if (context.channelKind === "storage") return true;
+
   // Check write permissions
-  return hasWritePermission(context.peerName, context.docId)
-}
+  return hasWritePermission(context.peerName, context.docId);
+};
 ```
 
 ## Implementation Details
@@ -266,6 +277,7 @@ canUpdate: (context) => {
 ### Establishment Handshake
 
 **Server Side (`establish-request` handler):**
+
 ```typescript
 case "channel/establish-request": {
   // 1. Establish the channel
@@ -275,10 +287,10 @@ case "channel/establish-request": {
     peerId,
     sendEstablished: (msg: EstablishedMsg) => channel.send(msg),
   })
-  
+
   // 2. Create/update peer state
   ensurePeerState(model, channelMessage.identity, channel.channelId)
-  
+
   // 3. Send establish-response ONLY (no sync-request)
   return {
     type: "cmd/send-establishment-message",
@@ -294,12 +306,13 @@ case "channel/establish-request": {
 ```
 
 **Client Side (`establish-response` handler):**
+
 ```typescript
 case "channel/establish-response": {
   // 1. Establish the channel
   const peerId = channelMessage.identity.peerId
   Object.assign(channel, { type: "established" as const, peerId, ... })
-  
+
   // 2. Set wantsUpdates for existing documents (based on canReveal)
   for (const docState of model.documents.values()) {
     const context = getRuleContext({ channel, docState, model })
@@ -307,7 +320,7 @@ case "channel/establish-response": {
       setWantsUpdates(docState, channel.channelId, true)
     }
   }
-  
+
   // 3. Request directory to discover peer's documents
   const commands: Command[] = [{
     type: "cmd/send-message",
@@ -316,14 +329,14 @@ case "channel/establish-response": {
       message: { type: "channel/directory-request" },
     },
   }]
-  
+
   // 4. Sync our own documents (if any)
   if (model.documents.size > 0) {
     const docs = Array.from(model.documents.values()).map(({ doc, docId }) => ({
       docId,
       requesterDocVersion: doc.version(),
     }))
-    
+
     commands.push({
       type: "cmd/send-message",
       envelope: {
@@ -332,7 +345,7 @@ case "channel/establish-response": {
       },
     })
   }
-  
+
   return batchAsNeeded(...commands)
 }
 ```
@@ -340,6 +353,7 @@ case "channel/establish-response": {
 ### Directory Discovery
 
 **Request Handler (`directory-request`):**
+
 ```typescript
 case "channel/directory-request": {
   // Filter documents based on canReveal
@@ -349,10 +363,10 @@ case "channel/directory-request": {
       docState: model.documents.get(docId),
       model,
     })
-    
+
     return !(context instanceof Error) && permissions.canReveal(context)
   })
-  
+
   return {
     type: "cmd/send-message",
     envelope: {
@@ -367,10 +381,11 @@ case "channel/directory-request": {
 ```
 
 **Response Handler (`directory-response`):**
+
 ```typescript
 case "channel/directory-response": {
   const docsToSync: ChannelMsgSyncRequest["docs"] = []
-  
+
   for (const docId of channelMessage.docIds) {
     // Create document state if it doesn't exist
     let docState = model.documents.get(docId)
@@ -378,17 +393,17 @@ case "channel/directory-response": {
       docState = createDocState({ docId })
       model.documents.set(docId, docState)
     }
-    
+
     // Mark that we want updates for this document
     setWantsUpdates(docState, fromChannelId, true)
-    
+
     // Request the document data with empty version (for snapshot)
     docsToSync.push({
       docId,
       requesterDocVersion: docState.doc.version(), // Empty for new docs
     })
   }
-  
+
   // Send sync-request to load the actual document data
   if (docsToSync.length > 0) {
     return {
@@ -405,13 +420,14 @@ case "channel/directory-response": {
 ### Sync Data Transfer
 
 **Request Handler (`sync-request`):**
+
 ```typescript
 case "channel/sync-request": {
   const commands: Command[] = []
-  
+
   for (const { docId, requesterDocVersion } of channelMessage.docs) {
     const docState = model.documents.get(docId)
-    
+
     if (docState) {
       // Send sync-response with appropriate data
       commands.push({
@@ -420,21 +436,22 @@ case "channel/sync-request": {
         docId,
         requesterDocVersion, // Used to determine snapshot vs update
       })
-      
+
       // Peer is requesting this doc, so they want updates
       setWantsUpdates(docState, fromChannelId, true)
     }
   }
-  
+
   return batchAsNeeded(...commands)
 }
 ```
 
 **Response Handler (`sync-response`):**
+
 ```typescript
 case "channel/sync-response": {
   const docState = model.documents.get(channelMessage.docId)
-  
+
   switch (channelMessage.transmission.type) {
     case "snapshot":
     case "update": {
@@ -446,12 +463,12 @@ case "channel/sync-response": {
       }
       break
     }
-    
+
     case "up-to-date": {
       // Document is already up to date
       break
     }
-    
+
     case "unavailable": {
       // Peer doesn't have the document
       break
@@ -466,11 +483,9 @@ The `requesterDocVersion` in sync-request has specific semantics:
 
 - **Empty version** (`new LoroDoc().version()`): "I have nothing, send me everything"
   - Server responds with `type: "snapshot"` (full document)
-  
 - **Non-empty version**: "I have this version, send me updates"
   - Server responds with `type: "update"` (delta from that version)
   - Or `type: "up-to-date"` if no changes
-  
 - **Version comparison**: Uses Loro's version vector comparison
   - `compare() === 0`: Versions are equal (up-to-date)
   - `compare() === 1`: Our version is ahead (send update)
@@ -482,29 +497,31 @@ The `requesterDocVersion` in sync-request has specific semantics:
 ### Scenario: Multi-Tenant Server
 
 **Setup:**
+
 ```typescript
 const permissions = {
   canReveal: (context) => {
     // Storage sees everything for persistence
-    if (context.channelKind === "storage") return true
-    
+    if (context.channelKind === "storage") return true;
+
     // Network peers only see their tenant's documents
-    const tenantId = extractTenantId(context.peerName)
-    return context.docId.startsWith(`tenant-${tenantId}-`)
+    const tenantId = extractTenantId(context.peerName);
+    return context.docId.startsWith(`tenant-${tenantId}-`);
   },
-  
+
   canUpdate: (context) => {
     // Storage accepts all updates
-    if (context.channelKind === "storage") return true
-    
+    if (context.channelKind === "storage") return true;
+
     // Network peers can only update their tenant's documents
-    const tenantId = extractTenantId(context.peerName)
-    return context.docId.startsWith(`tenant-${tenantId}-`)
-  }
-}
+    const tenantId = extractTenantId(context.peerName);
+    return context.docId.startsWith(`tenant-${tenantId}-`);
+  },
+};
 ```
 
 **Flow:**
+
 1. Tenant A creates document `tenant-A-doc1`
 2. System sends directory-response to all channels where `canReveal=true`
    - Storage receives announcement (canReveal=true for storage)
@@ -515,6 +532,7 @@ const permissions = {
 5. Both receive sync-response with document data
 
 **Result:**
+
 - Complete tenant isolation at the protocol level
 - Storage persists all documents
 - Each tenant only discovers and syncs their own documents
@@ -522,21 +540,23 @@ const permissions = {
 ### Scenario: Read-Only Replicas
 
 **Setup:**
+
 ```typescript
 const permissions = {
   canReveal: (context) => {
     // All peers can discover all documents
-    return true
+    return true;
   },
-  
+
   canUpdate: (context) => {
     // Only storage accepts updates (read-only replicas)
-    return context.channelKind === "storage"
-  }
-}
+    return context.channelKind === "storage";
+  },
+};
 ```
 
 **Flow:**
+
 1. Primary creates/modifies document
 2. System sends directory-response to all channels (canReveal=true for all)
 3. Storage sends sync-request → receives sync-response → persists
@@ -544,6 +564,7 @@ const permissions = {
 5. If replica tries to send updates, they're rejected by `canUpdate`
 
 **Result:**
+
 - Replicas can discover and read all documents
 - Replicas cannot write back to the system
 - Only storage adapter accepts updates
@@ -552,35 +573,37 @@ const permissions = {
 ### Scenario: Selective Sync (Mobile Client)
 
 **Setup:**
+
 ```typescript
 const permissions = {
   canReveal: (context) => {
     // Server reveals all documents to all clients
-    return true
+    return true;
   },
-  
+
   canUpdate: (context) => {
     // All peers can update
-    return true
-  }
-}
+    return true;
+  },
+};
 
 // Client-side: Only request documents user is viewing
 class SelectiveSyncClient {
   handleDirectoryResponse(docIds: string[]) {
     // Don't automatically request all documents
     // Only request when user navigates to a document
-    this.availableDocIds = docIds
+    this.availableDocIds = docIds;
   }
-  
+
   onUserNavigate(docId: string) {
     // User opened a document - now request it
-    this.sendSyncRequest([docId])
+    this.sendSyncRequest([docId]);
   }
 }
 ```
 
 **Result:**
+
 - Server announces all documents
 - Client learns what's available but doesn't request everything
 - Client only syncs documents user actually views
@@ -593,16 +616,19 @@ class SelectiveSyncClient {
 The system uses **directory-response as announcement** + **sync-request as subscription** rather than automatically pushing updates. This design:
 
 1. **Respects Peer Autonomy**
+
    - Peers decide what documents they care about
    - No forced synchronization of unwanted data
    - Enables selective sync strategies
 
 2. **Saves Bandwidth**
+
    - Announcements are tiny (just docId)
    - Full data only transferred when requested
    - Particularly important for mobile/constrained devices
 
 3. **Maintains Privacy**
+
    - `canReveal` controls who learns about documents
    - Peers can't access data without explicit request
    - Clear separation between discovery and access
@@ -620,6 +646,7 @@ The `wantsUpdates` flag is **misnamed** - it doesn't mean "peer wants updates", 
 > "We are willing to send updates to this channel based on our `canReveal` rules"
 
 The actual peer interest is tracked via `PeerDocumentAwareness`:
+
 - `awareness === "has-doc"` → Peer has requested, send updates
 - `awareness === "unknown"` → Peer hasn't requested, send announcement
 - `awareness === "no-doc"` → Peer doesn't have it, send nothing
@@ -634,13 +661,14 @@ Future refactoring should rename `wantsUpdates` to `canRevealToChannel` or `shou
 
 **Cause:** Server sending sync-request during `establish-request` handler
 
-**Solution:** Remove sync-request from establishment handshake (lines 473-490 in synchronizer-program.ts)
+**Solution:** Remove sync-request from establishment handshake (see `synchronizer/connection/handle-establish-request.ts`)
 
 ### Problem: Documents Not Syncing
 
 **Symptom:** Client doesn't receive documents after refresh
 
 **Checklist:**
+
 1. Is `canReveal` returning true for the document?
 2. Is the directory-request being sent?
 3. Is the directory-response including the document?
@@ -652,6 +680,7 @@ Future refactoring should rename `wantsUpdates` to `canRevealToChannel` or `shou
 **Symptom:** Peers seeing documents they shouldn't
 
 **Checklist:**
+
 1. Is `canReveal` properly filtering in directory-request handler?
 2. Is `canUpdate` properly filtering in sync-response handler?
 3. Are document IDs properly namespaced?
@@ -700,7 +729,12 @@ For real-time updates, consider explicit subscriptions:
 
 ## References
 
-- [synchronizer-program.ts](../packages/repo/src/synchronizer-program.ts) - Main implementation
+- [synchronizer-program.ts](../packages/repo/src/synchronizer-program.ts) - Main state machine and message/command types
+- [synchronizer/](../packages/repo/src/synchronizer/) - Handler implementations organized by concern:
+  - `connection/` - Channel establishment handlers
+  - `discovery/` - Directory request/response handlers
+  - `sync/` - Document sync handlers
+  - `ephemeral/` - Presence/ephemeral data handlers
 - [rules.ts](../packages/repo/src/rules.ts) - Rules interface
 - [channel.ts](../packages/repo/src/channel.ts) - Channel message types
 - [MESSAGES.md](../packages/repo/MESSAGES.md) - Message protocol documentation

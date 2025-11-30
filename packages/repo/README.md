@@ -18,8 +18,8 @@ pnpm add @loro-extended/repo
 
 ```typescript
 import { Repo } from "@loro-extended/repo";
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
+import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
 
 // Create adapters for network and storage
 const network = new SseClientNetworkAdapter("/api/sync");
@@ -51,15 +51,15 @@ The [`DocHandle`](./src/doc-handle.ts) is an always-available wrapper around a s
 
 - **Always Available**: Documents are immediately accessible without complex loading states
 - **Flexible Readiness**: Applications can define custom readiness criteria using predicates
-- **Simple Mutations**: Use the [`change()`](./src/doc-handle.ts:56) method to modify documents
+- **Simple Mutations**: Use the `change()` method to modify documents
 
 ### Adapters
 
 Adapters provide pluggable storage and network implementations through a unified channel-based architecture:
 
 - **Storage Adapters**: Handle document persistence (e.g., [`InMemoryStorageAdapter`](./src/storage/in-memory-storage-adapter.ts))
-- **Network Adapters**: Handle peer communication (e.g., [`InProcessNetworkAdapter`](./src/network/in-process-network-adapter.ts))
-- **External Adapters**: Available in `@loro-extended/adapters` for SSE, IndexedDB, etc.
+- **Network Adapters**: Handle peer communication (e.g., [`BridgeAdapter`](./src/adapter/bridge-adapter.ts) for testing)
+- **External Adapters**: Available as separate packages (`@loro-extended/adapter-sse`, `@loro-extended/adapter-indexeddb`, etc.)
 
 All adapters implement the [`Adapter`](./src/adapter/adapter.ts) interface and communicate via channels.
 
@@ -122,7 +122,7 @@ handle.change((doc) => {
   doc.getMap("root").set("title", "My Collaborative Document");
   doc.getList("tasks").push({
     description: "Finish the README",
-    completed: true
+    completed: true,
   });
 });
 
@@ -133,7 +133,7 @@ handle.doc.commit(); // Don't forget to commit!
 
 #### Typed Presence
 
-For type safety and default values, you can use the `typedPresence` API:
+For type safety and default values, you can use the `presence()` API:
 
 ```typescript
 import { Shape } from "@loro-extended/change";
@@ -146,7 +146,7 @@ const EmptyPresence = {
   name: "Anonymous",
 };
 
-const presence = handle.typedPresence(PresenceSchema, EmptyPresence);
+const presence = handle.presence(PresenceSchema, EmptyPresence);
 console.log(presence.self.name); // "Anonymous" (default)
 ```
 
@@ -167,8 +167,8 @@ This two-phase process prevents data from being sent before both sides have conf
 
 The repo maintains a sophisticated **peer state model** that tracks the status of every known peer, including which documents they are aware of (`documentAwareness`). This enables a significant performance optimization:
 
--   **New Peer Connections**: When connecting to a new peer for the first time, the repo performs a full discovery process, using a `directory-request` to learn which documents the peer has.
--   **Reconnections**: When reconnecting to a known peer, the repo uses its cached `PeerState`. It sends an optimized sync request containing only the changes made since the last connection, dramatically reducing redundant data transfer.
+- **New Peer Connections**: When connecting to a new peer for the first time, the repo performs a full discovery process, using a `directory-request` to learn which documents the peer has.
+- **Reconnections**: When reconnecting to a known peer, the repo uses its cached `PeerState`. It sends an optimized sync request containing only the changes made since the last connection, dramatically reducing redundant data transfer.
 
 This intelligent state tracking ensures that synchronization is both fast and efficient, especially in environments with intermittent connectivity.
 
@@ -192,7 +192,11 @@ For production use, see `@loro-extended/adapters`:
 Create custom storage adapters by extending the [`StorageAdapter`](./src/storage/storage-adapter.ts) base class. The base class is a powerful tool that handles **all channel protocol and synchronization logic automatically**. Subclasses only need to implement a simple key/value storage interface, with no knowledge of the underlying channel mechanics.
 
 ```typescript
-import { StorageAdapter, type StorageKey, type Chunk } from "@loro-extended/repo";
+import {
+  StorageAdapter,
+  type StorageKey,
+  type Chunk,
+} from "@loro-extended/repo";
 
 class MyStorageAdapter extends StorageAdapter {
   constructor() {
@@ -225,14 +229,14 @@ class MyStorageAdapter extends StorageAdapter {
 
 **Key Features:**
 
--   **Zero Channel Knowledge Required**: The base class transparently handles all channel message boilerplate, including establishment, sync requests, and responses.
--   **Automatic Establishment**: The adapter automatically handles the channel establishment handshake, presenting itself as a stable peer to the repo.
--   **Intelligent Version-Aware Sync**: When the repo requests a document, the base class automatically:
-    1.  Loads all relevant data chunks for the document using `loadRange`.
-    2.  Reconstructs the document's complete history in a temporary `LoroDoc`.
-    3.  Exports only the specific updates the requester needs based on their version vector.
--   **Incremental Storage**: The base class is designed for incremental storage, saving updates with keys like `["docId", "update", "timestamp"]` to support the version-aware sync process.
--   **`wantsUpdates` vs `loading`**: The system distinguishes between a channel's *permission* to receive updates (`wantsUpdates`) and its current *sync status* (`loading`). This allows a storage adapter to persist updates for a document it doesn't have yet, ensuring it can build a complete history over time.
+- **Zero Channel Knowledge Required**: The base class transparently handles all channel message boilerplate, including establishment, sync requests, and responses.
+- **Automatic Establishment**: The adapter automatically handles the channel establishment handshake, presenting itself as a stable peer to the repo.
+- **Intelligent Version-Aware Sync**: When the repo requests a document, the base class automatically:
+  1.  Loads all relevant data chunks for the document using `loadRange`.
+  2.  Reconstructs the document's complete history in a temporary `LoroDoc`.
+  3.  Exports only the specific updates the requester needs based on their version vector.
+- **Incremental Storage**: The base class is designed for incremental storage, saving updates with keys like `["docId", "update", "timestamp"]` to support the version-aware sync process.
+- **`wantsUpdates` vs `loading`**: The system distinguishes between a channel's _permission_ to receive updates (`wantsUpdates`) and its current _sync status_ (`loading`). This allows a storage adapter to persist updates for a document it doesn't have yet, ensuring it can build a complete history over time.
 
 ### Adapter Lifecycle
 
@@ -300,8 +304,8 @@ Here's a complete example of setting up a collaborative todo application:
 
 ```typescript
 import { Repo } from "@loro-extended/repo";
-import { SseClientNetworkAdapter } from "@loro-extended/adapters/network/sse/client";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapters/storage/indexed-db/client";
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
+import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
 
 // Create adapters
 const network = new SseClientNetworkAdapter("/api/sync");
@@ -325,7 +329,8 @@ const doc = todoHandle.doc;
 // Add a new todo using change()
 todoHandle.change((doc) => {
   const todosMap = doc.getMap("root");
-  const todosList = todosMap.get("todos") || todosMap.setContainer("todos", "List");
+  const todosList =
+    todosMap.get("todos") || todosMap.setContainer("todos", "List");
   todosList.push({
     id: crypto.randomUUID(),
     text: "Learn about Loro",
@@ -368,8 +373,8 @@ The Repo package follows a layered architecture:
 
 ### Data Flow
 
-1. **Document Access**: [`Repo.get()`](./src/repo.ts:67) creates a [`DocHandle`](./src/doc-handle.ts) with an immediately available document
-2. **Local Changes**: [`DocHandle.change()`](./src/doc-handle.ts:56) modifies the document and notifies the [`Synchronizer`](./src/synchronizer.ts)
+1. **Document Access**: `Repo.get()` creates a [`DocHandle`](./src/doc-handle.ts) with an immediately available document
+2. **Local Changes**: `DocHandle.change()` modifies the document and notifies the [`Synchronizer`](./src/synchronizer.ts)
 3. **Channel Communication**: [`Synchronizer`](./src/synchronizer.ts) sends messages through channels managed by [`AdapterManager`](./src/adapter/adapter-manager.ts)
 4. **Adapter Routing**: [`AdapterManager`](./src/adapter/adapter-manager.ts) routes messages to appropriate adapters
 5. **Remote Changes**: Adapters receive updates via channels and dispatch to [`Synchronizer`](./src/synchronizer.ts)
@@ -459,10 +464,10 @@ All storage and network operations flow through channels managed by adapters:
 
 The protocol is designed for efficiency and robustness, especially in environments with intermittent connectivity.
 
--   **Establishment Handshake**: A two-phase handshake (`establish-request` / `establish-response`) ensures that both peers have confirmed their identity before any document data is exchanged.
--   **Directory Protocol**: When connecting to a new peer, the repo sends a `directory-request` to discover which documents the peer has. The peer's response is filtered by `canReveal` permissions, ensuring private documents are not exposed. This step is skipped on reconnection to a known peer, thanks to the peer state cache.
--   **Version-Vector Sync**: All synchronization is based on Loro's version vectors. When requesting a document, the repo sends its current version. The recipient uses this to calculate the precise set of updates needed, minimizing data transfer.
--   **Hop Count**: Messages include a `hopCount` to prevent infinite forwarding loops in multi-peer networks.
+- **Establishment Handshake**: A two-phase handshake (`establish-request` / `establish-response`) ensures that both peers have confirmed their identity before any document data is exchanged.
+- **Directory Protocol**: When connecting to a new peer, the repo sends a `directory-request` to discover which documents the peer has. The peer's response is filtered by `canReveal` permissions, ensuring private documents are not exposed. This step is skipped on reconnection to a known peer, thanks to the peer state cache.
+- **Version-Vector Sync**: All synchronization is based on Loro's version vectors. When requesting a document, the repo sends its current version. The recipient uses this to calculate the precise set of updates needed, minimizing data transfer.
+- **Hop Count**: Messages include a `hopsRemaining` counter to prevent infinite forwarding loops in multi-peer networks.
 
 For detailed documentation, see:
 
@@ -474,11 +479,13 @@ For detailed documentation, see:
 ## Development
 
 Run tests:
+
 ```bash
 pnpm --filter @loro-extended/repo -- test
 ```
 
 Run specific test file:
+
 ```bash
 pnpm --filter @loro-extended/repo -- test run src/synchronizer.test.ts
 ```
