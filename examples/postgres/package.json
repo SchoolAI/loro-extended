@@ -1,0 +1,23 @@
+{
+  "name": "@loro-extended/example-postgres",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example using PostgreSQL storage adapter with @loro-extended/repo",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-postgres": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.2"
+  }
+}

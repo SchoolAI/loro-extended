@@ -1,0 +1,78 @@
+import { Pool } from "pg"
+import { Repo } from "@loro-extended/repo"
+import { PostgresStorageAdapter } from "@loro-extended/adapter-postgres/server"
+
+async function main() {
+  console.log("🐘 PostgreSQL Storage Adapter Example\n")
+
+  // Connect to PostgreSQL
+  const pool = new Pool({
+    connectionString: "postgres://loro:loro@localhost:5432/loro_example",
+  })
+
+  console.log("📦 Creating storage adapter...")
+  const storage = new PostgresStorageAdapter({ client: pool })
+
+  console.log("🔧 Creating repo with storage...")
+  const repo = new Repo({
+    peerId: "server-1",
+    storage,
+  })
+
+  // Create and modify a document
+  console.log("\n📝 Creating document...")
+  const handle = repo.create("my-doc")
+  handle.change(doc => {
+    doc.getMap("root").set("message", "Hello from PostgreSQL!")
+    doc.getMap("root").set("timestamp", Date.now())
+  })
+
+  console.log("✅ Document created:", handle.docId)
+  console.log("📄 Content:", JSON.stringify(handle.doc.toJSON(), null, 2))
+
+  // Wait for storage to persist
+  console.log("\n⏳ Waiting for storage to persist...")
+  await new Promise(resolve => setTimeout(resolve, 200))
+
+  // Query the database directly to see stored data
+  console.log("\n🔍 Querying database directly...")
+  const result = await pool.query(
+    "SELECT key, length(data) as size FROM loro_storage",
+  )
+  console.log("📊 Stored chunks:")
+  for (const row of result.rows) {
+    console.log(`   - ${row.key}: ${row.size} bytes`)
+  }
+
+  // Make another change
+  console.log("\n📝 Making another change...")
+  handle.change(doc => {
+    doc.getMap("root").set("updated", true)
+    doc.getMap("root").set("updateTime", Date.now())
+  })
+
+  console.log("📄 Updated content:", JSON.stringify(handle.doc.toJSON(), null, 2))
+
+  // Wait for storage to persist
+  await new Promise(resolve => setTimeout(resolve, 200))
+
+  // Query again to see new chunks
+  console.log("\n🔍 Querying database again...")
+  const result2 = await pool.query(
+    "SELECT key, length(data) as size FROM loro_storage ORDER BY key",
+  )
+  console.log("📊 All stored chunks:")
+  for (const row of result2.rows) {
+    console.log(`   - ${row.key}: ${row.size} bytes`)
+  }
+
+  // Clean up
+  console.log("\n🧹 Cleaning up...")
+  await pool.end()
+  console.log("✅ Done!")
+}
+
+main().catch(error => {
+  console.error("❌ Error:", error)
+  process.exit(1)
+})

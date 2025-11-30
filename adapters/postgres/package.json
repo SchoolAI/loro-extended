@@ -1,0 +1,38 @@
+{
+  "name": "@loro-extended/adapter-postgres",
+  "version": "0.1.0",
+  "description": "PostgreSQL storage adapter for @loro-extended/repo",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^"
+  },
+  "peerDependencies": {
+    "pg": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/pg": "^8.11.6",
+    "pg": "^8.13.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
