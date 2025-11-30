@@ -140,7 +140,12 @@ function translateSyncRequest(
         type: MESSAGE_TYPE.JoinRequest,
         crdtType: "loro" as CrdtType,
         roomId,
-        authPayload: new Uint8Array(0), // Auth handled at connection level
+        // Use authPayload to carry bidirectional flag
+        // [0] = bidirectional: false
+        // [] = bidirectional: true (default)
+        authPayload: msg.bidirectional
+          ? new Uint8Array(0)
+          : new Uint8Array([0]),
         requesterVersion: doc.requesterDocVersion.encode(),
       }
     },
@@ -276,6 +281,13 @@ function translateJoinRequestToChannel(
 
   const requesterDocVersion = VersionVector.decode(msg.requesterVersion)
 
+  // Check authPayload for bidirectional flag
+  // This is a hack to preserve the bidirectional flag through the Loro Protocol
+  // which doesn't natively support it in JoinRequest.
+  // [0] = bidirectional: false
+  // [] = bidirectional: true (default)
+  const bidirectional = msg.authPayload.length === 0 || msg.authPayload[0] !== 0
+
   const channelMsg: ChannelMsgSyncRequest = {
     type: "channel/sync-request",
     docs: [
@@ -284,10 +296,7 @@ function translateJoinRequestToChannel(
         requesterDocVersion,
       },
     ],
-    // Set bidirectional to false because the Loro Protocol handles bidirectional
-    // sync at the protocol level - both sides send JoinRequests independently.
-    // Setting this to true would cause an infinite loop of reciprocal sync-requests.
-    bidirectional: false,
+    bidirectional,
   }
 
   return { docId, channelMsg }

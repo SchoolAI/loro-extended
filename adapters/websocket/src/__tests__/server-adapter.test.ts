@@ -3,7 +3,7 @@ import { LoroDoc } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { WsReadyState, WsSocket } from "../handler/types.js"
 import { MESSAGE_TYPE } from "../protocol/constants.js"
-import { decodeMessage, encodeMessage } from "../protocol/index.js"
+import { encodeMessage } from "../protocol/index.js"
 import { WsServerNetworkAdapter } from "../server-adapter.js"
 
 class MockWsSocket implements WsSocket {
@@ -180,7 +180,7 @@ describe("WsServerNetworkAdapter", () => {
       bidirectional: true,
     }
 
-    connection!.send(msg)
+    connection?.send(msg)
 
     // Should have sent protocol messages
     expect(mockSocket.sentMessages.length).toBeGreaterThan(0)
@@ -224,8 +224,12 @@ describe("WsServerNetworkAdapter", () => {
 
     // Should have triggered onChannelReceive with translated message
     expect(onChannelReceive).toHaveBeenCalled()
-    const call = onChannelReceive.mock.calls[0]
-    expect(call[1].type).toBe("channel/sync-request")
+    // We expect establish-request/response first due to simulateHandshake
+    const calls = onChannelReceive.mock.calls
+    const syncRequest = calls.find(
+      (c: any[]) => c[1].type === "channel/sync-request",
+    )
+    expect(syncRequest).toBeDefined()
   })
 
   it("should handle keepalive ping", async () => {

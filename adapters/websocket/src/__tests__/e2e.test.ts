@@ -1,5 +1,4 @@
 import { Repo, validatePeerId } from "@loro-extended/repo"
-import { LoroDoc } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -10,7 +9,7 @@ describe("WebSocket Adapter E2E", () => {
   let serverAdapter: WsServerNetworkAdapter
   let clientAdapter1: WsClientNetworkAdapter
   let clientAdapter2: WsClientNetworkAdapter
-  let serverRepo: Repo
+  let _serverRepo: Repo
   let clientRepo1: Repo
   let clientRepo2: Repo
   let port: number
@@ -26,7 +25,8 @@ describe("WebSocket Adapter E2E", () => {
     // Setup server adapter
     serverAdapter = new WsServerNetworkAdapter()
     wss.on("connection", (ws, req) => {
-      const url = new URL(req.url!, `http://localhost:${port}`)
+      if (!req.url) throw new Error(`request URL is required`)
+      const url = new URL(req.url, `http://localhost:${port}`)
       const peerId = url.searchParams.get("peerId")
       if (!peerId) {
         throw new Error(`peerId is required`)
@@ -42,7 +42,7 @@ describe("WebSocket Adapter E2E", () => {
     })
 
     // Setup repos
-    serverRepo = new Repo({
+    _serverRepo = new Repo({
       identity: { peerId: "1000", name: "server", type: "service" },
       adapters: [serverAdapter],
     })
@@ -50,6 +50,7 @@ describe("WebSocket Adapter E2E", () => {
     clientAdapter1 = new WsClientNetworkAdapter({
       url: `ws://localhost:${port}?peerId=2000`,
       reconnect: { enabled: false },
+      WebSocket: WebSocket as any,
     })
     clientRepo1 = new Repo({
       identity: { peerId: "2000", name: "client-1", type: "user" },
@@ -59,6 +60,7 @@ describe("WebSocket Adapter E2E", () => {
     clientAdapter2 = new WsClientNetworkAdapter({
       url: `ws://localhost:${port}?peerId=3000`,
       reconnect: { enabled: false },
+      WebSocket: WebSocket as any,
     })
     clientRepo2 = new Repo({
       identity: { peerId: "3000", name: "client-2", type: "user" },
@@ -98,7 +100,16 @@ describe("WebSocket Adapter E2E", () => {
     const handle2 = clientRepo2.get(docId)
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("Sync timeout")), 5000)
-      handle2.doc.subscribe((event: any) => {
+
+      // Check if already synced
+      const text = handle2.doc.getText("text")
+      if (text && text.toString() === "Hello") {
+        clearTimeout(timeout)
+        resolve()
+        return
+      }
+
+      handle2.doc.subscribe((_event: any) => {
         const text = handle2.doc.getText("text")
         if (text && text.toString() === "Hello") {
           clearTimeout(timeout)

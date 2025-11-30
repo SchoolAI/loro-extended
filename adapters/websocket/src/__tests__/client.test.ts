@@ -34,7 +34,7 @@ class MockWebSocket {
     }
   }
 
-  send(data: any) {
+  send(_data: any) {
     // Mock send
   }
 
@@ -217,8 +217,12 @@ describe("WsClientNetworkAdapter", () => {
     socket.simulateMessage(encoded.buffer)
 
     expect(onChannelReceive).toHaveBeenCalled()
-    const call = onChannelReceive.mock.calls[0]
-    expect(call[1].type).toBe("channel/sync-response")
+    // We expect establish-response first due to simulateHandshake
+    const calls = onChannelReceive.mock.calls
+    const syncResponse = calls.find(
+      (c: any[]) => c[1].type === "channel/sync-response",
+    )
+    expect(syncResponse).toBeDefined()
   })
 
   it("should reconnect on close if enabled", async () => {

@@ -263,8 +263,8 @@ describe("fromProtocolMessage", () => {
     const result = fromProtocolMessage(msg, ctx)
 
     expect(result).not.toBeNull()
-    expect(result!.docId).toBe("room-1")
-    expect(result!.channelMsg.type).toBe("channel/sync-request")
+    expect(result?.docId).toBe("room-1")
+    expect(result?.channelMsg.type).toBe("channel/sync-request")
   })
 
   it("translates JoinResponseOk to sync-response", () => {
@@ -283,8 +283,8 @@ describe("fromProtocolMessage", () => {
     const result = fromProtocolMessage(msg, ctx)
 
     expect(result).not.toBeNull()
-    expect(result!.docId).toBe("room-1")
-    expect(result!.channelMsg.type).toBe("channel/sync-response")
+    expect(result?.docId).toBe("room-1")
+    expect(result?.channelMsg.type).toBe("channel/sync-response")
   })
 
   it("translates DocUpdate to sync-response", () => {
@@ -300,9 +300,9 @@ describe("fromProtocolMessage", () => {
     const result = fromProtocolMessage(msg, ctx)
 
     expect(result).not.toBeNull()
-    expect(result!.docId).toBe("room-1")
-    expect(result!.channelMsg.type).toBe("channel/sync-response")
-    const syncResponse = result!.channelMsg as ChannelMsgSyncResponse
+    expect(result?.docId).toBe("room-1")
+    expect(result?.channelMsg.type).toBe("channel/sync-response")
+    const syncResponse = result?.channelMsg as ChannelMsgSyncResponse
     expect(syncResponse.transmission.type).toBe("update")
   })
 
@@ -319,8 +319,8 @@ describe("fromProtocolMessage", () => {
     const result = fromProtocolMessage(msg, ctx)
 
     expect(result).not.toBeNull()
-    expect(result!.channelMsg.type).toBe("channel/ephemeral")
-    const ephemeral = result!.channelMsg as ChannelMsgEphemeral
+    expect(result?.channelMsg.type).toBe("channel/ephemeral")
+    const ephemeral = result?.channelMsg as ChannelMsgEphemeral
     expect(ephemeral.data).toEqual(new Uint8Array([1, 2, 3]))
   })
 
@@ -429,7 +429,7 @@ describe("translateJoinResponse", () => {
     expect(result.establishResponse.type).toBe("channel/establish-response")
     expect(result.establishResponse.identity).toEqual(identity)
     expect(result.syncResponse).toBeDefined()
-    expect(result.syncResponse!.type).toBe("channel/sync-response")
-    expect(result.syncResponse!.docId).toBe("room-1")
+    expect(result.syncResponse?.type).toBe("channel/sync-response")
+    expect(result.syncResponse?.docId).toBe("room-1")
   })
 })
