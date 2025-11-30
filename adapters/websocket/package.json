@@ -1,0 +1,44 @@
+{
+  "name": "@loro-extended/adapter-websocket",
+  "version": "0.1.0",
+  "description": "WebSocket network adapter implementing the Loro Syncing Protocol for @loro-extended/repo",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./protocol": {
+      "import": "./dist/protocol/index.js",
+      "types": "./dist/protocol/index.d.ts"
+    },
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "biome check --write .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@loro-extended/repo": "workspace:^",
+    "loro-crdt": "^1.10.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/ws": "^8.5.13",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "ws": "^8.18.0"
+  }
+}
