@@ -1,3 +1,7 @@
+import { useState } from "react"
+import type { DeviceSelectionProps } from "../use-local-media"
+import { AudioLevelMeter } from "./audio-level-meter"
+import { DeviceSelectorGroup } from "./device-selector"
 import { CameraIcon, MicIcon } from "./icons"
 import { VideoBubble } from "./video-bubble"
 
@@ -13,6 +17,10 @@ export type PreJoinScreenProps = {
   onRequestMedia: () => void
   onJoin: () => void
   canJoin: boolean
+  /** Device selection state and callbacks */
+  deviceSelection: DeviceSelectionProps
+  /** Audio level from 0-100 */
+  audioLevel: number
 }
 
 export function PreJoinScreen({
@@ -27,7 +35,11 @@ export function PreJoinScreen({
   onRequestMedia,
   onJoin,
   canJoin,
+  deviceSelection,
+  audioLevel,
 }: PreJoinScreenProps) {
+  const [showSettings, setShowSettings] = useState(false)
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Ready to join?</h2>
@@ -42,6 +54,11 @@ export function PreJoinScreen({
           hasAudio={hasAudio}
           hasVideo={hasVideo}
         />
+      </div>
+
+      {/* Audio level indicator */}
+      <div className="w-full max-w-xs">
+        <AudioLevelMeter level={audioLevel} isActive={hasAudio} />
       </div>
 
       {/* Status message area - fixed height to prevent layout shift */}
@@ -66,7 +83,7 @@ export function PreJoinScreen({
       </div>
 
       {/* Media controls */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 items-center">
         <button
           type="button"
           onClick={onToggleAudio}
@@ -91,7 +108,43 @@ export function PreJoinScreen({
         >
           <CameraIcon disabled={!hasVideo} />
         </button>
+
+        {/* Settings toggle button */}
+        <button
+          type="button"
+          onClick={() => setShowSettings(!showSettings)}
+          className={`p-3 rounded-full transition-colors ${
+            showSettings
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+          }`}
+          title="Device settings"
+        >
+          <SettingsIcon />
+        </button>
       </div>
+
+      {/* Device settings panel */}
+      {showSettings && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-lg">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            Device Settings
+          </h3>
+          <DeviceSelectorGroup
+            audioInputs={deviceSelection.audioInputs}
+            audioOutputs={deviceSelection.audioOutputs}
+            videoInputs={deviceSelection.videoInputs}
+            selectedAudioInput={deviceSelection.selectedAudioInput}
+            selectedAudioOutput={deviceSelection.selectedAudioOutput}
+            selectedVideoInput={deviceSelection.selectedVideoInput}
+            onAudioInputChange={deviceSelection.onAudioInputChange}
+            onAudioOutputChange={deviceSelection.onAudioOutputChange}
+            onVideoInputChange={deviceSelection.onVideoInputChange}
+            isAudioOutputSupported={deviceSelection.isAudioOutputSupported}
+            disabled={mediaLoading}
+          />
+        </div>
+      )}
 
       {/* Join button */}
       <button
@@ -107,5 +160,22 @@ export function PreJoinScreen({
         Share this link with others to invite them
       </p>
     </div>
+  )
+}
+
+/**
+ * Settings/gear icon
+ */
+function SettingsIcon({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <title>Settings</title>
+      <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+    </svg>
   )
 }

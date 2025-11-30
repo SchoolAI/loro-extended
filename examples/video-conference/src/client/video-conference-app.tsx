@@ -84,6 +84,8 @@ export default function VideoConferenceApp({
     toggleAudio,
     toggleVideo,
     requestMedia,
+    deviceSelection,
+    audioLevel,
   } = useLocalMedia(true, true)
 
   // Get participant peer IDs from the document
@@ -235,6 +237,8 @@ export default function VideoConferenceApp({
               onRequestMedia={requestMedia}
               onJoin={joinRoom}
               canJoin={!!handle && isMediaReady}
+              deviceSelection={deviceSelection}
+              audioLevel={audioLevel}
             />
           )}
 

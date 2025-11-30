@@ -1,8 +1,12 @@
+export type { UseAudioLevelReturn } from "./use-audio-level"
+export { useAudioLevel } from "./use-audio-level"
 export type {
   ParticipantConnectionStatus,
   UseConnectionStatusReturn,
 } from "./use-connection-status"
 export { useConnectionStatus } from "./use-connection-status"
+export type { MediaDevices, UseMediaDevicesReturn } from "./use-media-devices"
+export { useMediaDevices } from "./use-media-devices"
 export { useParticipantCleanup } from "./use-participant-cleanup"
 export type {
   ConnectionState,

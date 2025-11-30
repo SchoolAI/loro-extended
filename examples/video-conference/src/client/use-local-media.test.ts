@@ -4,31 +4,85 @@ import { useLocalMedia } from "./use-local-media"
 
 describe("useLocalMedia", () => {
   // Mock MediaStream and tracks
-  let mockAudioTrack: { enabled: boolean; stop: ReturnType<typeof vi.fn> }
-  let mockVideoTrack: { enabled: boolean; stop: ReturnType<typeof vi.fn> }
+  type MockTrack = {
+    enabled: boolean
+    stop: ReturnType<typeof vi.fn>
+    getSettings: () => { deviceId: string }
+    addEventListener: ReturnType<typeof vi.fn>
+    removeEventListener: ReturnType<typeof vi.fn>
+  }
+  let mockAudioTrack: MockTrack
+  let mockVideoTrack: MockTrack
   let mockStream: {
-    getTracks: () => (typeof mockAudioTrack)[]
-    getAudioTracks: () => (typeof mockAudioTrack)[]
-    getVideoTracks: () => (typeof mockVideoTrack)[]
+    getTracks: () => MockTrack[]
+    getAudioTracks: () => MockTrack[]
+    getVideoTracks: () => MockTrack[]
   }
 
   beforeEach(() => {
-    mockAudioTrack = { enabled: true, stop: vi.fn() }
-    mockVideoTrack = { enabled: true, stop: vi.fn() }
+    mockAudioTrack = {
+      enabled: true,
+      stop: vi.fn(),
+      getSettings: () => ({ deviceId: "mock-audio-device-id" }),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
+    mockVideoTrack = {
+      enabled: true,
+      stop: vi.fn(),
+      getSettings: () => ({ deviceId: "mock-video-device-id" }),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
     mockStream = {
       getTracks: () => [mockAudioTrack, mockVideoTrack],
       getAudioTracks: () => [mockAudioTrack],
       getVideoTracks: () => [mockVideoTrack],
     }
 
-    // Mock getUserMedia
+    // Mock getUserMedia and other mediaDevices methods
     Object.defineProperty(global.navigator, "mediaDevices", {
       value: {
         getUserMedia: vi.fn().mockResolvedValue(mockStream),
+        enumerateDevices: vi.fn().mockResolvedValue([
+          {
+            deviceId: "mock-audio-device-id",
+            kind: "audioinput",
+            label: "Mock Microphone",
+          },
+          {
+            deviceId: "mock-video-device-id",
+            kind: "videoinput",
+            label: "Mock Camera",
+          },
+          {
+            deviceId: "mock-speaker-device-id",
+            kind: "audiooutput",
+            label: "Mock Speaker",
+          },
+        ]),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       },
       writable: true,
       configurable: true,
     })
+
+    // Mock AudioContext for audio level monitoring
+    global.AudioContext = vi.fn().mockImplementation(() => ({
+      createAnalyser: vi.fn().mockReturnValue({
+        fftSize: 256,
+        frequencyBinCount: 128,
+        smoothingTimeConstant: 0.8,
+        getByteFrequencyData: vi.fn(),
+      }),
+      createMediaStreamSource: vi.fn().mockReturnValue({
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      }),
+      close: vi.fn(),
+      state: "running",
+    })) as unknown as typeof AudioContext
   })
 
   afterEach(() => {
@@ -273,16 +327,22 @@ describe("useLocalMedia", () => {
 
   describe("cleanup", () => {
     it("stops all tracks on unmount", async () => {
-      // Create a mock with stop tracking
+      // Create a mock with stop tracking and all required methods
       const audioTrack = {
         enabled: true,
         stop: vi.fn(),
         kind: "audio",
+        getSettings: () => ({ deviceId: "cleanup-audio-device-id" }),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       }
       const videoTrack = {
         enabled: true,
         stop: vi.fn(),
         kind: "video",
+        getSettings: () => ({ deviceId: "cleanup-video-device-id" }),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       }
       const stream = {
         getTracks: () => [audioTrack, videoTrack],
