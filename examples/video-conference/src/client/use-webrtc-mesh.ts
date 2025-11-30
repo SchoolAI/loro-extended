@@ -1,6 +1,6 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import type { PeerID } from "@loro-extended/repo"
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import type { SignalData, SignalingPresence } from "../shared/types"
 import { shouldInitiate } from "../shared/webrtc-protocol"
 import { usePeerManager } from "./hooks/use-peer-manager"
@@ -38,6 +38,13 @@ export function useWebRtcMesh(
   setSignalingPresence: (update: Partial<SignalingPresence>) => void,
   webrtcAdapter: WebRtcDataChannelAdapter,
 ): UseWebRtcMeshReturn {
+  // Generate a unique instance ID for this session (refreshes on reload)
+  // This allows us to ignore stale signals from previous sessions
+  const myInstanceId = useMemo(() => crypto.randomUUID(), [])
+
+  // Track the instance ID of remote peers so we can target signals correctly
+  const remoteInstanceIdsRef = useRef<Map<PeerID, string>>(new Map())
+
   // Track which peers were created from incoming signals (non-initiator)
   // These should NOT be destroyed by the participant lifecycle effect
   const signalCreatedPeersRef = useRef<Set<PeerID>>(new Set())
@@ -48,7 +55,19 @@ export function useWebRtcMesh(
     queueOutgoingSignal,
     clearOutgoingSignals,
     filterNewSignals,
-  } = useSignalChannel()
+  } = useSignalChannel(myInstanceId)
+
+  // Wrapper to attach targetInstanceId to outgoing signals
+  const handleOnSignal = useCallback(
+    (targetPeerId: PeerID, signal: SignalData) => {
+      const targetInstanceId = remoteInstanceIdsRef.current.get(targetPeerId)
+      if (targetInstanceId) {
+        signal.targetInstanceId = targetInstanceId
+      }
+      queueOutgoingSignal(targetPeerId, signal)
+    },
+    [queueOutgoingSignal],
+  )
 
   // Peer manager for connection lifecycle
   const {
@@ -61,7 +80,7 @@ export function useWebRtcMesh(
   } = usePeerManager({
     myPeerId,
     localStream,
-    onSignal: queueOutgoingSignal,
+    onSignal: handleOnSignal,
     webrtcAdapter,
   })
 
@@ -140,6 +159,11 @@ export function useWebRtcMesh(
         continue
       }
 
+      // Store the remote peer's instance ID
+      if (presence.instanceId) {
+        remoteInstanceIdsRef.current.set(peerId as PeerID, presence.instanceId)
+      }
+
       // Check if this peer has signals addressed to us
       const signalsForMe = presence.signals?.[myPeerIdStr]
 
@@ -151,10 +175,13 @@ export function useWebRtcMesh(
 
   // Publish outgoing signals to signaling presence
   useEffect(() => {
-    if (Object.keys(outgoingSignals).length > 0) {
-      setSignalingPresence({ signals: outgoingSignals })
-    }
-  }, [outgoingSignals, setSignalingPresence])
+    // Always publish our instanceId, even if no signals
+    // This allows others to know our current instanceId
+    setSignalingPresence({
+      instanceId: myInstanceId,
+      signals: outgoingSignals,
+    })
+  }, [outgoingSignals, setSignalingPresence, myInstanceId])
 
   // Store destroyPeer in a ref so cleanup can access it without dependency issues
   const destroyPeerRef = useRef(destroyPeer)

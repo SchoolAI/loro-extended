@@ -26,7 +26,7 @@ export type UseSignalChannelReturn = {
  * - Actual peer connections (use usePeerManager)
  * - Presence integration (handled by parent hook)
  */
-export function useSignalChannel(): UseSignalChannelReturn {
+export function useSignalChannel(myInstanceId: string): UseSignalChannelReturn {
   // Outgoing signals to publish via presence
   const [outgoingSignals, setOutgoingSignals] = useState<SignalsMap>({})
 
@@ -60,6 +60,15 @@ export function useSignalChannel(): UseSignalChannelReturn {
       const newSignals: SignalData[] = []
 
       for (const signal of signals) {
+        // 1. Check if signal is intended for this instance
+        // If targetInstanceId is present but doesn't match, ignore it
+        if (
+          signal.targetInstanceId &&
+          signal.targetInstanceId !== myInstanceId
+        ) {
+          continue
+        }
+
         // Create a unique ID for this signal to avoid reprocessing
         const signalId = createSignalId(fromPeerId, signal)
 
@@ -71,7 +80,7 @@ export function useSignalChannel(): UseSignalChannelReturn {
 
       return newSignals
     },
-    [],
+    [myInstanceId],
   )
 
   return {

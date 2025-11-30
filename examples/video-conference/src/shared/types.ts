@@ -43,7 +43,13 @@ export const EmptyRoom = {
 // ============================================================================
 
 // Runtime types (more permissive than schema for actual usage)
-export type SignalData = any
+export type SignalData = {
+  type: "offer" | "answer" | "candidate"
+  sdp?: string
+  candidate?: any
+  targetInstanceId?: string // The instance ID this signal is intended for
+  [key: string]: any
+}
 
 export type SignalsMap = Record<string, SignalData[]>
 
@@ -74,10 +80,12 @@ export const EmptyUserPresence: UserPresence = {
  * to send to that peer.
  */
 export type SignalingPresence = {
+  instanceId: string // Unique ID for this client instance (refreshes on reload)
   signals: SignalsMap
 }
 
 export const EmptySignalingPresence: SignalingPresence = {
+  instanceId: "",
   signals: {},
 }
 
