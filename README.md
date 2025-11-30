@@ -6,6 +6,62 @@
 
 ---
 
+## 📚 Examples
+
+Explore these example applications to see `@loro-extended` in action:
+
+<table>
+<tr>
+<td width="50%">
+
+### [Todo App](./examples/todo)
+
+Real-time collaborative todo list with React and SSE. Demonstrates offline-first architecture with automatic conflict resolution.
+
+<img src="./docs/images/loro-extended-todo.webp" alt="Todo App Screenshot" width="100%">
+
+</td>
+<td width="50%">
+
+### [Chat with AI](./examples/chat)
+
+Collaborative chat with AI streaming. Features reactive server-side AI responses that stream directly into Loro Text containers.
+
+<img src="./docs/images/loro-chat.webp" alt="Chat App Screenshot" width="100%">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### [Video Conference](./examples/video-conference)
+
+WebRTC-based video conferencing with peer-to-peer sync. Demonstrates dual-adapter architecture (SSE + WebRTC) for resilient, low-latency collaboration.
+
+<img src="./docs/images/loro-video-conference.webp" alt="Video Conference Screenshot" width="100%">
+
+</td>
+<td width="50%">
+
+### [Hono Counter](./examples/hono-counter)
+
+A simple counter app using Hono's jsx-dom with Vite. Shows how to integrate `@loro-extended/hono` with the Hono framework.
+
+<img src="./docs/images/loro-hono-counter.webp" alt="Hono Counter Screenshot" width="100%">
+
+</td>
+</tr>
+</table>
+
+**Additional Examples:**
+
+| Example                                           | Description                                                                                                  |
+| :------------------------------------------------ | :----------------------------------------------------------------------------------------------------------- |
+| **[`todo-websocket`](./examples/todo-websocket)** | Same as `todo`, but uses WebSocket instead of SSE for real-time communication.                               |
+| **[`postgres`](./examples/postgres)**             | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database. |
+
+---
+
 ## The "Zero-Plumbing" Philosophy
 
 Whether you are building a web app or a group of cooperating AI agents, managing state synchronization is often the hardest part. You spend half your time writing "plumbing": API endpoints, WebSocket handlers, retry logic, and conflict resolution.
@@ -233,21 +289,6 @@ app.use("/sync", createSseExpressRouter(network));
 
 app.listen(3000);
 ```
-
----
-
-## 📚 Examples
-
-Explore these example applications to see `@loro-extended` in action:
-
-| Example                                               | Description                                                                                                                                             |
-| :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **[`todo`](./examples/todo)**                         | A real-time collaborative todo app using React and SSE. Demonstrates offline-first architecture with automatic conflict resolution.                     |
-| **[`todo-websocket`](./examples/todo-websocket)**     | Same as `todo`, but uses WebSocket instead of SSE for real-time communication.                                                                          |
-| **[`chat`](./examples/chat)**                         | A collaborative chat app with AI streaming. Features reactive server-side AI responses that stream directly into Loro Text containers.                  |
-| **[`video-conference`](./examples/video-conference)** | WebRTC-based video conferencing with peer-to-peer sync. Demonstrates dual-adapter architecture (SSE + WebRTC) for resilient, low-latency collaboration. |
-| **[`hono-counter`](./examples/hono-counter)**         | A simple counter app using Hono's jsx-dom with Vite. Shows how to integrate `@loro-extended/hono` with the Hono framework.                              |
-| **[`postgres`](./examples/postgres)**                 | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database.                                            |
 
 ---
 
