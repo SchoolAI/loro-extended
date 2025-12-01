@@ -1,0 +1,49 @@
+{
+  "name": "example-bumper-cars",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:all": "pnpm build:client && pnpm build:server",
+    "build:client": "vite build",
+    "build:server": "tsc --project tsconfig.node.json",
+    "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx --watch src/server/server.ts",
+    "format": "biome format --write .",
+    "lint": "biome check --write .",
+    "serve:client": "vite preview",
+    "serve:server": "node dist/src/server/server.js",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@logtape/logtape": "^1.1.1",
+    "@loro-extended/adapter-leveldb": "workspace:^",
+    "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/change": "workspace:^",
+    "@loro-extended/react": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "classic-level": "^1.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "nipplejs": "^0.10.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.9",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.20.3",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}
