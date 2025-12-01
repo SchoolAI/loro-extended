@@ -114,25 +114,20 @@ export function handleSyncResponse(
   // Apply the sync transmission
   commands.push(...applySyncTransmission(message, context))
 
-  // IMPORTANT: Re-broadcast our ephemeral data after initial sync
-  //
-  // This handles the case where presence was set BEFORE sync completed.
-  // When presence is set before any channels are established, the broadcast
-  // goes to 0 peers. Now that sync is complete, we re-broadcast our ephemeral
-  // data so the peer (and any hub relay) knows about our presence.
-  //
-  // We use hopsRemaining: 1 to allow hub-and-spoke relay to propagate
-  // our presence to other peers.
-  if (
-    message.transmission.type === "snapshot" ||
-    message.transmission.type === "update"
-  ) {
+  // Apply incoming ephemeral data if provided in the sync-response
+  // This contains all known presence data from the responder
+  if (message.ephemeral) {
+    logger.debug(
+      "sync-response: applying ephemeral data from {peerId} for {docId}",
+      {
+        peerId: channel.peerId,
+        docId: message.docId,
+      },
+    )
     commands.push({
-      type: "cmd/broadcast-ephemeral",
+      type: "cmd/apply-ephemeral",
       docId: message.docId,
-      allPeerData: false, // Only send our own data
-      hopsRemaining: 1, // Allow relay through hub
-      toChannelIds: [fromChannelId],
+      data: message.ephemeral,
     })
   }
 

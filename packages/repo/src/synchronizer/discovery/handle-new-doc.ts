@@ -55,10 +55,7 @@
  * @see handle-directory-response.ts - Similar handler for directory-request/response flow
  */
 
-import type {
-  ChannelMsgNewDoc,
-  ChannelMsgSyncRequest,
-} from "../../channel.js"
+import type { ChannelMsgNewDoc, ChannelMsgSyncRequest } from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
@@ -80,9 +77,7 @@ export function handleNewDoc(
 
   const peerState = model.peers.get(channel.peerId)
   if (!peerState) {
-    logger.warn(
-      `rejecting new-doc: peer state not found for ${channel.peerId}`,
-    )
+    logger.warn(`rejecting new-doc: peer state not found for ${channel.peerId}`)
     return
   }
 

@@ -115,24 +115,14 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/batch containing cmd/import-doc-data and cmd/broadcast-ephemeral
+    // Should return cmd/import-doc-data (no longer batched with broadcast-ephemeral)
+    // Ephemeral is now embedded in sync-response, not broadcast separately
     expect(command).toBeDefined()
-    expect(command?.type).toBe("cmd/batch")
+    expect(command?.type).toBe("cmd/import-doc-data")
 
-    if (command?.type === "cmd/batch") {
-      const importCmd = command.commands.find(
-        c => c.type === "cmd/import-doc-data",
-      )
-      expect(importCmd).toBeDefined()
-      if (importCmd?.type === "cmd/import-doc-data") {
-        expect(importCmd.docId).toBe(docId)
-        expect(importCmd.fromPeerId).toBe(peerId)
-      }
-
-      const broadcastCmd = command.commands.find(
-        c => c.type === "cmd/broadcast-ephemeral",
-      )
-      expect(broadcastCmd).toBeDefined()
+    if (command?.type === "cmd/import-doc-data") {
+      expect(command.docId).toBe(docId)
+      expect(command.fromPeerId).toBe(peerId)
     }
   })
 
@@ -281,7 +271,70 @@ describe("handle-sync-response", () => {
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness).toBeUndefined()
 
-    // Should return cmd/batch containing cmd/import-doc-data and cmd/broadcast-ephemeral
+    // Should return cmd/import-doc-data (no longer batched with broadcast-ephemeral)
+    // Ephemeral is now embedded in sync-response, not broadcast separately
+    expect(command).toBeDefined()
+    expect(command?.type).toBe("cmd/import-doc-data")
+
+    if (command?.type === "cmd/import-doc-data") {
+      expect(command.docId).toBe(docId)
+      expect(command.fromPeerId).toBe(peerId)
+      expect(command.data).toEqual(snapshotData)
+    }
+
+    // Document should NOT have imported data yet (import happens via command)
+    const updatedDocState = newModel.documents.get(docId)
+    // The doc still has only local changes
+    expect(updatedDocState?.doc.getText("text").toString()).toBe("local")
+  })
+
+  it("should apply ephemeral data from sync-response", () => {
+    const peerId = "test-peer-id" as PeerID
+    const channel = createEstablishedChannel(peerId)
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel)
+
+    // Add peer state
+    initialModel.peers.set(peerId, {
+      identity: { peerId, name: "test-peer", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set(),
+      lastSeen: new Date(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Add document
+    const docState = createDocState({ docId })
+    initialModel.documents.set(docId, docState)
+
+    // Create valid snapshot data
+    const sourceDoc = new LoroDoc()
+    sourceDoc.getText("test").insert(0, "hello")
+    const snapshotData = sourceDoc.export({ mode: "snapshot" })
+
+    // Create ephemeral data
+    const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-response",
+          docId,
+          transmission: {
+            type: "snapshot",
+            data: snapshotData,
+            version: createVersionVector(),
+          },
+          ephemeral: ephemeralData,
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should return cmd/batch containing cmd/import-doc-data and cmd/apply-ephemeral
     expect(command).toBeDefined()
     expect(command?.type).toBe("cmd/batch")
 
@@ -289,17 +342,67 @@ describe("handle-sync-response", () => {
       const importCmd = command.commands.find(
         c => c.type === "cmd/import-doc-data",
       )
+      const applyEphemeralCmd = command.commands.find(
+        c => c.type === "cmd/apply-ephemeral",
+      )
+
       expect(importCmd).toBeDefined()
-      if (importCmd?.type === "cmd/import-doc-data") {
-        expect(importCmd.docId).toBe(docId)
-        expect(importCmd.fromPeerId).toBe(peerId)
-        expect(importCmd.data).toEqual(snapshotData)
+      expect(applyEphemeralCmd).toBeDefined()
+
+      if (applyEphemeralCmd?.type === "cmd/apply-ephemeral") {
+        expect(applyEphemeralCmd.docId).toBe(docId)
+        expect(Array.from(applyEphemeralCmd.data)).toEqual(
+          Array.from(ephemeralData),
+        )
       }
     }
+  })
 
-    // Document should NOT have imported data yet (import happens via command)
-    const updatedDocState = newModel.documents.get(docId)
-    // The doc still has only local changes
-    expect(updatedDocState?.doc.getText("text").toString()).toBe("local")
+  it("should not include apply-ephemeral when no ephemeral in sync-response", () => {
+    const peerId = "test-peer-id" as PeerID
+    const channel = createEstablishedChannel(peerId)
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel)
+
+    // Add peer state
+    initialModel.peers.set(peerId, {
+      identity: { peerId, name: "test-peer", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set(),
+      lastSeen: new Date(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Add document
+    const docState = createDocState({ docId })
+    initialModel.documents.set(docId, docState)
+
+    // Create valid snapshot data
+    const sourceDoc = new LoroDoc()
+    sourceDoc.getText("test").insert(0, "hello")
+    const snapshotData = sourceDoc.export({ mode: "snapshot" })
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-response",
+          docId,
+          transmission: {
+            type: "snapshot",
+            data: snapshotData,
+            version: createVersionVector(),
+          },
+          // No ephemeral field
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should return just cmd/import-doc-data (no batch needed)
+    expect(command).toBeDefined()
+    expect(command?.type).toBe("cmd/import-doc-data")
   })
 })

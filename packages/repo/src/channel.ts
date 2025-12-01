@@ -54,6 +54,8 @@ export type ChannelMsgSyncRequest = {
   docs: {
     docId: DocId
     requesterDocVersion: VersionVector
+    /** Requester's ephemeral state for this doc (presence data) */
+    ephemeral?: Uint8Array
   }[]
   /**
    * Whether the receiver should send a reciprocal sync-request back.
@@ -69,6 +71,8 @@ export type ChannelMsgSyncResponse = {
   type: "channel/sync-response"
   docId: DocId
   transmission: SyncTransmission
+  /** Responder's ephemeral snapshot (all known peers' presence data) */
+  ephemeral?: Uint8Array
 }
 
 export type ChannelMsgUpdate = {

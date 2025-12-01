@@ -368,6 +368,186 @@ describe("Channel JSON Serialization", () => {
       })
     })
 
+    describe("sync messages with ephemeral", () => {
+      it("should serialize sync-request with ephemeral data", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "test")
+
+        const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
+
+        const msg: ChannelMsg = {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId: "doc-1",
+              requesterDocVersion: doc.version(),
+              ephemeral: ephemeralData,
+            },
+          ],
+          bidirectional: false,
+        }
+
+        const json = serializeChannelMsg(msg)
+        expect(json.type).toBe("channel/sync-request")
+        if (json.type === "channel/sync-request") {
+          expect(json.docs).toHaveLength(1)
+          expect(json.docs[0].ephemeral).toBeDefined()
+          expect(typeof json.docs[0].ephemeral).toBe("string")
+        }
+      })
+
+      it("should serialize sync-response with ephemeral data", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "hello")
+        const snapshot = doc.export({ mode: "snapshot" })
+
+        const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
+
+        const msg: ChannelMsg = {
+          type: "channel/sync-response",
+          docId: "doc-1",
+          transmission: {
+            type: "snapshot",
+            data: snapshot,
+            version: doc.version(),
+          },
+          ephemeral: ephemeralData,
+        }
+
+        const json = serializeChannelMsg(msg)
+        expect(json.type).toBe("channel/sync-response")
+        if (json.type === "channel/sync-response") {
+          expect(json.ephemeral).toBeDefined()
+          expect(typeof json.ephemeral).toBe("string")
+        }
+      })
+
+      it("should round-trip sync-request with ephemeral", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "test")
+
+        const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
+
+        const original: ChannelMsg = {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId: "doc-1",
+              requesterDocVersion: doc.version(),
+              ephemeral: ephemeralData,
+            },
+          ],
+          bidirectional: false,
+        }
+
+        const json = serializeChannelMsg(original)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/sync-request")
+        if (restored.type === "channel/sync-request") {
+          expect(restored.docs).toHaveLength(1)
+          expect(restored.docs[0].ephemeral).toBeDefined()
+          if (restored.docs[0].ephemeral) {
+            expect(Array.from(restored.docs[0].ephemeral)).toEqual(
+              Array.from(ephemeralData),
+            )
+          }
+        }
+      })
+
+      it("should round-trip sync-response with ephemeral", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "hello world")
+        const snapshot = doc.export({ mode: "snapshot" })
+
+        const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
+
+        const original: ChannelMsg = {
+          type: "channel/sync-response",
+          docId: "doc-1",
+          transmission: {
+            type: "snapshot",
+            data: snapshot,
+            version: doc.version(),
+          },
+          ephemeral: ephemeralData,
+        }
+
+        const json = serializeChannelMsg(original)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/sync-response")
+        if (restored.type === "channel/sync-response") {
+          expect(restored.ephemeral).toBeDefined()
+          if (restored.ephemeral) {
+            expect(Array.from(restored.ephemeral)).toEqual(
+              Array.from(ephemeralData),
+            )
+          }
+          // Also verify the snapshot still works
+          if (restored.transmission.type === "snapshot") {
+            const newDoc = new LoroDoc()
+            newDoc.import(restored.transmission.data)
+            expect(newDoc.toJSON()).toEqual({ text: "hello world" })
+          }
+        }
+      })
+
+      it("should handle sync-request without ephemeral (backward compatibility)", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "test")
+
+        const original: ChannelMsg = {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId: "doc-1",
+              requesterDocVersion: doc.version(),
+              // No ephemeral field
+            },
+          ],
+          bidirectional: false,
+        }
+
+        const json = serializeChannelMsg(original)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/sync-request")
+        if (restored.type === "channel/sync-request") {
+          expect(restored.docs[0].ephemeral).toBeUndefined()
+        }
+      })
+
+      it("should handle sync-response without ephemeral (backward compatibility)", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "hello")
+
+        const original: ChannelMsg = {
+          type: "channel/sync-response",
+          docId: "doc-1",
+          transmission: {
+            type: "up-to-date",
+            version: doc.version(),
+          },
+          // No ephemeral field
+        }
+
+        const json = serializeChannelMsg(original)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/sync-response")
+        if (restored.type === "channel/sync-response") {
+          expect(restored.ephemeral).toBeUndefined()
+        }
+      })
+    })
+
     describe("directory messages", () => {
       it("should serialize directory-request without docIds", () => {
         const msg: ChannelMsg = {
@@ -416,29 +596,29 @@ describe("Channel JSON Serialization", () => {
           response,
         )
       })
-  
+
       it("should serialize new-doc", () => {
         const msg: ChannelMsg = {
           type: "channel/new-doc",
           docIds: ["doc-1", "doc-2", "doc-3"],
         }
-  
+
         const json = serializeChannelMsg(msg)
         expect(json).toEqual(msg)
       })
-  
+
       it("should round-trip new-doc message", () => {
         const original: ChannelMsg = {
           type: "channel/new-doc",
           docIds: ["doc-1", "doc-2"],
         }
-  
+
         expect(deserializeChannelMsg(serializeChannelMsg(original))).toEqual(
           original,
         )
       })
     })
-  
+
     describe("delete messages", () => {
       it("should serialize delete-request", () => {
         const msg: ChannelMsg = {

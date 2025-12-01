@@ -160,6 +160,19 @@ export type Command =
       docId: DocId
       requesterDocVersion: VersionVector
       toChannelId: ChannelId
+      /** Whether to include ephemeral snapshot in the response */
+      includeEphemeral?: boolean
+    }
+  | {
+      type: "cmd/send-sync-request"
+      toChannelId: ChannelId
+      docs: {
+        docId: DocId
+        requesterDocVersion: VersionVector
+      }[]
+      bidirectional: boolean
+      /** Whether to include ephemeral data for each doc in the request */
+      includeEphemeral?: boolean
     }
 
   // Document operations

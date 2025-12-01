@@ -59,6 +59,7 @@ export type ChannelMsgJSON =
       docs: {
         docId: string
         requesterDocVersion: VersionVectorJSON
+        ephemeral?: BinaryDataJSON
       }[]
       bidirectional: boolean
     }
@@ -66,6 +67,7 @@ export type ChannelMsgJSON =
       type: "channel/sync-response"
       docId: string
       transmission: SyncTransmissionJSON
+      ephemeral?: BinaryDataJSON
     }
   | {
       type: "channel/update"
@@ -156,10 +158,22 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
         docs: msg.docs.map(doc => ({
           docId: doc.docId,
           requesterDocVersion: versionVectorToJSON(doc.requesterDocVersion),
+          ...(doc.ephemeral && { ephemeral: uint8ArrayToJSON(doc.ephemeral) }),
         })),
       }
 
-    case "channel/sync-response":
+    case "channel/sync-response": {
+      const result: ChannelMsgJSON = {
+        type: msg.type,
+        docId: msg.docId,
+        transmission: serializeSyncTransmission(msg.transmission),
+      }
+      if (msg.ephemeral) {
+        result.ephemeral = uint8ArrayToJSON(msg.ephemeral)
+      }
+      return result
+    }
+
     case "channel/update":
       return {
         ...msg,
@@ -220,10 +234,24 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
         docs: json.docs.map(doc => ({
           docId: doc.docId,
           requesterDocVersion: versionVectorFromJSON(doc.requesterDocVersion),
+          ...(doc.ephemeral && {
+            ephemeral: uint8ArrayFromJSON(doc.ephemeral),
+          }),
         })),
       }
 
-    case "channel/sync-response":
+    case "channel/sync-response": {
+      const result: ChannelMsg = {
+        type: json.type,
+        docId: json.docId,
+        transmission: deserializeSyncTransmission(json.transmission),
+      }
+      if (json.ephemeral) {
+        result.ephemeral = uint8ArrayFromJSON(json.ephemeral)
+      }
+      return result
+    }
+
     case "channel/update":
       return {
         ...json,

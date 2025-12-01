@@ -59,6 +59,7 @@ import type { ChannelMsgSyncRequest } from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
+import { getEstablishedChannelsForDoc } from "../../utils/get-established-channels-for-doc.js"
 import {
   addPeerSubscription,
   setPeerDocumentAwareness,
@@ -91,7 +92,7 @@ export function handleSyncRequest(
   const reciprocalDocs: ChannelMsgSyncRequest["docs"] = []
 
   // Process each requested document
-  for (const { docId, requesterDocVersion } of docs) {
+  for (const { docId, requesterDocVersion, ephemeral } of docs) {
     // ALWAYS track subscription and awareness
     // The peer is explicitly telling us they want this document and what version they have
     // This ensures that if we get the document later, we know to send it to them
@@ -147,31 +148,70 @@ export function handleSyncRequest(
       }
     }
 
+    // Apply incoming ephemeral data from the requester if provided
+    if (ephemeral) {
+      logger.debug(
+        "sync-request: applying ephemeral data from {peerId} for {docId}",
+        {
+          peerId: channel.peerId,
+          docId,
+        },
+      )
+      commands.push({
+        type: "cmd/apply-ephemeral",
+        docId,
+        data: ephemeral,
+      })
+
+      // Relay requester's ephemeral to other peers (not back to requester)
+      const otherChannelIds = getEstablishedChannelsForDoc(
+        model.channels,
+        model.peers,
+        docId,
+      ).filter(id => id !== fromChannelId)
+
+      if (otherChannelIds.length > 0) {
+        logger.debug(
+          "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
+          {
+            peerId: channel.peerId,
+            count: otherChannelIds.length,
+            docId,
+          },
+        )
+        commands.push({
+          type: "cmd/send-message",
+          envelope: {
+            toChannelIds: otherChannelIds,
+            message: {
+              type: "channel/ephemeral",
+              docId,
+              hopsRemaining: 0, // Direct relay only
+              data: ephemeral,
+            },
+          },
+        })
+      }
+    }
+
     logger.debug("sending sync-response due to channel/sync-request", {
       docId,
       peerId: channel.peerId,
     })
 
-    // 1. Send sync-response with document data
+    // Send sync-response with document data and ephemeral snapshot
     // The cmd/send-sync-response command will determine whether to send
     // a snapshot (full doc) or update (delta) based on requesterDocVersion
+    // The includeEphemeral flag tells it to include all known ephemeral state
     commands.push({
       type: "cmd/send-sync-response",
       toChannelId: fromChannelId,
       docId,
       requesterDocVersion,
+      includeEphemeral: true,
     })
 
-    // 2. Since peer has requested the doc, also send all our ephemeral (presence) state
-    commands.push({
-      type: "cmd/broadcast-ephemeral",
-      docId,
-      allPeerData: true,
-      hopsRemaining: 0,
-      toChannelIds: [fromChannelId],
-    })
-
-    // 3. Collect docs for reciprocal sync-request
+    // Collect docs for reciprocal sync-request
     // If bidirectional is true, we want to ensure we are also subscribed to this document
     // and have the latest version from the peer.
     if (bidirectional) {

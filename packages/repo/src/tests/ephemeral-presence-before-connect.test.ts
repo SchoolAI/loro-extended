@@ -1,16 +1,19 @@
 /**
- * Test for the bug where presence set before channel establishment is lost.
+ * Tests for presence propagation during connection establishment.
  *
- * Scenario (from real-world logs):
+ * These tests verify that presence data is correctly propagated even when
+ * set immediately after repo creation, before channels are fully established.
+ *
+ * Expected behavior:
  * 1. Client creates Repo with adapter (adapter starts connecting)
  * 2. Client creates document handle and sets presence immediately
- * 3. At this point, channel is not yet established (0 channels)
- * 4. Channel establishment completes shortly after
- * 5. Server should receive client's presence, but doesn't until heartbeat
+ * 3. Channel establishment completes shortly after
+ * 4. Presence is included in the sync-request message
+ * 5. Server receives presence atomically with document sync
+ * 6. Server relays presence to other connected peers
  *
- * The bug: When presence is set before the channel is established,
- * the broadcast goes to 0 channels and the presence is never sent to the server.
- * The fix: When channel establishment completes, broadcast ephemeral data.
+ * This is achieved by embedding ephemeral data in sync-request/sync-response
+ * messages, ensuring atomic delivery of both document and presence state.
  */
 
 import { afterEach, describe, expect, it } from "vitest"
@@ -50,7 +53,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientA = new Repo({
       identity: { name: "clientA", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterType: "clientA-adapter" }),
+        new BridgeAdapter({
+          bridge: bridgeToA,
+          adapterType: "clientA-adapter",
+        }),
       ],
     })
     repos.push(clientA)
@@ -71,7 +77,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientB = new Repo({
       identity: { name: "clientB", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToB, adapterType: "clientB-adapter" }),
+        new BridgeAdapter({
+          bridge: bridgeToB,
+          adapterType: "clientB-adapter",
+        }),
       ],
     })
     repos.push(clientB)
@@ -122,7 +131,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientA = new Repo({
       identity: { name: "clientA", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterType: "clientA-adapter" }),
+        new BridgeAdapter({
+          bridge: bridgeToA,
+          adapterType: "clientA-adapter",
+        }),
       ],
     })
     repos.push(clientA)
@@ -139,7 +151,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientB = new Repo({
       identity: { name: "clientB", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToB, adapterType: "clientB-adapter" }),
+        new BridgeAdapter({
+          bridge: bridgeToB,
+          adapterType: "clientB-adapter",
+        }),
       ],
     })
     repos.push(clientB)

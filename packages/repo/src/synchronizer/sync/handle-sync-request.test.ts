@@ -193,25 +193,13 @@ describe("handle-sync-request", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    // Should be a batch because we always send broadcast-ephemeral now
-    expectCommand(command, "cmd/batch")
+    // With no ephemeral data in the request, we just get a sync-response
+    // (ephemeral is now embedded in sync-response via includeEphemeral flag)
+    expectCommand(command, "cmd/send-sync-response")
 
-    if (command && command.type === "cmd/batch") {
-      // Should contain sync-response and broadcast-ephemeral
-      const syncResponse = command.commands.find(
-        c => c.type === "cmd/send-sync-response",
-      )
-      const broadcastEphemeral = command.commands.find(
-        c => c.type === "cmd/broadcast-ephemeral",
-      )
-      const reciprocalRequest = command.commands.find(
-        c => c.type === "cmd/send-message",
-      )
-
-      expect(syncResponse).toBeDefined()
-      expect(broadcastEphemeral).toBeDefined()
-      // Should NOT contain reciprocal request
-      expect(reciprocalRequest).toBeUndefined()
+    if (command && command.type === "cmd/send-sync-response") {
+      expect(command.docId).toBe(docId)
+      expect(command.includeEphemeral).toBe(true)
     }
   })
 
@@ -239,5 +227,203 @@ describe("handle-sync-request", () => {
     const [_newModel, command] = update(message, initialModel)
 
     expect(command).toBeUndefined()
+  })
+
+  it("should apply incoming ephemeral data from sync-request", () => {
+    const peerId = "test-peer-id" as PeerID
+    const channel = createEstablishedChannel(peerId)
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel)
+
+    // Add peer state
+    initialModel.peers.set(peerId, {
+      identity: { peerId, name: "test-peer", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set(),
+      lastSeen: new Date(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Add document
+    const docState = createDocState({ docId })
+    initialModel.documents.set(docId, docState)
+
+    // Create ephemeral data
+    const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId,
+              requesterDocVersion: createVersionVector(),
+              ephemeral: ephemeralData,
+            },
+          ],
+          bidirectional: false,
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should be a batch containing apply-ephemeral and send-sync-response
+    expectCommand(command, "cmd/batch")
+
+    if (command && command.type === "cmd/batch") {
+      const applyEphemeral = command.commands.find(
+        c => c.type === "cmd/apply-ephemeral",
+      )
+      const syncResponse = command.commands.find(
+        c => c.type === "cmd/send-sync-response",
+      )
+
+      expect(applyEphemeral).toBeDefined()
+      if (applyEphemeral && applyEphemeral.type === "cmd/apply-ephemeral") {
+        expect(applyEphemeral.docId).toBe(docId)
+        expect(Array.from(applyEphemeral.data)).toEqual(
+          Array.from(ephemeralData),
+        )
+      }
+
+      expect(syncResponse).toBeDefined()
+      if (syncResponse && syncResponse.type === "cmd/send-sync-response") {
+        expect(syncResponse.docId).toBe(docId)
+        expect(syncResponse.includeEphemeral).toBe(true)
+      }
+    }
+  })
+
+  it("should relay ephemeral to other peers when received in sync-request", () => {
+    const peerId1 = "peer-1" as PeerID
+    const peerId2 = "peer-2" as PeerID
+    const channel1 = createEstablishedChannel(peerId1, { channelId: 1 })
+    const channel2 = createEstablishedChannel(peerId2, { channelId: 2 })
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel1)
+
+    // Add second channel (with different channelId)
+    initialModel.channels.set(channel2.channelId, channel2)
+
+    // Add peer states - both subscribed to the doc
+    initialModel.peers.set(peerId1, {
+      identity: { peerId: peerId1, name: "peer-1", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set([docId]),
+      lastSeen: new Date(),
+      channels: new Set([channel1.channelId]),
+    })
+    initialModel.peers.set(peerId2, {
+      identity: { peerId: peerId2, name: "peer-2", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set([docId]),
+      lastSeen: new Date(),
+      channels: new Set([channel2.channelId]),
+    })
+
+    // Add document
+    const docState = createDocState({ docId })
+    initialModel.documents.set(docId, docState)
+
+    // Create ephemeral data
+    const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel1.channelId,
+        message: {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId,
+              requesterDocVersion: createVersionVector(),
+              ephemeral: ephemeralData,
+            },
+          ],
+          bidirectional: false,
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should be a batch containing apply-ephemeral, relay message, and send-sync-response
+    expectCommand(command, "cmd/batch")
+
+    if (command && command.type === "cmd/batch") {
+      // Find the relay message (send-message with channel/ephemeral)
+      const relayMessage = command.commands.find(
+        c =>
+          c.type === "cmd/send-message" &&
+          c.envelope.message.type === "channel/ephemeral",
+      )
+
+      expect(relayMessage).toBeDefined()
+      if (relayMessage && relayMessage.type === "cmd/send-message") {
+        // Should relay to peer2, not back to peer1
+        expect(relayMessage.envelope.toChannelIds).not.toContain(
+          channel1.channelId,
+        )
+        expect(relayMessage.envelope.toChannelIds).toContain(channel2.channelId)
+
+        if (relayMessage.envelope.message.type === "channel/ephemeral") {
+          expect(relayMessage.envelope.message.docId).toBe(docId)
+          expect(relayMessage.envelope.message.hopsRemaining).toBe(0)
+        }
+      }
+    }
+  })
+
+  it("should include ephemeral in sync-response via includeEphemeral flag", () => {
+    const peerId = "test-peer-id" as PeerID
+    const channel = createEstablishedChannel(peerId)
+    const docId = "test-doc"
+    const initialModel = createModelWithChannel(channel)
+
+    // Add peer state
+    initialModel.peers.set(peerId, {
+      identity: { peerId, name: "test-peer", type: "user" },
+      documentAwareness: new Map(),
+      subscriptions: new Set(),
+      lastSeen: new Date(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Add document
+    const docState = createDocState({ docId })
+    initialModel.documents.set(docId, docState)
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-request",
+          docs: [
+            {
+              docId,
+              requesterDocVersion: createVersionVector(),
+              // No ephemeral in request
+            },
+          ],
+          bidirectional: false,
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should return send-sync-response with includeEphemeral=true
+    expectCommand(command, "cmd/send-sync-response")
+
+    if (command && command.type === "cmd/send-sync-response") {
+      expect(command.docId).toBe(docId)
+      expect(command.includeEphemeral).toBe(true)
+    }
   })
 })

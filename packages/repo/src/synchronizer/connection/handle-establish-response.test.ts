@@ -60,8 +60,8 @@ describe("handle-establish-response", () => {
       expect(peerState?.identity.name).toBe("test")
     }
 
-    // Should return sync-request
-    expectCommand(command, "cmd/send-message")
+    // Should return sync-request command
+    expectCommand(command, "cmd/send-sync-request")
   })
 
   describe("reconnection detection", () => {
@@ -81,13 +81,11 @@ describe("handle-establish-response", () => {
       // Creates peer state
       expect(newModel.peers.has("1")).toBe(true)
 
-      // Sends sync-request
-      expectCommand(command, "cmd/send-message")
-      expect(command.envelope.message.type).toBe("channel/sync-request")
-      if (command.envelope.message.type === "channel/sync-request") {
-        expect(command.envelope.message.docs).toHaveLength(2)
-        expect(command.envelope.message.bidirectional).toBe(true)
-      }
+      // Sends sync-request command
+      expectCommand(command, "cmd/send-sync-request")
+      expect(command.docs).toHaveLength(2)
+      expect(command.bidirectional).toBe(true)
+      expect(command.includeEphemeral).toBe(true)
     })
 
     it("skips directory-request for known peer", () => {
@@ -110,13 +108,11 @@ describe("handle-establish-response", () => {
       )
 
       // Only syncs new doc-2 (no directory-request)
-      expectCommand(command, "cmd/send-message")
-      expect(command.envelope.message.type).toBe("channel/sync-request")
-      if (command.envelope.message.type === "channel/sync-request") {
-        expect(command.envelope.message.docs).toHaveLength(1)
-        expect(command.envelope.message.docs[0].docId).toBe("doc-2")
-        expect(command.envelope.message.bidirectional).toBe(true)
-      }
+      expectCommand(command, "cmd/send-sync-request")
+      expect(command.docs).toHaveLength(1)
+      expect(command.docs[0].docId).toBe("doc-2")
+      expect(command.bidirectional).toBe(true)
+      expect(command.includeEphemeral).toBe(true)
     })
 
     it("syncs only changed documents on reconnection", () => {
@@ -139,15 +135,12 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      // Now returns sync-request
-      expectCommand(command, "cmd/send-message")
-      if (command.envelope.message.type === "channel/sync-request") {
-        expect(command.envelope.message.docs).toHaveLength(1)
-        expect(command.envelope.message.docs[0].docId).toBe("doc-1")
-        expect(command.envelope.message.docs[0].requesterDocVersion).toEqual(
-          oldVersion,
-        ) // Incremental sync
-      }
+      // Now returns sync-request command
+      expectCommand(command, "cmd/send-sync-request")
+      expect(command.docs).toHaveLength(1)
+      expect(command.docs[0].docId).toBe("doc-1")
+      expect(command.docs[0].requesterDocVersion).toEqual(oldVersion) // Incremental sync
+      expect(command.includeEphemeral).toBe(true)
     })
 
     it("skips unchanged documents on reconnection", () => {
@@ -230,12 +223,11 @@ describe("handle-establish-response", () => {
       )
 
       // Should sync doc-2 (changed) and doc-3 (new), skip doc-1 (unchanged)
-      expectCommand(command, "cmd/send-message")
-      if (command.envelope.message.type === "channel/sync-request") {
-        expect(command.envelope.message.docs).toHaveLength(2)
-        const docIds = command.envelope.message.docs.map(d => d.docId).sort()
-        expect(docIds).toEqual(["doc-2", "doc-3"])
-      }
+      expectCommand(command, "cmd/send-sync-request")
+      expect(command.docs).toHaveLength(2)
+      const docIds = command.docs.map((d: { docId: string }) => d.docId).sort()
+      expect(docIds).toEqual(["doc-2", "doc-3"])
+      expect(command.includeEphemeral).toBe(true)
     })
   })
 })

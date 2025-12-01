@@ -3,12 +3,16 @@ import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
 
 /**
- * Tests for ephemeral/presence timing issues.
+ * Tests for ephemeral/presence timing scenarios.
  *
- * These tests simulate real-world timing scenarios where:
- * - Presence is set immediately after connection
- * - Multiple clients connect at different times
- * - Network delays affect message ordering
+ * These tests verify that presence data is correctly propagated in various
+ * real-world timing scenarios:
+ * - Presence set immediately after connection (React useEffect pattern)
+ * - Multiple clients connecting at different times
+ * - Late joiners receiving existing presence
+ *
+ * The implementation embeds ephemeral data in sync-request/sync-response
+ * messages, ensuring presence arrives atomically with document data.
  *
  * Note: We use real timers because EphemeralStore from loro-crdt uses internal
  * timers that conflict with vitest's fake timers.
@@ -232,11 +236,12 @@ describe("Ephemeral Store - Timing Issues", () => {
     describe("Late Joiner Presence Visibility", () => {
       it("should propagate presence set BEFORE sync completes (React pattern)", async () => {
         /**
-         * This test simulates what happens in a React app:
+         * This test verifies the React useEffect pattern works correctly:
          * 1. Component mounts and immediately calls setSelf()
-         * 2. This happens BEFORE the sync-request/response completes
-         * 3. The broadcast goes to 0 peers because no channels are established yet
-         * 4. When sync completes, the server should still notify existing clients
+         * 2. Presence is embedded in the sync-request message
+         * 3. Server receives presence atomically with document sync
+         * 4. Server relays presence to existing clients
+         * 5. Existing clients see the new peer's presence immediately
          */
         const docId = "react-pattern-doc"
 

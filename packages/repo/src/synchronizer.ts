@@ -462,6 +462,17 @@ export class Synchronizer {
           command.docId,
           command.requesterDocVersion,
           command.toChannelId,
+          command.includeEphemeral,
+        )
+        break
+      }
+
+      case "cmd/send-sync-request": {
+        this.#executeSendSyncRequest(
+          command.toChannelId,
+          command.docs,
+          command.bidirectional,
+          command.includeEphemeral,
         )
         break
       }
@@ -622,6 +633,7 @@ export class Synchronizer {
     docId: DocId,
     requesterDocVersion: VersionVector,
     toChannelId: ChannelId,
+    includeEphemeral?: boolean,
   ) {
     const docState = this.model.documents.get(docId)
     if (!docState) {
@@ -715,19 +727,110 @@ export class Synchronizer {
           }
     }
 
+    // Build the sync-response message
+    const syncResponseMessage: {
+      type: "channel/sync-response"
+      docId: DocId
+      transmission: SyncTransmission
+      ephemeral?: Uint8Array
+    } = {
+      type: "channel/sync-response" as const,
+      docId,
+      transmission,
+    }
+
+    // Include ephemeral snapshot if requested
+    if (includeEphemeral) {
+      const ephemeralStore = this.getOrCreateEphemeralStore(docId)
+      const ephemeralData = ephemeralStore.encodeAll()
+      if (ephemeralData.length > 0) {
+        syncResponseMessage.ephemeral = ephemeralData
+        this.logger.debug(
+          "including ephemeral data in sync-response for {docId} to {channelId}",
+          {
+            docId,
+            channelId: toChannelId,
+            ephemeralSize: ephemeralData.length,
+          },
+        )
+      }
+    }
+
     const messageToSend = {
       toChannelIds: [toChannelId],
-      message: {
-        type: "channel/sync-response" as const,
-        docId,
-        transmission,
-      },
+      message: syncResponseMessage,
     }
 
     const sentCount = this.adapters.send(messageToSend)
 
     if (sentCount === 0) {
       this.logger.warn("can't send sync-response to channel {toChannelId}", {
+        toChannelId,
+      })
+    }
+  }
+
+  #executeSendSyncRequest(
+    toChannelId: ChannelId,
+    docs: { docId: DocId; requesterDocVersion: VersionVector }[],
+    bidirectional: boolean,
+    includeEphemeral?: boolean,
+  ) {
+    // Validate channel exists
+    const channel = this.model.channels.get(toChannelId)
+    if (!channel) {
+      this.logger.warn(
+        "can't send sync-request, channel {toChannelId} doesn't exist",
+        { toChannelId },
+      )
+      return
+    }
+
+    // Build docs array with optional ephemeral data
+    const docsWithEphemeral = docs.map(doc => {
+      const result: {
+        docId: DocId
+        requesterDocVersion: VersionVector
+        ephemeral?: Uint8Array
+      } = {
+        docId: doc.docId,
+        requesterDocVersion: doc.requesterDocVersion,
+      }
+
+      // Include ephemeral data if requested
+      if (includeEphemeral) {
+        const ephemeralStore = this.getOrCreateEphemeralStore(doc.docId)
+        // Encode only our own peer's ephemeral data
+        const ephemeralData = ephemeralStore.encode(this.identity.peerId)
+        if (ephemeralData.length > 0) {
+          result.ephemeral = ephemeralData
+          this.logger.debug(
+            "including ephemeral data in sync-request for {docId} to {channelId}",
+            {
+              docId: doc.docId,
+              channelId: toChannelId,
+              ephemeralSize: ephemeralData.length,
+            },
+          )
+        }
+      }
+
+      return result
+    })
+
+    const messageToSend = {
+      toChannelIds: [toChannelId],
+      message: {
+        type: "channel/sync-request" as const,
+        docs: docsWithEphemeral,
+        bidirectional,
+      },
+    }
+
+    const sentCount = this.adapters.send(messageToSend)
+
+    if (sentCount === 0) {
+      this.logger.warn("can't send sync-request to channel {toChannelId}", {
         toChannelId,
       })
     }

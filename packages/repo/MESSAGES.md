@@ -189,7 +189,8 @@ Both peers send `channel/sync-request` messages (defined in [`channel.ts`](src/c
   docs: [
     {
       docId: "doc-uuid",
-      requesterDocVersion: VersionVector // Current version at requester
+      requesterDocVersion: VersionVector, // Current version at requester
+      ephemeral?: Uint8Array // Requester's presence data for this doc
     }
   ],
   bidirectional: true // Optional, defaults to true
@@ -198,37 +199,50 @@ Both peers send `channel/sync-request` messages (defined in [`channel.ts`](src/c
 
 The `requesterDocVersion` tells the responder what version the requester already has, enabling efficient delta updates.
 
+The optional `ephemeral` field contains the requester's presence/ephemeral data for this document. When present, the responder will:
+1. Apply the ephemeral data locally
+2. Relay it to other connected peers (hub-and-spoke pattern)
+
 #### 9. Sync Responses (Both Directions)
 
 When receiving `channel/sync-request` via [`handleSyncRequest`](src/synchronizer/sync/handle-sync-request.ts):
 
 ```typescript
-for (const { docId, requesterDocVersion } of docs) {
+for (const { docId, requesterDocVersion, ephemeral } of docs) {
   const docState = model.documents.get(docId)
 
   if (docState) {
     // 1. Set awareness that this channel has the doc
     setAwarenessState(docState, fromChannelId, "has-doc")
 
-    // 2. Export document data as update from requester's version
+    // 2. Apply incoming ephemeral data if present
+    if (ephemeral) {
+      applyEphemeral(docId, ephemeral)
+      // Relay to other peers
+      relayEphemeralToOtherPeers(docId, ephemeral)
+    }
+
+    // 3. Export document data as update from requester's version
     const data = docState.doc.export({
       mode: "update",
       from: requesterDocVersion
     })
 
-    // 3. Send sync response through our channel
+    // 4. Send sync response through our channel (with all known ephemeral)
     {
       type: "channel/sync-response",
       docId,
-      hopCount: 0,
       transmission: {
         type: "update",
         data: Uint8Array
-      }
+      },
+      ephemeral?: Uint8Array // All known presence data for this doc
     }
   }
 }
 ```
+
+The `ephemeral` field in the sync-response contains all known presence data for the document, allowing the requester to immediately see all connected peers' presence without waiting for separate ephemeral messages.
 
 #### 10. Applying Sync Responses
 

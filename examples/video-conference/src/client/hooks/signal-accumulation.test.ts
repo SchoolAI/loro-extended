@@ -280,7 +280,10 @@ a=rtcp-fb:96 nack pli`,
           // Queue signals for each peer
           result.current.queueOutgoingSignal(peer, createRealisticOffer())
           for (let i = 0; i < 10; i++) {
-            result.current.queueOutgoingSignal(peer, createRealisticCandidate(i))
+            result.current.queueOutgoingSignal(
+              peer,
+              createRealisticCandidate(i),
+            )
           }
         }
       })

@@ -148,17 +148,14 @@ export function handleEstablishResponse(
 
   // Request our docs from peer, and suggest a reciprocal sync-request
   // for bidirectional syncing
+  // Use cmd/send-sync-request to include ephemeral data with the request
   if (docsToSync.length > 0) {
     commands.push({
-      type: "cmd/send-message",
-      envelope: {
-        toChannelIds: [channel.channelId],
-        message: {
-          type: "channel/sync-request",
-          docs: docsToSync,
-          bidirectional: true,
-        },
-      },
+      type: "cmd/send-sync-request",
+      toChannelId: channel.channelId,
+      docs: docsToSync,
+      bidirectional: true,
+      includeEphemeral: true,
     })
   }
 

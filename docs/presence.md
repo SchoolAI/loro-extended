@@ -53,12 +53,26 @@ Periodically (every 10s), we ensure convergence:
 - **Hops**: `hopsRemaining: 0`
 - **Goal**: Heal inconsistencies and ensure new peers get full state. Direct neighbors only to prevent flooding.
 
-#### 3. Connection Handshake (Immediate, Single-hop)
-When peers discover or request documents:
-- **Trigger**: `handleSyncRequest` or `handleDirectoryResponse`
-- **Payload**: The **entire** ephemeral store (`store.encodeAll()`).
-- **Hops**: `hopsRemaining: 0`
-- **Goal**: Immediate state synchronization upon connection.
+#### 3. Connection Handshake (Embedded in Sync Messages)
+Ephemeral data is now embedded directly in sync-request and sync-response messages, eliminating race conditions during initial synchronization:
+
+**Sync Request (Client → Server)**:
+- **Trigger**: `handleSyncRequest` receives `channel/sync-request` with optional `ephemeral` field
+- **Payload**: Requester's ephemeral data for the document
+- **Behavior**:
+  1. Server applies the ephemeral data locally
+  2. Server relays to other connected peers (hub-and-spoke)
+  3. Server includes all known ephemeral in the sync-response
+
+**Sync Response (Server → Client)**:
+- **Trigger**: `cmd/send-sync-response` with `includeEphemeral: true`
+- **Payload**: The **entire** ephemeral store (`store.encodeAll()`)
+- **Goal**: Client receives all presence data atomically with document data
+
+This design ensures:
+- No race conditions between document sync and presence sync
+- Presence is visible immediately after sync completes
+- Fewer separate messages during initial connection
 
 ### The "Hops" Logic
 
