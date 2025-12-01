@@ -1,18 +1,14 @@
+import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/server"
-import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import { type InferPlainType, TypedDoc } from "@loro-extended/change"
 import { type DocHandle, type DocId, Repo } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
-import {
-  ChatSchema,
-  EmptyPresence,
-  PresenceSchema,
-} from "../shared/types.js"
+import { ChatSchema, EmptyPresence, PresenceSchema } from "../shared/types.js"
 import { logger, model } from "./config.js"
 import { requestLogger } from "./request-logger.js"
 
@@ -127,7 +123,10 @@ function processDocumentUpdate(
         if (value.type === "user") userCount++
       }
 
-      if (userCount >= 2 && !lastMsg.content.toString().includes("@ai")) {
+      if (
+        userCount >= 2 &&
+        !lastMsg.content.toString().toLowerCase().includes("@ai")
+      ) {
         // Don't respond as an assistent
         return
       }
