@@ -43,11 +43,25 @@ WebRTC-based video conferencing with peer-to-peer sync. Demonstrates dual-adapte
 </td>
 <td width="50%">
 
+### [Bumper Cars](./examples/bumper-cars)
+
+Multiplayer bumper cars arena with server-authoritative physics. Demonstrates presence system for real-time game state and CRDT counters for persistent scoring.
+
+<img src="./docs/images/loro-bumper-cars.webp" alt="Bumper Cars Screenshot" width="100%">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
 ### [Hono Counter](./examples/hono-counter)
 
 A simple counter app using Hono's jsx-dom with Vite. Shows how to integrate `@loro-extended/hono` with the Hono framework.
 
 <img src="./docs/images/loro-hono-counter.webp" alt="Hono Counter Screenshot" width="100%">
+
+</td>
+<td width="50%">
 
 </td>
 </tr>
