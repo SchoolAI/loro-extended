@@ -4,7 +4,7 @@ This document describes the complete message flow when two peers connect and syn
 
 ## Architecture Overview
 
-The system uses a **channel-based architecture** where each connection (network or storage) is represented as a [`Channel`](src/channel.ts). Each channel is bidirectional, but owned by its repo - it has a `send()` method and a `receive()` callback, but for two repos to communicate, they each need a channel connected to the other.
+The system uses a **channel-based architecture** where each connection (network or storage) is represented as a [`Channel`](src/channel.ts). Each channel is bidirectional--it has a `send()` method and a `receive()` callback--but `send` can only be initiated by the owning repo. This means that, in order to send to another repo, each repo must set up a channel to each other repo.
 
 The [`Synchronizer`](src/synchronizer.ts) orchestrates all message passing through a functional state machine pattern (TEA/Elm architecture) implemented in [`synchronizer-program.ts`](src/synchronizer-program.ts).
 
