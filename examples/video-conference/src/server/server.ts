@@ -31,8 +31,8 @@ const repo = new Repo({
       // Storage adapters can always see documents
       if (context.channelKind === "storage") return true
 
-      // Network peers can see all room documents
-      return true
+      // Network peers can only see room documents that they themselves reveal
+      return false
     },
   },
 })

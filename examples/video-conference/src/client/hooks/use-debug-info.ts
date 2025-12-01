@@ -16,13 +16,30 @@ export type PeerConnectionInfo = {
 
 export type ChannelInfo = {
   channelId: number
-  adapterId: string
+  adapterType: string
   kind: "storage" | "network" | "other"
   peerId?: PeerID
   isEstablished: boolean
 }
 
 export type ConnectionSource = "webrtc" | "sse" | "websocket" | "other"
+
+/**
+ * Determine the connection source type from an adapter type string.
+ */
+function getConnectionSource(adapterType: string): ConnectionSource {
+  const lower = adapterType.toLowerCase()
+  if (lower.includes("webrtc")) {
+    return "webrtc"
+  }
+  if (lower.includes("sse")) {
+    return "sse"
+  }
+  if (lower.includes("websocket") || lower.includes("ws")) {
+    return "websocket"
+  }
+  return "other"
+}
 
 export type PresencePeerInfo = {
   peerId: string
@@ -42,14 +59,20 @@ export function truncateId(id: string, prefixLen = 4, suffixLen = 4): string {
   return `${id.slice(0, prefixLen)}...${id.slice(-suffixLen)}`
 }
 
+export type PeerSeenInfo = {
+  peerId: PeerID
+  subscriptionCount: number
+  channels: ChannelInfo[]
+}
+
 export type DebugInfo = {
   // Network Status
   isOnline: boolean
 
   // Loro Sync Status
   localPeerId: PeerID
-  connectedPeersCount: number
-  channels: ChannelInfo[]
+  peersSeenCount: number
+  peersSeen: PeerSeenInfo[]
 
   // WebRTC Mesh Status
   instanceId: string
@@ -100,8 +123,9 @@ export function useDebugInfo({
   )
 
   // Loro state (polled)
-  const [channels, setChannels] = useState<ChannelInfo[]>([])
-  const [connectedPeersCount, setConnectedPeersCount] = useState(0)
+  const [peersSeen, setPeersSeen] = useState<PeerSeenInfo[]>([])
+  const [peersSeenCount, setPeersSeenCount] = useState(0)
+  const [allChannels, setAllChannels] = useState<ChannelInfo[]>([])
 
   // Listen for online/offline events
   useEffect(() => {
@@ -122,21 +146,40 @@ export function useDebugInfo({
     const synchronizer = repo.synchronizer
     const model = synchronizer.getModelSnapshot()
 
-    // Get channel info
+    // Get all channel info first
     const channelInfos: ChannelInfo[] = []
+    const channelsByPeer = new Map<PeerID, ChannelInfo[]>()
+
     for (const [channelId, channel] of model.channels) {
-      channelInfos.push({
+      const info: ChannelInfo = {
         channelId,
-        adapterId: channel.adapterId,
+        adapterType: channel.adapterType,
         kind: channel.kind,
         peerId: isEstablished(channel) ? channel.peerId : undefined,
         isEstablished: isEstablished(channel),
+      }
+      channelInfos.push(info)
+
+      // Group channels by peer
+      if (info.peerId) {
+        const existing = channelsByPeer.get(info.peerId) || []
+        existing.push(info)
+        channelsByPeer.set(info.peerId, existing)
+      }
+    }
+    setAllChannels(channelInfos)
+
+    // Get peer info with their associated channels
+    const peerInfos: PeerSeenInfo[] = []
+    for (const [peerId, peerState] of model.peers) {
+      peerInfos.push({
+        peerId,
+        subscriptionCount: peerState.subscriptions.size,
+        channels: channelsByPeer.get(peerId) || [],
       })
     }
-    setChannels(channelInfos)
-
-    // Count connected peers
-    setConnectedPeersCount(model.peers.size)
+    setPeersSeen(peerInfos)
+    setPeersSeenCount(model.peers.size)
   }, [repo])
 
   // Set up polling interval
@@ -168,18 +211,9 @@ export function useDebugInfo({
   // Build a map of adapter types we're connected through
   // This helps us understand which adapters are active
   const activeAdapterTypes = new Set<ConnectionSource>()
-  for (const channel of channels) {
+  for (const channel of allChannels) {
     if (channel.isEstablished) {
-      const adapterId = channel.adapterId.toLowerCase()
-      if (adapterId.includes("webrtc")) {
-        activeAdapterTypes.add("webrtc")
-      } else if (adapterId.includes("sse")) {
-        activeAdapterTypes.add("sse")
-      } else if (adapterId.includes("websocket") || adapterId.includes("ws")) {
-        activeAdapterTypes.add("websocket")
-      } else {
-        activeAdapterTypes.add("other")
-      }
+      activeAdapterTypes.add(getConnectionSource(channel.adapterType))
     }
   }
 
@@ -194,42 +228,30 @@ export function useDebugInfo({
     if (peerId === localPeerId) continue
 
     // Determine sources by checking which adapters the peer is connected through
-    const sources: ConnectionSource[] = []
+    const sources = new Set<ConnectionSource>()
 
     // Check channels to determine connection types for this specific peer
-    for (const channel of channels) {
+    for (const channel of allChannels) {
       if (channel.peerId === peerId && channel.isEstablished) {
-        const adapterId = channel.adapterId.toLowerCase()
-        if (adapterId.includes("webrtc") && !sources.includes("webrtc")) {
-          sources.push("webrtc")
-        } else if (adapterId.includes("sse") && !sources.includes("sse")) {
-          sources.push("sse")
-        } else if (
-          (adapterId.includes("websocket") || adapterId.includes("ws")) &&
-          !sources.includes("websocket")
-        ) {
-          sources.push("websocket")
-        } else if (!sources.includes("other")) {
-          sources.push("other")
-        }
+        sources.add(getConnectionSource(channel.adapterType))
       }
     }
 
     // If no direct channel to this peer, but we have presence data,
     // it's likely coming through a hub (SSE/WebSocket server)
     // Check if we have any hub-type adapters active
-    if (sources.length === 0) {
+    if (sources.size === 0) {
       if (activeAdapterTypes.has("sse")) {
-        sources.push("sse")
+        sources.add("sse")
       }
       if (activeAdapterTypes.has("websocket")) {
-        sources.push("websocket")
+        sources.add("websocket")
       }
     }
 
     presencePeers.push({
       peerId,
-      sources,
+      sources: Array.from(sources),
       hasUserPresence: peerId in userPresence,
       hasSignalingPresence: peerId in signalingPresence,
     })
@@ -241,8 +263,8 @@ export function useDebugInfo({
 
     // Loro Sync Status
     localPeerId,
-    connectedPeersCount,
-    channels,
+    peersSeenCount,
+    peersSeen,
 
     // WebRTC Mesh Status
     instanceId,
@@ -250,7 +272,7 @@ export function useDebugInfo({
     signalQueueSize,
 
     // Presence Status
-    userPresenceCount: Object.keys(userPresence).length,
+    userPresenceCount: presencePeers.length,
     signalingPresenceCount: Object.keys(signalingPresence).length,
     presencePeers,
   }

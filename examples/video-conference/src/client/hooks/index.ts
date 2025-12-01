@@ -10,6 +10,7 @@ export type {
   ConnectionSource,
   DebugInfo,
   PeerConnectionInfo,
+  PeerSeenInfo,
   PresencePeerInfo,
   UseDebugInfoOptions,
   UseDebugInfoReturn,

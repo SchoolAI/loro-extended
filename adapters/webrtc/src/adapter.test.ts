@@ -32,10 +32,12 @@ function createMockDataChannel(
     send: vi.fn(),
     close: vi.fn(),
     addEventListener: vi.fn((type: string, listener: EventListener) => {
-      if (!listeners.has(type)) {
-        listeners.set(type, new Set())
+      let l = listeners.get(type)
+      if (!l) {
+        l = new Set()
+        listeners.set(type, l)
       }
-      listeners.get(type)!.add(listener)
+      l.add(listener)
     }),
     removeEventListener: vi.fn((type: string, listener: EventListener) => {
       listeners.get(type)?.delete(listener)

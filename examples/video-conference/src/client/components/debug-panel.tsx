@@ -24,9 +24,22 @@ function Section({ title, children, defaultOpen = true }: SectionProps) {
         className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-slate-700/50 transition-colors"
       >
         <span className="font-medium text-slate-200">{title}</span>
-        <span className="text-slate-400">{isOpen ? "▼" : "▶"}</span>
+        <span
+          className="text-slate-400 transition-transform duration-300"
+          style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        >
+          ▼
+        </span>
       </button>
-      {isOpen && <div className="px-3 pb-3 space-y-1">{children}</div>}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          maxHeight: isOpen ? "1000px" : "0",
+          opacity: isOpen ? 1 : 0,
+        }}
+      >
+        <div className="px-3 pb-3 space-y-1">{children}</div>
+      </div>
     </div>
   )
 }
@@ -58,6 +71,85 @@ function InfoRow({
       >
         {value}
       </span>
+    </div>
+  )
+}
+
+/**
+ * Clickable info row that expands to show details.
+ */
+function ExpandableInfoRow({
+  label,
+  value,
+  status,
+  title,
+  children,
+  hasContent,
+}: {
+  label: string
+  value: string | number
+  status?: "good" | "warning" | "error" | "neutral"
+  title?: string
+  children: React.ReactNode
+  hasContent: boolean
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const statusColors = {
+    good: "text-green-400",
+    warning: "text-yellow-400",
+    error: "text-red-400",
+    neutral: "text-slate-300",
+  }
+
+  if (!hasContent) {
+    return (
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-400">{label}</span>
+        <span
+          className={`${statusColors[status ?? "neutral"]} cursor-default`}
+          title={title}
+        >
+          {value}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex justify-between text-xs hover:bg-slate-700/30 rounded px-1 -mx-1 py-0.5 transition-colors"
+      >
+        <span className="text-slate-400 flex items-center gap-1">
+          <span
+            className="text-[8px] transition-transform duration-200"
+            style={{
+              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          >
+            ▶
+          </span>
+          {label}
+        </span>
+        <span
+          className={`${statusColors[status ?? "neutral"]} cursor-pointer`}
+          title={title}
+        >
+          {value}
+        </span>
+      </button>
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          maxHeight: isExpanded ? "500px" : "0",
+          opacity: isExpanded ? 1 : 0,
+        }}
+      >
+        <div className="mt-1 ml-3 space-y-1">{children}</div>
+      </div>
     </div>
   )
 }
@@ -109,12 +201,41 @@ function getSourceVariant(
     case "webrtc":
       return "good"
     case "sse":
-    case "websocket":
       return "warning"
-    case "other":
     default:
       return "neutral"
   }
+}
+
+/**
+ * Animated detail list that smoothly appears/disappears.
+ */
+function DetailList({
+  title,
+  children,
+  show,
+}: {
+  title: string
+  children: React.ReactNode
+  show: boolean
+}) {
+  return (
+    <div
+      className="overflow-hidden transition-all duration-300 ease-in-out"
+      style={{
+        maxHeight: show ? "500px" : "0",
+        opacity: show ? 1 : 0,
+        marginTop: show ? "0.5rem" : "0",
+      }}
+    >
+      <div className="space-y-1">
+        <div className="text-[10px] text-slate-500 uppercase tracking-wide">
+          {title}
+        </div>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -125,6 +246,7 @@ function getSourceVariant(
  * - Collapsible (minimized by default)
  * - Sections for Network, Loro Sync, WebRTC, and Presence status
  * - Auto-refresh with manual refresh button
+ * - Smooth animations for expanding/collapsing content
  */
 export function DebugPanel({ debugInfo, onRefresh }: DebugPanelProps) {
   const [isMinimized, setIsMinimized] = useState(true)
@@ -185,115 +307,7 @@ export function DebugPanel({ debugInfo, onRefresh }: DebugPanelProps) {
           />
         </Section>
 
-        {/* Loro Sync Status */}
-        <Section title="🔄 Loro Sync Status">
-          <InfoRow
-            label="Local PeerID"
-            value={truncateId(debugInfo.localPeerId)}
-            title={debugInfo.localPeerId}
-            status="neutral"
-          />
-          <InfoRow
-            label="Connected Peers"
-            value={debugInfo.connectedPeersCount}
-            status={debugInfo.connectedPeersCount > 0 ? "good" : "warning"}
-          />
-          <InfoRow
-            label="Channels"
-            value={debugInfo.channels.length}
-            status={debugInfo.channels.length > 0 ? "good" : "warning"}
-          />
-
-          {debugInfo.channels.length > 0 && (
-            <div className="mt-2 space-y-1">
-              <div className="text-[10px] text-slate-500 uppercase tracking-wide">
-                Channel Details
-              </div>
-              {debugInfo.channels.map(channel => (
-                <div
-                  key={channel.channelId}
-                  className="text-[10px] bg-slate-700/50 rounded px-2 py-1 flex items-center justify-between"
-                >
-                  <span className="text-slate-400">#{channel.channelId}</span>
-                  <div className="flex items-center gap-1">
-                    <Badge variant={channel.isEstablished ? "good" : "warning"}>
-                      {channel.isEstablished ? "established" : "connecting"}
-                    </Badge>
-                    <Badge variant="neutral">{channel.kind}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* WebRTC Mesh Status */}
-        <Section title="📡 WebRTC Mesh Status">
-          <InfoRow
-            label="Instance ID"
-            value={truncateId(debugInfo.instanceId)}
-            title={debugInfo.instanceId}
-            status="neutral"
-          />
-          <InfoRow
-            label="Peer Connections"
-            value={debugInfo.peerConnections.length}
-            status={debugInfo.peerConnections.length > 0 ? "good" : "neutral"}
-          />
-          <InfoRow
-            label="Signal Queue"
-            value={debugInfo.signalQueueSize}
-            status={
-              debugInfo.signalQueueSize === 0
-                ? "good"
-                : debugInfo.signalQueueSize > 10
-                  ? "warning"
-                  : "neutral"
-            }
-          />
-
-          {debugInfo.peerConnections.length > 0 && (
-            <div className="mt-2 space-y-1">
-              <div className="text-[10px] text-slate-500 uppercase tracking-wide">
-                Peer Connections
-              </div>
-              {debugInfo.peerConnections.map(peer => (
-                <div
-                  key={peer.remotePeerId}
-                  className="text-[10px] bg-slate-700/50 rounded px-2 py-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <TruncatedId
-                      id={peer.remotePeerId}
-                      className="text-slate-400 font-mono"
-                    />
-                    <Badge
-                      variant={
-                        peer.connectionState === "connected"
-                          ? "good"
-                          : peer.connectionState === "failed"
-                            ? "error"
-                            : "warning"
-                      }
-                    >
-                      {peer.connectionState}
-                    </Badge>
-                  </div>
-                  {peer.remoteInstanceId && (
-                    <div
-                      className="text-slate-500 mt-0.5 cursor-default"
-                      title={peer.remoteInstanceId}
-                    >
-                      Instance: {truncateId(peer.remoteInstanceId)}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* Presence Status */}
+        {/* Loro Presence Sync Status */}
         <Section title="👥 Presence Status">
           <InfoRow
             label="User Presence"
@@ -306,44 +320,172 @@ export function DebugPanel({ debugInfo, onRefresh }: DebugPanelProps) {
             status={debugInfo.signalingPresenceCount > 0 ? "good" : "neutral"}
           />
 
-          {debugInfo.presencePeers.length > 0 && (
-            <div className="mt-2 space-y-1">
-              <div className="text-[10px] text-slate-500 uppercase tracking-wide">
-                Presence Peers
+          <DetailList
+            title="Presence Peers"
+            show={debugInfo.presencePeers.length > 0}
+          >
+            {debugInfo.presencePeers.map(peer => (
+              <div
+                key={peer.peerId}
+                className="text-[10px] bg-slate-700/50 rounded px-2 py-1 flex items-center justify-between"
+              >
+                <TruncatedId
+                  id={peer.peerId}
+                  className="text-slate-400 font-mono"
+                />
+                <div className="flex items-center gap-1">
+                  {peer.sources.length > 0 ? (
+                    peer.sources.map(source => (
+                      <Badge key={source} variant={getSourceVariant(source)}>
+                        {source}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge variant="neutral">unknown</Badge>
+                  )}
+                  {peer.hasUserPresence && (
+                    <span title="Has user presence">👤</span>
+                  )}
+                  {peer.hasSignalingPresence && (
+                    <span title="Has signaling presence">📶</span>
+                  )}
+                </div>
               </div>
-              {debugInfo.presencePeers.map(peer => (
-                <div
-                  key={peer.peerId}
-                  className="text-[10px] bg-slate-700/50 rounded px-2 py-1 flex items-center justify-between"
-                >
+            ))}
+          </DetailList>
+        </Section>
+
+        {/* Loro Doc Sync Status */}
+        <Section title="🔄 Document Status">
+          <InfoRow
+            label="Local PeerID"
+            value={truncateId(debugInfo.localPeerId)}
+            title={debugInfo.localPeerId}
+            status="neutral"
+          />
+
+          <ExpandableInfoRow
+            label="Peers Seen"
+            value={debugInfo.peersSeenCount}
+            status={debugInfo.peersSeenCount > 0 ? "good" : "warning"}
+            hasContent={debugInfo.peersSeen.length > 0}
+          >
+            {debugInfo.peersSeen.map(peer => (
+              <div
+                key={peer.peerId}
+                className="text-[10px] bg-slate-700/50 rounded px-2 py-1"
+              >
+                <div className="flex items-center justify-between">
                   <TruncatedId
                     id={peer.peerId}
                     className="text-slate-400 font-mono"
                   />
                   <div className="flex items-center gap-1">
-                    {peer.sources.length > 0 ? (
-                      peer.sources.map(source => (
-                        <Badge
-                          key={source}
-                          variant={getSourceVariant(source)}
-                        >
-                          {source}
-                        </Badge>
-                      ))
-                    ) : (
-                      <Badge variant="neutral">unknown</Badge>
-                    )}
-                    {peer.hasUserPresence && (
-                      <span title="Has user presence">👤</span>
-                    )}
-                    {peer.hasSignalingPresence && (
-                      <span title="Has signaling presence">📶</span>
-                    )}
+                    <Badge
+                      variant={peer.channels.length > 0 ? "good" : "warning"}
+                    >
+                      {peer.channels.length} ch
+                    </Badge>
+                    <Badge variant="neutral">
+                      {peer.subscriptionCount}
+                      {` ${peer.subscriptionCount === 1 ? "doc" : "docs"}`}
+                    </Badge>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                {peer.channels.length > 0 && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {peer.channels.map(channel => (
+                      <div
+                        key={channel.channelId}
+                        className="text-[9px] bg-slate-600/30 rounded px-1.5 py-0.5 flex items-center justify-between"
+                      >
+                        <span
+                          className="text-slate-500 cursor-default"
+                          title={channel.adapterType}
+                        >
+                          #{channel.channelId} {channel.adapterType}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Badge
+                            variant={channel.isEstablished ? "good" : "warning"}
+                          >
+                            {channel.isEstablished ? "est" : "conn"}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {peer.channels.length === 0 && (
+                  <div className="mt-1 ml-2 text-[9px] text-slate-500 italic">
+                    No active channels
+                  </div>
+                )}
+              </div>
+            ))}
+          </ExpandableInfoRow>
+        </Section>
+
+        {/* WebRTC Mesh Status */}
+        <Section title="📡 WebRTC Mesh Status">
+          <InfoRow
+            label="Instance ID"
+            value={truncateId(debugInfo.instanceId)}
+            title={debugInfo.instanceId}
+            status="neutral"
+          />
+
+          <ExpandableInfoRow
+            label="Peer Connections"
+            value={debugInfo.peerConnections.length}
+            status={debugInfo.peerConnections.length > 0 ? "good" : "neutral"}
+            hasContent={debugInfo.peerConnections.length > 0}
+          >
+            {debugInfo.peerConnections.map(peer => (
+              <div
+                key={peer.remotePeerId}
+                className="text-[10px] bg-slate-700/50 rounded px-2 py-1"
+              >
+                <div className="flex items-center justify-between">
+                  <TruncatedId
+                    id={peer.remotePeerId}
+                    className="text-slate-400 font-mono"
+                  />
+                  <Badge
+                    variant={
+                      peer.connectionState === "connected"
+                        ? "good"
+                        : peer.connectionState === "failed"
+                          ? "error"
+                          : "warning"
+                    }
+                  >
+                    {peer.connectionState}
+                  </Badge>
+                </div>
+                {peer.remoteInstanceId && (
+                  <div
+                    className="text-slate-500 mt-0.5 cursor-default"
+                    title={peer.remoteInstanceId}
+                  >
+                    Instance: {truncateId(peer.remoteInstanceId)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </ExpandableInfoRow>
+
+          <InfoRow
+            label="Signal Queue"
+            value={debugInfo.signalQueueSize}
+            status={
+              debugInfo.signalQueueSize === 0
+                ? "good"
+                : debugInfo.signalQueueSize > 10
+                  ? "warning"
+                  : "neutral"
+            }
+          />
         </Section>
       </div>
 
