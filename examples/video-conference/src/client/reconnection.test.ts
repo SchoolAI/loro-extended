@@ -76,7 +76,7 @@ describe("useWebRtcMesh Reconnection", () => {
               const err = new Error(
                 "DOMException: Cannot set remote answer in state stable",
               )
-              const handlers = events["error"] || []
+              const handlers = events.error || []
               for (const h of handlers) {
                 h(err)
               }

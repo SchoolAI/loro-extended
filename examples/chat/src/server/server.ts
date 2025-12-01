@@ -81,6 +81,7 @@ function appendAssistantMessage(
       id,
       role: "assistant",
       author: "ai",
+      authorName: "AI Assistant",
       content,
       timestamp: Date.now(),
       needsAiReply: false,
@@ -196,6 +197,7 @@ const repo = new Repo({
     canReveal(context) {
       if (context.channelKind === "storage") return true
 
+      // Don't reveal documents unrelated to the one that the client asks for
       return false
     },
   },

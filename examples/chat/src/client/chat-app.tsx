@@ -1,5 +1,5 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
-import type { DocId, PeerID, ReadyState } from "@loro-extended/repo"
+import type { DocId, ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
   ChatSchema,
@@ -10,22 +10,38 @@ import {
 import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
+// localStorage keys for name persistence
+const NAME_STORAGE_KEY = "loro-chat-user-name"
+const PREVIOUS_NAME_KEY = "loro-chat-previous-name"
+
 // Generate a new conversation ID
 function generateConversationId(): DocId {
   return `chat-${crypto.randomUUID()}`
 }
 
-function getAuthorName(message: Message, authors: Map<PeerID, string>) {
+// Generate a random name like "Someone-1234"
+function generateRandomName(): string {
+  const randomNum = Math.floor(1000 + Math.random() * 9000) // 1000-9999
+  return `Someone-${randomNum}`
+}
+
+// Get or create the user's name from localStorage
+function getOrCreateUserName(): string {
+  const stored = localStorage.getItem(NAME_STORAGE_KEY)
+  if (stored) return stored
+  const newName = generateRandomName()
+  localStorage.setItem(NAME_STORAGE_KEY, newName)
+  return newName
+}
+
+function getAuthorName(message: Message) {
   if (message.role === "assistant") {
     return "AI Assistant"
   }
 
-  const author = authors.get(message.author)
-  if (author) {
-    return author
-  }
-
-  return "Someone"
+  // Use the authorName stored in the message directly
+  // It already contains transition info if applicable (e.g., "Alice (was Bob)")
+  return message.authorName || "Someone"
 }
 
 function ChatApp() {
@@ -34,6 +50,20 @@ function ChatApp() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [isCopied, setIsCopied] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+
+  // Name editing state
+  const [userName, setUserName] = useState(getOrCreateUserName)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(userName)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // Focus the name input when editing starts
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus()
+      nameInputRef.current.select()
+    }
+  }, [isEditingName])
 
   // Get document ID from URL hash, or create new conversation
   const docId = useDocIdFromHash(generateConversationId())
@@ -54,12 +84,32 @@ function ChatApp() {
   // Use ephemeral state for presence
   const { all, setSelf } = usePresence(docId, PresenceSchema, EmptyPresence)
 
-  const authors: Map<PeerID, string> = new Map([[repo.identity.peerId, "You"]])
-
-  // Set self presence
+  // Set self presence with name
   useEffect(() => {
-    setSelf({ type: "user" })
-  }, [setSelf])
+    setSelf({ type: "user", name: userName })
+  }, [setSelf, userName])
+
+  // Check if the current user has sent any messages in this conversation
+  const hasUserSentMessages = doc.messages.some(
+    msg => msg.role === "user" && msg.author === repo.identity.peerId,
+  )
+
+  // Handle name change submission
+  const handleNameSubmit = () => {
+    const newName = nameInput.trim()
+    if (newName && newName !== userName) {
+      // Only store old name for transition if user has already sent messages
+      // If they haven't sent any messages yet, no need to show "(was OldName)"
+      if (hasUserSentMessages) {
+        localStorage.setItem(PREVIOUS_NAME_KEY, userName)
+      }
+      // Update to new name
+      localStorage.setItem(NAME_STORAGE_KEY, newName)
+      setUserName(newName)
+      setSelf({ type: "user", name: newName })
+    }
+    setIsEditingName(false)
+  }
 
   const memberCount = Object.values(all).filter(p => p.type === "user").length
 
@@ -69,11 +119,20 @@ function ChatApp() {
   const sendMessage = () => {
     if (!input.trim()) return
 
+    // Check for pending name change
+    const previousName = localStorage.getItem(PREVIOUS_NAME_KEY)
+    let authorName = userName
+    if (previousName) {
+      authorName = `${userName} (was ${previousName})`
+      localStorage.removeItem(PREVIOUS_NAME_KEY) // Fulfill the responsibility
+    }
+
     changeDoc(d => {
       d.messages.push({
         id: crypto.randomUUID(),
         role: "user",
         author: repo.identity.peerId,
+        authorName,
         content: input,
         timestamp: Date.now(),
         needsAiReply: true,
@@ -155,6 +214,47 @@ function ChatApp() {
                 {isConnected ? "Connected" : "Connecting..."}
               </div>
             </div>
+          </div>
+
+          {/* Name display and edit */}
+          <div className="flex items-center gap-2">
+            {isEditingName ? (
+              <form
+                onSubmit={e => {
+                  e.preventDefault()
+                  handleNameSubmit()
+                }}
+                className="flex items-center gap-1"
+              >
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  className="bg-slate-700 text-white px-2 py-1 rounded text-sm w-32 outline-none focus:ring-2 focus:ring-blue-500"
+                  onBlur={handleNameSubmit}
+                  onKeyDown={e => {
+                    if (e.key === "Escape") {
+                      setNameInput(userName)
+                      setIsEditingName(false)
+                    }
+                  }}
+                />
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setNameInput(userName)
+                  setIsEditingName(true)
+                }}
+                className="py-1 px-2 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+                title="Edit name"
+              >
+                ✏️
+                <span className="text-slate-300 text-sm ps-2">{userName}</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -256,7 +356,7 @@ function ChatApp() {
                 >
                   <div className="flex items-baseline gap-2 mb-1 px-1">
                     <span className="text-xs font-medium text-gray-500">
-                      {getAuthorName(msg as Message, authors)}
+                      {getAuthorName(msg as Message)}
                     </span>
                     <span className="text-[10px] text-gray-400">
                       {new Date(msg.timestamp).toLocaleTimeString([], {

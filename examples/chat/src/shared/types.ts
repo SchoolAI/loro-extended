@@ -5,6 +5,7 @@ export const MessageSchema = Shape.map({
   id: Shape.plain.string(),
   role: Shape.plain.string("user", "assistant"),
   author: Shape.plain.string(), // peerId or 'ai' for AI
+  authorName: Shape.plain.string(), // Display name - may include transition info like "Alice (was Bob)"
   content: Shape.text(), // LoroText for streaming
   timestamp: Shape.plain.number(),
   needsAiReply: Shape.plain.boolean(),
@@ -23,6 +24,7 @@ export type Message = {
   id: string
   role: "user" | "assistant"
   author: PeerID
+  authorName: string
   content: string
   timestamp: number
   needsAiReply: false
