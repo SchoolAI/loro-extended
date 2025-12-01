@@ -23,7 +23,7 @@ class MockAdapter extends Adapter<{ name: string }> {
   protected generate(context: { name: string }): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: vi.fn((message: ChannelMsg) => {
         this.sentMessages.push({ channelId: context.name, message })
       }),
@@ -84,7 +84,7 @@ class MockAdapter extends Adapter<{ name: string }> {
 describe("Synchronizer - Permissions Integration", () => {
   it("should respect permissions in directory requests", async () => {
     // Create a fresh adapter for this test to avoid reuse issues
-    const freshAdapter = new MockAdapter({ adapterId: "test-adapter-2" })
+    const freshAdapter = new MockAdapter({ adapterType: "test-adapter-2" })
     const restrictiveSync = new Synchronizer({
       identity: { peerId: "1", name: "test", type: "user" },
       adapters: [freshAdapter as AnyAdapter],
@@ -127,8 +127,8 @@ describe("Synchronizer - Permissions Integration", () => {
     // Setup bridge for communication
     const bridge = new Bridge()
 
-    const adapter1 = new BridgeAdapter({ adapterId: "adapter1", bridge })
-    const adapter2 = new BridgeAdapter({ adapterId: "adapter2", bridge })
+    const adapter1 = new BridgeAdapter({ adapterType: "adapter1", bridge })
+    const adapter2 = new BridgeAdapter({ adapterType: "adapter2", bridge })
 
     const repo1 = new Repo({
       identity: { name: "Peer 1", type: "user" },
@@ -158,8 +158,8 @@ describe("Synchronizer - Permissions Integration", () => {
     // Setup bridge for communication
     const bridge = new Bridge()
 
-    const adapter1 = new BridgeAdapter({ adapterId: "adapter1", bridge })
-    const adapter2 = new BridgeAdapter({ adapterId: "adapter2", bridge })
+    const adapter1 = new BridgeAdapter({ adapterType: "adapter1", bridge })
+    const adapter2 = new BridgeAdapter({ adapterType: "adapter2", bridge })
 
     const repo1 = new Repo({
       identity: { name: "Peer 1", type: "user" },

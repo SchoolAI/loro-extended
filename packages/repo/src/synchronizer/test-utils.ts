@@ -26,7 +26,7 @@ export function createMockChannel(
     type: "connected",
     channelId: 1,
     kind: "network",
-    adapterId: "test-adapter",
+    adapterType: "test-adapter",
     send: baseSend,
     stop: vi.fn(),
     onReceive: vi.fn(),

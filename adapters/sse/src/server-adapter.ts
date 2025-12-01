@@ -84,13 +84,13 @@ export class SseServerNetworkAdapter extends Adapter<PeerID> {
   private connections = new Map<PeerID, SseConnection>()
 
   constructor() {
-    super({ adapterId: "sse-server" })
+    super({ adapterType: "sse-server" })
   }
 
   protected generate(peerId: PeerID): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
         const connection = this.connections.get(peerId)
         if (connection) {

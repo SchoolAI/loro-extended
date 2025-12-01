@@ -17,11 +17,11 @@ describe("Repo E2E", () => {
     const bridge = new Bridge()
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
     })
     const repo2 = new Repo({
       identity: { name: "repo2", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter2" })],
     })
 
     // Repo 1 creates a document
@@ -63,14 +63,14 @@ describe("Repo E2E", () => {
 
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
       rules: {
         canUpdate: () => repo1CanWrite,
       },
     })
     const repo2 = new Repo({
       identity: { name: "repo2", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter2" })],
     })
 
     const handle1 = repo1.get(crypto.randomUUID())
@@ -106,12 +106,12 @@ describe("Repo E2E", () => {
     const bridge = new Bridge()
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter1" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
       rules: { canDelete: () => false },
     })
     const repo2 = new Repo({
       identity: { name: "repo2", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapter2" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapter2" })],
     })
 
     const handle1 = repo1.get(crypto.randomUUID())
@@ -142,7 +142,7 @@ describe("Repo E2E", () => {
     it("should reveal all documents when canReveal is always true", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
         rules: { canReveal: () => true },
       })
       const handle1 = repoA.get(crypto.randomUUID())
@@ -150,7 +150,7 @@ describe("Repo E2E", () => {
 
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
       // Wait for the repos to connect and exchange messages
@@ -169,12 +169,12 @@ describe("Repo E2E", () => {
     it("should not announce documents when canReveal is false", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
         rules: { canReveal: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
       repoA.get(crypto.randomUUID()) // Create a document that will not be announced
@@ -192,12 +192,12 @@ describe("Repo E2E", () => {
     it("should sync a document on direct request even if not announced", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
         rules: { canReveal: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
       const handleA = repoA.get(crypto.randomUUID())
@@ -218,7 +218,7 @@ describe("Repo E2E", () => {
     it("should selectively announce documents based on permissions", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
         rules: {
           canReveal: context => context.docId.startsWith("allowed"),
         },
@@ -237,7 +237,7 @@ describe("Repo E2E", () => {
       // Now create repoB - it should receive announcements based on canReveal
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
-        adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+        adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
       // Wait for repos to connect and exchange messages

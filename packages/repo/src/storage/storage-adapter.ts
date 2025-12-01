@@ -56,7 +56,7 @@ export abstract class StorageAdapter extends Adapter<void> {
   protected generate(): GeneratedChannel {
     return {
       kind: "storage",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: this.handleChannelMessage.bind(this),
       stop: () => {},
     }
@@ -142,7 +142,7 @@ export abstract class StorageAdapter extends Adapter<void> {
       type: "channel/establish-response",
       identity: {
         peerId: this.storagePeerId,
-        name: this.adapterId,
+        name: this.adapterType,
         type: "service",
       },
     })

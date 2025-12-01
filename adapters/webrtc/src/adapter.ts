@@ -73,7 +73,7 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
   private attachedChannels = new Map<PeerID, AttachedChannel>()
 
   constructor() {
-    super({ adapterId: "webrtc-datachannel" })
+    super({ adapterType: "webrtc-datachannel" })
   }
 
   /**
@@ -85,7 +85,7 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
 
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
         if (dataChannel.readyState !== "open") {
           this.logger.warn(

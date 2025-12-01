@@ -20,7 +20,7 @@ class MockAdapter extends Adapter<{ name: string }> {
   protected generate(context: { name: string }): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: vi.fn((message: ChannelMsg) => {
         this.sentMessages.push({ channelId: context.name, message })
       }),
@@ -60,7 +60,7 @@ describe("Synchronizer - Reset Functionality", () => {
   let mockAdapter: MockAdapter
 
   beforeEach(() => {
-    mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
+    mockAdapter = new MockAdapter({ adapterType: "test-adapter" })
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],

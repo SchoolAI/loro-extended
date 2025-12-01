@@ -87,9 +87,9 @@ describe("WebRtcDataChannelAdapter", () => {
   })
 
   describe("constructor", () => {
-    it("should create adapter with correct adapterId", () => {
+    it("should create adapter with correct adapterType", () => {
       expect(adapter).toBeInstanceOf(WebRtcDataChannelAdapter)
-      expect(adapter.adapterId).toBe("webrtc-datachannel")
+      expect(adapter.adapterType).toBe("webrtc-datachannel")
     })
   })
 

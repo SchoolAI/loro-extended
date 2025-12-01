@@ -88,7 +88,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private shouldReconnect = true
 
   constructor(options: WsClientOptions) {
-    super({ adapterId: "ws-client" })
+    super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
     this.translationContext = createTranslationContext()
@@ -97,7 +97,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   protected generate(): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
           this.logger.warn("Cannot send: WebSocket not connected")

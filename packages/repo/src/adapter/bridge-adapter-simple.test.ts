@@ -10,7 +10,7 @@ describe("BridgeAdapter Simple Test", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -20,7 +20,7 @@ describe("BridgeAdapter Simple Test", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },

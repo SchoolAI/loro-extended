@@ -8,13 +8,13 @@ import type {
   GeneratedChannel,
 } from "../channel.js"
 import { ChannelDirectory } from "../channel-directory.js"
-import type { AdapterId, PeerIdentityDetails } from "../types.js"
+import type { AdapterType, PeerIdentityDetails } from "../types.js"
 import type { HandleSendFn } from "./types.js"
 
 export type AnyAdapter = Adapter<any>
 
 type AdapterParams = {
-  adapterId: AdapterId
+  adapterType: AdapterType
   logger?: Logger
 }
 
@@ -47,7 +47,7 @@ type AdapterLifecycleState =
   | AdapterLifecycleStoppedState
 
 export abstract class Adapter<G> {
-  readonly adapterId: AdapterId
+  readonly adapterType: AdapterType
   readonly logger: Logger
   readonly channels: ChannelDirectory<G>
 
@@ -59,11 +59,11 @@ export abstract class Adapter<G> {
 
   #lifecycle: AdapterLifecycleState = { state: "created" }
 
-  constructor({ adapterId, logger }: AdapterParams) {
-    this.adapterId = adapterId
+  constructor({ adapterType, logger }: AdapterParams) {
+    this.adapterType = adapterType
     this.logger = (logger ?? getLogger())
       .getChild("adapter")
-      .with({ adapterId })
+      .with({ adapterType })
     this.channels = new ChannelDirectory(this.generate.bind(this))
   }
 
@@ -167,7 +167,7 @@ export abstract class Adapter<G> {
       // Allow re-initialization if adapter was stopped (for adapter reuse in tests)
       this.#lifecycle.state !== "stopped"
     ) {
-      throw new Error(`Adapter ${this.adapterId} already initialized`)
+      throw new Error(`Adapter ${this.adapterType} already initialized`)
     }
     // Store identity for subclasses to access
     this.identity = hooks.identity
@@ -177,7 +177,7 @@ export abstract class Adapter<G> {
   async _start(): Promise<void> {
     if (this.#lifecycle.state !== "initialized") {
       throw new Error(
-        `Cannot start adapter ${this.adapterId} in state ${this.#lifecycle.state}`,
+        `Cannot start adapter ${this.adapterType} in state ${this.#lifecycle.state}`,
       )
     }
     // Transition to started state BEFORE calling onStart so that
@@ -189,9 +189,9 @@ export abstract class Adapter<G> {
   async _stop(): Promise<void> {
     if (this.#lifecycle.state !== "started") {
       this.logger.warn(
-        "Stopping adapter {adapterId} in unexpected state: {state.state}",
+        "Stopping adapter {adapterType} in unexpected state: {state.state}",
         {
-          adapterId: this.adapterId,
+          adapterType: this.adapterType,
           state: this.#lifecycle,
         },
       )
@@ -216,7 +216,7 @@ export abstract class Adapter<G> {
     for (const toChannelId of envelope.toChannelIds) {
       const channel = this.channels.get(toChannelId)
       if (channel) {
-        this.onSend?.(this.adapterId, toChannelId, envelope.message)
+        this.onSend?.(this.adapterType, toChannelId, envelope.message)
         channel.send(envelope.message)
         sentCount++
       }

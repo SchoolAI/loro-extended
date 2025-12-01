@@ -33,11 +33,11 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToA,
-          adapterId: "server-to-a",
+          adapterType: "server-to-a",
         }),
         new BridgeAdapter({
           bridge: serverBridgeToB,
-          adapterId: "server-to-b",
+          adapterType: "server-to-b",
         }),
       ],
     })
@@ -48,7 +48,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToA,
-          adapterId: "clientA-adapter",
+          adapterType: "clientA-adapter",
         }),
       ],
     })
@@ -59,7 +59,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToB,
-          adapterId: "clientB-adapter",
+          adapterType: "clientB-adapter",
         }),
       ],
     })
@@ -214,14 +214,14 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const peer1 = new Repo({
         identity: { name: "peer1", type: "user" },
         adapters: [
-          new BridgeAdapter({ bridge: directBridge, adapterId: "peer1" }),
+          new BridgeAdapter({ bridge: directBridge, adapterType: "peer1" }),
         ],
       })
 
       const peer2 = new Repo({
         identity: { name: "peer2", type: "user" },
         adapters: [
-          new BridgeAdapter({ bridge: directBridge, adapterId: "peer2" }),
+          new BridgeAdapter({ bridge: directBridge, adapterType: "peer2" }),
         ],
       })
 

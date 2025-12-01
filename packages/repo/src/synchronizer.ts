@@ -402,7 +402,7 @@ export class Synchronizer {
             toChannelIds: command.envelope.toChannelIds,
             totalAdapters: this.adapters.adapters.length,
             adapterChannelCounts: this.adapters.adapters.map(a => ({
-              adapterId: a.adapterId,
+              adapterType: a.adapterType,
               channelCount: a.channels.size,
             })),
           },

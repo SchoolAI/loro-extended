@@ -35,9 +35,6 @@ export interface PostgresStorageAdapterOptions {
 
   /** Auto-create table if not exists (default: true) */
   createTable?: boolean
-
-  /** Adapter ID for logging (default: 'postgres') */
-  adapterId?: string
 }
 
 /**
@@ -64,7 +61,7 @@ export class PostgresStorageAdapter extends StorageAdapter {
   #initialized = false
 
   constructor(options: PostgresStorageAdapterOptions) {
-    super({ adapterId: options.adapterId ?? "postgres" })
+    super({ adapterType: "postgres" })
     this.#client = options.client
     this.#tableName = options.tableName ?? "loro_storage"
     this.#keyColumn = options.keyColumn ?? "key"

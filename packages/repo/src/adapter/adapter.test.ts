@@ -5,7 +5,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import type { AdapterId, PeerID, PeerIdentityDetails } from "../types.js"
+import type { AdapterType, PeerID, PeerIdentityDetails } from "../types.js"
 import { Adapter, type AdapterHooks } from "./adapter.js"
 
 // Mock adapter for testing
@@ -17,8 +17,8 @@ class MockAdapter extends Adapter<string> {
   // Track what was passed to generate
   lastGeneratedContext: string | undefined
 
-  constructor(adapterId: AdapterId = "mock-adapter") {
-    super({ adapterId })
+  constructor(adapterType: AdapterType = "mock-adapter") {
+    super({ adapterType })
   }
 
   protected generate(context: string): GeneratedChannel {
@@ -26,7 +26,7 @@ class MockAdapter extends Adapter<string> {
     this.lastGeneratedContext = context
 
     return {
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       kind: "network",
       send: vi.fn(),
       stop: vi.fn(),
@@ -75,7 +75,7 @@ describe("Adapter", () => {
   describe("Lifecycle State Management", () => {
     it("starts in 'created' state", () => {
       expect(adapter).toBeDefined()
-      expect(adapter.adapterId).toBe("mock-adapter")
+      expect(adapter.adapterType).toBe("mock-adapter")
     })
 
     it("transitions from 'created' to 'initialized' on _initialize", () => {
@@ -131,9 +131,9 @@ describe("Adapter", () => {
       await adapter._stop()
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "Stopping adapter {adapterId} in unexpected state: {state.state}",
+        "Stopping adapter {adapterType} in unexpected state: {state.state}",
         expect.objectContaining({
-          adapterId: "mock-adapter",
+          adapterType: "mock-adapter",
         }),
       )
     })
@@ -555,7 +555,7 @@ describe("Adapter", () => {
       })
 
       expect(onSendSpy).toHaveBeenCalledWith(
-        adapter.adapterId,
+        adapter.adapterType,
         channel.channelId,
         message,
       )
@@ -624,7 +624,7 @@ describe("Adapter", () => {
 
         protected generate(_context: string): GeneratedChannel {
           return {
-            adapterId: this.adapterId,
+            adapterType: this.adapterType,
             kind: "network",
             send: vi.fn(),
             stop: vi.fn(),
@@ -642,7 +642,7 @@ describe("Adapter", () => {
         }
       }
 
-      const adapter = new OnStartChannelAdapter({ adapterId: "test-adapter" })
+      const adapter = new OnStartChannelAdapter({ adapterType: "test-adapter" })
       const onStartHooks: AdapterHooks = {
         identity: {
           peerId: "0" satisfies PeerID,
@@ -667,11 +667,11 @@ describe("Adapter", () => {
   })
 
   describe("Logger Integration", () => {
-    it("creates logger with adapterId", () => {
+    it("creates logger with adapterType", () => {
       const customAdapter = new MockAdapter("custom-id")
 
       expect(customAdapter.logger).toBeDefined()
-      // Logger should be configured with adapterId context
+      // Logger should be configured with adapterType context
     })
   })
 

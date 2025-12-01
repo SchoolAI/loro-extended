@@ -63,7 +63,7 @@ export function getReadyStates(
         channels.push({
           kind: channel.kind,
           state: channel.type,
-          adapterId: channel.adapterId,
+          adapterType: channel.adapterType,
         })
       }
 

@@ -10,15 +10,15 @@ export class InMemoryStorageAdapter extends StorageAdapter {
   constructor(
     sharedDataOrOptions?:
       | Map<string, Uint8Array>
-      | { sharedData?: Map<string, Uint8Array>; adapterId?: string },
+      | { sharedData?: Map<string, Uint8Array>; adapterType?: string },
   ) {
     // Handle both old API (just sharedData) and new API (options object)
     const options =
       sharedDataOrOptions instanceof Map
-        ? { sharedData: sharedDataOrOptions, adapterId: "in-memory" }
-        : { adapterId: "in-memory", ...sharedDataOrOptions }
+        ? { sharedData: sharedDataOrOptions, adapterType: "in-memory" }
+        : { adapterType: "in-memory", ...sharedDataOrOptions }
 
-    super({ adapterId: options.adapterId })
+    super({ adapterType: options.adapterType })
 
     if (options.sharedData) {
       this.#data = options.sharedData

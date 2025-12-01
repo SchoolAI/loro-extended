@@ -32,11 +32,11 @@ describe("Ephemeral Store - Timing Issues", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToA,
-          adapterId: "server-to-a",
+          adapterType: "server-to-a",
         }),
         new BridgeAdapter({
           bridge: serverBridgeToB,
-          adapterId: "server-to-b",
+          adapterType: "server-to-b",
         }),
       ],
     })
@@ -46,7 +46,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToA,
-          adapterId: "clientA-adapter",
+          adapterType: "clientA-adapter",
         }),
       ],
     })
@@ -56,7 +56,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       adapters: [
         new BridgeAdapter({
           bridge: serverBridgeToB,
-          adapterId: "clientB-adapter",
+          adapterType: "clientB-adapter",
         }),
       ],
     })
@@ -257,7 +257,7 @@ describe("Ephemeral Store - Timing Issues", () => {
           adapters: [
             new BridgeAdapter({
               bridge: serverBridgeToB,
-              adapterId: "clientB-adapter",
+              adapterType: "clientB-adapter",
             }),
           ],
         })

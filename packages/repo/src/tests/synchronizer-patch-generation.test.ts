@@ -20,7 +20,7 @@ class MockAdapter extends Adapter<{ name: string }> {
   protected generate(context: { name: string }): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: vi.fn((message: ChannelMsg) => {
         this.sentMessages.push({ channelId: context.name, message })
       }),
@@ -65,7 +65,7 @@ describe("Synchronizer - Patch Generation", () => {
     onPatch = vi.fn((newPatches: Patch[]) => {
       patches.push(...newPatches)
     })
-    mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
+    mockAdapter = new MockAdapter({ adapterType: "test-adapter" })
   })
 
   it("should generate patches when onPatch is provided", async () => {
@@ -89,7 +89,7 @@ describe("Synchronizer - Patch Generation", () => {
   it("should work without onPatch callback", () => {
     const syncWithoutPatch = new Synchronizer({
       identity: { peerId: "1", name: "test", type: "user" },
-      adapters: [new MockAdapter({ adapterId: "test" }) as AnyAdapter],
+      adapters: [new MockAdapter({ adapterType: "test" }) as AnyAdapter],
     })
 
     // Should not throw when no patch callback is provided

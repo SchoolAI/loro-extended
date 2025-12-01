@@ -428,15 +428,6 @@ describe("PostgresStorageAdapter", () => {
       )
       expect(createTableQuery).toBeUndefined()
     })
-
-    it("should use custom adapterId", () => {
-      const customAdapter = new PostgresStorageAdapter({
-        client: mockClient,
-        adapterId: "custom-postgres",
-      })
-
-      expect(customAdapter.adapterId).toBe("custom-postgres")
-    })
   })
 
   describe("SQL Query Generation", () => {

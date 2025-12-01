@@ -141,8 +141,8 @@ describe("HttpPollingServerNetworkAdapter", () => {
     }
   })
 
-  it("should have correct adapterId", () => {
-    expect(adapter.adapterId).toBe("http-polling-server")
+  it("should have correct adapterType", () => {
+    expect(adapter.adapterType).toBe("http-polling-server")
   })
 
   it("should have default connection timeout", () => {

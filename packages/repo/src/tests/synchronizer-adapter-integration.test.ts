@@ -19,7 +19,7 @@ class MockAdapter extends Adapter<{ name: string }> {
   protected generate(context: { name: string }): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: vi.fn((message: ChannelMsg) => {
         this.sentMessages.push({ channelId: context.name, message })
       }),
@@ -58,7 +58,7 @@ describe("Synchronizer - Adapter Integration", () => {
   let mockAdapter: MockAdapter
 
   beforeEach(() => {
-    mockAdapter = new MockAdapter({ adapterId: "test-adapter" })
+    mockAdapter = new MockAdapter({ adapterType: "test-adapter" })
   })
 
   it("should send messages through adapters", async () => {
@@ -78,8 +78,8 @@ describe("Synchronizer - Adapter Integration", () => {
   })
 
   it("should handle multiple adapters", async () => {
-    const adapter1 = new MockAdapter({ adapterId: "adapter-1" })
-    const adapter2 = new MockAdapter({ adapterId: "adapter-2" })
+    const adapter1 = new MockAdapter({ adapterType: "adapter-1" })
+    const adapter2 = new MockAdapter({ adapterType: "adapter-2" })
 
     const multiSync = new Synchronizer({
       identity: { peerId: "2", name: "test", type: "user" },

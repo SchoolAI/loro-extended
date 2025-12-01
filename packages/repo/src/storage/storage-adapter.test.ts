@@ -18,7 +18,7 @@ class MockStorageAdapter extends StorageAdapter {
   private storage = new Map<string, Uint8Array>()
 
   constructor() {
-    super({ adapterId: "mock-storage" })
+    super({ adapterType: "mock-storage" })
   }
 
   async load(key: StorageKey): Promise<Uint8Array | undefined> {
@@ -128,7 +128,7 @@ describe("StorageAdapter", () => {
 
       const channel = Array.from(adapter.channels)[0]
       expect(channel.kind).toBe("storage")
-      expect(channel.adapterId).toBe("mock-storage")
+      expect(channel.adapterType).toBe("mock-storage")
     })
   })
 

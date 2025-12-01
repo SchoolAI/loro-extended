@@ -1,6 +1,6 @@
 import type { VersionVector } from "loro-crdt"
 import type {
-  AdapterId,
+  AdapterType,
   ChannelId,
   DocId,
   PeerID,
@@ -253,7 +253,7 @@ export function isEstablished(channel: Channel): channel is EstablishedChannel {
 
 export type ChannelMeta = {
   kind: ChannelKind
-  adapterId: AdapterId
+  adapterType: AdapterType
 }
 
 export type ChannelIdentity = {

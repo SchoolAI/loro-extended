@@ -61,13 +61,13 @@ describe("Repo", () => {
 
     const bridge = new Bridge()
 
-    const networkA = new BridgeAdapter({ adapterId: "network-a", bridge })
+    const networkA = new BridgeAdapter({ adapterType: "network-a", bridge })
     const repoA = new Repo({
       identity: { name: "repoA", type: "user" },
       adapters: [networkA],
     })
 
-    const networkB = new BridgeAdapter({ adapterId: "network-b", bridge })
+    const networkB = new BridgeAdapter({ adapterType: "network-b", bridge })
     const repoB = new Repo({
       identity: { name: "repoB", type: "user" },
       adapters: [networkB],

@@ -75,13 +75,13 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
   private connections = new Map<PeerID, WsConnection>()
 
   constructor() {
-    super({ adapterId: "ws-server" })
+    super({ adapterType: "websocket-server" })
   }
 
   protected generate(peerId: PeerID): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
         const connection = this.connections.get(peerId)
         if (connection) {

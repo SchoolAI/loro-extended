@@ -14,7 +14,7 @@ export class IndexedDBStorageAdapter extends StorageAdapter {
   #dbPromise: Promise<IDBPDatabase>
 
   constructor() {
-    super({ adapterId: "indexeddb" })
+    super({ adapterType: "indexeddb" })
     this.#dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {

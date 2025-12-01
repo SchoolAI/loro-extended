@@ -19,7 +19,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // repoA has the doc and restrictive rules
     const repoA = new Repo({
       identity: { name: "repoA", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapterA" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
       rules: {
         canReveal: () => false, // Deny everything by default
       },
@@ -54,7 +54,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // repoB connects
     const repoB = new Repo({
       identity: { name: "repoB", type: "user", peerId: peerIdB },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "adapterB" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
     })
 
     // Wait for sync

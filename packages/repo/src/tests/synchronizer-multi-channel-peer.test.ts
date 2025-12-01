@@ -32,7 +32,7 @@ class MockNetworkAdapter extends Adapter<{ name: string }> {
   protected generate(context: { name: string }): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: vi.fn((message: ChannelMsg) => {
         this.sentMessages.push({ channelId: context.name, message })
       }),
@@ -86,8 +86,8 @@ describe("Multi-channel peer scenarios", () => {
   const remotePeerId: PeerID = "123"
 
   beforeEach(() => {
-    sseAdapter = new MockNetworkAdapter({ adapterId: "sse-adapter" })
-    webrtcAdapter = new MockNetworkAdapter({ adapterId: "webrtc-adapter" })
+    sseAdapter = new MockNetworkAdapter({ adapterType: "sse-adapter" })
+    webrtcAdapter = new MockNetworkAdapter({ adapterType: "webrtc-adapter" })
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [sseAdapter as AnyAdapter, webrtcAdapter as AnyAdapter],

@@ -40,8 +40,8 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const server = new Repo({
       identity: { name: "server", type: "service" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterId: "server-to-a" }),
-        new BridgeAdapter({ bridge: bridgeToB, adapterId: "server-to-b" }),
+        new BridgeAdapter({ bridge: bridgeToA, adapterType: "server-to-a" }),
+        new BridgeAdapter({ bridge: bridgeToB, adapterType: "server-to-b" }),
       ],
     })
     repos.push(server)
@@ -50,7 +50,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientA = new Repo({
       identity: { name: "clientA", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterId: "clientA-adapter" }),
+        new BridgeAdapter({ bridge: bridgeToA, adapterType: "clientA-adapter" }),
       ],
     })
     repos.push(clientA)
@@ -71,7 +71,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientB = new Repo({
       identity: { name: "clientB", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToB, adapterId: "clientB-adapter" }),
+        new BridgeAdapter({ bridge: bridgeToB, adapterType: "clientB-adapter" }),
       ],
     })
     repos.push(clientB)
@@ -112,8 +112,8 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const server = new Repo({
       identity: { name: "server", type: "service" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterId: "server-to-a" }),
-        new BridgeAdapter({ bridge: bridgeToB, adapterId: "server-to-b" }),
+        new BridgeAdapter({ bridge: bridgeToA, adapterType: "server-to-a" }),
+        new BridgeAdapter({ bridge: bridgeToB, adapterType: "server-to-b" }),
       ],
     })
     repos.push(server)
@@ -122,7 +122,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientA = new Repo({
       identity: { name: "clientA", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToA, adapterId: "clientA-adapter" }),
+        new BridgeAdapter({ bridge: bridgeToA, adapterType: "clientA-adapter" }),
       ],
     })
     repos.push(clientA)
@@ -139,7 +139,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const clientB = new Repo({
       identity: { name: "clientB", type: "user" },
       adapters: [
-        new BridgeAdapter({ bridge: bridgeToB, adapterId: "clientB-adapter" }),
+        new BridgeAdapter({ bridge: bridgeToB, adapterType: "clientB-adapter" }),
       ],
     })
     repos.push(clientB)
@@ -175,14 +175,14 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
 
     const server = new Repo({
       identity: { name: "server", type: "service" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "server-adapter" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "server-adapter" })],
     })
     repos.push(server)
 
     // All in one synchronous block - no awaits
     const client = new Repo({
       identity: { name: "client", type: "user" },
-      adapters: [new BridgeAdapter({ bridge, adapterId: "client-adapter" })],
+      adapters: [new BridgeAdapter({ bridge, adapterType: "client-adapter" })],
     })
     repos.push(client)
 

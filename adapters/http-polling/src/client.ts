@@ -100,7 +100,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
   private pollAbortController?: AbortController
 
   constructor(options: HttpPollingClientOptions) {
-    super({ adapterId: "http-polling-client" })
+    super({ adapterType: "http-polling-client" })
     this.pollUrl = options.pollUrl
     this.postUrl = options.postUrl
     this.serverWaitHint = options.serverWaitHint ?? 30000
@@ -112,7 +112,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
   protected generate(): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: async (msg: ChannelMsg) => {
         if (!this.peerId) {
           throw new Error("Adapter not initialized - peerId not available")

@@ -1,8 +1,8 @@
 import type { ChannelMsg } from "../channel.js"
-import type { AdapterId, ChannelId } from "../types.js"
+import type { AdapterType, ChannelId } from "../types.js"
 
 export type HandleSendFn = (
-  adapterId: AdapterId,
+  adapterType: AdapterType,
   toChannelId: ChannelId,
   message: ChannelMsg,
 ) => void

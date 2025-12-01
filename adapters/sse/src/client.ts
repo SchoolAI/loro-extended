@@ -23,7 +23,7 @@ export class SseClientNetworkAdapter extends Adapter<void> {
     postUrl: string | ((peerId: PeerID) => string)
     eventSourceUrl: string | ((peerId: PeerID) => string)
   }) {
-    super({ adapterId: "sse-client" })
+    super({ adapterType: "sse-client" })
     // Store the URL templates - we'll resolve them in onStart() when we have the peerId
     this.postUrl = postUrl
     this.eventSourceUrl = eventSourceUrl
@@ -32,7 +32,7 @@ export class SseClientNetworkAdapter extends Adapter<void> {
   protected generate(): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: async (msg: ChannelMsg) => {
         if (!this.peerId) {
           throw new Error("Adapter not initialized - peerId not available")

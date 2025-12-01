@@ -11,7 +11,7 @@ export class LevelDBStorageAdapter extends StorageAdapter {
   #db: ClassicLevel<string, Uint8Array>
 
   constructor(dbPath: string) {
-    super({ adapterId: `leveldb:${dbPath}` })
+    super({ adapterType: "leveldb" })
     this.#db = new ClassicLevel(dbPath, {
       valueEncoding: "binary",
     })

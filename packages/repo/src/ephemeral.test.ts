@@ -26,7 +26,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -36,7 +36,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -88,7 +88,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -103,7 +103,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -126,7 +126,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -136,7 +136,7 @@ describe("Ephemeral Store Integration", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },

@@ -12,7 +12,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -22,15 +22,15 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
     })
 
     // Verify both repos are connected through the bridge
-    expect(bridge.adapterIds.has("bridge-adapter-repo1")).toBe(true)
-    expect(bridge.adapterIds.has("bridge-adapter-repo2")).toBe(true)
+    expect(bridge.adapterTypes.has("bridge-adapter-repo1")).toBe(true)
+    expect(bridge.adapterTypes.has("bridge-adapter-repo2")).toBe(true)
   })
 
   it("should synchronize a document from repo1 to repo2", async () => {
@@ -40,7 +40,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -50,7 +50,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -83,7 +83,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -93,7 +93,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -134,7 +134,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -144,7 +144,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -193,7 +193,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -203,7 +203,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -242,7 +242,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -252,22 +252,22 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
     })
 
     // Verify both adapters are registered
-    expect(bridge.adapterIds.size).toBe(2)
+    expect(bridge.adapterTypes.size).toBe(2)
 
     // Reset repo1 (should remove its adapter from bridge)
     repo1.reset()
 
     // Verify adapter was removed
-    expect(bridge.adapterIds.has("bridge-adapter-repo1")).toBe(false)
-    expect(bridge.adapterIds.has("bridge-adapter-repo2")).toBe(true)
-    expect(bridge.adapterIds.size).toBe(1)
+    expect(bridge.adapterTypes.has("bridge-adapter-repo1")).toBe(false)
+    expect(bridge.adapterTypes.has("bridge-adapter-repo2")).toBe(true)
+    expect(bridge.adapterTypes.size).toBe(1)
   })
 
   it("should work with more than two repos on the same bridge", async () => {
@@ -282,7 +282,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo1",
+          adapterType: "bridge-adapter-repo1",
         }),
       ],
       identity: { name: "repo1", type: "user" },
@@ -299,7 +299,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo2",
+          adapterType: "bridge-adapter-repo2",
         }),
       ],
       identity: { name: "repo2", type: "user" },
@@ -316,7 +316,7 @@ describe("BridgeAdapter Integration Tests", () => {
       adapters: [
         new BridgeAdapter({
           bridge,
-          adapterId: "bridge-adapter-repo3",
+          adapterType: "bridge-adapter-repo3",
         }),
       ],
       identity: { name: "repo3", type: "user" },

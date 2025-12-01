@@ -162,14 +162,14 @@ export class HttpPollingServerNetworkAdapter extends Adapter<PeerID> {
   private _connectionTimeout: number
 
   constructor(options: { connectionTimeout?: number } = {}) {
-    super({ adapterId: "http-polling-server" })
+    super({ adapterType: "http-polling-server" })
     this._connectionTimeout = options.connectionTimeout ?? 120000 // 2 minutes default
   }
 
   protected generate(peerId: PeerID): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
         const connection = this.connections.get(peerId)
         if (connection) {
