@@ -176,6 +176,76 @@ console.log(result); // Updated document state
 
 ## Advanced Usage
 
+### Discriminated Unions
+
+For type-safe tagged unions (like different message types or presence states), use `Shape.plain.discriminatedUnion()`:
+
+```typescript
+import { Shape, mergeValue } from "@loro-extended/change";
+
+// Define variant shapes - each must have the discriminant key
+const ClientPresenceShape = Shape.plain.object({
+  type: Shape.plain.string("client"), // Literal type for discrimination
+  name: Shape.plain.string(),
+  input: Shape.plain.object({
+    force: Shape.plain.number(),
+    angle: Shape.plain.number(),
+  }),
+});
+
+const ServerPresenceShape = Shape.plain.object({
+  type: Shape.plain.string("server"), // Literal type for discrimination
+  cars: Shape.plain.record(
+    Shape.plain.object({
+      x: Shape.plain.number(),
+      y: Shape.plain.number(),
+    })
+  ),
+  tick: Shape.plain.number(),
+});
+
+// Create the discriminated union
+const GamePresenceSchema = Shape.plain.discriminatedUnion("type", {
+  client: ClientPresenceShape,
+  server: ServerPresenceShape,
+});
+
+// Empty states for each variant
+const EmptyClientPresence = {
+  type: "client" as const,
+  name: "",
+  input: { force: 0, angle: 0 },
+};
+
+const EmptyServerPresence = {
+  type: "server" as const,
+  cars: {},
+  tick: 0,
+};
+
+// Use with mergeValue for presence data
+const crdtValue = { type: "client", name: "Alice" };
+const result = mergeValue(GamePresenceSchema, crdtValue, EmptyClientPresence);
+// Result: { type: "client", name: "Alice", input: { force: 0, angle: 0 } }
+
+// Type-safe filtering
+function handlePresence(presence: typeof result) {
+  if (presence.type === "server") {
+    // TypeScript knows this is ServerPresence
+    console.log(presence.cars, presence.tick);
+  } else {
+    // TypeScript knows this is ClientPresence
+    console.log(presence.name, presence.input);
+  }
+}
+```
+
+**Key features:**
+- The discriminant key (e.g., `"type"`) determines which variant shape to use
+- Missing fields are filled from the empty state of the matching variant
+- Works seamlessly with `@loro-extended/react`'s `usePresence` hook
+- Full TypeScript support for discriminated union types
+
 ### Nested Structures
 
 Handle complex nested documents with ease:
@@ -335,6 +405,7 @@ const schema = Shape.doc({
 - `Shape.plain.record(valueShape)` - Object values with dynamic string keys
 - `Shape.plain.array(itemShape)` - Array values
 - `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
+- `Shape.plain.discriminatedUnion(key, variants)` - Tagged union types with a discriminant key
 
 ### TypedDoc Methods
 

@@ -163,6 +163,29 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
   readonly shapes: T
 }
 
+/**
+ * A discriminated union shape that uses a discriminant key to determine which variant to use.
+ * This enables type-safe handling of tagged unions like:
+ *
+ * ```typescript
+ * type GamePresence =
+ *   | { type: "client"; name: string; input: { force: number; angle: number } }
+ *   | { type: "server"; cars: Record<string, CarState>; tick: number }
+ * ```
+ *
+ * @typeParam K - The discriminant key (e.g., "type")
+ * @typeParam T - A record mapping discriminant values to their object shapes
+ */
+export interface DiscriminatedUnionValueShape<
+  K extends string = string,
+  T extends Record<string, ObjectValueShape> = Record<string, ObjectValueShape>,
+> extends Shape<T[keyof T]["_plain"], T[keyof T]["_draft"]> {
+  readonly _type: "value"
+  readonly valueType: "discriminatedUnion"
+  readonly discriminantKey: K
+  readonly variants: T
+}
+
 // Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
 export type ValueShape =
   | StringValueShape
@@ -175,6 +198,7 @@ export type ValueShape =
   | RecordValueShape
   | ArrayValueShape
   | UnionValueShape
+  | DiscriminatedUnionValueShape
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
@@ -330,6 +354,47 @@ export const Shape = {
       _type: "value" as const,
       valueType: "union" as const,
       shapes,
+      _plain: {} as any,
+      _draft: {} as any,
+    }),
+
+    /**
+     * Creates a discriminated union shape for type-safe tagged unions.
+     *
+     * @example
+     * ```typescript
+     * const ClientPresenceShape = Shape.plain.object({
+     *   type: Shape.plain.string("client"),
+     *   name: Shape.plain.string(),
+     *   input: Shape.plain.object({ force: Shape.plain.number(), angle: Shape.plain.number() }),
+     * })
+     *
+     * const ServerPresenceShape = Shape.plain.object({
+     *   type: Shape.plain.string("server"),
+     *   cars: Shape.plain.record(Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() })),
+     *   tick: Shape.plain.number(),
+     * })
+     *
+     * const GamePresenceSchema = Shape.plain.discriminatedUnion("type", {
+     *   client: ClientPresenceShape,
+     *   server: ServerPresenceShape,
+     * })
+     * ```
+     *
+     * @param discriminantKey - The key used to discriminate between variants (e.g., "type")
+     * @param variants - A record mapping discriminant values to their object shapes
+     */
+    discriminatedUnion: <
+      K extends string,
+      T extends Record<string, ObjectValueShape>,
+    >(
+      discriminantKey: K,
+      variants: T,
+    ): DiscriminatedUnionValueShape<K, T> => ({
+      _type: "value" as const,
+      valueType: "discriminatedUnion" as const,
+      discriminantKey,
+      variants,
       _plain: {} as any,
       _draft: {} as any,
     }),

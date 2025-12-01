@@ -8,15 +8,19 @@ export type {
   ContainerType as RootContainerType,
   // Container shapes
   CounterContainerShape,
+  // Discriminated union for tagged unions
+  DiscriminatedUnionValueShape,
   // Schema node types
   DocShape,
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
+  ObjectValueShape,
   RecordContainerShape,
   RecordValueShape,
   TextContainerShape,
   TreeContainerShape,
+  UnionValueShape,
   // Value shapes
   ValueShape,
   // ...

@@ -1,5 +1,10 @@
 import type { Value } from "loro-crdt"
-import type { ContainerShape, DocShape, ValueShape } from "./shape.js"
+import type {
+  ContainerShape,
+  DiscriminatedUnionValueShape,
+  DocShape,
+  ValueShape,
+} from "./shape.js"
 import { isObjectValue } from "./utils/type-guards.js"
 
 /**
@@ -101,6 +106,49 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
         }
         return result
       }
+
+      // Handle discriminated unions
+      if (shape._type === "value" && shape.valueType === "discriminatedUnion") {
+        return mergeDiscriminatedUnion(
+          shape as DiscriminatedUnionValueShape,
+          crdtValue,
+          emptyValue,
+        )
+      }
+
       return crdtValue ?? emptyValue
   }
+}
+
+/**
+ * Merges a discriminated union value by determining the variant from the discriminant key.
+ * Uses the emptyValue's discriminant to determine the default variant when the discriminant is missing.
+ */
+function mergeDiscriminatedUnion(
+  shape: DiscriminatedUnionValueShape,
+  crdtValue: Value,
+  emptyValue: Value,
+): Value {
+  const crdtObj = (crdtValue as Record<string, Value>) ?? {}
+  const emptyObj = (emptyValue as Record<string, Value>) ?? {}
+
+  // Get the discriminant value from CRDT, falling back to empty state
+  const discriminantValue =
+    crdtObj[shape.discriminantKey] ?? emptyObj[shape.discriminantKey]
+
+  if (typeof discriminantValue !== "string") {
+    // If no valid discriminant, return the empty state
+    return emptyValue
+  }
+
+  // Find the variant shape for this discriminant value
+  const variantShape = shape.variants[discriminantValue]
+
+  if (!variantShape) {
+    // Unknown variant - return CRDT value or empty
+    return crdtValue ?? emptyValue
+  }
+
+  // Merge using the variant's object shape
+  return mergeValue(variantShape, crdtValue, emptyValue)
 }
