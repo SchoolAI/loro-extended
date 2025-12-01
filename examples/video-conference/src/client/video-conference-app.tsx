@@ -65,6 +65,9 @@ export default function VideoConferenceApp({
   const { all: rawUserPresence, setSelf: setUserPresence } =
     useUntypedPresence(roomId)
   const userPresence = rawUserPresence as Record<string, UserPresence>
+  useEffect(() => {
+    console.log({ userPresence })
+  }, [userPresence])
 
   // Signaling presence - high-frequency WebRTC signals
   // Uses a separate channel to avoid mixing with user metadata
@@ -75,6 +78,9 @@ export default function VideoConferenceApp({
     string,
     SignalingPresence
   >
+  useEffect(() => {
+    console.log({ signalingPresence })
+  }, [signalingPresence])
 
   // Local media (camera/microphone)
   const {

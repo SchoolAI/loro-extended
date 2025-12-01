@@ -10,7 +10,11 @@
 
 import type { PeerID } from "@loro-extended/repo"
 import { describe, expect, it } from "vitest"
-import type { SignalingPresence, UserPresence } from "../../shared/types"
+import type {
+  SignalData,
+  SignalingPresence,
+  UserPresence,
+} from "../../shared/types"
 
 describe("Presence Data Flow", () => {
   describe("UserPresence", () => {
@@ -47,24 +51,28 @@ describe("Presence Data Flow", () => {
   })
 
   describe("SignalingPresence", () => {
-    it("contains only signals", () => {
+    it("contains only signals and instanceId", () => {
       const signalingPresence: SignalingPresence = {
+        instanceId: "test-instance",
         signals: {
           "peer-123": [{ type: "offer", sdp: "..." }],
         },
       }
 
       expect(signalingPresence.signals["peer-123"]).toHaveLength(1)
+      expect(signalingPresence.instanceId).toBe("test-instance")
       // @ts-expect-error - name should not exist on SignalingPresence
       expect(signalingPresence.name).toBeUndefined()
     })
 
     it("can be updated independently", () => {
       const original: SignalingPresence = {
+        instanceId: "test-instance",
         signals: {},
       }
 
       const updated: SignalingPresence = {
+        instanceId: original.instanceId,
         signals: {
           ...original.signals,
           "peer-456": [{ type: "offer", sdp: "v=0..." }],
@@ -112,12 +120,14 @@ describe("Presence Data Flow", () => {
       const myPeerId = "peer-1" as PeerID
       const allSignalingPresence: Record<string, SignalingPresence> = {
         "peer-2": {
+          instanceId: "instance-2",
           signals: {
             "peer-1": [{ type: "offer", sdp: "offer-from-alice" }],
             "peer-3": [{ type: "offer", sdp: "offer-to-charlie" }],
           },
         },
         "peer-3": {
+          instanceId: "instance-3",
           signals: {
             "peer-1": [{ type: "offer", sdp: "offer-from-charlie" }],
           },
@@ -148,13 +158,15 @@ describe("Presence Data Flow", () => {
     it("updates signals without affecting user presence", () => {
       // With separated presence, we only update the signaling channel
       const currentSignaling: SignalingPresence = {
+        instanceId: "test-instance",
         signals: {},
       }
 
       const targetPeerId = "peer-2"
-      const newSignal = { type: "offer", sdp: "v=0..." }
+      const newSignal: SignalData = { type: "offer", sdp: "v=0..." }
 
       const updatedSignaling: SignalingPresence = {
+        instanceId: currentSignaling.instanceId,
         signals: {
           ...currentSignaling.signals,
           [targetPeerId]: [
@@ -195,9 +207,13 @@ describe("Presence Data Flow", () => {
 
       // Signaling presence updates frequently (many signals during connection)
       const signalingUpdates: SignalingPresence[] = [
-        { signals: { "peer-2": [{ type: "offer" }] } },
-        { signals: { "peer-2": [{ type: "offer" }, { type: "candidate" }] } },
+        { instanceId: "i1", signals: { "peer-2": [{ type: "offer" }] } },
         {
+          instanceId: "i1",
+          signals: { "peer-2": [{ type: "offer" }, { type: "candidate" }] },
+        },
+        {
+          instanceId: "i1",
           signals: {
             "peer-2": [
               { type: "offer" },
@@ -207,6 +223,7 @@ describe("Presence Data Flow", () => {
           },
         },
         {
+          instanceId: "i1",
           signals: {
             "peer-2": [
               { type: "offer" },

@@ -66,11 +66,16 @@ describe("Signaling Presence", () => {
     it("has empty signals", () => {
       expect(EmptySignalingPresence.signals).toEqual({})
     })
+
+    it("has empty instanceId", () => {
+      expect(EmptySignalingPresence.instanceId).toBe("")
+    })
   })
 
   describe("SignalingPresence type", () => {
     it("can hold signals for multiple peers", () => {
       const presence: SignalingPresence = {
+        instanceId: "test-instance",
         signals: {
           "peer-1": [{ type: "offer", sdp: "..." }],
           "peer-2": [{ type: "answer", sdp: "..." }],
@@ -84,6 +89,7 @@ describe("Signaling Presence", () => {
 
     it("can accumulate multiple signals per peer", () => {
       const presence: SignalingPresence = {
+        instanceId: "test-instance",
         signals: {
           "peer-1": [
             { type: "offer", sdp: "..." },

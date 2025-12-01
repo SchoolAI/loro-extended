@@ -70,6 +70,15 @@ export function useWebRtcMesh(
     [queueOutgoingSignal],
   )
 
+  // Clear outgoing signals when a connection is established
+  // This prevents signal accumulation that can cause PayloadTooLargeError
+  const handleOnConnected = useCallback(
+    (remotePeerId: PeerID) => {
+      clearOutgoingSignals(remotePeerId)
+    },
+    [clearOutgoingSignals],
+  )
+
   // Peer manager for connection lifecycle
   const {
     remoteStreams,
@@ -82,6 +91,7 @@ export function useWebRtcMesh(
     myPeerId,
     localStream,
     onSignal: handleOnSignal,
+    onConnected: handleOnConnected,
     webrtcAdapter,
   })
 

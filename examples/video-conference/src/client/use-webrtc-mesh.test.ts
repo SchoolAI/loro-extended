@@ -2,7 +2,7 @@ import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import type { PeerID } from "@loro-extended/repo"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { SignalingPresence } from "../shared/types"
+import type { SignalData, SignalingPresence } from "../shared/types"
 
 // Store mock instances for inspection - must be defined before vi.mock
 const mockPeerInstances: MockPeer[] = []
@@ -174,10 +174,11 @@ describe("useWebRtcMesh", () => {
 
   describe("signal processing", () => {
     it("processes incoming signals and creates peer if needed", async () => {
-      const incomingSignal = { type: "offer", sdp: "test-sdp" }
-      // SignalingPresence now only contains signals (no user metadata)
+      const incomingSignal: SignalData = { type: "offer", sdp: "test-sdp" }
+      // SignalingPresence now only contains signals and instanceId (no user metadata)
       const signalingPresence: Record<string, SignalingPresence> = {
         [remotePeerId]: {
+          instanceId: "remote-instance-1",
           signals: {
             [myPeerId]: [incomingSignal],
           },
@@ -205,9 +206,10 @@ describe("useWebRtcMesh", () => {
     })
 
     it("deduplicates signals - same signal not processed twice", async () => {
-      const incomingSignal = { type: "offer", sdp: "test-sdp" }
+      const incomingSignal: SignalData = { type: "offer", sdp: "test-sdp" }
       const signalingPresence: Record<string, SignalingPresence> = {
         [remotePeerId]: {
+          instanceId: "remote-instance-1",
           signals: {
             [myPeerId]: [incomingSignal],
           },

@@ -2,15 +2,17 @@
 import type { PeerID } from "@loro-extended/repo"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
+import type { SignalData } from "../../shared/types"
 import { useSignalChannel } from "./use-signal-channel"
 
 describe("useSignalChannel", () => {
   const peerA = "100000000000000000000000000000" as PeerID
   const peerB = "200000000000000000000000000000" as PeerID
+  const testInstanceId = "test-instance-id"
 
   describe("queueOutgoingSignal", () => {
     it("adds signal to outgoing signals for target peer", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
         result.current.queueOutgoingSignal(peerA, {
@@ -27,7 +29,7 @@ describe("useSignalChannel", () => {
     })
 
     it("accumulates multiple signals for same peer", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
         result.current.queueOutgoingSignal(peerA, {
@@ -48,7 +50,7 @@ describe("useSignalChannel", () => {
     })
 
     it("keeps signals separate for different peers", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
         result.current.queueOutgoingSignal(peerA, {
@@ -70,7 +72,7 @@ describe("useSignalChannel", () => {
 
   describe("clearOutgoingSignals", () => {
     it("removes signals for specified peer", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
         result.current.queueOutgoingSignal(peerA, { type: "offer" })
@@ -89,7 +91,7 @@ describe("useSignalChannel", () => {
     })
 
     it("does nothing if peer has no signals", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
         result.current.clearOutgoingSignals(peerA)
@@ -101,14 +103,14 @@ describe("useSignalChannel", () => {
 
   describe("filterNewSignals", () => {
     it("returns all signals on first call", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
-      const signals = [
+      const signals: SignalData[] = [
         { type: "offer", sdp: "test" },
         { type: "candidate", candidate: "ice1" },
       ]
 
-      let newSignals: unknown[]
+      let newSignals: SignalData[]
       act(() => {
         newSignals = result.current.filterNewSignals(peerA, signals)
       })
@@ -117,9 +119,9 @@ describe("useSignalChannel", () => {
     })
 
     it("filters out already processed signals", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
-      const signals = [
+      const signals: SignalData[] = [
         { type: "offer", sdp: "test" },
         { type: "candidate", candidate: "ice1" },
       ]
@@ -130,7 +132,7 @@ describe("useSignalChannel", () => {
       })
 
       // Second call with same signals - none are new
-      let newSignals: unknown[]
+      let newSignals: SignalData[]
       act(() => {
         newSignals = result.current.filterNewSignals(peerA, signals)
       })
@@ -139,10 +141,10 @@ describe("useSignalChannel", () => {
     })
 
     it("returns only new signals when mixed with processed ones", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
-      const initialSignals = [{ type: "offer", sdp: "test" }]
-      const mixedSignals = [
+      const initialSignals: SignalData[] = [{ type: "offer", sdp: "test" }]
+      const mixedSignals: SignalData[] = [
         { type: "offer", sdp: "test" }, // Already processed
         { type: "candidate", candidate: "ice1" }, // New
       ]
@@ -151,7 +153,7 @@ describe("useSignalChannel", () => {
         result.current.filterNewSignals(peerA, initialSignals)
       })
 
-      let newSignals: unknown[]
+      let newSignals: SignalData[]
       act(() => {
         newSignals = result.current.filterNewSignals(peerA, mixedSignals)
       })
@@ -161,9 +163,9 @@ describe("useSignalChannel", () => {
     })
 
     it("tracks signals separately per peer", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
-      const signal = { type: "offer", sdp: "test" }
+      const signal: SignalData = { type: "offer", sdp: "test" }
 
       // Process signal from peer A
       act(() => {
@@ -171,7 +173,7 @@ describe("useSignalChannel", () => {
       })
 
       // Same signal from peer B should still be new
-      let newSignals: unknown[]
+      let newSignals: SignalData[]
       act(() => {
         newSignals = result.current.filterNewSignals(peerB, [signal])
       })
@@ -180,9 +182,9 @@ describe("useSignalChannel", () => {
     })
 
     it("handles empty signal array", () => {
-      const { result } = renderHook(() => useSignalChannel())
+      const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
-      let newSignals: unknown[]
+      let newSignals: SignalData[]
       act(() => {
         newSignals = result.current.filterNewSignals(peerA, [])
       })

@@ -149,6 +149,8 @@ export type UsePeerManagerOptions = {
   myPeerId: PeerID
   localStream: MediaStream | null
   onSignal: (targetPeerId: PeerID, signal: SignalData) => void
+  /** Called when a peer connection is successfully established */
+  onConnected?: (remotePeerId: PeerID) => void
   webrtcAdapter: WebRtcDataChannelAdapter
 }
 
@@ -185,6 +187,7 @@ export function usePeerManager({
   myPeerId,
   localStream,
   onSignal,
+  onConnected,
   webrtcAdapter,
 }: UsePeerManagerOptions): UsePeerManagerReturn {
   // Map of peerId -> PeerConnection
@@ -274,6 +277,9 @@ export function usePeerManager({
         setConnectionStates(prev =>
           new Map(prev).set(remotePeerId, "connected"),
         )
+        // Notify parent that connection is established
+        // This allows clearing accumulated signals to prevent payload bloat
+        onConnected?.(remotePeerId)
       })
 
       // Handle connection closed
@@ -287,7 +293,7 @@ export function usePeerManager({
         setConnectionStates(prev => new Map(prev).set(remotePeerId, "failed"))
       })
     },
-    [myPeerId, localStream, onSignal, destroyPeer, webrtcAdapter],
+    [myPeerId, localStream, onSignal, onConnected, destroyPeer, webrtcAdapter],
   )
 
   // Pass a signal to a peer
@@ -295,7 +301,9 @@ export function usePeerManager({
     const connection = peersRef.current.get(remotePeerId)
     if (connection) {
       try {
-        connection.peer.signal(signal)
+        // Cast to any because simple-peer's SignalData type is slightly different
+        // from our SignalData type (their type field is more restrictive)
+        connection.peer.signal(signal as any)
       } catch (err) {
         console.error(`Error processing WebRTC signal:`, err)
       }

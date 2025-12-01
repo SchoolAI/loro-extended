@@ -348,7 +348,7 @@ describe("useWebRtcMesh Reconnection", () => {
         },
       }
 
-      const { result } = renderHook(() =>
+      renderHook(() =>
         useWebRtcMesh(
           initiatorPeerId,
           mockLocalStream,
