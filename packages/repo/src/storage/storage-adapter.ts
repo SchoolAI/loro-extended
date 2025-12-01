@@ -9,6 +9,7 @@ import type {
   ChannelMsg,
   ChannelMsgDeleteRequest,
   ChannelMsgDirectoryRequest,
+  ChannelMsgNewDoc,
   ChannelMsgSyncRequest,
   ConnectedChannel,
   GeneratedChannel,
@@ -105,7 +106,11 @@ export abstract class StorageAdapter extends Adapter<void> {
         case "channel/directory-request":
           return await this.handleDirectoryRequest(msg)
         case "channel/directory-response":
-          return await this.handleDirectoryResponse(msg)
+          // directory-response is only for request/response flow (future glob feature)
+          // Storage adapters don't need to handle this
+          break
+        case "channel/new-doc":
+          return await this.handleNewDoc(msg)
         case "channel/delete-request":
           return await this.handleDeleteRequest(msg)
         case "channel/delete-response":
@@ -382,17 +387,15 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
-   * Handle directory responses (announcements) by eagerly requesting documents.
+   * Handle new-doc announcements by eagerly requesting documents.
    * Storage adapters are "eager" - they automatically request all announced documents.
    */
-  private async handleDirectoryResponse(msg: ChannelMsg): Promise<void> {
-    if (msg.type !== "channel/directory-response") return
-
+  private async handleNewDoc(msg: ChannelMsgNewDoc): Promise<void> {
     const { docIds } = msg
 
     if (docIds.length === 0) return
 
-    this.logger.debug("received directory-response announcement", {
+    this.logger.debug("received new-doc announcement", {
       docIds,
       count: docIds.length,
     })

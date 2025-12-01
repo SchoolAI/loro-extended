@@ -416,8 +416,29 @@ describe("Channel JSON Serialization", () => {
           response,
         )
       })
+  
+      it("should serialize new-doc", () => {
+        const msg: ChannelMsg = {
+          type: "channel/new-doc",
+          docIds: ["doc-1", "doc-2", "doc-3"],
+        }
+  
+        const json = serializeChannelMsg(msg)
+        expect(json).toEqual(msg)
+      })
+  
+      it("should round-trip new-doc message", () => {
+        const original: ChannelMsg = {
+          type: "channel/new-doc",
+          docIds: ["doc-1", "doc-2"],
+        }
+  
+        expect(deserializeChannelMsg(serializeChannelMsg(original))).toEqual(
+          original,
+        )
+      })
     })
-
+  
     describe("delete messages", () => {
       it("should serialize delete-request", () => {
         const msg: ChannelMsg = {

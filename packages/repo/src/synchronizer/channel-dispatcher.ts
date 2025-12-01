@@ -8,6 +8,7 @@ import { handleEstablishRequest } from "./connection/handle-establish-request.js
 import { handleEstablishResponse } from "./connection/handle-establish-response.js"
 import { handleDirectoryRequest } from "./discovery/handle-directory-request.js"
 import { handleDirectoryResponse } from "./discovery/handle-directory-response.js"
+import { handleNewDoc } from "./discovery/handle-new-doc.js"
 import { handleEphemeral } from "./ephemeral/handle-ephemeral.js"
 import { handleSyncRequest } from "./sync/handle-sync-request.js"
 import { handleSyncResponse } from "./sync/handle-sync-response.js"
@@ -108,8 +109,15 @@ export function channelDispatcher(
     case "channel/directory-response":
       return handleDirectoryResponse(channelMessage, ctx)
 
+    case "channel/new-doc":
+      return handleNewDoc(channelMessage, ctx)
+
     case "channel/ephemeral":
       return handleEphemeral(channelMessage, ctx)
+
+    case "channel/delete-request":
+    case "channel/delete-response":
+      // Delete messages are handled elsewhere or not yet implemented
+      return
   }
-  return
 }

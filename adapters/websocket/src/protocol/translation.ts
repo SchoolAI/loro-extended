@@ -111,6 +111,7 @@ export function toProtocolMessages(
 
     case "channel/directory-request":
     case "channel/directory-response":
+    case "channel/new-doc":
     case "channel/delete-request":
     case "channel/delete-response":
       // These don't have direct protocol equivalents

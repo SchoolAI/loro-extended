@@ -81,6 +81,10 @@ export type ChannelMsgJSON =
       docIds: string[]
     }
   | {
+      type: "channel/new-doc"
+      docIds: string[]
+    }
+  | {
       type: "channel/delete-request"
       docId: string
     }
@@ -140,6 +144,7 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
     case "channel/establish-response":
     case "channel/directory-request":
     case "channel/directory-response":
+    case "channel/new-doc":
     case "channel/delete-request":
     case "channel/delete-response":
       // These messages don't contain VersionVector or Uint8Array
@@ -204,6 +209,7 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
     case "channel/establish-response":
     case "channel/directory-request":
     case "channel/directory-response":
+    case "channel/new-doc":
     case "channel/delete-request":
     case "channel/delete-response":
       return json as ChannelMsg

@@ -8,6 +8,7 @@ export { handleEstablishRequest } from "./connection/handle-establish-request.js
 export { handleEstablishResponse } from "./connection/handle-establish-response.js"
 export { handleDirectoryRequest } from "./discovery/handle-directory-request.js"
 export { handleDirectoryResponse } from "./discovery/handle-directory-response.js"
+export { handleNewDoc } from "./discovery/handle-new-doc.js"
 export { handleEphemeral } from "./ephemeral/handle-ephemeral.js"
 // Helper functions
 export {

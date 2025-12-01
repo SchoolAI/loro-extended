@@ -302,8 +302,9 @@ All messages are defined in [`channel.ts`](src/channel.ts) (see `ChannelMsg` typ
 - **`channel/establish-response`**: Handshake acknowledgment
 - **`channel/sync-request`**: Request document synchronization
 - **`channel/sync-response`**: Provide document data or updates
-- **`channel/directory-request`**: Request list of available documents
-- **`channel/directory-response`**: Provide list of available documents
+- **`channel/directory-request`**: Request list of available documents (for future glob-based discovery)
+- **`channel/directory-response`**: Response to directory-request with matching documents
+- **`channel/new-doc`**: Announce new documents to peers (unsolicited announcement)
 - **`channel/delete-request`**: Request document deletion
 - **`channel/delete-response`**: Confirm document deletion
 

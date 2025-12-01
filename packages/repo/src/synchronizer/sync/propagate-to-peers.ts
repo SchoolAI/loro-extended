@@ -15,7 +15,7 @@
  *    - Enables real-time collaboration
  *
  * 2. **If peer awareness is "unknown"**:
- *    - Send `directory-response` as announcement
+ *    - Send `new-doc` as announcement
  *    - Peer can then decide whether to request the document
  *    - Respects peer autonomy (no forced sync)
  *
@@ -262,7 +262,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     // CASE 2: Peer doesn't know about this document yet OR they have it but are behind
     // Send announcement (peer can then decide whether to request)
     logger.debug(
-      `${logPrefix}: sending directory-response announcement for {docId} to {channelId} (reason: {reason})`,
+      `${logPrefix}: sending new-doc announcement for {docId} to {channelId} (reason: {reason})`,
       {
         channelId: channel.channelId,
         docId,
@@ -278,7 +278,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
       envelope: {
         toChannelIds: [channel.channelId],
         message: {
-          type: "channel/directory-response",
+          type: "channel/new-doc",
           docIds: [docId],
         },
       },

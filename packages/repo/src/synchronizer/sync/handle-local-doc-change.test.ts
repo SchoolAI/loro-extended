@@ -80,7 +80,7 @@ describe("handle-local-doc-change", () => {
     }
   })
 
-  it("should send directory-response announcement to peers with unknown awareness", () => {
+  it("should send new-doc announcement to peers with unknown awareness", () => {
     const peerId = "test-peer-id" as PeerID
     const channel = createEstablishedChannel(peerId, { channelId: 1 })
     const docId = "test-doc"
@@ -106,11 +106,11 @@ describe("handle-local-doc-change", () => {
 
     const [_newModel, command] = update(message, initialModel)
 
-    // Should send directory-response as announcement
+    // Should send new-doc as announcement
     expectCommand(command, "cmd/send-message")
     expect(command.envelope.toChannelIds).toEqual([1])
-    expect(command.envelope.message.type).toBe("channel/directory-response")
-    if (command.envelope.message.type === "channel/directory-response") {
+    expect(command.envelope.message.type).toBe("channel/new-doc")
+    if (command.envelope.message.type === "channel/new-doc") {
       expect(command.envelope.message.docIds).toEqual([docId])
     }
   })
@@ -280,10 +280,10 @@ describe("handle-local-doc-change", () => {
     expectCommand(cmd0, "cmd/send-message")
     expectCommand(cmd1, "cmd/send-message")
 
-    // One should be sync-response, one should be directory-response
+    // One should be update, one should be new-doc
     const messages = [cmd0.envelope.message, cmd1.envelope.message]
     const types = messages.map(m => m.type).sort()
-    expect(types).toEqual(["channel/directory-response", "channel/update"])
+    expect(types).toEqual(["channel/new-doc", "channel/update"])
   })
 
   it("should log error when document not found", () => {

@@ -87,6 +87,20 @@ export type ChannelMsgDirectoryResponse = {
   docIds: DocId[]
 }
 
+/**
+ * Announce new documents to peers.
+ *
+ * This is an unsolicited message sent when a new document is created locally.
+ * Peers can then decide whether to request the document data via sync-request.
+ *
+ * Note: This is different from directory-response, which is a response to
+ * directory-request (for glob-based document discovery).
+ */
+export type ChannelMsgNewDoc = {
+  type: "channel/new-doc"
+  docIds: DocId[]
+}
+
 export type ChannelMsgDeleteRequest = {
   type: "channel/delete-request"
   docId: DocId
@@ -152,6 +166,7 @@ export type EstablishedMsg =
   | ChannelMsgUpdate
   | ChannelMsgDirectoryRequest
   | ChannelMsgDirectoryResponse
+  | ChannelMsgNewDoc
   | ChannelMsgDeleteRequest
   | ChannelMsgDeleteResponse
   | ChannelMsgEphemeral
