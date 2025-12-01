@@ -1,5 +1,5 @@
 {
-  "name": "@loro-extended/example-postgres",
+  "name": "example-postgres",
   "version": "0.1.1",
   "private": true,
   "description": "Example using PostgreSQL storage adapter with @loro-extended/repo",

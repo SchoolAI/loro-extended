@@ -14,7 +14,7 @@ Explore these example applications to see `@loro-extended` in action:
 <tr>
 <td width="50%">
 
-### [Todo App](./examples/todo)
+### [Todo App](./examples/todo-sse)
 
 Real-time collaborative todo list with React and SSE. Demonstrates offline-first architecture with automatic conflict resolution.
 
@@ -165,12 +165,12 @@ This monorepo is a collection of packages designed to work together:
 
 ### Core Packages
 
-| Package                                          | Description                                                                                                                                                                                                                         |
-| :----------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[`@loro-extended/change`](./packages/change)** | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.                                                                                                                        |
-| **[`@loro-extended/repo`](./packages/repo)**     | **The Sync Engine.** Manages documents lifecycle, storage, and network sync. It's your local data store.                                                                                                                            |
-| **[`@loro-extended/react`](./packages/react)**   | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views. See [`todo`](./examples/todo), [`chat`](./examples/chat), and [`video-conference`](./examples/video-conference) for examples. |
-| **[`@loro-extended/hono`](./packages/hono)**     | **The UI Layer.** Hono JSX hooks and utilities, including `useDocument` and `usePresence`. See [`hono-counter`](./examples/hono-counter) for an example.                                                                            |
+| Package                                          | Description                                                                                                                                                                                                                                 |
+| :----------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **[`@loro-extended/change`](./packages/change)** | **The Data Layer.** A schema-driven wrapper for Loro. Provides the `change()` function and TypeScript magic.                                                                                                                                |
+| **[`@loro-extended/repo`](./packages/repo)**     | **The Sync Engine.** Manages documents lifecycle, storage, and network sync. It's your local data store.                                                                                                                                    |
+| **[`@loro-extended/react`](./packages/react)**   | **The UI Layer.** React hooks like `useDocument` and `usePresence` that bind your data to your views. See [`todo-sse`](./examples/todo-sse), [`chat`](./examples/chat), and [`video-conference`](./examples/video-conference) for examples. |
+| **[`@loro-extended/hono`](./packages/hono)**     | **The UI Layer.** Hono JSX hooks and utilities, including `useDocument` and `usePresence`. See [`hono-counter`](./examples/hono-counter) for an example.                                                                                    |
 
 ### Storage Adapters
 
@@ -184,8 +184,8 @@ This monorepo is a collection of packages designed to work together:
 
 | Package                                                              | Description                                                                                                                                  |
 | :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[`@loro-extended/adapter-http-polling`](./adapters/http-polling)** | HTTP polling network adapter with long-polling support. See [`examples/todo/POLLING.md`](./examples/todo/POLLING.md) for usage.              |
-| **[`@loro-extended/adapter-sse`](./adapters/sse)**                   | Server-Sent Events (SSE) for real-time client-server sync. See [`todo`](./examples/todo) and [`chat`](./examples/chat) for examples.         |
+| **[`@loro-extended/adapter-http-polling`](./adapters/http-polling)** | HTTP polling network adapter with long-polling support. See [`examples/todo-sse/POLLING.md`](./examples/todo-sse/POLLING.md) for usage.      |
+| **[`@loro-extended/adapter-sse`](./adapters/sse)**                   | Server-Sent Events (SSE) for real-time client-server sync. See [`todo-sse`](./examples/todo-sse) and [`chat`](./examples/chat) for examples. |
 | **[`@loro-extended/adapter-websocket`](./adapters/websocket)**       | WebSocket adapter for real-time client-server sync. See [`todo-websocket`](./examples/todo-websocket) for a full example.                    |
 | **[`@loro-extended/adapter-webrtc`](./adapters/webrtc)**             | WebRTC data channel adapter for peer-to-peer document synchronization. See [`video-conference`](./examples/video-conference) for an example. |
 

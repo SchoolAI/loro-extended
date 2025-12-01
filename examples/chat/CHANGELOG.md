@@ -1,4 +1,4 @@
-# chat-app
+# example-chat
 
 ## 0.1.0
 

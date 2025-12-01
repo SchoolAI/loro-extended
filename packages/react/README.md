@@ -478,7 +478,7 @@ const [doc, changeDoc] = useDocument(documentId, schema, emptyState);
 
 ## Complete Example
 
-For a full collaborative React application, see the [Todo App Example](../../examples/todo/README.md) which demonstrates:
+For a full collaborative React application, see the [Todo SSE Example](../../examples/todo-sse/README.md) which demonstrates:
 
 - Setting up the Repo with network and storage adapters
 - Using `useDocument` for reactive document state

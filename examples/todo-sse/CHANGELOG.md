@@ -1,4 +1,4 @@
-# todo-app
+# example-todo-sse
 
 ## 0.1.0
 

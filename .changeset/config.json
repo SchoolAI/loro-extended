@@ -5,9 +5,14 @@
   "fixed": [
     [
       "@loro-extended/adapter-http-polling",
+      "@loro-extended/adapter-sse",
+      "@loro-extended/adapter-webrtc",
+      "@loro-extended/adapter-websocket",
+
       "@loro-extended/adapter-indexeddb",
       "@loro-extended/adapter-leveldb",
-      "@loro-extended/adapter-sse",
+      "@loro-extended/adapter-postgres",
+
       "@loro-extended/change",
       "@loro-extended/hono",
       "@loro-extended/react",

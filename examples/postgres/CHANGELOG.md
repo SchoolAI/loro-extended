@@ -1,4 +1,4 @@
-# @loro-extended/example-postgres
+# example-postgres
 
 ## 0.1.1
 
