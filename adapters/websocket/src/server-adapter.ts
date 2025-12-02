@@ -230,7 +230,7 @@ export function wrapWsSocket(ws: {
   close(code?: number, reason?: string): void
   on(
     event: "message",
-    handler: (data: Buffer | ArrayBuffer | string) => void,
+    handler: (data: Buffer | ArrayBuffer | string, isBinary: boolean) => void,
   ): void
   on(event: "close", handler: (code: number, reason: Buffer) => void): void
   on(event: "error", handler: (error: Error) => void): void
@@ -250,13 +250,23 @@ export function wrapWsSocket(ws: {
     },
 
     onMessage(handler: (data: Uint8Array | string) => void): void {
-      ws.on("message", data => {
-        if (Buffer.isBuffer(data)) {
-          handler(new Uint8Array(data))
-        } else if (data instanceof ArrayBuffer) {
-          handler(new Uint8Array(data))
+      ws.on("message", (data: Buffer | ArrayBuffer | string, isBinary: boolean) => {
+        if (isBinary) {
+          // Binary message - convert to Uint8Array
+          if (Buffer.isBuffer(data)) {
+            handler(new Uint8Array(data))
+          } else if (data instanceof ArrayBuffer) {
+            handler(new Uint8Array(data))
+          } else {
+            handler(new Uint8Array(data as unknown as ArrayBuffer))
+          }
         } else {
-          handler(data as string)
+          // Text message - convert to string
+          if (Buffer.isBuffer(data)) {
+            handler(data.toString("utf-8"))
+          } else {
+            handler(data as string)
+          }
         }
       })
     },
