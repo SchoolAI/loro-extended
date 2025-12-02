@@ -125,63 +125,96 @@ export function toProtocolMessages(
 }
 
 /**
- * Translate a sync-request to JoinRequest messages.
+ * Translate a sync-request to JoinRequest messages and optional ephemeral DocUpdate messages.
+ * Returns an array of protocol messages (JoinRequests followed by ephemeral DocUpdates for each doc).
  */
 function translateSyncRequest(
   msg: ChannelMsgSyncRequest,
   ctx: TranslationContext,
-): JoinRequest[] {
-  return msg.docs.map(
-    (doc: { docId: string; requesterDocVersion: VersionVector }) => {
-      const roomId = getRoomId(ctx, doc.docId)
-      // Register the mapping if not already registered
-      registerRoom(ctx, roomId, doc.docId)
+): ProtocolMessage[] {
+  const result: ProtocolMessage[] = []
 
-      return {
-        type: MESSAGE_TYPE.JoinRequest,
-        crdtType: "loro" as CrdtType,
+  for (const doc of msg.docs) {
+    const roomId = getRoomId(ctx, doc.docId)
+    // Register the mapping if not already registered
+    registerRoom(ctx, roomId, doc.docId)
+
+    // Add JoinRequest for this doc
+    result.push({
+      type: MESSAGE_TYPE.JoinRequest,
+      crdtType: "loro" as CrdtType,
+      roomId,
+      // Use authPayload to carry bidirectional flag
+      // [0] = bidirectional: false
+      // [] = bidirectional: true (default)
+      authPayload: msg.bidirectional
+        ? new Uint8Array(0)
+        : new Uint8Array([0]),
+      requesterVersion: doc.requesterDocVersion.encode(),
+    })
+
+    // If this doc has ephemeral data, send it as a separate DocUpdate
+    if (doc.ephemeral && doc.ephemeral.data.length > 0) {
+      result.push({
+        type: MESSAGE_TYPE.DocUpdate,
+        crdtType: "ephemeral" as CrdtType,
         roomId,
-        // Use authPayload to carry bidirectional flag
-        // [0] = bidirectional: false
-        // [] = bidirectional: true (default)
-        authPayload: msg.bidirectional
-          ? new Uint8Array(0)
-          : new Uint8Array([0]),
-        requesterVersion: doc.requesterDocVersion.encode(),
-      }
-    },
-  )
+        updates: [encodeEphemeralWithPeerId(doc.ephemeral.peerId, doc.ephemeral.data)],
+      })
+    }
+  }
+
+  return result
 }
 
 /**
  * Translate a sync-response to DocUpdate messages.
+ * This also handles the ephemeral field, sending it as a separate DocUpdate
+ * with crdtType: "ephemeral".
  */
 function translateSyncResponse(
   msg: ChannelMsgSyncResponse,
   ctx: TranslationContext,
 ): DocUpdate[] {
   const roomId = getRoomId(ctx, msg.docId)
+  const result: DocUpdate[] = []
 
+  // Handle document data transmission
   switch (msg.transmission.type) {
     case "snapshot":
     case "update":
-      return [
-        {
-          type: MESSAGE_TYPE.DocUpdate,
-          crdtType: "loro" as CrdtType,
-          roomId,
-          updates: [msg.transmission.data],
-        },
-      ]
+      result.push({
+        type: MESSAGE_TYPE.DocUpdate,
+        crdtType: "loro" as CrdtType,
+        roomId,
+        updates: [msg.transmission.data],
+      })
+      break
 
     case "up-to-date":
     case "unavailable":
-      // No data to send
-      return []
-
-    default:
-      return []
+      // No document data to send
+      break
   }
+
+  // Handle ephemeral data if present
+  // This ensures presence data is transmitted along with sync-response
+  if (msg.ephemeral && msg.ephemeral.length > 0) {
+    const ephemeralUpdates = msg.ephemeral.map(store =>
+      encodeEphemeralWithPeerId(store.peerId, store.data),
+    )
+
+    if (ephemeralUpdates.length > 0) {
+      result.push({
+        type: MESSAGE_TYPE.DocUpdate,
+        crdtType: "ephemeral" as CrdtType,
+        roomId,
+        updates: ephemeralUpdates,
+      })
+    }
+  }
+
+  return result
 }
 
 /**

@@ -93,6 +93,82 @@ describe("toProtocolMessages", () => {
     expect((result[1] as JoinRequest).roomId).toBe("doc-2")
   })
 
+  it("translates sync-request with ephemeral data to JoinRequest and DocUpdate messages", () => {
+    const ctx = createTranslationContext()
+    const version = createEmptyVersion()
+
+    // This is the bug scenario: sync-request includes ephemeral data per doc
+    // but the translation layer was ignoring it
+    const msg: ChannelMsgSyncRequest = {
+      type: "channel/sync-request",
+      docs: [
+        {
+          docId: "doc-1",
+          requesterDocVersion: version,
+          ephemeral: {
+            peerId: "peer-123" as any,
+            data: new Uint8Array([10, 11, 12]),
+          },
+        },
+      ],
+      bidirectional: true,
+    }
+
+    const result = toProtocolMessages(msg, ctx)
+
+    // Should have 2 messages: JoinRequest for the doc, DocUpdate for ephemeral
+    expect(result).toHaveLength(2)
+
+    // First message should be the JoinRequest
+    expect(result[0].type).toBe(MESSAGE_TYPE.JoinRequest)
+    expect((result[0] as JoinRequest).roomId).toBe("doc-1")
+
+    // Second message should be the ephemeral data
+    expect(result[1].type).toBe(MESSAGE_TYPE.DocUpdate)
+    expect((result[1] as DocUpdate).crdtType).toBe("ephemeral")
+    expect((result[1] as DocUpdate).roomId).toBe("doc-1")
+  })
+
+  it("translates sync-request with multiple docs and ephemeral data", () => {
+    const ctx = createTranslationContext()
+    const version = createEmptyVersion()
+
+    const msg: ChannelMsgSyncRequest = {
+      type: "channel/sync-request",
+      docs: [
+        {
+          docId: "doc-1",
+          requesterDocVersion: version,
+          ephemeral: {
+            peerId: "peer-123" as any,
+            data: new Uint8Array([10, 11, 12]),
+          },
+        },
+        {
+          docId: "doc-2",
+          requesterDocVersion: version,
+          // No ephemeral for doc-2
+        },
+      ],
+      bidirectional: true,
+    }
+
+    const result = toProtocolMessages(msg, ctx)
+
+    // Should have 3 messages: JoinRequest for doc-1, DocUpdate for doc-1 ephemeral, JoinRequest for doc-2
+    expect(result).toHaveLength(3)
+
+    expect(result[0].type).toBe(MESSAGE_TYPE.JoinRequest)
+    expect((result[0] as JoinRequest).roomId).toBe("doc-1")
+
+    expect(result[1].type).toBe(MESSAGE_TYPE.DocUpdate)
+    expect((result[1] as DocUpdate).crdtType).toBe("ephemeral")
+    expect((result[1] as DocUpdate).roomId).toBe("doc-1")
+
+    expect(result[2].type).toBe(MESSAGE_TYPE.JoinRequest)
+    expect((result[2] as JoinRequest).roomId).toBe("doc-2")
+  })
+
   it("translates sync-response with update to DocUpdate", () => {
     const ctx = createTranslationContext()
     const version = createEmptyVersion()
@@ -173,6 +249,78 @@ describe("toProtocolMessages", () => {
     expect(result).toHaveLength(0)
   })
 
+  it("translates sync-response with ephemeral data to DocUpdate messages", () => {
+    const ctx = createTranslationContext()
+    const version = createEmptyVersion()
+
+    // This is the bug scenario: sync-response includes ephemeral data
+    // but the translation layer was ignoring it
+    const msg: ChannelMsgSyncResponse = {
+      type: "channel/sync-response",
+      docId: "doc-1",
+      transmission: {
+        type: "update",
+        data: new Uint8Array([1, 2, 3]),
+        version,
+      },
+      ephemeral: [
+        {
+          peerId: "peer-123" as any,
+          data: new Uint8Array([10, 11, 12]),
+        },
+        {
+          peerId: "peer-456" as any,
+          data: new Uint8Array([20, 21, 22]),
+        },
+      ],
+    }
+
+    const result = toProtocolMessages(msg, ctx)
+
+    // Should have 2 messages: one for document data, one for ephemeral
+    expect(result).toHaveLength(2)
+
+    // First message should be the document update
+    expect(result[0].type).toBe(MESSAGE_TYPE.DocUpdate)
+    expect((result[0] as DocUpdate).crdtType).toBe("loro")
+    expect((result[0] as DocUpdate).updates[0]).toEqual(
+      new Uint8Array([1, 2, 3]),
+    )
+
+    // Second message should be the ephemeral data
+    expect(result[1].type).toBe(MESSAGE_TYPE.DocUpdate)
+    expect((result[1] as DocUpdate).crdtType).toBe("ephemeral")
+    expect((result[1] as DocUpdate).updates).toHaveLength(2)
+  })
+
+  it("translates sync-response with only ephemeral data (up-to-date transmission)", () => {
+    const ctx = createTranslationContext()
+    const version = createEmptyVersion()
+
+    // When transmission is up-to-date but we have ephemeral data to send
+    const msg: ChannelMsgSyncResponse = {
+      type: "channel/sync-response",
+      docId: "doc-1",
+      transmission: {
+        type: "up-to-date",
+        version,
+      },
+      ephemeral: [
+        {
+          peerId: "peer-123" as any,
+          data: new Uint8Array([10, 11, 12]),
+        },
+      ],
+    }
+
+    const result = toProtocolMessages(msg, ctx)
+
+    // Should have 1 message for ephemeral data even though doc is up-to-date
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe(MESSAGE_TYPE.DocUpdate)
+    expect((result[0] as DocUpdate).crdtType).toBe("ephemeral")
+  })
+
   it("translates update message to DocUpdate", () => {
     const ctx = createTranslationContext()
     const version = createEmptyVersion()
@@ -203,8 +351,7 @@ describe("toProtocolMessages", () => {
       hopsRemaining: 1,
       stores: [
         {
-          docId: "doc-1",
-          peerId: "123456789",
+          peerId: "123456789" as any,
           data: new Uint8Array([10, 11, 12]),
         },
       ],
