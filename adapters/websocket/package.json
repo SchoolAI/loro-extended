@@ -28,7 +28,7 @@
     "build": "tsup",
     "format": "biome format --write .",
     "lint": "biome check --write .",
-    "test": "vitest run",
+    "test": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
