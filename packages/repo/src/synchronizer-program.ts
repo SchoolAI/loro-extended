@@ -60,6 +60,7 @@ import type {
   AddressedEstablishmentEnvelope,
   Channel,
   ConnectedChannel,
+  EphemeralStoreData,
   ReturnEnvelope,
 } from "./channel.js"
 import type { Rules } from "./rules.js"
@@ -183,7 +184,12 @@ export type Command =
       data: Uint8Array
       fromPeerId: PeerID
     }
-  | { type: "cmd/apply-ephemeral"; docId: DocId; data: Uint8Array }
+  // Apply ephemeral data - new format with stores array
+  | {
+      type: "cmd/apply-ephemeral"
+      docId: DocId
+      stores: EphemeralStoreData[]
+    }
   | {
       type: "cmd/broadcast-ephemeral"
       docId: DocId

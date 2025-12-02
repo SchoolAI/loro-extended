@@ -37,6 +37,22 @@ export type SyncTransmissionJSON =
     }
 
 /**
+ * JSON-serializable version of EphemeralPeerData
+ */
+export type EphemeralPeerDataJSON = {
+  peerId: PeerID
+  data: BinaryDataJSON
+}
+
+/**
+ * JSON-serializable version of EphemeralStoreData
+ */
+export type EphemeralStoreDataJSON = {
+  peerId: PeerID
+  data: BinaryDataJSON
+}
+
+/**
  * JSON-serializable versions of all channel messages
  */
 export type ChannelMsgJSON =
@@ -59,7 +75,7 @@ export type ChannelMsgJSON =
       docs: {
         docId: string
         requesterDocVersion: VersionVectorJSON
-        ephemeral?: BinaryDataJSON
+        ephemeral?: EphemeralPeerDataJSON
       }[]
       bidirectional: boolean
     }
@@ -67,7 +83,7 @@ export type ChannelMsgJSON =
       type: "channel/sync-response"
       docId: string
       transmission: SyncTransmissionJSON
-      ephemeral?: BinaryDataJSON
+      ephemeral?: EphemeralPeerDataJSON[]
     }
   | {
       type: "channel/update"
@@ -99,7 +115,7 @@ export type ChannelMsgJSON =
       type: "channel/ephemeral"
       docId: string
       hopsRemaining: number
-      data: BinaryDataJSON
+      stores: EphemeralStoreDataJSON[]
     }
 
 /**
@@ -158,7 +174,12 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
         docs: msg.docs.map(doc => ({
           docId: doc.docId,
           requesterDocVersion: versionVectorToJSON(doc.requesterDocVersion),
-          ...(doc.ephemeral && { ephemeral: uint8ArrayToJSON(doc.ephemeral) }),
+          ...(doc.ephemeral && {
+            ephemeral: {
+              peerId: doc.ephemeral.peerId,
+              data: uint8ArrayToJSON(doc.ephemeral.data),
+            },
+          }),
         })),
       }
 
@@ -168,8 +189,11 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
         docId: msg.docId,
         transmission: serializeSyncTransmission(msg.transmission),
       }
-      if (msg.ephemeral) {
-        result.ephemeral = uint8ArrayToJSON(msg.ephemeral)
+      if (msg.ephemeral && msg.ephemeral.length > 0) {
+        result.ephemeral = msg.ephemeral.map(ep => ({
+          peerId: ep.peerId,
+          data: uint8ArrayToJSON(ep.data),
+        }))
       }
       return result
     }
@@ -183,7 +207,10 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
     case "channel/ephemeral":
       return {
         ...msg,
-        data: uint8ArrayToJSON(msg.data),
+        stores: msg.stores.map(s => ({
+          peerId: s.peerId,
+          data: uint8ArrayToJSON(s.data),
+        })),
       }
   }
 }
@@ -235,7 +262,10 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
           docId: doc.docId,
           requesterDocVersion: versionVectorFromJSON(doc.requesterDocVersion),
           ...(doc.ephemeral && {
-            ephemeral: uint8ArrayFromJSON(doc.ephemeral),
+            ephemeral: {
+              peerId: doc.ephemeral.peerId,
+              data: uint8ArrayFromJSON(doc.ephemeral.data),
+            },
           }),
         })),
       }
@@ -246,8 +276,11 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
         docId: json.docId,
         transmission: deserializeSyncTransmission(json.transmission),
       }
-      if (json.ephemeral) {
-        result.ephemeral = uint8ArrayFromJSON(json.ephemeral)
+      if (json.ephemeral && json.ephemeral.length > 0) {
+        result.ephemeral = json.ephemeral.map(ep => ({
+          peerId: ep.peerId,
+          data: uint8ArrayFromJSON(ep.data),
+        }))
       }
       return result
     }
@@ -261,7 +294,10 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
     case "channel/ephemeral":
       return {
         ...json,
-        data: uint8ArrayFromJSON(json.data),
+        stores: json.stores.map(s => ({
+          peerId: s.peerId,
+          data: uint8ArrayFromJSON(s.data),
+        })),
       }
   }
 }

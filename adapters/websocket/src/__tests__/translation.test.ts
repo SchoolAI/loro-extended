@@ -201,7 +201,13 @@ describe("toProtocolMessages", () => {
       type: "channel/ephemeral",
       docId: "doc-1",
       hopsRemaining: 1,
-      data: new Uint8Array([10, 11, 12]),
+      stores: [
+        {
+          docId: "doc-1",
+          peerId: "123456789",
+          data: new Uint8Array([10, 11, 12]),
+        },
+      ],
     }
 
     const result = toProtocolMessages(msg, ctx)
@@ -209,9 +215,16 @@ describe("toProtocolMessages", () => {
     expect(result).toHaveLength(1)
     expect(result[0].type).toBe(MESSAGE_TYPE.DocUpdate)
     expect((result[0] as DocUpdate).crdtType).toBe("ephemeral")
-    expect((result[0] as DocUpdate).updates[0]).toEqual(
-      new Uint8Array([10, 11, 12]),
-    )
+    // The update now includes the peerId encoded with the data
+    // Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [data]
+    // "123456789" is 9 bytes, so: [0, 9, ...peerId bytes..., 10, 11, 12]
+    const update = (result[0] as DocUpdate).updates[0]
+    expect(update.length).toBe(2 + 9 + 3) // 2 bytes length + 9 bytes peerId + 3 bytes data
+    // Verify the peerId length prefix
+    expect(update[0]).toBe(0) // high byte of length
+    expect(update[1]).toBe(9) // low byte of length (9 chars)
+    // Verify the data at the end
+    expect(update.slice(-3)).toEqual(new Uint8Array([10, 11, 12]))
   })
 
   it("returns empty array for establish-request", () => {
@@ -321,7 +334,9 @@ describe("fromProtocolMessage", () => {
     expect(result).not.toBeNull()
     expect(result?.channelMsg.type).toBe("channel/ephemeral")
     const ephemeral = result?.channelMsg as ChannelMsgEphemeral
-    expect(ephemeral.data).toEqual(new Uint8Array([1, 2, 3]))
+    // New format uses stores array
+    expect(ephemeral.stores).toHaveLength(1)
+    expect(ephemeral.stores[0].data).toEqual(new Uint8Array([1, 2, 3]))
   })
 
   it("returns null for empty DocUpdate", () => {

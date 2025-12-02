@@ -288,7 +288,10 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       return
     }
 
-    const translated = fromProtocolMessage(msg, this.translationContext)
+    // Pass the server's peerId for ephemeral messages
+    const translated = fromProtocolMessage(msg, this.translationContext, {
+      senderPeerId: "server",
+    })
 
     if (translated) {
       this.serverChannel.onReceive(translated.channelMsg)

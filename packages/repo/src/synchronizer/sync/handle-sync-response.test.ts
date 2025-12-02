@@ -312,7 +312,7 @@ describe("handle-sync-response", () => {
     sourceDoc.getText("test").insert(0, "hello")
     const snapshotData = sourceDoc.export({ mode: "snapshot" })
 
-    // Create ephemeral data
+    // Create ephemeral data (new format: EphemeralPeerData[])
     const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
 
     const message: SynchronizerMessage = {
@@ -327,7 +327,12 @@ describe("handle-sync-response", () => {
             data: snapshotData,
             version: createVersionVector(),
           },
-          ephemeral: ephemeralData,
+          ephemeral: [
+            {
+              peerId,
+              data: ephemeralData,
+            },
+          ],
         },
       },
     }
@@ -350,8 +355,11 @@ describe("handle-sync-response", () => {
       expect(applyEphemeralCmd).toBeDefined()
 
       if (applyEphemeralCmd?.type === "cmd/apply-ephemeral") {
+        // New format: stores array
+        expect(applyEphemeralCmd.stores).toHaveLength(1)
         expect(applyEphemeralCmd.docId).toBe(docId)
-        expect(Array.from(applyEphemeralCmd.data)).toEqual(
+        expect(applyEphemeralCmd.stores[0].peerId).toBe(peerId)
+        expect(Array.from(applyEphemeralCmd.stores[0].data)).toEqual(
           Array.from(ephemeralData),
         )
       }

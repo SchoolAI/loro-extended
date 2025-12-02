@@ -91,25 +91,24 @@ export class DocHandle<T extends DocContent = DocContent> {
       },
 
       get all() {
-        return synchronizer.getOrCreateEphemeralStore(docId).getAllStates()
+        // Return all peers' presence data aggregated by peerId
+        return synchronizer.getAllEphemeralStates(docId)
       },
 
       setRaw: (key: string, value: Value) => {
-        return synchronizer.getOrCreateEphemeralStore(docId).set(key, value)
+        // For backward compatibility, set a key directly on my store
+        // This is an escape hatch for setting arbitrary keys
+        return synchronizer.getMyEphemeralStore(docId).set(key, value)
       },
 
       subscribe: (cb: (values: ObjectValue) => void) => {
         // Call immediately with current state
-        const initialValues = synchronizer
-          .getOrCreateEphemeralStore(docId)
-          .getAllStates()
+        const initialValues = synchronizer.getAllEphemeralStates(docId)
         cb(initialValues)
 
         return synchronizer.emitter.on("ephemeral-change", event => {
           if (event.docId === docId) {
-            const values = synchronizer
-              .getOrCreateEphemeralStore(docId)
-              .getAllStates()
+            const values = synchronizer.getAllEphemeralStates(docId)
             cb(values)
           }
         })

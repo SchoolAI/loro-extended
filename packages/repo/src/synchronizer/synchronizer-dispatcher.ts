@@ -38,7 +38,7 @@ export function synchronizerDispatcher(
             type: "cmd/broadcast-ephemeral",
             docId,
             allPeerData: true,
-            hopsRemaining: 0,
+            hopsRemaining: 1, // Allow server to relay heartbeat to other clients
             toChannelIds: channelIds,
           })
         }

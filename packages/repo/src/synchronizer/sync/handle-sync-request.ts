@@ -149,18 +149,19 @@ export function handleSyncRequest(
     }
 
     // Apply incoming ephemeral data from the requester if provided
+    // ephemeral is now EphemeralPeerData: { peerId, data }
     if (ephemeral) {
       logger.debug(
         "sync-request: applying ephemeral data from {peerId} for {docId}",
         {
-          peerId: channel.peerId,
+          peerId: ephemeral.peerId,
           docId,
         },
       )
       commands.push({
         type: "cmd/apply-ephemeral",
         docId,
-        data: ephemeral,
+        stores: [{ peerId: ephemeral.peerId, data: ephemeral.data }],
       })
 
       // Relay requester's ephemeral to other peers (not back to requester)
@@ -174,7 +175,7 @@ export function handleSyncRequest(
         logger.debug(
           "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
           {
-            peerId: channel.peerId,
+            peerId: ephemeral.peerId,
             count: otherChannelIds.length,
             docId,
           },
@@ -187,7 +188,7 @@ export function handleSyncRequest(
               type: "channel/ephemeral",
               docId,
               hopsRemaining: 0, // Direct relay only
-              data: ephemeral,
+              stores: [{ peerId: ephemeral.peerId, data: ephemeral.data }],
             },
           },
         })

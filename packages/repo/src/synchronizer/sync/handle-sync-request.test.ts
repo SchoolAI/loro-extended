@@ -248,7 +248,7 @@ describe("handle-sync-request", () => {
     const docState = createDocState({ docId })
     initialModel.documents.set(docId, docState)
 
-    // Create ephemeral data
+    // Create ephemeral data (new format: EphemeralPeerData)
     const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
 
     const message: SynchronizerMessage = {
@@ -261,7 +261,10 @@ describe("handle-sync-request", () => {
             {
               docId,
               requesterDocVersion: createVersionVector(),
-              ephemeral: ephemeralData,
+              ephemeral: {
+                peerId,
+                data: ephemeralData,
+              },
             },
           ],
           bidirectional: false,
@@ -284,8 +287,11 @@ describe("handle-sync-request", () => {
 
       expect(applyEphemeral).toBeDefined()
       if (applyEphemeral && applyEphemeral.type === "cmd/apply-ephemeral") {
+        // New format: stores array
+        expect(applyEphemeral.stores).toHaveLength(1)
         expect(applyEphemeral.docId).toBe(docId)
-        expect(Array.from(applyEphemeral.data)).toEqual(
+        expect(applyEphemeral.stores[0].peerId).toBe(peerId)
+        expect(Array.from(applyEphemeral.stores[0].data)).toEqual(
           Array.from(ephemeralData),
         )
       }
@@ -329,7 +335,7 @@ describe("handle-sync-request", () => {
     const docState = createDocState({ docId })
     initialModel.documents.set(docId, docState)
 
-    // Create ephemeral data
+    // Create ephemeral data (new format: EphemeralPeerData)
     const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
 
     const message: SynchronizerMessage = {
@@ -342,7 +348,10 @@ describe("handle-sync-request", () => {
             {
               docId,
               requesterDocVersion: createVersionVector(),
-              ephemeral: ephemeralData,
+              ephemeral: {
+                peerId: peerId1,
+                data: ephemeralData,
+              },
             },
           ],
           bidirectional: false,
@@ -374,6 +383,9 @@ describe("handle-sync-request", () => {
         if (relayMessage.envelope.message.type === "channel/ephemeral") {
           expect(relayMessage.envelope.message.docId).toBe(docId)
           expect(relayMessage.envelope.message.hopsRemaining).toBe(0)
+          // New format: stores array
+          expect(relayMessage.envelope.message.stores).toHaveLength(1)
+          expect(relayMessage.envelope.message.stores[0].peerId).toBe(peerId1)
         }
       }
     }

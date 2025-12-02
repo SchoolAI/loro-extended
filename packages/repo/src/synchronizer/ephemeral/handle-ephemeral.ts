@@ -6,14 +6,17 @@ import { batchAsNeeded } from "../utils.js"
 
 export function handleEphemeral(
   message: ChannelMsgEphemeral,
-  { model, fromChannelId }: ChannelHandlerContext,
+  { model, fromChannelId, logger }: ChannelHandlerContext,
 ): Command | undefined {
+  const commands: Command[] = []
+
   // First, apply the ephemeral data locally
-  const applyCommand: Command = {
+  // The new format uses stores array with per-peer data
+  commands.push({
     type: "cmd/apply-ephemeral",
     docId: message.docId,
-    data: message.data,
-  }
+    stores: message.stores,
+  })
 
   // If hops remaining, relay the SAME data to other peers (hub-and-spoke relay)
   // This is critical: we forward the original message data, not re-encode our own data
@@ -30,7 +33,7 @@ export function handleEphemeral(
 
     if (toChannelIds.length > 0) {
       // Use cmd/send-message to forward the original data unchanged
-      const relayCommand: Command = {
+      commands.push({
         type: "cmd/send-message",
         envelope: {
           toChannelIds,
@@ -38,14 +41,12 @@ export function handleEphemeral(
             type: "channel/ephemeral",
             docId: message.docId,
             hopsRemaining: message.hopsRemaining - 1,
-            data: message.data, // Forward the original data, not re-encoded
+            stores: message.stores, // Forward the original stores, not re-encoded
           },
         },
-      }
-
-      return batchAsNeeded(applyCommand, relayCommand)
+      })
     }
   }
 
-  return applyCommand
+  return batchAsNeeded(...commands)
 }

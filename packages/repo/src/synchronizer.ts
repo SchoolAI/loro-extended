@@ -7,7 +7,9 @@ import { AdapterManager } from "./adapter/adapter-manager.js"
 import type {
   Channel,
   ChannelMsg,
+  ChannelMsgSyncResponse,
   ConnectedChannel,
+  EphemeralPeerData,
   SyncTransmission,
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
@@ -30,6 +32,7 @@ import type {
   ReadyState,
 } from "./types.js"
 import { equal } from "./utils/equal.js"
+import { TimerlessEphemeralStore } from "./utils/timerless-ephemeral-store.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
@@ -69,7 +72,19 @@ export class Synchronizer {
 
   readonly updateFn: SynchronizerUpdate
 
-  readonly ephemeralStores = new Map<DocId, EphemeralStore>()
+  /**
+   * Per-doc-peer ephemeral stores.
+   *
+   * Structure: Map<DocId, Map<PeerID, EphemeralStore>>
+   *
+   * Each document has a map of peer stores:
+   * - "My" store uses TimerlessEphemeralStore (never expires)
+   * - Others' stores use regular EphemeralStore with timeout
+   *
+   * Each store contains multiple keys (cursor, name, mouseX, etc.)
+   * representing that peer's presence data in that document.
+   */
+  readonly docPeerStores = new Map<DocId, Map<PeerID, EphemeralStore>>()
 
   readonly emitter = new Emittery<SynchronizerEvents>()
 
@@ -149,9 +164,9 @@ export class Synchronizer {
   }
 
   channelReceive(channel: Channel, message: ChannelMsg) {
-    this.logger.trace("onReceive: {message.type} from {channel.channelId}", {
-      channel,
-      message,
+    this.logger.trace("onReceive: {messageType} from {channelId}", {
+      channelId: channel.channelId,
+      messageType: message.type,
     })
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
@@ -164,7 +179,9 @@ export class Synchronizer {
 
   // Helper functions for adapter callbacks
   channelAdded(channel: ConnectedChannel) {
-    this.logger.debug("channelAdded: {channel.channelId}", { channel })
+    this.logger.debug("channelAdded: {channelId}", {
+      channelId: channel.channelId,
+    })
     this.#dispatch({ type: "synchronizer/channel-added", channel })
   }
 
@@ -179,50 +196,139 @@ export class Synchronizer {
   }
 
   channelRemoved(channel: Channel) {
-    this.logger.debug("channelRemoved: {channel.channelId}", { channel })
+    this.logger.debug("channelRemoved: {channelId}", {
+      channelId: channel.channelId,
+    })
     this.#dispatch({ type: "synchronizer/channel-removed", channel })
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // PUBLIC API
+  // PUBLIC API - Ephemeral Store Management
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  getOrCreateEphemeralStore(docId: DocId): EphemeralStore {
-    let store = this.ephemeralStores.get(docId)
+
+  /**
+   * Get or create the Map of peer stores for a document.
+   */
+  getOrCreateDocStores(docId: DocId): Map<PeerID, EphemeralStore> {
+    let peerStores = this.docPeerStores.get(docId)
+    if (!peerStores) {
+      peerStores = new Map()
+      this.docPeerStores.set(docId, peerStores)
+    }
+    return peerStores
+  }
+
+  /**
+   * Get or create a peer's ephemeral store for a document.
+   *
+   * - "My" store uses TimerlessEphemeralStore (never expires)
+   * - Others' stores use regular EphemeralStore with timeout
+   *
+   * @param docId The document ID
+   * @param peerId The peer ID
+   * @returns The peer's ephemeral store for this document
+   */
+  getOrCreatePeerEphemeralStore(docId: DocId, peerId: PeerID): EphemeralStore {
+    const peerStores = this.getOrCreateDocStores(docId)
+    let store = peerStores.get(peerId)
 
     if (!store) {
-      // Set the timeout to 2x heartbeat, so there is a buffer of time before
-      // ephemeral data is considered outdated and removed
-      store = new EphemeralStore(HEARTBEAT_INTERVAL * 2)
-
-      this.ephemeralStores.set(docId, store)
+      const isMyStore = peerId === this.identity.peerId
+      store = isMyStore
+        ? new TimerlessEphemeralStore()
+        : new EphemeralStore(HEARTBEAT_INTERVAL * 2)
+      peerStores.set(peerId, store)
     }
 
     return store
   }
 
   /**
-   * Sets a bundle of values on our peerId within the EphemeralStore representing this DocId
+   * Get my ephemeral store for a document (convenience method).
+   */
+  getMyEphemeralStore(docId: DocId): EphemeralStore {
+    return this.getOrCreatePeerEphemeralStore(docId, this.identity.peerId)
+  }
+
+  /**
+   * Sets values on my presence for a document.
+   * Each key-value pair is set individually in my store.
    */
   setEphemeralValues(docId: DocId, values: ObjectValue) {
-    const store = this.getOrCreateEphemeralStore(docId)
+    const store = this.getMyEphemeralStore(docId)
 
-    const currentValues = this.getEphemeralValues(docId, this.identity.peerId)
-
-    const newValues = { ...currentValues, ...values }
-
-    store.set(this.identity.peerId, newValues)
+    for (const [key, value] of Object.entries(values)) {
+      store.set(key, value)
+    }
 
     this.#dispatch({ type: "synchronizer/ephemeral-local-change", docId })
   }
 
   /**
-   * Gets the bundle of values for a peerId within the EphemeralStore related to this DocId
+   * Gets all values for a peer's presence in a document.
    */
   getEphemeralValues(docId: DocId, peerId: PeerID): ObjectValue {
-    const store = this.getOrCreateEphemeralStore(docId)
-
-    return (store.get(peerId) as ObjectValue) ?? {}
+    const store = this.getOrCreatePeerEphemeralStore(docId, peerId)
+    return store.getAllStates() as ObjectValue
   }
+
+  /**
+   * Get all peers' presence data for a document (aggregated on-demand).
+   */
+  getAllEphemeralStates(docId: DocId): Record<PeerID, ObjectValue> {
+    const peerStores = this.docPeerStores.get(docId)
+    if (!peerStores) return {}
+
+    const result: Record<PeerID, ObjectValue> = {}
+    for (const [peerId, store] of peerStores) {
+      const states = store.getAllStates()
+      // Only include peers with non-empty state
+      if (Object.keys(states).length > 0) {
+        result[peerId] = states as ObjectValue
+      }
+    }
+    return result
+  }
+
+  /**
+   * Encode all peer stores for a document.
+   * Returns an array of { docId, peerId, data } for each peer with data.
+   */
+  #encodeAllPeerStores(
+    docId: DocId,
+  ): { docId: DocId; peerId: PeerID; data: Uint8Array }[] {
+    const peerStores = this.docPeerStores.get(docId)
+    if (!peerStores) return []
+
+    const result: { docId: DocId; peerId: PeerID; data: Uint8Array }[] = []
+    for (const [peerId, store] of peerStores) {
+      const data = store.encodeAll()
+      if (data.length > 0) {
+        result.push({ docId, peerId, data })
+      }
+    }
+    return result
+  }
+
+  /**
+   * Get channel IDs for all peers subscribed to a document.
+   */
+  #getChannelsForDoc(docId: DocId): ChannelId[] {
+    const channelIds: ChannelId[] = []
+    for (const [channelId, channel] of this.model.channels) {
+      if (isEstablishedFn(channel)) {
+        const peerState = this.model.peers.get(channel.peerId)
+        if (peerState?.subscriptions.has(docId)) {
+          channelIds.push(channelId)
+        }
+      }
+    }
+    return channelIds
+  }
+
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // PUBLIC API - Document Management
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   getOrCreateDocumentState(docId: DocId): DocState {
     let docState = this.model.documents.get(docId)
@@ -497,28 +603,41 @@ export class Synchronizer {
       }
 
       case "cmd/apply-ephemeral": {
-        const store = this.getOrCreateEphemeralStore(command.docId)
+        const docId = command.docId
 
-        store.apply(command.data)
+        // New format: array of per-peer stores
+        for (const { peerId, data } of command.stores) {
+          if (data.length === 0) {
+            // Empty data indicates we must delete
+            const peerStores = this.docPeerStores.get(docId)
+            if (peerStores) {
+              peerStores.delete(peerId)
+            }
+            this.logger.debug(
+              "cmd/apply-ephemeral: deleted store for {peerId} in {docId}",
+              { peerId, docId },
+            )
+          } else {
+            const store = this.getOrCreatePeerEphemeralStore(docId, peerId)
 
-        this.emitter.emit("ephemeral-change", { docId: command.docId })
+            store.apply(data)
 
+            this.logger.trace(
+              "cmd/apply-ephemeral: applied {dataLength} bytes for {peerId} in {docId}",
+              { peerId, docId, dataLength: data.length },
+            )
+          }
+          this.emitter.emit("ephemeral-change", { docId })
+        }
         break
       }
 
       case "cmd/broadcast-ephemeral": {
-        const store = this.getOrCreateEphemeralStore(command.docId)
-        const currentValue = store.get(this.identity.peerId)
-
-        // Reset EphemeralStore timeout for this peer's values
-        // Only if we have a value - otherwise we're setting undefined which causes deletion
-        if (currentValue !== undefined) {
-          store.set(this.identity.peerId, currentValue)
-        }
+        const myStore = this.getMyEphemeralStore(command.docId)
+        const myStates = myStore.getAllStates()
 
         // If we are only sending our own data, and we don't have any, skip broadcast
-        // This prevents sending accidental deletions when we haven't set presence yet
-        if (!command.allPeerData && currentValue === undefined) {
+        if (!command.allPeerData && Object.keys(myStates).length === 0) {
           this.logger.debug(
             "cmd/broadcast-ephemeral: skipping for {docId}",
             () => ({ docId: command.docId }),
@@ -526,22 +645,42 @@ export class Synchronizer {
           break
         }
 
-        const data = command.allPeerData
-          ? store.encodeAll()
-          : store.encode(this.identity.peerId)
+        // Touch my store to update timestamps before encoding.
+        // This is essential for heartbeat: EphemeralStore encodes data with
+        // original timestamps, and receiving stores expire data based on those
+        // timestamps. Without touching, heartbeat data would have stale timestamps.
+        if (myStore instanceof TimerlessEphemeralStore) {
+          myStore.touch()
+        }
 
-        if (data.length > 0) {
+        // Encode stores to send
+        const stores = command.allPeerData
+          ? this.#encodeAllPeerStores(command.docId)
+          : (() => {
+              const myData = myStore.encodeAll()
+              return myData.length > 0
+                ? [
+                    {
+                      docId: command.docId,
+                      peerId: this.identity.peerId,
+                      data: myData,
+                    },
+                  ]
+                : []
+            })()
+
+        if (stores.length > 0) {
           const sent = this.adapters.send({
             toChannelIds: command.toChannelIds,
             message: {
               type: "channel/ephemeral",
               docId: command.docId,
               hopsRemaining: command.hopsRemaining,
-              data,
+              stores,
             },
           })
-          this.logger.debug(
-            "cmd/broadcast-ephemeral: sent {docId} to {sent} peers",
+          this.logger.trace(
+            "cmd/broadcast-ephemeral: sent {docId} presence to {sent} peers",
             { docId: command.docId, sent },
           )
         } else {
@@ -554,25 +693,13 @@ export class Synchronizer {
       }
 
       case "cmd/remove-ephemeral-peer": {
-        // Iterate over all ephemeral stores and remove the peer's data
-        for (const [docId, store] of this.ephemeralStores) {
-          // Delete the peer's data from the local store
-          store.delete(command.peerId)
+        // Remove the peer's store from all documents
+        for (const [docId, peerStores] of this.docPeerStores) {
+          if (peerStores.has(command.peerId)) {
+            peerStores.delete(command.peerId)
 
-          // Generate a deletion update to broadcast to other peers
-          const deletionUpdate = store.encode(command.peerId)
-
-          if (deletionUpdate.length > 0) {
-            // Find all channels subscribed to this document
-            const channelIds: ChannelId[] = []
-            for (const [channelId, channel] of this.model.channels) {
-              if (isEstablishedFn(channel)) {
-                const peerState = this.model.peers.get(channel.peerId)
-                if (peerState?.subscriptions.has(docId)) {
-                  channelIds.push(channelId)
-                }
-              }
-            }
+            // Broadcast deletion to other peers
+            const channelIds = this.#getChannelsForDoc(docId)
 
             if (channelIds.length > 0) {
               this.adapters.send({
@@ -581,14 +708,19 @@ export class Synchronizer {
                   type: "channel/ephemeral",
                   docId,
                   hopsRemaining: 0,
-                  data: deletionUpdate,
+                  stores: [
+                    {
+                      peerId: command.peerId,
+                      data: new Uint8Array(0), // Empty data signals deletion
+                    },
+                  ],
                 },
               })
             }
-          }
 
-          // Emit local change event so UI updates immediately
-          this.emitter.emit("ephemeral-change", { docId })
+            // Emit local change event so UI updates immediately
+            this.emitter.emit("ephemeral-change", { docId })
+          }
         }
         break
       }
@@ -728,12 +860,7 @@ export class Synchronizer {
     }
 
     // Build the sync-response message
-    const syncResponseMessage: {
-      type: "channel/sync-response"
-      docId: DocId
-      transmission: SyncTransmission
-      ephemeral?: Uint8Array
-    } = {
+    const syncResponseMessage: ChannelMsgSyncResponse = {
       type: "channel/sync-response" as const,
       docId,
       transmission,
@@ -741,16 +868,25 @@ export class Synchronizer {
 
     // Include ephemeral snapshot if requested
     if (includeEphemeral) {
-      const ephemeralStore = this.getOrCreateEphemeralStore(docId)
-      const ephemeralData = ephemeralStore.encodeAll()
-      if (ephemeralData.length > 0) {
-        syncResponseMessage.ephemeral = ephemeralData
+      // Note: #encodeAllPeerStores includes "my" store.
+      // We should touch "my" store before encoding.
+      const myStore = this.getMyEphemeralStore(docId)
+      if (myStore instanceof TimerlessEphemeralStore) {
+        myStore.touch()
+      }
+
+      const stores = this.#encodeAllPeerStores(docId)
+      if (stores.length > 0) {
+        syncResponseMessage.ephemeral = stores.map(s => ({
+          peerId: s.peerId,
+          data: s.data,
+        }))
         this.logger.debug(
           "including ephemeral data in sync-response for {docId} to {channelId}",
           {
             docId,
             channelId: toChannelId,
-            ephemeralSize: ephemeralData.length,
+            storeCount: stores.length,
           },
         )
       }
@@ -791,7 +927,7 @@ export class Synchronizer {
       const result: {
         docId: DocId
         requesterDocVersion: VersionVector
-        ephemeral?: Uint8Array
+        ephemeral?: EphemeralPeerData
       } = {
         docId: doc.docId,
         requesterDocVersion: doc.requesterDocVersion,
@@ -799,17 +935,28 @@ export class Synchronizer {
 
       // Include ephemeral data if requested
       if (includeEphemeral) {
-        const ephemeralStore = this.getOrCreateEphemeralStore(doc.docId)
-        // Encode only our own peer's ephemeral data
-        const ephemeralData = ephemeralStore.encode(this.identity.peerId)
-        if (ephemeralData.length > 0) {
-          result.ephemeral = ephemeralData
+        const myStore = this.getMyEphemeralStore(doc.docId)
+
+        // Touch my store to update timestamps before encoding
+        if (myStore instanceof TimerlessEphemeralStore) {
+          myStore.touch()
+        } else {
+          this.logger.error("myStore must be TimerlessEphemeralStore")
+        }
+
+        const myData = myStore.encodeAll()
+
+        if (myData.length > 0) {
+          result.ephemeral = {
+            peerId: this.identity.peerId,
+            data: myData,
+          }
           this.logger.debug(
             "including ephemeral data in sync-request for {docId} to {channelId}",
             {
               docId: doc.docId,
               channelId: toChannelId,
-              ephemeralSize: ephemeralData.length,
+              ephemeralSize: myData.length,
             },
           )
         }

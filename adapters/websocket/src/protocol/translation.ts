@@ -215,7 +215,41 @@ function translateUpdate(
 }
 
 /**
+ * Encode a peerId and data into a single Uint8Array.
+ * Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [data]
+ */
+function encodeEphemeralWithPeerId(peerId: string, data: Uint8Array): Uint8Array {
+  const encoder = new TextEncoder()
+  const peerIdBytes = encoder.encode(peerId)
+  const result = new Uint8Array(2 + peerIdBytes.length + data.length)
+  // Store peerId length as 2 bytes (big-endian)
+  result[0] = (peerIdBytes.length >> 8) & 0xff
+  result[1] = peerIdBytes.length & 0xff
+  result.set(peerIdBytes, 2)
+  result.set(data, 2 + peerIdBytes.length)
+  return result
+}
+
+/**
+ * Decode a peerId and data from a single Uint8Array.
+ * Returns { peerId, data } or null if invalid.
+ */
+function decodeEphemeralWithPeerId(
+  encoded: Uint8Array,
+): { peerId: string; data: Uint8Array } | null {
+  if (encoded.length < 2) return null
+  const peerIdLength = (encoded[0] << 8) | encoded[1]
+  if (encoded.length < 2 + peerIdLength) return null
+  const decoder = new TextDecoder()
+  const peerId = decoder.decode(encoded.slice(2, 2 + peerIdLength))
+  const data = encoded.slice(2 + peerIdLength)
+  return { peerId, data }
+}
+
+/**
  * Translate an ephemeral message to DocUpdate with ephemeral CRDT type.
+ * The new format uses stores array with per-peer data.
+ * We encode the peerId into each update so it survives the protocol translation.
  */
 function translateEphemeral(
   msg: ChannelMsgEphemeral,
@@ -223,12 +257,21 @@ function translateEphemeral(
 ): DocUpdate[] {
   const roomId = getRoomId(ctx, msg.docId)
 
+  // Encode each store with its peerId so we can recover it on the other side
+  const updates = msg.stores.map(store =>
+    encodeEphemeralWithPeerId(store.peerId, store.data),
+  )
+
+  if (updates.length === 0) {
+    return []
+  }
+
   return [
     {
       type: MESSAGE_TYPE.DocUpdate,
       crdtType: "ephemeral" as CrdtType,
       roomId,
-      updates: [msg.data],
+      updates,
     },
   ]
 }
@@ -242,15 +285,25 @@ export type TranslatedMessage = {
 }
 
 /**
+ * Options for translating from protocol messages.
+ */
+export type FromProtocolOptions = {
+  /** The peerId of the sender (for ephemeral messages) */
+  senderPeerId?: string
+}
+
+/**
  * Convert a Loro Protocol message to loro-extended ChannelMsg.
  *
  * @param msg The protocol message
  * @param ctx Translation context for room/doc mappings
+ * @param options Optional translation options
  * @returns The translated message with docId, or null if not translatable
  */
 export function fromProtocolMessage(
   msg: ProtocolMessage,
   ctx: TranslationContext,
+  options?: FromProtocolOptions,
 ): TranslatedMessage | null {
   switch (msg.type) {
     case MESSAGE_TYPE.JoinRequest:
@@ -260,7 +313,7 @@ export function fromProtocolMessage(
       return translateJoinResponseOkToChannel(msg, ctx)
 
     case MESSAGE_TYPE.DocUpdate:
-      return translateDocUpdateToChannel(msg, ctx)
+      return translateDocUpdateToChannel(msg, ctx, options?.senderPeerId)
 
     case MESSAGE_TYPE.JoinError:
     case MESSAGE_TYPE.UpdateError:
@@ -335,6 +388,7 @@ function translateJoinResponseOkToChannel(
 function translateDocUpdateToChannel(
   msg: DocUpdate,
   ctx: TranslationContext,
+  senderPeerId?: string,
 ): TranslatedMessage | null {
   const docId = getDocId(ctx, msg.roomId)
 
@@ -344,12 +398,35 @@ function translateDocUpdateToChannel(
 
   // Handle ephemeral messages
   if (msg.crdtType === "ephemeral" || msg.crdtType === "ephemeral-persisted") {
-    // Ephemeral messages should have exactly one update
+    // Decode each update to extract the peerId that was encoded when sending
+    const stores = msg.updates
+      .map(encoded => {
+        const decoded = decodeEphemeralWithPeerId(encoded)
+        if (!decoded) {
+          // Fallback for old format or invalid data
+          return {
+            docId,
+            peerId: (senderPeerId ?? "unknown") as `${number}`,
+            data: encoded,
+          }
+        }
+        return {
+          docId,
+          peerId: decoded.peerId as `${number}`,
+          data: decoded.data,
+        }
+      })
+      .filter(store => store.data.length > 0)
+
+    if (stores.length === 0) {
+      return null
+    }
+
     const channelMsg: ChannelMsgEphemeral = {
       type: "channel/ephemeral",
       docId,
       hopsRemaining: 1, // Default hop count
-      data: msg.updates[0],
+      stores,
     }
     return { docId, channelMsg }
   }

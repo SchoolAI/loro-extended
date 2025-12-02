@@ -41,9 +41,13 @@ describe("TypedPresence", () => {
     expect(presence.self.cursor).toEqual({ x: 10, y: 20 })
     expect(presence.self.name).toBe("Alice")
 
-    // Simulate peer presence
-    const peerId = "peer-2"
-    handle.untypedPresence.setRaw(peerId, { name: "Bob" })
+    // Simulate peer presence by setting values in a peer's store directly
+    const peerId = "123456789"
+    const peerStore = synchronizer.getOrCreatePeerEphemeralStore(
+      "test-doc",
+      peerId,
+    )
+    peerStore.set("name", "Bob")
 
     expect(presence.all[peerId]).toEqual({
       name: "Bob",

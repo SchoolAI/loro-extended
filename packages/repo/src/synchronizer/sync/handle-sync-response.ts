@@ -116,18 +116,23 @@ export function handleSyncResponse(
 
   // Apply incoming ephemeral data if provided in the sync-response
   // This contains all known presence data from the responder
-  if (message.ephemeral) {
+  // ephemeral is now EphemeralPeerData[]: { peerId, data }[]
+  if (message.ephemeral && message.ephemeral.length > 0) {
     logger.debug(
-      "sync-response: applying ephemeral data from {peerId} for {docId}",
+      "sync-response: applying ephemeral data from {peerId} for {docId} ({count} peer stores)",
       {
         peerId: channel.peerId,
         docId: message.docId,
+        count: message.ephemeral.length,
       },
     )
     commands.push({
       type: "cmd/apply-ephemeral",
       docId: message.docId,
-      data: message.ephemeral,
+      stores: message.ephemeral.map(ep => ({
+        peerId: ep.peerId,
+        data: ep.data,
+      })),
     })
   }
 

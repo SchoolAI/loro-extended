@@ -133,7 +133,10 @@ export class WsConnection {
     }
 
     // Translate to loro-extended message
-    const translated = fromProtocolMessage(msg, this.translationContext)
+    // Pass the sender's peerId for ephemeral messages
+    const translated = fromProtocolMessage(msg, this.translationContext, {
+      senderPeerId: this.peerId,
+    })
 
     if (translated) {
       this.channel.onReceive(translated.channelMsg)

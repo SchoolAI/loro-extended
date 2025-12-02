@@ -190,7 +190,7 @@ Both peers send `channel/sync-request` messages (defined in [`channel.ts`](src/c
     {
       docId: "doc-uuid",
       requesterDocVersion: VersionVector, // Current version at requester
-      ephemeral?: Uint8Array // Requester's presence data for this doc
+      ephemeral?: { peerId: string, data: Uint8Array } // Requester's presence data for this doc
     }
   ],
   bidirectional: true // Optional, defaults to true
@@ -200,7 +200,7 @@ Both peers send `channel/sync-request` messages (defined in [`channel.ts`](src/c
 The `requesterDocVersion` tells the responder what version the requester already has, enabling efficient delta updates.
 
 The optional `ephemeral` field contains the requester's presence/ephemeral data for this document. When present, the responder will:
-1. Apply the ephemeral data locally
+1. Apply the ephemeral data locally (associated with the provided `peerId`)
 2. Relay it to other connected peers (hub-and-spoke pattern)
 
 #### 9. Sync Responses (Both Directions)
@@ -236,13 +236,13 @@ for (const { docId, requesterDocVersion, ephemeral } of docs) {
         type: "update",
         data: Uint8Array
       },
-      ephemeral?: Uint8Array // All known presence data for this doc
+      ephemeral?: { peerId: string, data: Uint8Array }[] // All known presence data for this doc
     }
   }
 }
 ```
 
-The `ephemeral` field in the sync-response contains all known presence data for the document, allowing the requester to immediately see all connected peers' presence without waiting for separate ephemeral messages.
+The `ephemeral` field in the sync-response contains all known presence data for the document (as an array of peer data), allowing the requester to immediately see all connected peers' presence without waiting for separate ephemeral messages.
 
 #### 10. Applying Sync Responses
 

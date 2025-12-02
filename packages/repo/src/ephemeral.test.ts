@@ -76,9 +76,16 @@ describe("Ephemeral Store Integration", () => {
     })
     const handle = repo.get("test-doc")
 
+    // setRaw sets a key directly in my store (escape hatch for arbitrary keys)
     handle.untypedPresence.setRaw("global-key", "global-value")
 
-    expect(handle.untypedPresence.all["global-key"]).toBe("global-value")
+    // With per-peer stores, the value is in my store, accessed via all[myPeerId]
+    const myPeerId = repo.identity.peerId
+    const myPresence = handle.untypedPresence.all[myPeerId] as Record<
+      string,
+      unknown
+    >
+    expect(myPresence["global-key"]).toBe("global-value")
   })
 
   it("should sync ephemeral state on initial sync", async () => {
