@@ -272,7 +272,7 @@ export function useDebugInfo({
     signalQueueSize,
 
     // Presence Status
-    userPresenceCount: presencePeers.length,
+    userPresenceCount: Object.keys(userPresence).length,
     signalingPresenceCount: Object.keys(signalingPresence).length,
     presencePeers,
   }
