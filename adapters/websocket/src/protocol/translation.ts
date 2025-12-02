@@ -147,9 +147,7 @@ function translateSyncRequest(
       // Use authPayload to carry bidirectional flag
       // [0] = bidirectional: false
       // [] = bidirectional: true (default)
-      authPayload: msg.bidirectional
-        ? new Uint8Array(0)
-        : new Uint8Array([0]),
+      authPayload: msg.bidirectional ? new Uint8Array(0) : new Uint8Array([0]),
       requesterVersion: doc.requesterDocVersion.encode(),
     })
 
@@ -159,7 +157,9 @@ function translateSyncRequest(
         type: MESSAGE_TYPE.DocUpdate,
         crdtType: "ephemeral" as CrdtType,
         roomId,
-        updates: [encodeEphemeralWithPeerId(doc.ephemeral.peerId, doc.ephemeral.data)],
+        updates: [
+          encodeEphemeralWithPeerId(doc.ephemeral.peerId, doc.ephemeral.data),
+        ],
       })
     }
   }
@@ -251,7 +251,10 @@ function translateUpdate(
  * Encode a peerId and data into a single Uint8Array.
  * Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [data]
  */
-function encodeEphemeralWithPeerId(peerId: string, data: Uint8Array): Uint8Array {
+function encodeEphemeralWithPeerId(
+  peerId: string,
+  data: Uint8Array,
+): Uint8Array {
   const encoder = new TextEncoder()
   const peerIdBytes = encoder.encode(peerId)
   const result = new Uint8Array(2 + peerIdBytes.length + data.length)

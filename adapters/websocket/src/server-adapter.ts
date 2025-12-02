@@ -250,25 +250,28 @@ export function wrapWsSocket(ws: {
     },
 
     onMessage(handler: (data: Uint8Array | string) => void): void {
-      ws.on("message", (data: Buffer | ArrayBuffer | string, isBinary: boolean) => {
-        if (isBinary) {
-          // Binary message - convert to Uint8Array
-          if (Buffer.isBuffer(data)) {
-            handler(new Uint8Array(data))
-          } else if (data instanceof ArrayBuffer) {
-            handler(new Uint8Array(data))
+      ws.on(
+        "message",
+        (data: Buffer | ArrayBuffer | string, isBinary: boolean) => {
+          if (isBinary) {
+            // Binary message - convert to Uint8Array
+            if (Buffer.isBuffer(data)) {
+              handler(new Uint8Array(data))
+            } else if (data instanceof ArrayBuffer) {
+              handler(new Uint8Array(data))
+            } else {
+              handler(new Uint8Array(data as unknown as ArrayBuffer))
+            }
           } else {
-            handler(new Uint8Array(data as unknown as ArrayBuffer))
+            // Text message - convert to string
+            if (Buffer.isBuffer(data)) {
+              handler(data.toString("utf-8"))
+            } else {
+              handler(data as string)
+            }
           }
-        } else {
-          // Text message - convert to string
-          if (Buffer.isBuffer(data)) {
-            handler(data.toString("utf-8"))
-          } else {
-            handler(data as string)
-          }
-        }
-      })
+        },
+      )
     },
 
     onClose(handler: (code: number, reason: string) => void): void {
