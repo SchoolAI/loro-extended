@@ -1,4 +1,13 @@
-import { createServer } from "node:http"
+// Track startup time from the very beginning
+const SERVER_START_TIME = Date.now()
+const startupLog = (message: string) => {
+  const elapsed = Date.now() - SERVER_START_TIME
+  console.log(`[+${elapsed}ms] ${message}`)
+}
+
+startupLog("Server module loading...")
+
+import { createServer, type IncomingMessage } from "node:http"
 import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import {
   WsServerNetworkAdapter,
@@ -17,6 +26,8 @@ import {
 import { logger } from "./config.js"
 import { GameLoop } from "./game-loop.js"
 
+startupLog("Imports complete, LogTape configured")
+
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -27,15 +38,24 @@ app.use((req, _res, next) => {
   next()
 })
 
+startupLog("Express app created")
+
 // Create adapters
+startupLog("Creating WsServerNetworkAdapter...")
 const wsAdapter = new WsServerNetworkAdapter()
+startupLog("WsServerNetworkAdapter created")
+
+startupLog("Creating LevelDBStorageAdapter...")
 const storageAdapter = new LevelDBStorageAdapter("loro-bumper-cars.db")
+startupLog("LevelDBStorageAdapter created")
 
 // Create Repo
+startupLog("Creating Repo...")
 const repo = new Repo({
   identity: { name: "bumper-cars-server", type: "service" },
   adapters: [wsAdapter, storageAdapter],
 })
+startupLog(`Repo created with peerId: ${repo.identity.peerId}`)
 
 logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
@@ -59,11 +79,25 @@ const gameLoop = new GameLoop(
 )
 
 // Start game loop
+startupLog("Starting game loop...")
 gameLoop.start()
+startupLog("Game loop started")
 
 // Create HTTP + WebSocket server
+startupLog("Creating HTTP server...")
 const server = createServer(app)
+startupLog("HTTP server created")
+
+startupLog("Creating WebSocketServer...")
 const wss = new WebSocketServer({ server, path: "/ws" })
+startupLog("WebSocketServer created")
+
+// Log when WebSocket upgrade requests arrive (before connection is established)
+server.on("upgrade", (request: IncomingMessage, _socket, _head) => {
+  const url = request.url || "unknown"
+  startupLog(`WebSocket upgrade request received for: ${url}`)
+  logger.info`WebSocket upgrade request received for: ${url}`
+})
 
 wss.on("connection", (ws, req) => {
   if (!req.url) {
@@ -93,9 +127,12 @@ app.get("/health", (_req, res) => {
 })
 
 const PORT = process.env.PORT || 5170
+startupLog(`Starting to listen on port ${PORT}...`)
 server.listen(PORT, () => {
+  startupLog(`Server listening on port ${PORT}`)
   console.log(`🎪 Bumper Cars server listening on http://localhost:${PORT}`)
   console.log(`   WebSocket endpoint: ws://localhost:${PORT}/ws`)
+  startupLog("Server fully ready to accept connections")
 })
 
 // Graceful shutdown
