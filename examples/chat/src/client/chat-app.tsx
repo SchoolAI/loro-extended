@@ -34,9 +34,14 @@ function getOrCreateUserName(): string {
   return newName
 }
 
-function getAuthorName(message: Message) {
+function getAuthorName(message: Message, myPeerId: string) {
   if (message.role === "assistant") {
     return "AI Assistant"
+  }
+
+  // Show "You" for the current user's messages
+  if (message.author === myPeerId) {
+    return "You"
   }
 
   // Use the authorName stored in the message directly
@@ -48,6 +53,7 @@ function ChatApp() {
   const repo = useRepo()
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
   const [isCopied, setIsCopied] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
 
@@ -64,6 +70,11 @@ function ChatApp() {
       nameInputRef.current.select()
     }
   }, [isEditingName])
+
+  // Focus the message input on mount
+  useEffect(() => {
+    messageInputRef.current?.focus()
+  }, [])
 
   // Get document ID from URL hash, or create new conversation
   const docId = useDocIdFromHash(generateConversationId())
@@ -334,10 +345,12 @@ function ChatApp() {
               </p>
             </div>
           ) : (
-            doc.messages.map(msg => (
+            doc.messages.map(msg => {
+              const isMyMessage = msg.author === myPeerId
+              return (
               <div
                 key={msg.id}
-                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+                className={`flex gap-3 ${isMyMessage ? "flex-row-reverse" : "flex-row"}`}
               >
                 {/* Avatar */}
                 <div
@@ -352,11 +365,11 @@ function ChatApp() {
 
                 {/* Message Bubble */}
                 <div
-                  className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${msg.role === "user" ? "items-end" : "items-start"}`}
+                  className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isMyMessage ? "items-end" : "items-start"}`}
                 >
                   <div className="flex items-baseline gap-2 mb-1 px-1">
                     <span className="text-xs font-medium text-gray-500">
-                      {getAuthorName(msg as Message)}
+                      {getAuthorName(msg as Message, myPeerId)}
                     </span>
                     <span className="text-[10px] text-gray-400">
                       {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -367,7 +380,7 @@ function ChatApp() {
                   </div>
                   <div
                     className={`px-4 py-2.5 rounded-2xl shadow-sm text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words ${
-                      msg.role === "user"
+                      isMyMessage
                         ? "bg-blue-500 text-white rounded-tr-none"
                         : "bg-white text-gray-800 border border-gray-100 rounded-tl-none"
                     }`}
@@ -379,7 +392,7 @@ function ChatApp() {
                   </div>
                 </div>
               </div>
-            ))
+            )})
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -389,13 +402,13 @@ function ChatApp() {
       <div className="bg-white border-t border-gray-200 p-4 sm:p-6">
         <div className="max-w-4xl mx-auto flex gap-3">
           <input
+            ref={messageInputRef}
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
             placeholder="Type a message..."
             className="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-full focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-5 shadow-sm transition-all outline-none"
-            disabled={!handle}
           />
           <button
             type="button"
