@@ -1,7 +1,7 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
 import type { DocId, PeerID } from "@loro-extended/repo"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   EmptyRoom,
   RoomSchema,
@@ -45,6 +45,17 @@ export default function VideoConferenceApp({
 
   // Get room ID from URL hash, or create new room
   const roomId = useRoomIdFromHash(generateRoomId())
+
+  // Track previous room ID to detect changes
+  const prevRoomIdRef = useRef<DocId>(roomId)
+
+  // Handle room changes - reset state when switching rooms
+  useEffect(() => {
+    if (prevRoomIdRef.current !== roomId) {
+      setHasJoined(false)
+      prevRoomIdRef.current = roomId
+    }
+  }, [roomId])
 
   // Ensure hash is set if it was empty (first load)
   useEffect(() => {
