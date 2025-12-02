@@ -151,7 +151,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         ? this.options.url(this.peerId)
         : this.options.url
 
-    this.logger.debug("Connecting to WebSocket server", { url })
+    this.logger.info("WebSocket connecting to {url} (peerId: {peerId})", { url, peerId: this.peerId })
 
     try {
       this.socket = new this.WebSocketImpl(url)
@@ -192,7 +192,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       this.isConnecting = false
       this.reconnectAttempts = 0
 
-      this.logger.info("WebSocket connected", { url })
+      this.logger.info("WebSocket connected to {url} (peerId: {peerId})", { url, peerId: this.peerId })
 
       // Set up message handler
       this.socket.addEventListener("message", event => {
@@ -233,7 +233,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       })
     } catch (error) {
       this.isConnecting = false
-      this.logger.error("Failed to connect", { error })
+      this.logger.error("WebSocket connection failed to {url} (peerId: {peerId}): {error}", { error, url, peerId: this.peerId })
       this.scheduleReconnect()
     }
   }
@@ -302,7 +302,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
    * Handle WebSocket close.
    */
   private handleClose(code: number, reason: string): void {
-    this.logger.info("WebSocket closed", { code, reason })
+    this.logger.info("WebSocket disconnected (code: {code}, reason: {reason}, peerId: {peerId})", { code, reason, peerId: this.peerId })
 
     this.stopKeepalive()
 
@@ -380,7 +380,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
     this.reconnectAttempts++
 
-    this.logger.info("Scheduling reconnect", {
+    this.logger.info("Scheduling reconnect attempt {attempt} in {delay}ms", {
       attempt: this.reconnectAttempts,
       delay,
     })
