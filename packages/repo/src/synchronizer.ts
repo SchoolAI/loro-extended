@@ -136,6 +136,7 @@ export class Synchronizer {
     for (const adapter of adapters) {
       adapter._initialize({
         identity: this.identity,
+        logger: this.logger,
         onChannelAdded: this.channelAdded.bind(this),
         onChannelRemoved: this.channelRemoved.bind(this),
         onChannelReceive: this.channelReceive.bind(this),

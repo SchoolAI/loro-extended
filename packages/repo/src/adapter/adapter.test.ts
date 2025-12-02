@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type {
   Channel,
@@ -6,7 +7,10 @@ import type {
   GeneratedChannel,
 } from "../channel.js"
 import type { AdapterType, PeerID, PeerIdentityDetails } from "../types.js"
-import { Adapter, type AdapterHooks } from "./adapter.js"
+import { Adapter, type AdapterContext } from "./adapter.js"
+
+// Create a mock logger for tests
+const mockLogger = getLogger(["test"])
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<string> {
@@ -53,8 +57,9 @@ class MockAdapter extends Adapter<string> {
 
 describe("Adapter", () => {
   let adapter: MockAdapter
-  let hooks: {
+  let context: {
     identity: PeerIdentityDetails
+    logger: typeof mockLogger
     onChannelAdded: ReturnType<typeof vi.fn>
     onChannelRemoved: ReturnType<typeof vi.fn>
     onChannelReceive: ReturnType<typeof vi.fn>
@@ -63,8 +68,9 @@ describe("Adapter", () => {
 
   beforeEach(() => {
     adapter = new MockAdapter()
-    hooks = {
+    context = {
       identity: { peerId: "0", name: "test-peer", type: "user" },
+      logger: mockLogger,
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
       onChannelReceive: vi.fn(),
@@ -79,22 +85,22 @@ describe("Adapter", () => {
     })
 
     it("transitions from 'created' to 'initialized' on _initialize", () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       // State is internal, but we can verify behavior
-      expect(() => adapter._initialize(hooks)).toThrow(
+      expect(() => adapter._initialize(context)).toThrow(
         "Adapter mock-adapter already initialized",
       )
     })
 
     it("transitions from 'initialized' to 'started' on _start", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       expect(adapter.onStartCalls).toBe(1)
     })
 
     it("transitions from 'started' to 'stopped' on _stop", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
       await adapter._stop()
 
@@ -103,12 +109,12 @@ describe("Adapter", () => {
     })
 
     it("allows re-initialization after stop (for test reuse)", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
       await adapter._stop()
 
       // Should allow re-initialization
-      expect(() => adapter._initialize(hooks)).not.toThrow()
+      expect(() => adapter._initialize(context)).not.toThrow()
     })
 
     it("throws when starting without initialization", async () => {
@@ -118,9 +124,9 @@ describe("Adapter", () => {
     })
 
     it("throws when initializing twice (without stop)", () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
 
-      expect(() => adapter._initialize(hooks)).toThrow(
+      expect(() => adapter._initialize(context)).toThrow(
         "Adapter mock-adapter already initialized",
       )
     })
@@ -148,7 +154,7 @@ describe("Adapter", () => {
       })
 
       it("throws when called in 'initialized' state", () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
 
         expect(() => adapter.testAddChannel("test-context")).toThrow(
           "can't add channel in 'initialized' state (must be 'started')",
@@ -156,7 +162,7 @@ describe("Adapter", () => {
       })
 
       it("succeeds when called in 'started' state", async () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
 
         const channel = adapter.testAddChannel("test-context")
@@ -167,7 +173,7 @@ describe("Adapter", () => {
       })
 
       it("throws when called after stop", async () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
         await adapter._stop()
 
@@ -185,7 +191,7 @@ describe("Adapter", () => {
       })
 
       it("throws when called in 'initialized' state", () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
 
         expect(() => adapter.testRemoveChannel(1)).toThrow(
           "can't remove channel in 'initialized' state (must be 'started')",
@@ -193,7 +199,7 @@ describe("Adapter", () => {
       })
 
       it("succeeds when called in 'started' state", async () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
 
         const channel = adapter.testAddChannel("test-context")
@@ -204,7 +210,7 @@ describe("Adapter", () => {
       })
 
       it("throws when called after stop", async () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
         await adapter._stop()
 
@@ -214,7 +220,7 @@ describe("Adapter", () => {
       })
 
       it("returns undefined when channel not found", async () => {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
 
         const removed = adapter.testRemoveChannel(999)
@@ -226,37 +232,37 @@ describe("Adapter", () => {
 
   describe("Hook Integration", () => {
     it("calls onChannelAdded hook when channel is added", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("test-context")
 
-      expect(hooks.onChannelAdded).toHaveBeenCalledTimes(1)
-      expect(hooks.onChannelAdded).toHaveBeenCalledWith(channel)
+      expect(context.onChannelAdded).toHaveBeenCalledTimes(1)
+      expect(context.onChannelAdded).toHaveBeenCalledWith(channel)
     })
 
     it("calls onChannelRemoved hook when channel is removed", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("test-context")
       adapter.testRemoveChannel(channel.channelId)
 
-      expect(hooks.onChannelRemoved).toHaveBeenCalledTimes(1)
-      expect(hooks.onChannelRemoved).toHaveBeenCalledWith(channel)
+      expect(context.onChannelRemoved).toHaveBeenCalledTimes(1)
+      expect(context.onChannelRemoved).toHaveBeenCalledWith(channel)
     })
 
     it("does not call onChannelRemoved when channel not found", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       adapter.testRemoveChannel(999)
 
-      expect(hooks.onChannelRemoved).not.toHaveBeenCalled()
+      expect(context.onChannelRemoved).not.toHaveBeenCalled()
     })
 
     it("calls onChannelReceive hook when channel receives message", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("test-context")
@@ -267,49 +273,50 @@ describe("Adapter", () => {
 
       channel.onReceive(message)
 
-      expect(hooks.onChannelReceive).toHaveBeenCalledTimes(1)
-      expect(hooks.onChannelReceive).toHaveBeenCalledWith(channel, message)
+      expect(context.onChannelReceive).toHaveBeenCalledTimes(1)
+      expect(context.onChannelReceive).toHaveBeenCalledWith(channel, message)
     })
 
     it("hooks are available in 'started' state", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       // Add multiple channels and verify hooks work for all
       const channel1 = adapter.testAddChannel("context-1")
       const channel2 = adapter.testAddChannel("context-2")
 
-      expect(hooks.onChannelAdded).toHaveBeenCalledTimes(2)
+      expect(context.onChannelAdded).toHaveBeenCalledTimes(2)
 
       adapter.testRemoveChannel(channel1.channelId)
       adapter.testRemoveChannel(channel2.channelId)
 
-      expect(hooks.onChannelRemoved).toHaveBeenCalledTimes(2)
+      expect(context.onChannelRemoved).toHaveBeenCalledTimes(2)
     })
 
     it("uses hooks from lifecycle state at time of channel creation", async () => {
       // This tests that hooks are captured in closures correctly
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       adapter.testAddChannel("test-context")
 
-      // Create new hooks
-      const newHooks: AdapterHooks = {
+      // Create new context
+      const newContext: AdapterContext = {
         identity: {
           peerId: "0" satisfies PeerID,
           name: "test-peer",
           type: "user",
         },
+        logger: mockLogger,
         onChannelAdded: vi.fn(),
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),
         onChannelEstablish: vi.fn(),
       }
 
-      // Stop and re-initialize with new hooks
+      // Stop and re-initialize with new context
       await adapter._stop()
-      adapter._initialize(newHooks)
+      adapter._initialize(newContext)
       await adapter._start()
 
       // The old channel's onReceive should still use the OLD hooks
@@ -323,16 +330,16 @@ describe("Adapter", () => {
       const newChannel = adapter.testAddChannel("new-context")
       newChannel.onReceive(message)
 
-      // New hooks should be called for new channel
-      expect(newHooks.onChannelReceive).toHaveBeenCalledWith(
+      // New context should be called for new channel
+      expect(newContext.onChannelReceive).toHaveBeenCalledWith(
         newChannel,
         message,
       )
-      expect(hooks.onChannelReceive).not.toHaveBeenCalled()
+      expect(context.onChannelReceive).not.toHaveBeenCalled()
     })
 
     it("channel.onReceive is properly wired to lifecycle hook", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("test-context")
@@ -351,12 +358,12 @@ describe("Adapter", () => {
       channel.onReceive(message)
 
       // Should call the lifecycle's onChannelReceive with the channel and message
-      expect(hooks.onChannelReceive).toHaveBeenCalledTimes(1)
-      expect(hooks.onChannelReceive).toHaveBeenCalledWith(channel, message)
+      expect(context.onChannelReceive).toHaveBeenCalledTimes(1)
+      expect(context.onChannelReceive).toHaveBeenCalledWith(channel, message)
     })
 
     it("multiple channels each have their own onReceive wired correctly", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -375,13 +382,13 @@ describe("Adapter", () => {
       channel1.onReceive(message1)
       channel2.onReceive(message2)
 
-      expect(hooks.onChannelReceive).toHaveBeenCalledTimes(2)
-      expect(hooks.onChannelReceive).toHaveBeenNthCalledWith(
+      expect(context.onChannelReceive).toHaveBeenCalledTimes(2)
+      expect(context.onChannelReceive).toHaveBeenNthCalledWith(
         1,
         channel1,
         message1,
       )
-      expect(hooks.onChannelReceive).toHaveBeenNthCalledWith(
+      expect(context.onChannelReceive).toHaveBeenNthCalledWith(
         2,
         channel2,
         message2,
@@ -391,7 +398,7 @@ describe("Adapter", () => {
 
   describe("Channel Operations", () => {
     it("creates channel with correct context", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       adapter.testAddChannel("my-context")
@@ -401,7 +408,7 @@ describe("Adapter", () => {
     })
 
     it("creates multiple channels with different contexts", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       adapter.testAddChannel("context-1")
@@ -417,7 +424,7 @@ describe("Adapter", () => {
     })
 
     it("assigns unique channelIds to each channel", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -430,7 +437,7 @@ describe("Adapter", () => {
     })
 
     it("removes specific channel by id", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -446,7 +453,7 @@ describe("Adapter", () => {
     })
 
     it("clears all channels on stop", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       adapter.testAddChannel("context-1")
@@ -463,7 +470,7 @@ describe("Adapter", () => {
 
   describe("_send Method", () => {
     it("sends message to matching channels", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -489,7 +496,7 @@ describe("Adapter", () => {
     })
 
     it("sends message to multiple matching channels", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -518,7 +525,7 @@ describe("Adapter", () => {
     })
 
     it("returns 0 when no matching channels", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const message: ChannelMsg = {
@@ -536,7 +543,7 @@ describe("Adapter", () => {
     })
 
     it("calls onSend hook when set", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("context-1")
@@ -562,7 +569,7 @@ describe("Adapter", () => {
     })
 
     it("works without onSend hook", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("context-1")
@@ -584,7 +591,7 @@ describe("Adapter", () => {
 
   describe("Abstract Method Implementation", () => {
     it("calls onStart when adapter starts", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
 
       expect(adapter.onStartCalls).toBe(0)
 
@@ -594,7 +601,7 @@ describe("Adapter", () => {
     })
 
     it("calls onStop when adapter stops", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       expect(adapter.onStopCalls).toBe(0)
@@ -605,7 +612,7 @@ describe("Adapter", () => {
     })
 
     it("calls generate for each channel creation", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       expect(adapter.generateCalls).toHaveLength(0)
@@ -643,18 +650,19 @@ describe("Adapter", () => {
       }
 
       const adapter = new OnStartChannelAdapter({ adapterType: "test-adapter" })
-      const onStartHooks: AdapterHooks = {
+      const onStartContext: AdapterContext = {
         identity: {
           peerId: "0" satisfies PeerID,
           name: "test-peer",
           type: "user",
         },
+        logger: mockLogger,
         onChannelAdded: vi.fn(),
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),
         onChannelEstablish: vi.fn(),
       }
-      adapter._initialize(onStartHooks)
+      adapter._initialize(onStartContext)
 
       // Should not throw
       await expect(adapter._start()).resolves.not.toThrow()
@@ -662,7 +670,7 @@ describe("Adapter", () => {
       // Verify channel was created
       expect(adapter.channelCreatedDuringStart).toBe(true)
       expect(adapter.channels.size).toBe(1)
-      expect(onStartHooks.onChannelAdded).toHaveBeenCalledTimes(1)
+      expect(onStartContext.onChannelAdded).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -673,11 +681,18 @@ describe("Adapter", () => {
       expect(customAdapter.logger).toBeDefined()
       // Logger should be configured with adapterType context
     })
+
+    it("updates logger during initialization", () => {
+      adapter._initialize(context)
+
+      // After initialization, the logger should be derived from the context logger
+      expect(adapter.logger).toBeDefined()
+    })
   })
 
   describe("ChannelDirectory Integration", () => {
     it("uses ChannelDirectory for channel management", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       expect(adapter.channels).toBeDefined()
@@ -691,7 +706,7 @@ describe("Adapter", () => {
     })
 
     it("can iterate over channels", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")
@@ -705,7 +720,7 @@ describe("Adapter", () => {
     })
 
     it("can check if channel exists", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("context-1")
@@ -715,7 +730,7 @@ describe("Adapter", () => {
     })
 
     it("can get channel by id", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel = adapter.testAddChannel("context-1")
@@ -728,7 +743,7 @@ describe("Adapter", () => {
   describe("Edge Cases", () => {
     it("handles rapid start/stop cycles", async () => {
       for (let i = 0; i < 5; i++) {
-        adapter._initialize(hooks)
+        adapter._initialize(context)
         await adapter._start()
         adapter.testAddChannel(`context-${i}`)
         await adapter._stop()
@@ -740,7 +755,7 @@ describe("Adapter", () => {
     })
 
     it("handles empty toChannelIds in _send", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const message: ChannelMsg = {
@@ -758,7 +773,7 @@ describe("Adapter", () => {
     })
 
     it("handles channel removal during iteration", async () => {
-      adapter._initialize(hooks)
+      adapter._initialize(context)
       await adapter._start()
 
       const channel1 = adapter.testAddChannel("context-1")

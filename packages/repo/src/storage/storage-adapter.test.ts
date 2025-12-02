@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import { decodeImportBlobMeta, LoroDoc } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ChannelMsg, ConnectedChannel, ReceiveFn } from "../channel.js"
@@ -6,6 +7,9 @@ import {
   StorageAdapter,
   type StorageKey,
 } from "./storage-adapter.js"
+
+// Create a mock logger for tests
+const mockLogger = getLogger(["test"])
 
 // Mock storage adapter for testing
 class MockStorageAdapter extends StorageAdapter {
@@ -81,6 +85,7 @@ describe("StorageAdapter", () => {
   ): Promise<ConnectedChannel> {
     adapterInstance._initialize({
       identity: { peerId: "123", name: "test-peer", type: "user" },
+      logger: mockLogger,
       onChannelAdded: () => {},
       onChannelRemoved: () => {},
       onChannelReceive: () => {},
@@ -111,6 +116,7 @@ describe("StorageAdapter", () => {
 
       adapter._initialize({
         identity: { peerId: "123", name: "test-peer", type: "user" },
+        logger: mockLogger,
         onChannelAdded: () => channelCount++,
         onChannelRemoved: () => channelCount--,
         onChannelReceive: () => {},

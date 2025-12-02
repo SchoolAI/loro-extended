@@ -15,28 +15,40 @@ export type AnyAdapter = Adapter<any>
 
 type AdapterParams = {
   adapterType: AdapterType
-  logger?: Logger
 }
 
-export type AdapterHooks = {
+/**
+ * Context provided to adapters during initialization.
+ * Contains identity, logger, and callbacks for channel lifecycle events.
+ */
+export type AdapterContext = {
   identity: PeerIdentityDetails
+  logger: Logger
   onChannelReceive: (channel: Channel, message: ChannelMsg) => void
   onChannelAdded: (channel: ConnectedChannel) => void
   onChannelRemoved: (channel: Channel) => void
   onChannelEstablish: (channel: ConnectedChannel) => void
 }
 
+/**
+ * @deprecated Use AdapterContext instead
+ */
+export type AdapterHooks = AdapterContext
+
+// Callbacks only (without identity and logger) for lifecycle state
+type AdapterCallbacks = Omit<AdapterContext, "identity" | "logger">
+
 type AdapterLifecycleCreatedState = { state: "created" } // Constructor finished, not initialized
 
 // biome-ignore format: left-align
 type AdapterLifecycleInitializedState =
  & { state: "initialized" }
- & AdapterHooks
+ & AdapterCallbacks
 
 // biome-ignore format: left-align
 type AdapterLifecycleStartedState =
  & { state: "started" }
- & AdapterHooks
+ & AdapterCallbacks
 
 type AdapterLifecycleStoppedState = { state: "stopped" }
 
@@ -48,7 +60,9 @@ type AdapterLifecycleState =
 
 export abstract class Adapter<G> {
   readonly adapterType: AdapterType
-  readonly logger: Logger
+  // Logger is set during _initialize() with the Synchronizer's logger
+  // Before initialization, uses a placeholder logger
+  logger: Logger
   readonly channels: ChannelDirectory<G>
 
   // Used for debugging; set by AdapterManager
@@ -59,11 +73,11 @@ export abstract class Adapter<G> {
 
   #lifecycle: AdapterLifecycleState = { state: "created" }
 
-  constructor({ adapterType, logger }: AdapterParams) {
+  constructor({ adapterType }: AdapterParams) {
     this.adapterType = adapterType
-    this.logger = (logger ?? getLogger())
-      .getChild("adapter")
-      .with({ adapterType })
+    // Use a placeholder logger until _initialize() provides the real one
+    // This logger won't output anything unless LogTape is configured at the root level
+    this.logger = getLogger().getChild("adapter").with({ adapterType })
     this.channels = new ChannelDirectory(this.generate.bind(this))
   }
 
@@ -161,7 +175,7 @@ export abstract class Adapter<G> {
   // INTERNAL API - For Synchronizer
   // ============================================================================
 
-  _initialize(hooks: AdapterHooks): void {
+  _initialize(context: AdapterContext): void {
     if (
       this.#lifecycle.state !== "created" &&
       // Allow re-initialization if adapter was stopped (for adapter reuse in tests)
@@ -170,8 +184,19 @@ export abstract class Adapter<G> {
       throw new Error(`Adapter ${this.adapterType} already initialized`)
     }
     // Store identity for subclasses to access
-    this.identity = hooks.identity
-    this.#lifecycle = { state: "initialized", ...hooks }
+    this.identity = context.identity
+    // Set the real logger from the Synchronizer
+    this.logger = context.logger
+      .getChild("adapter")
+      .with({ adapterType: this.adapterType })
+    // Store callbacks in lifecycle state (without identity and logger)
+    this.#lifecycle = {
+      state: "initialized",
+      onChannelReceive: context.onChannelReceive,
+      onChannelAdded: context.onChannelAdded,
+      onChannelRemoved: context.onChannelRemoved,
+      onChannelEstablish: context.onChannelEstablish,
+    }
   }
 
   async _start(): Promise<void> {
