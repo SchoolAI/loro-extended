@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import { LoroDoc } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -82,6 +83,7 @@ describe("WsClientNetworkAdapter", () => {
 
     adapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -111,6 +113,7 @@ describe("WsClientNetworkAdapter", () => {
 
     adapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -193,6 +196,7 @@ describe("WsClientNetworkAdapter", () => {
     const onChannelReceive = vi.fn()
     testAdapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
+      logger: getLogger(["test"]),
       onChannelReceive,
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -242,6 +246,7 @@ describe("WsClientNetworkAdapter", () => {
 
     adapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -284,6 +289,7 @@ describe("WsClientNetworkAdapter", () => {
 
     adapter._initialize({
       identity: { peerId: "client-1" as any, name: "client", type: "user" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),

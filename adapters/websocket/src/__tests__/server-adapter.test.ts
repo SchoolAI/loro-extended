@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import type { PeerID } from "@loro-extended/repo"
 import { LoroDoc } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -61,6 +62,7 @@ describe("WsServerNetworkAdapter", () => {
         name: "server",
         type: "service",
       },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -197,6 +199,7 @@ describe("WsServerNetworkAdapter", () => {
         name: "server",
         type: "service",
       },
+      logger: getLogger(["test"]),
       onChannelReceive,
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),

@@ -137,6 +137,9 @@ importers:
         specifier: workspace:^
         version: link:../../packages/repo
     devDependencies:
+      '@logtape/logtape':
+        specifier: ^1.1.1
+        version: 1.1.1
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(@swc/core@1.13.3)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)
@@ -156,6 +159,9 @@ importers:
         specifier: ^1.10.2
         version: 1.10.2
     devDependencies:
+      '@logtape/logtape':
+        specifier: ^1.1.1
+        version: 1.1.1
       '@types/node':
         specifier: ^22.15.29
         version: 22.19.1

@@ -36,6 +36,7 @@
     "loro-crdt": "^1.10.2"
   },
   "devDependencies": {
+    "@logtape/logtape": "^1.1.1",
     "@types/node": "^22.15.29",
     "@types/ws": "^8.5.13",
     "tsup": "^8.5.0",
