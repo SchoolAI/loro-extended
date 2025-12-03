@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   HttpPollingConnection,
@@ -160,6 +161,7 @@ describe("HttpPollingServerNetworkAdapter", () => {
     // Initialize and start the adapter with mock hooks
     adapter._initialize({
       identity: { peerId: "9999", name: "test-server", type: "service" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -179,6 +181,7 @@ describe("HttpPollingServerNetworkAdapter", () => {
   it("should return existing connection on re-register", async () => {
     adapter._initialize({
       identity: { peerId: "9999", name: "test-server", type: "service" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
@@ -195,6 +198,7 @@ describe("HttpPollingServerNetworkAdapter", () => {
   it("should get all connections", async () => {
     adapter._initialize({
       identity: { peerId: "9999", name: "test-server", type: "service" },
+      logger: getLogger(["test"]),
       onChannelReceive: vi.fn(),
       onChannelAdded: vi.fn(),
       onChannelRemoved: vi.fn(),
