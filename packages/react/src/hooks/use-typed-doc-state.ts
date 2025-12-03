@@ -1,5 +1,6 @@
 import {
   type DocShape,
+  type InferEmptyStateType,
   type InferPlainType,
   TypedDoc,
 } from "@loro-extended/change"
@@ -22,16 +23,16 @@ import { useDocHandleState } from "./use-doc-handle-state.js"
 export function useTypedDocState<T extends DocShape>(
   documentId: DocId,
   schema: T,
-  emptyState: InferPlainType<T>,
+  emptyState: InferEmptyStateType<T>,
 ) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
   // Data transformation from Loro to JSON with empty state overlay
   // We include snapshot.version to trigger re-computation when the document changes
-  const doc = useMemo(() => {
+  const doc: InferPlainType<T> = useMemo(() => {
     if (!handle) {
       // Return empty state immediately - no loading needed!
-      return emptyState
+      return emptyState as InferPlainType<T>
     }
 
     // Access the doc via the getter property (not a method call)

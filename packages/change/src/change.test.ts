@@ -801,7 +801,7 @@ describe("TypedLoroDoc", () => {
       const emptyState = {
         title: "Default Title",
         count: 0,
-        items: ["default"],
+        items: [],
       }
 
       const typedDoc = createTypedDoc(schema, emptyState)
@@ -809,7 +809,7 @@ describe("TypedLoroDoc", () => {
       expect(typedDoc.value).toEqual({
         title: "Default Title",
         count: 0,
-        items: ["default"],
+        items: [],
       })
     })
 
@@ -823,7 +823,7 @@ describe("TypedLoroDoc", () => {
       const emptyState = {
         title: "Default Title",
         count: 0,
-        items: ["default"],
+        items: [],
       }
 
       const typedDoc = createTypedDoc(schema, emptyState)
@@ -835,7 +835,7 @@ describe("TypedLoroDoc", () => {
 
       expect(result.title).toBe("Hello World")
       expect(result.count).toBe(5)
-      expect(result.items).toEqual(["default"]) // Empty state preserved
+      expect(result.items).toEqual([]) // Empty state preserved
     })
 
     it("should handle nested empty state structures", () => {
@@ -855,7 +855,7 @@ describe("TypedLoroDoc", () => {
           title: "Default Title",
           metadata: {
             views: 0,
-            tags: ["default-tag"],
+            tags: [],
             author: "Anonymous",
           },
         },
@@ -873,7 +873,7 @@ describe("TypedLoroDoc", () => {
 
       expect(result.article.title).toBe("New Title")
       expect(result.article.metadata.views).toBe(10)
-      expect(result.article.metadata.tags).toEqual(["default-tag"]) // Preserved
+      expect(result.article.metadata.tags).toEqual([]) // Preserved
       expect(result.article.metadata.author).toBe("John Doe")
     })
 

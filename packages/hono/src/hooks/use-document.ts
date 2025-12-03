@@ -1,4 +1,8 @@
-import type { DocShape, InferPlainType } from "@loro-extended/change"
+import type {
+  DocShape,
+  InferEmptyStateType,
+  InferPlainType,
+} from "@loro-extended/change"
 import type { DocHandle, DocId } from "@loro-extended/repo"
 import type { DocWrapper } from "./use-doc-handle-state.js"
 import type { ChangeFn } from "./use-typed-doc-changer.js"
@@ -60,7 +64,7 @@ export type UseDocumentReturn<T extends DocShape> = [
 export function useDocument<T extends DocShape>(
   documentId: DocId,
   schema: T,
-  emptyState: InferPlainType<T>,
+  emptyState: InferEmptyStateType<T>,
 ): UseDocumentReturn<T> {
   const { doc, handle } = useTypedDocState<T>(documentId, schema, emptyState)
   const changeDoc = useTypedDocChanger<T>(handle, schema, emptyState)

@@ -108,7 +108,8 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema, { wrapper: { stats: { visits: 0 } } })
+      // Empty state must use empty record - add initial data via change()
+      const doc = new TypedDoc(schema, { wrapper: { stats: {} } })
 
       doc.change(draft => {
         draft.wrapper.stats.visits = 100

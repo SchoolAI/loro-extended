@@ -16,10 +16,11 @@ import type { MovableListDraftNode } from "./draft-nodes/movable-list.js"
 import type { RecordDraftNode } from "./draft-nodes/record.js"
 import type { TextDraftNode } from "./draft-nodes/text.js"
 
-export interface Shape<Plain, Draft> {
+export interface Shape<Plain, Draft, EmptyState = Plain> {
   readonly _type: string
   readonly _plain: Plain
   readonly _draft: Draft
+  readonly _emptyState: EmptyState
 }
 
 export interface DocShape<
@@ -29,30 +30,36 @@ export interface DocShape<
   >,
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
-    { [K in keyof NestedShapes]: NestedShapes[K]["_draft"] }
+    { [K in keyof NestedShapes]: NestedShapes[K]["_draft"] },
+    { [K in keyof NestedShapes]: NestedShapes[K]["_emptyState"] }
   > {
   readonly _type: "doc"
   // A doc's root containers each separately has its own shape, hence 'shapes'
   readonly shapes: NestedShapes
 }
 
-export interface TextContainerShape extends Shape<string, TextDraftNode> {
+export interface TextContainerShape
+  extends Shape<string, TextDraftNode, string> {
   readonly _type: "text"
 }
-export interface CounterContainerShape extends Shape<number, CounterDraftNode> {
+export interface CounterContainerShape
+  extends Shape<number, CounterDraftNode, number> {
   readonly _type: "counter"
 }
 export interface TreeContainerShape<NestedShape = ContainerOrValueShape>
-  extends Shape<any, any> {
+  extends Shape<any, any, never[]> {
   readonly _type: "tree"
   // TODO(duane): What does a tree contain? One type, or many?
   readonly shape: NestedShape
 }
 
 // Container schemas using interfaces for recursive references
+// NOTE: List and Record use never[] and Record<string, never> for EmptyState
+// to enforce that only empty values ([] and {}) are valid in empty state.
+// This prevents users from expecting per-entry merging behavior.
 export interface ListContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
-> extends Shape<NestedShape["_plain"][], ListDraftNode<NestedShape>> {
+> extends Shape<NestedShape["_plain"][], ListDraftNode<NestedShape>, never[]> {
   readonly _type: "list"
   // A list contains many elements, all of the same 'shape'
   readonly shape: NestedShape
@@ -60,7 +67,11 @@ export interface ListContainerShape<
 
 export interface MovableListContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
-> extends Shape<NestedShape["_plain"][], MovableListDraftNode<NestedShape>> {
+> extends Shape<
+    NestedShape["_plain"][],
+    MovableListDraftNode<NestedShape>,
+    never[]
+  > {
   readonly _type: "movableList"
   // A list contains many elements, all of the same 'shape'
   readonly shape: NestedShape
@@ -75,7 +86,8 @@ export interface MapContainerShape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
     MapDraftNode<NestedShapes> & {
       [K in keyof NestedShapes]: NestedShapes[K]["_draft"]
-    }
+    },
+    { [K in keyof NestedShapes]: NestedShapes[K]["_emptyState"] }
   > {
   readonly _type: "map"
   // Each map property has its own shape, hence 'shapes'
@@ -86,7 +98,8 @@ export interface RecordContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
 > extends Shape<
     Record<string, NestedShape["_plain"]>,
-    RecordDraftNode<NestedShape>
+    RecordDraftNode<NestedShape>,
+    Record<string, never>
   > {
   readonly _type: "record"
   readonly shape: NestedShape
@@ -105,28 +118,30 @@ export type ContainerType = ContainerShape["_type"]
 
 // LoroValue shape types - a shape for each of Loro's Value types
 export interface StringValueShape<T extends string = string>
-  extends Shape<T, T> {
+  extends Shape<T, T, T> {
   readonly _type: "value"
   readonly valueType: "string"
   readonly options?: T[]
 }
-export interface NumberValueShape extends Shape<number, number> {
+export interface NumberValueShape extends Shape<number, number, number> {
   readonly _type: "value"
   readonly valueType: "number"
 }
-export interface BooleanValueShape extends Shape<boolean, boolean> {
+export interface BooleanValueShape extends Shape<boolean, boolean, boolean> {
   readonly _type: "value"
   readonly valueType: "boolean"
 }
-export interface NullValueShape extends Shape<null, null> {
+export interface NullValueShape extends Shape<null, null, null> {
   readonly _type: "value"
   readonly valueType: "null"
 }
-export interface UndefinedValueShape extends Shape<undefined, undefined> {
+export interface UndefinedValueShape
+  extends Shape<undefined, undefined, undefined> {
   readonly _type: "value"
   readonly valueType: "undefined"
 }
-export interface Uint8ArrayValueShape extends Shape<Uint8Array, Uint8Array> {
+export interface Uint8ArrayValueShape
+  extends Shape<Uint8Array, Uint8Array, Uint8Array> {
   readonly _type: "value"
   readonly valueType: "uint8array"
 }
@@ -135,29 +150,40 @@ export interface ObjectValueShape<
   T extends Record<string, ValueShape> = Record<string, ValueShape>,
 > extends Shape<
     { [K in keyof T]: T[K]["_plain"] },
-    { [K in keyof T]: T[K]["_draft"] }
+    { [K in keyof T]: T[K]["_draft"] },
+    { [K in keyof T]: T[K]["_emptyState"] }
   > {
   readonly _type: "value"
   readonly valueType: "object"
   readonly shape: T
 }
 
+// NOTE: RecordValueShape and ArrayValueShape use Record<string, never> and never[]
+// for EmptyState to enforce that only empty values ({} and []) are valid.
 export interface RecordValueShape<T extends ValueShape = ValueShape>
-  extends Shape<Record<string, T["_plain"]>, Record<string, T["_draft"]>> {
+  extends Shape<
+    Record<string, T["_plain"]>,
+    Record<string, T["_draft"]>,
+    Record<string, never>
+  > {
   readonly _type: "value"
   readonly valueType: "record"
   readonly shape: T
 }
 
 export interface ArrayValueShape<T extends ValueShape = ValueShape>
-  extends Shape<T["_plain"][], T["_draft"][]> {
+  extends Shape<T["_plain"][], T["_draft"][], never[]> {
   readonly _type: "value"
   readonly valueType: "array"
   readonly shape: T
 }
 
 export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
-  extends Shape<T[number]["_plain"], T[number]["_draft"]> {
+  extends Shape<
+    T[number]["_plain"],
+    T[number]["_draft"],
+    T[number]["_emptyState"]
+  > {
   readonly _type: "value"
   readonly valueType: "union"
   readonly shapes: T
@@ -179,7 +205,11 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
 export interface DiscriminatedUnionValueShape<
   K extends string = string,
   T extends Record<string, ObjectValueShape> = Record<string, ObjectValueShape>,
-> extends Shape<T[keyof T]["_plain"], T[keyof T]["_draft"]> {
+> extends Shape<
+    T[keyof T]["_plain"],
+    T[keyof T]["_draft"],
+    T[keyof T]["_emptyState"]
+  > {
   readonly _type: "value"
   readonly valueType: "discriminatedUnion"
   readonly discriminantKey: K
@@ -215,6 +245,7 @@ export const Shape = {
     shapes: shape,
     _plain: {} as any,
     _draft: {} as any,
+    _emptyState: {} as any,
   }),
 
   // CRDTs are represented by Loro Containers--they converge on state using Loro's
@@ -223,6 +254,7 @@ export const Shape = {
     _type: "counter" as const,
     _plain: 0,
     _draft: {} as CounterDraftNode,
+    _emptyState: 0,
   }),
 
   list: <T extends ContainerOrValueShape>(shape: T): ListContainerShape<T> => ({
@@ -230,6 +262,7 @@ export const Shape = {
     shape,
     _plain: [] as any,
     _draft: {} as any,
+    _emptyState: [] as never[],
   }),
 
   map: <T extends Record<string, ContainerOrValueShape>>(
@@ -239,6 +272,7 @@ export const Shape = {
     shapes: shape,
     _plain: {} as any,
     _draft: {} as any,
+    _emptyState: {} as any,
   }),
 
   record: <T extends ContainerOrValueShape>(
@@ -248,6 +282,7 @@ export const Shape = {
     shape,
     _plain: {} as any,
     _draft: {} as any,
+    _emptyState: {} as Record<string, never>,
   }),
 
   movableList: <T extends ContainerOrValueShape>(
@@ -257,12 +292,14 @@ export const Shape = {
     shape,
     _plain: [] as any,
     _draft: {} as any,
+    _emptyState: [] as never[],
   }),
 
   text: (): TextContainerShape => ({
     _type: "text" as const,
     _plain: "",
     _draft: {} as TextDraftNode,
+    _emptyState: "",
   }),
 
   tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
@@ -270,6 +307,7 @@ export const Shape = {
     shape,
     _plain: {} as any,
     _draft: {} as any,
+    _emptyState: [] as never[],
   }),
 
   // Values are represented as plain JS objects, with the limitation that they MUST be
@@ -284,6 +322,7 @@ export const Shape = {
       valueType: "string" as const,
       _plain: (options[0] ?? "") as T,
       _draft: (options[0] ?? "") as T,
+      _emptyState: (options[0] ?? "") as T,
       options: options.length > 0 ? options : undefined,
     }),
 
@@ -292,6 +331,7 @@ export const Shape = {
       valueType: "number" as const,
       _plain: 0,
       _draft: 0,
+      _emptyState: 0,
     }),
 
     boolean: (): BooleanValueShape => ({
@@ -299,6 +339,7 @@ export const Shape = {
       valueType: "boolean" as const,
       _plain: false,
       _draft: false,
+      _emptyState: false,
     }),
 
     null: (): NullValueShape => ({
@@ -306,6 +347,7 @@ export const Shape = {
       valueType: "null" as const,
       _plain: null,
       _draft: null,
+      _emptyState: null,
     }),
 
     undefined: (): UndefinedValueShape => ({
@@ -313,6 +355,7 @@ export const Shape = {
       valueType: "undefined" as const,
       _plain: undefined,
       _draft: undefined,
+      _emptyState: undefined,
     }),
 
     uint8Array: (): Uint8ArrayValueShape => ({
@@ -320,6 +363,7 @@ export const Shape = {
       valueType: "uint8array" as const,
       _plain: new Uint8Array(),
       _draft: new Uint8Array(),
+      _emptyState: new Uint8Array(),
     }),
 
     object: <T extends Record<string, ValueShape>>(
@@ -330,6 +374,7 @@ export const Shape = {
       shape,
       _plain: {} as any,
       _draft: {} as any,
+      _emptyState: {} as any,
     }),
 
     record: <T extends ValueShape>(shape: T): RecordValueShape<T> => ({
@@ -338,6 +383,7 @@ export const Shape = {
       shape,
       _plain: {} as any,
       _draft: {} as any,
+      _emptyState: {} as Record<string, never>,
     }),
 
     array: <T extends ValueShape>(shape: T): ArrayValueShape<T> => ({
@@ -346,6 +392,7 @@ export const Shape = {
       shape,
       _plain: [] as any,
       _draft: [] as any,
+      _emptyState: [] as never[],
     }),
 
     // Special value type that helps make things like `string | null` representable
@@ -356,6 +403,7 @@ export const Shape = {
       shapes,
       _plain: {} as any,
       _draft: {} as any,
+      _emptyState: {} as any,
     }),
 
     /**
@@ -397,6 +445,7 @@ export const Shape = {
       variants,
       _plain: {} as any,
       _draft: {} as any,
+      _emptyState: {} as any,
     }),
   },
 }

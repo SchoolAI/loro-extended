@@ -31,6 +31,7 @@ export type {
   Draft,
   InferDraftType,
   // Type inference
+  InferEmptyStateType,
   InferPlainType,
 } from "./types.js"
 // Utility exports

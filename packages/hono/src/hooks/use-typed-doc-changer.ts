@@ -1,7 +1,7 @@
 import {
   type DocShape,
   type Draft,
-  type InferPlainType,
+  type InferEmptyStateType,
   TypedDoc,
 } from "@loro-extended/change"
 import type { DocHandle } from "@loro-extended/repo"
@@ -24,7 +24,7 @@ export type ChangeFn<T extends DocShape> = (draft: Draft<T>) => void
 export function useTypedDocChanger<T extends DocShape>(
   handle: DocHandle<DocWrapper> | null,
   schema: T,
-  emptyState: InferPlainType<T>,
+  emptyState: InferEmptyStateType<T>,
 ) {
   // Create a transformer that converts LoroDoc to typed draft
   // Note: The loroDoc parameter is already the LoroDoc from handle.doc (property, not method)

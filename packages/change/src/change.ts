@@ -10,14 +10,23 @@ import {
 } from "./json-patch.js"
 import { overlayEmptyState } from "./overlay.js"
 import type { DocShape } from "./shape.js"
-import type { Draft, InferPlainType } from "./types.js"
+import type { Draft, InferEmptyStateType, InferPlainType } from "./types.js"
 import { validateEmptyState } from "./validation.js"
 
 // Core TypedDoc abstraction around LoroDoc
 export class TypedDoc<Shape extends DocShape> {
+  /**
+   * Creates a new TypedDoc with the given schema and empty state.
+   *
+   * @param shape - The document schema
+   * @param emptyState - Default values for the document. For dynamic containers
+   *   (list, record, etc.), only empty values ([] or {}) are allowed. Use
+   *   `.change()` to add initial data after construction.
+   * @param doc - Optional existing LoroDoc to wrap
+   */
   constructor(
     private shape: Shape,
-    private emptyState: InferPlainType<Shape>,
+    private emptyState: InferEmptyStateType<Shape>,
     private doc: LoroDoc = new LoroDoc(),
   ) {
     validateEmptyState(emptyState, shape)
@@ -28,7 +37,7 @@ export class TypedDoc<Shape extends DocShape> {
     return overlayEmptyState(
       this.shape,
       crdtValue,
-      this.emptyState,
+      this.emptyState as any,
     ) as InferPlainType<Shape>
   }
 
@@ -36,7 +45,7 @@ export class TypedDoc<Shape extends DocShape> {
     // Reuse existing DocumentDraft system with empty state integration
     const draft = new DraftDoc({
       shape: this.shape,
-      emptyState: this.emptyState,
+      emptyState: this.emptyState as any,
       doc: this.doc,
     })
     fn(draft as unknown as Draft<Shape>)
@@ -98,7 +107,7 @@ export class TypedDoc<Shape extends DocShape> {
 // Factory function for TypedLoroDoc
 export function createTypedDoc<Shape extends DocShape>(
   shape: Shape,
-  emptyState: InferPlainType<Shape>,
+  emptyState: InferEmptyStateType<Shape>,
   existingDoc?: LoroDoc,
 ): TypedDoc<Shape> {
   return new TypedDoc<Shape>(shape, emptyState, existingDoc || new LoroDoc())
