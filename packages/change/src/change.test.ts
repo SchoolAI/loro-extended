@@ -973,6 +973,38 @@ describe("TypedLoroDoc", () => {
         createTypedDoc(schema, invalidEmptyState as any)
       }).toThrow()
     })
+    it("should handle null values in empty state correctly", () => {
+      const schema = Shape.doc({
+        interjection: Shape.map({
+          currentPrediction: Shape.plain.union([
+            Shape.plain.string(),
+            Shape.plain.null(),
+          ]),
+        }),
+      })
+
+      const emptyState = {
+        interjection: {
+          currentPrediction: null,
+        },
+      }
+
+      const typedDoc = createTypedDoc(schema, emptyState)
+
+      // This should not throw "empty state required"
+      expect(() => {
+        typedDoc.change(draft => {
+          // Accessing the property triggers getOrCreateNode
+          const current = draft.interjection.currentPrediction
+          expect(current).toBeNull()
+
+          // Verify we can update it
+          draft.interjection.currentPrediction = "new value"
+        })
+      }).not.toThrow()
+
+      expect(typedDoc.value.interjection.currentPrediction).toBe("new value")
+    })
   })
 
   describe("Multiple Changes", () => {

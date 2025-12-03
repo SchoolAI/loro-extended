@@ -92,13 +92,13 @@ export class MapDraftNode<
         } else {
           // Only fall back to empty state if the container doesn't have the value
           const emptyState = (this.emptyState as any)?.[key]
-          if (!emptyState) {
+          if (emptyState === undefined) {
             throw new Error("empty state required")
           }
           node = emptyState as Value
         }
       }
-      if (!node) throw new Error("no container made")
+      if (node === undefined) throw new Error("no container made")
       this.propertyCache.set(key, node)
     }
 
@@ -114,6 +114,7 @@ export class MapDraftNode<
           ? value => {
               // console.log("set value", value)
               this.container.set(key, value)
+              this.propertyCache.set(key, value)
             }
           : undefined,
       })
