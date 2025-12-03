@@ -24,7 +24,7 @@
     "build": "tsup",
     "format": "biome format --write .",
     "lint": "biome check --write .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
