@@ -1,5 +1,15 @@
 # @loro-extended/repo
 
+## 0.6.0
+
+### Patch Changes
+
+- c67e26c: Refactor directory-response into a new-doc message that is specifically for new, local doc announcements (pull-based). This frees us to use directory-response for its original intended purpose in future.
+- 76a18ba: Updated Repo messages to be more efficient with regard to ephemeral state when peers request documents--just pass the ephemeral state along with the sync-request and sync-response, rather than initiating another message loop.
+- Updated dependencies [26ca4cd]
+- Updated dependencies [b9da0e9]
+  - @loro-extended/change@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

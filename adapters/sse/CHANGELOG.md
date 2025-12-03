@@ -1,5 +1,17 @@
 # @loro-extended/adapter-sse
 
+## 0.6.0
+
+### Minor Changes
+
+- 10502f5: Fix an issue with SSE adapter where successful termination resulted in never reconnecting
+
+### Patch Changes
+
+- Updated dependencies [c67e26c]
+- Updated dependencies [76a18ba]
+  - @loro-extended/repo@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

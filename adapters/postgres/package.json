@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-postgres",
-  "version": "0.1.1",
+  "version": "0.6.0",
   "description": "PostgreSQL storage adapter for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",
