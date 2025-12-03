@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape"
 import type { PeerID, PeerIdentityDetails } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { WebRtcDataChannelAdapter } from "./adapter.js"
@@ -12,6 +13,7 @@ function createMockHooks() {
       name: "test-peer",
       type: "user" as const,
     } satisfies PeerIdentityDetails,
+    logger: getLogger(["test"]),
     onChannelAdded: vi.fn(),
     onChannelRemoved: vi.fn(),
     onChannelReceive: vi.fn(),
