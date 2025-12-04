@@ -1,5 +1,5 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
-import type { PeerID } from "@loro-extended/repo"
+import { generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import type { SignalData, SignalingPresence } from "../shared/types"
 import { shouldInitiate } from "../shared/webrtc-protocol"
@@ -41,7 +41,7 @@ export function useWebRtcMesh(
 ): UseWebRtcMeshReturn {
   // Generate a unique instance ID for this session (refreshes on reload)
   // This allows us to ignore stale signals from previous sessions
-  const myInstanceId = useMemo(() => crypto.randomUUID(), [])
+  const myInstanceId = useMemo(() => generateUUID(), [])
 
   // Track the instance ID of remote peers so we can target signals correctly
   const remoteInstanceIdsRef = useRef<Map<PeerID, string>>(new Map())

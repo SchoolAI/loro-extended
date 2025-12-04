@@ -1,5 +1,5 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
-import type { DocId, ReadyState } from "@loro-extended/repo"
+import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
   ChatSchema,
@@ -16,7 +16,7 @@ const PREVIOUS_NAME_KEY = "loro-chat-previous-name"
 
 // Generate a new conversation ID
 function generateConversationId(): DocId {
-  return `chat-${crypto.randomUUID()}`
+  return `chat-${generateUUID()}`
 }
 
 // Generate a random name like "Someone-1234"
@@ -140,7 +140,7 @@ function ChatApp() {
 
     changeDoc(d => {
       d.messages.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         role: "user",
         author: repo.identity.peerId,
         authorName,

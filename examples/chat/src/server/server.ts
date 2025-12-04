@@ -4,7 +4,7 @@ import {
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/server"
 import { type InferPlainType, TypedDoc } from "@loro-extended/change"
-import { type DocHandle, type DocId, Repo } from "@loro-extended/repo"
+import { type DocHandle, type DocId, generateUUID, Repo } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
@@ -74,7 +74,7 @@ function appendAssistantMessage(
   typedDoc: TypedDoc<typeof ChatSchema>,
   content: string,
 ) {
-  const id = crypto.randomUUID()
+  const id = generateUUID()
 
   typedDoc.change(draft => {
     draft.messages.push({

@@ -1,6 +1,6 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
-import type { DocId, PeerID } from "@loro-extended/repo"
+import { generateUUID, type DocId, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   EmptyRoom,
@@ -26,7 +26,7 @@ import { useWebRtcMesh } from "./use-webrtc-mesh"
 
 // Generate a new room ID
 function generateRoomId(): DocId {
-  return `room-${crypto.randomUUID()}`
+  return `room-${generateUUID()}`
 }
 
 type VideoConferenceAppProps = {
