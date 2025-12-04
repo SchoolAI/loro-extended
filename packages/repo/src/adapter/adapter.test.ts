@@ -86,10 +86,9 @@ describe("Adapter", () => {
 
     it("transitions from 'created' to 'initialized' on _initialize", () => {
       adapter._initialize(context)
-      // State is internal, but we can verify behavior
-      expect(() => adapter._initialize(context)).toThrow(
-        "Adapter mock-adapter already initialized",
-      )
+      // State is internal, but we can verify behavior by checking that
+      // re-initialization auto-stops and succeeds (HMR resilience)
+      expect(() => adapter._initialize(context)).not.toThrow()
     })
 
     it("transitions from 'initialized' to 'started' on _start", async () => {
@@ -123,12 +122,22 @@ describe("Adapter", () => {
       )
     })
 
-    it("throws when initializing twice (without stop)", () => {
+    it("auto-stops and re-initializes when initializing twice (HMR resilience)", () => {
       adapter._initialize(context)
 
-      expect(() => adapter._initialize(context)).toThrow(
-        "Adapter mock-adapter already initialized",
-      )
+      // Should auto-stop and allow re-initialization (for HMR scenarios)
+      expect(() => adapter._initialize(context)).not.toThrow()
+    })
+
+    it("auto-stops from started state when re-initializing (HMR resilience)", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      adapter.testAddChannel("test-context")
+      expect(adapter.channels.size).toBe(1)
+
+      // Re-initialize should auto-stop, clearing channels
+      adapter._initialize(context)
+      expect(adapter.channels.size).toBe(0)
     })
 
     it("warns when stopping from non-started state", async () => {

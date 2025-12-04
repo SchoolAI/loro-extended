@@ -176,9 +176,21 @@ export abstract class Adapter<G> {
   // ============================================================================
 
   _initialize(context: AdapterContext): void {
+    // If already initialized/started, auto-stop to allow re-initialization (handles HMR)
+    if (
+      this.#lifecycle.state === "initialized" ||
+      this.#lifecycle.state === "started"
+    ) {
+      this.logger.warn(
+        "Adapter {adapterType} re-initializing (auto-stopping from {state} state)",
+        { adapterType: this.adapterType, state: this.#lifecycle.state },
+      )
+      this.channels.reset()
+      this.#lifecycle = { state: "stopped" }
+    }
+
     if (
       this.#lifecycle.state !== "created" &&
-      // Allow re-initialization if adapter was stopped (for adapter reuse in tests)
       this.#lifecycle.state !== "stopped"
     ) {
       throw new Error(`Adapter ${this.adapterType} already initialized`)
