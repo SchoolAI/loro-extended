@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
+import { TypedDoc } from "./change.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
+import { validateValue } from "./validation.js"
 
 describe("discriminatedUnion", () => {
   // Define variant shapes
@@ -165,5 +167,80 @@ describe("discriminatedUnion", () => {
     )
 
     expect(result).toEqual(crdtValue)
+  })
+  describe("validation", () => {
+    it("should validate a correct value for client variant", () => {
+      const value = {
+        type: "client",
+        name: "Alice",
+        input: { force: 1, angle: 90 },
+      }
+      expect(validateValue(value, GamePresenceSchema)).toEqual(value)
+    })
+
+    it("should validate a correct value for server variant", () => {
+      const value = {
+        type: "server",
+        cars: { p1: { x: 10, y: 20 } },
+        tick: 100,
+      }
+      expect(validateValue(value, GamePresenceSchema)).toEqual(value)
+    })
+
+    it("should throw an error for an invalid discriminant value", () => {
+      const value = { type: "unknown", name: "Bob" }
+      expect(() => validateValue(value, GamePresenceSchema)).toThrow(
+        'Invalid discriminant value "unknown" at path root. Expected one of: client, server',
+      )
+    })
+
+    it("should throw an error for a missing discriminant key", () => {
+      const value = { name: "Bob" }
+      expect(() => validateValue(value, GamePresenceSchema)).toThrow(
+        'Expected string for discriminant key "type" at path root, got undefined',
+      )
+    })
+
+    it("should throw an error if the value does not match the variant schema", () => {
+      const value = {
+        type: "client",
+        name: "Alice",
+        input: { force: "invalid", angle: 90 }, // force should be number
+      }
+      expect(() => validateValue(value, GamePresenceSchema)).toThrow(
+        "Expected number at path root.input.force, got string",
+      )
+    })
+
+    describe("TypedDoc integration", () => {
+      it("should allow setting a discriminated union property in a MapDraftNode", () => {
+        const DocSchema = Shape.doc({
+          state: Shape.map({
+            presence: GamePresenceSchema,
+          }),
+        })
+
+        const doc = new TypedDoc(DocSchema, {
+          state: {
+            presence: EmptyClientPresence,
+          },
+        })
+
+        doc.change(draft => {
+          // This should work now that MapDraftNode recognizes discriminatedUnion as a value shape
+          draft.state.presence = {
+            type: "server",
+            cars: { p1: { x: 10, y: 20 } },
+            tick: 100,
+          }
+        })
+
+        expect(doc.value.state.presence).toEqual({
+          type: "server",
+          cars: { p1: { x: 10, y: 20 } },
+          tick: 100,
+        })
+      })
+    })
   })
 })

@@ -150,5 +150,11 @@ function mergeDiscriminatedUnion(
   }
 
   // Merge using the variant's object shape
-  return mergeValue(variantShape, crdtValue, emptyValue)
+  // If the empty state's discriminant doesn't match the current discriminant,
+  // we shouldn't use the empty state for merging as it belongs to a different variant.
+  const emptyDiscriminant = emptyObj[shape.discriminantKey]
+  const effectiveEmptyValue =
+    emptyDiscriminant === discriminantValue ? emptyValue : undefined
+
+  return mergeValue(variantShape, crdtValue, effectiveEmptyValue as Value)
 }

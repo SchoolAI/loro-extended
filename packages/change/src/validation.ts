@@ -1,6 +1,7 @@
 import type {
   ArrayValueShape,
   ContainerOrValueShape,
+  DiscriminatedUnionValueShape,
   DocShape,
   ListContainerShape,
   MapContainerShape,
@@ -231,6 +232,38 @@ export function validateValue(
         throw new Error(
           `Value at path ${currentPath} does not match any union type: ${lastError?.message}`,
         )
+      }
+
+      case "discriminatedUnion": {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new Error(
+            `Expected object at path ${currentPath}, got ${typeof value}`,
+          )
+        }
+
+        const unionSchema = valueSchema as DiscriminatedUnionValueShape
+        const discriminantKey = unionSchema.discriminantKey
+        const discriminantValue = (value as Record<string, unknown>)[
+          discriminantKey
+        ]
+
+        if (typeof discriminantValue !== "string") {
+          throw new Error(
+            `Expected string for discriminant key "${discriminantKey}" at path ${currentPath}, got ${typeof discriminantValue}`,
+          )
+        }
+
+        const variantSchema = unionSchema.variants[discriminantValue]
+
+        if (!variantSchema) {
+          throw new Error(
+            `Invalid discriminant value "${discriminantValue}" at path ${currentPath}. Expected one of: ${Object.keys(
+              unionSchema.variants,
+            ).join(", ")}`,
+          )
+        }
+
+        return validateValue(value, variantSchema, currentPath)
       }
 
       default:

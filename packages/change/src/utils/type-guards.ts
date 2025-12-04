@@ -197,6 +197,7 @@ export function isValueShape(
       "record",
       "array",
       "union",
+      "discriminatedUnion",
     ].includes(schema.valueType)
   )
 }
