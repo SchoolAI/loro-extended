@@ -5,7 +5,39 @@
 
 import type { ContainerShape, DocShape, Shape } from "./shape.js"
 
+/**
+ * Infers the plain (JSON-serializable) type from any Shape.
+ *
+ * This is the recommended way to extract types from shapes.
+ * Works with DocShape, ContainerShape, and ValueShape.
+ *
+ * @example
+ * ```typescript
+ * const ChatSchema = Shape.doc({
+ *   messages: Shape.list(Shape.map({
+ *     id: Shape.plain.string(),
+ *     content: Shape.text(),
+ *   })),
+ * })
+ *
+ * // Extract the document type
+ * type ChatDoc = Infer<typeof ChatSchema>
+ * // Result: { messages: { id: string; content: string }[] }
+ *
+ * const PresenceSchema = Shape.plain.object({
+ *   name: Shape.plain.string(),
+ *   cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() }),
+ * })
+ *
+ * // Extract the presence type
+ * type Presence = Infer<typeof PresenceSchema>
+ * // Result: { name: string; cursor: { x: number; y: number } }
+ * ```
+ */
+export type Infer<T> = T extends Shape<infer P, any, any> ? P : never
+
 // Input type inference - what developers can pass to push/insert methods
+// @deprecated Use `Infer<T>` instead for a simpler, unified API
 export type InferPlainType<T> = T extends Shape<infer P, any, any> ? P : never
 
 export type InferDraftType<T> = T extends Shape<any, infer D, any> ? D : never

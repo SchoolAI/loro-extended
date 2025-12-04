@@ -29,8 +29,9 @@ export type {
 export { Shape } from "./shape.js"
 export type {
   Draft,
+  // Type inference - Infer<T> is the recommended unified helper
+  Infer,
   InferDraftType,
-  // Type inference
   InferEmptyStateType,
   InferPlainType,
 } from "./types.js"
