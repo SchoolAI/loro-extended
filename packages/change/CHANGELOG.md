@@ -1,5 +1,11 @@
 # @loro-extended/change
 
+## 0.7.0
+
+### Minor Changes
+
+- ab2d939: Deprecate InferPlainType<> type helper in favor of Infer<>; fix a type invariance bug with discriminatedUnion
+
 ## 0.6.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # example-postgres
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [a26a6c2]
+- Updated dependencies [0879e51]
+  - @loro-extended/repo@0.7.0
+  - @loro-extended/adapter-postgres@0.7.0
+
 ## 0.1.2
 
 ### Patch Changes

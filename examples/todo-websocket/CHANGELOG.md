@@ -1,5 +1,22 @@
 # example-todo-websocket
 
+## 0.2.0
+
+### Minor Changes
+
+- 0879e51: When generating a UUID, prefer crypto.generateUUID, but gracefully fall back to other means in insecure contexts
+
+### Patch Changes
+
+- Updated dependencies [ab2d939]
+- Updated dependencies [a26a6c2]
+- Updated dependencies [0879e51]
+  - @loro-extended/change@0.7.0
+  - @loro-extended/repo@0.7.0
+  - @loro-extended/react@0.7.0
+  - @loro-extended/adapter-leveldb@0.7.0
+  - @loro-extended/adapter-websocket@0.7.0
+
 ## 0.1.1
 
 ### Patch Changes

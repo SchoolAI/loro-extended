@@ -1,5 +1,17 @@
 # @loro-extended/repo
 
+## 0.7.0
+
+### Minor Changes
+
+- 0879e51: When generating a UUID, prefer crypto.generateUUID, but gracefully fall back to other means in insecure contexts
+
+### Patch Changes
+
+- a26a6c2: Auto-reset repo if needed
+- Updated dependencies [ab2d939]
+  - @loro-extended/change@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
