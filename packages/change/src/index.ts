@@ -29,6 +29,7 @@ export type {
 export { Shape } from "./shape.js"
 export { createTypedDoc, TypedDoc } from "./typed-doc.js"
 export type {
+  DeepReadonly,
   Draft,
   // Type inference - Infer<T> is the recommended unified helper
   Infer,

@@ -1,4 +1,5 @@
 import type {
+  DeepReadonly,
   DocShape,
   InferEmptyStateType,
   InferPlainType,
@@ -10,9 +11,12 @@ import { useTypedDocChanger } from "./use-typed-doc-changer.js"
 import { useTypedDocState } from "./use-typed-doc-state.js"
 
 /** The return type of the `useDocument` hook. */
-export type UseDocumentReturn<T extends DocShape> = [
+export type UseDocumentReturn<
+  T extends DocShape,
+  Result = InferPlainType<T>,
+> = [
   /** The current state of the document (always defined due to empty state overlay). */
-  doc: InferPlainType<T>,
+  doc: Result,
   /** A function to change the document. */
   changeFn: (fn: ChangeFn<T>) => void,
   /** The DocHandle instance that provides access to the underlying LoroDoc and state. */
@@ -62,12 +66,18 @@ export type UseDocumentReturn<T extends DocShape> = [
  * )
  * ```
  */
-export function useDocument<T extends DocShape>(
+export function useDocument<T extends DocShape, Result = InferPlainType<T>>(
   documentId: DocId,
   schema: T,
   emptyState: InferEmptyStateType<T>,
-): UseDocumentReturn<T> {
-  const { doc, handle } = useTypedDocState<T>(documentId, schema, emptyState)
+  selector?: (doc: DeepReadonly<InferPlainType<T>>) => Result,
+): UseDocumentReturn<T, Result> {
+  const { doc, handle } = useTypedDocState<T, Result>(
+    documentId,
+    schema,
+    emptyState,
+    selector,
+  )
   const changeDoc = useTypedDocChanger<T>(handle, schema, emptyState)
 
   return [doc, changeDoc, handle]

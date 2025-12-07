@@ -32,9 +32,48 @@ describe("useDocument", () => {
 
     const [doc, changeDoc, handle] = result.current
 
-    expect(doc).toEqual(testEmptyState) // Always defined due to empty state
+    // Check properties individually since doc is a Proxy
+    expect(doc.title).toBe(testEmptyState.title)
+    expect(doc.count).toBe(testEmptyState.count)
     expect(typeof changeDoc).toBe("function")
     expect(handle).not.toBeNull() // Handle is immediately available with new API
+  })
+
+  it("should support selector for granular access", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () =>
+        useDocument(documentId, testSchema, testEmptyState, doc => doc.title),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
+
+    const [title] = result.current
+    expect(title).toBe(testEmptyState.title)
+  })
+
+  it("should support selector for plain object return", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () =>
+        useDocument(documentId, testSchema, testEmptyState, doc => ({
+          title: doc.title,
+          count: doc.count,
+        })),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
+
+    const [doc] = result.current
+
+    // With selector returning plain object, toEqual works
+    expect(doc).toEqual(testEmptyState)
   })
 
   it("should compose useLoroDocState and useLoroDocChanger correctly", () => {
@@ -52,7 +91,8 @@ describe("useDocument", () => {
 
     // With the new synchronous API, handle is immediately available
     expect(handle).not.toBeNull()
-    expect(doc).toEqual(testEmptyState)
+    expect(doc.title).toBe(testEmptyState.title)
+    expect(doc.count).toBe(testEmptyState.count)
 
     // Test that changeDoc works correctly
     const mockChangeFn = vi.fn()
@@ -102,8 +142,8 @@ describe("useDocument", () => {
     const [doc2, changeDoc2, handle2] = result.current
 
     // Both docs should show empty state, handles are immediately available
-    expect(doc1).toEqual(testEmptyState)
-    expect(doc2).toEqual(testEmptyState)
+    expect(doc1.title).toBe(testEmptyState.title)
+    expect(doc2.title).toBe(testEmptyState.title)
     expect(handle1).not.toBeNull()
     expect(handle2).not.toBeNull()
 

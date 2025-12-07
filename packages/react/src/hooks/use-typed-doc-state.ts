@@ -1,4 +1,5 @@
 import {
+  type DeepReadonly,
   type DocShape,
   type InferEmptyStateType,
   type InferPlainType,
@@ -20,19 +21,24 @@ import { useDocHandleState } from "./use-doc-handle-state.js"
  * - TypedDoc integration with DocHandle
  * - Empty state overlay logic
  */
-export function useTypedDocState<T extends DocShape>(
+export function useTypedDocState<
+  T extends DocShape,
+  Result = InferPlainType<T>,
+>(
   documentId: DocId,
   schema: T,
   emptyState: InferEmptyStateType<T>,
+  selector?: (doc: DeepReadonly<InferPlainType<T>>) => Result,
 ) {
   const { handle, snapshot } = useDocHandleState(documentId)
 
   // Data transformation from Loro to JSON with empty state overlay
   // We include snapshot.version to trigger re-computation when the document changes
-  const doc: InferPlainType<T> = useMemo(() => {
+  const doc: Result = useMemo(() => {
     if (!handle) {
       // Return empty state immediately - no loading needed!
-      return emptyState as InferPlainType<T>
+      const state = emptyState as unknown as DeepReadonly<InferPlainType<T>>
+      return selector ? selector(state) : (state as unknown as Result)
     }
 
     // Access the doc via the getter property (not a method call)
@@ -43,8 +49,9 @@ export function useTypedDocState<T extends DocShape>(
     // Use snapshot.version to ensure we re-compute when document changes
     void snapshot.version
 
-    return updatedTypedDoc.value
-  }, [snapshot.version, handle, schema, emptyState])
+    const value = updatedTypedDoc.value
+    return selector ? selector(value) : (value as unknown as Result)
+  }, [snapshot.version, handle, schema, emptyState, selector])
 
   return { doc, handle, snapshot }
 }
