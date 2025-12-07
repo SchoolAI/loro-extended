@@ -2,29 +2,28 @@
 export type {
   DocShape,
   Draft,
-  InferPlainType,
+  Infer,
 } from "@loro-extended/change"
 export { Shape } from "@loro-extended/change"
-export type { SimpleChangeFn } from "./hooks/use-doc-changer.js"
-
-// Base hooks for advanced usage
-export { useDocChanger, useUntypedDocChanger } from "./hooks/use-doc-changer.js"
-
 // Common types
-export type { DocWrapper } from "./hooks/use-doc-handle-state.js"
-export {
-  useDocHandleState,
-  useRawLoroDoc,
-} from "./hooks/use-doc-handle-state.js"
-export type { UseDocumentReturn } from "./hooks/use-document.js"
-
+export type {
+  ChangeFn,
+  DocWrapper,
+  SimpleChangeFn,
+} from "@loro-extended/hooks-core"
+// Base hooks for advanced usage
 // Typed hooks - require @loro-extended/change
-export { useDocument } from "./hooks/use-document.js"
-export { usePresence, useUntypedPresence } from "./hooks/use-presence.js"
-export type { ChangeFn } from "./hooks/use-typed-doc-changer.js"
-export { useTypedDocChanger } from "./hooks/use-typed-doc-changer.js"
-export { useTypedDocState } from "./hooks/use-typed-doc-state.js"
-export type { UseUntypedDocumentReturn } from "./hooks/use-untyped-document.js"
-export { useUntypedDocument } from "./hooks/use-untyped-document.js"
+export {
+  useDocChanger,
+  useDocHandleState,
+  useDocument,
+  usePresence,
+  useRawLoroDoc,
+  useTypedDocChanger,
+  useTypedDocState,
+  useUntypedDocChanger,
+  useUntypedDocument,
+  useUntypedPresence,
+} from "./hooks-core.js"
 
 export * from "./repo-context.js"

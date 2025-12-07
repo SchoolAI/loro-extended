@@ -1,7 +1,7 @@
 {
-  "name": "@loro-extended/react",
-  "version": "0.7.0",
-  "description": "React hooks and utilities for Loro",
+  "name": "@loro-extended/hooks-core",
+  "version": "0.1.0",
+  "description": "Core logic for Loro hooks, shared between React and Hono",
   "author": "Duane Johnson",
   "license": "MIT",
   "type": "module",
@@ -24,25 +24,15 @@
     "build": "tsup",
     "format": "biome format --write .",
     "lint": "biome check --write .",
-    "test": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@loro-extended/hooks-core": "workspace:^",
     "@loro-extended/repo": "workspace:^",
     "loro-crdt": "^1.10.2"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.8.0",
-    "@testing-library/react": "^16.3.0",
-    "@types/react": "19.1.8",
-    "jsdom": "^26.1.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
-  },
-  "peerDependencies": {
-    "react": ">=18"
+    "typescript": "^5.9.2"
   },
   "peerDependenciesMeta": {
     "@loro-extended/change": {

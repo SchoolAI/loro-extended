@@ -1,13 +1,6 @@
 import { Repo, type RepoParams } from "@loro-extended/repo"
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-} from "react"
-
-const RepoContext = createContext<Repo | null>(null)
+import { type ReactNode, useEffect, useMemo } from "react"
+import { RepoContext } from "./hooks-core.js"
 
 export const RepoProvider = ({
   config,
@@ -29,10 +22,4 @@ export const RepoProvider = ({
   return <RepoContext.Provider value={repo}>{children}</RepoContext.Provider>
 }
 
-export const useRepo = () => {
-  const repo = useContext(RepoContext)
-  if (!repo) {
-    throw new Error("useRepo must be used within a RepoProvider")
-  }
-  return repo
-}
+export { useRepo } from "./hooks-core.js"

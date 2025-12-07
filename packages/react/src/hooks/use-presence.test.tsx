@@ -2,7 +2,7 @@ import { Shape } from "@loro-extended/change"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { usePresence, useUntypedPresence } from "./use-presence.js"
+import { usePresence, useUntypedPresence } from "../index.js"
 
 describe("useUntypedPresence", () => {
   it("should provide self and all", async () => {

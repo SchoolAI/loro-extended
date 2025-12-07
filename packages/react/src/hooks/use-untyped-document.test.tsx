@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { useUntypedDocument } from "./use-untyped-document.js"
+import { useUntypedDocument } from "../index.js"
 
 describe("useUntypedDocument", () => {
   it("should return the expected tuple structure", () => {

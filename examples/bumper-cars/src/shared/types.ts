@@ -63,10 +63,6 @@ export type PlayerScore = {
   bumps: number
 }
 
-export const EmptyArena = {
-  scores: {} as Record<string, PlayerScore>,
-}
-
 // ============================================================================
 // Presence Schemas (Ephemeral) - Using Discriminated Union
 // ============================================================================

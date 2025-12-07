@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@loro-extended/hooks-core": "workspace:^",
     "@loro-extended/repo": "workspace:^",
     "loro-crdt": "^1.10.2"
   },

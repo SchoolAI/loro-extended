@@ -3,7 +3,7 @@ import { InMemoryStorageAdapter } from "@loro-extended/repo"
 import { type RenderOptions, render } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { vi } from "vitest"
-import type { DocWrapper } from "./hooks/use-doc-handle-state.js"
+import type { DocWrapper } from "./index.js"
 import { RepoProvider } from "./repo-context.js"
 
 // Mock DocHandle for testing

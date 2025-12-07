@@ -2,7 +2,7 @@ import { Shape } from "@loro-extended/change"
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
-import { useDocument } from "./use-document.js"
+import { useDocument } from "../index.js"
 
 // Test schema with placeholder values
 const testSchema = Shape.doc({
