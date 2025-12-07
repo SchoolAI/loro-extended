@@ -70,6 +70,8 @@ export type Mutable<T extends DocShape<Record<string, ContainerShape>>> =
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
   Mutable<T>
 
-export type DeepReadonly<T> = {
-  readonly [P in keyof T]: DeepReadonly<T[P]>
-}
+export type DeepReadonly<T> = T extends any[]
+  ? ReadonlyArray<DeepReadonly<T[number]>> & { toJSON(): T }
+  : T extends object
+    ? { readonly [P in keyof T]: DeepReadonly<T[P]> } & { toJSON(): T }
+    : T

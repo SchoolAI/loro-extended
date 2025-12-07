@@ -7,6 +7,7 @@ import type {
   ValueShape,
 } from "@loro-extended/change"
 import {
+  createPlaceholderProxy,
   derivePlaceholder,
   deriveShapePlaceholder,
   TypedDoc,
@@ -170,7 +171,9 @@ export function createHooks(framework: FrameworkHooks) {
 
     const doc: Result = useMemo(() => {
       if (!handle) {
-        const state = placeholder as unknown as DeepReadonly<Infer<T>>
+        const state = createPlaceholderProxy(
+          placeholder as object,
+        ) as unknown as DeepReadonly<Infer<T>>
         return selector ? selector(state) : (state as unknown as Result)
       }
 

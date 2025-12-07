@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest"
+import { LoroDoc } from "loro-crdt"
+import { describe, expect, it, vi } from "vitest"
 import { Shape } from "../shape.js"
-import { createTypedDoc } from "../typed-doc.js"
+import { createTypedDoc, TypedDoc } from "../typed-doc.js"
 
 const MessageSchema = Shape.map({
   id: Shape.plain.string(),
@@ -174,5 +175,81 @@ describe("JSON Compatibility", () => {
     expect(values).toContain(true)
     expect(values).toContain(false)
     expect(values).toHaveLength(2)
+  })
+
+  it("should be efficient (not access unrelated parts)", () => {
+    const loroDoc = new LoroDoc()
+    const doc = new TypedDoc(ChatSchema, loroDoc)
+
+    doc.change((root: any) => {
+      root.messages.push({ id: "1", content: "A", timestamp: 1 })
+      root.meta.title = "Test"
+    })
+
+    // Spy on LoroDoc methods
+    const getMapSpy = vi.spyOn(loroDoc, "getMap")
+    const getListSpy = vi.spyOn(loroDoc, "getList")
+
+    // Access messages and call toJSON
+    const messagesJson = doc.value.messages.toJSON()
+
+    expect(messagesJson).toHaveLength(1)
+
+    // Should have accessed "messages" list
+    expect(getListSpy).toHaveBeenCalledWith("messages")
+
+    // Should NOT have accessed "meta" map
+    expect(getMapSpy).not.toHaveBeenCalledWith("meta")
+
+    // Should NOT have accessed "settings" map (record)
+    expect(getMapSpy).not.toHaveBeenCalledWith("settings")
+  })
+
+  it("should allow calling toJSON() directly on refs", () => {
+    const doc = createTypedDoc(ChatSchema)
+    doc.change((root: any) => {
+      root.meta.title = "Direct"
+      root.meta.count.increment(10)
+      root.messages.push({ id: "1", content: "A", timestamp: 1 })
+      root.settings.set("opt", true)
+    })
+
+    // DocRef
+    expect(doc.value.toJSON()).toEqual(
+      expect.objectContaining({
+        meta: expect.objectContaining({ title: "Direct" }),
+      }),
+    )
+
+    // MapRef
+    expect(doc.value.meta.toJSON()).toEqual({
+      title: "Direct",
+      count: 10,
+    })
+
+    // ListRef
+    expect(doc.value.messages.toJSON()).toEqual([
+      { id: "1", content: "A", timestamp: 1 },
+    ])
+
+    // RecordRef
+    expect(doc.value.settings.toJSON()).toEqual({
+      opt: true,
+    })
+
+    doc.change((root: any) => {
+      // Inside change, these are mutable refs
+      expect(root.meta.toJSON()).toEqual({ title: "Direct", count: 10 })
+      expect(root.messages.toJSON()).toEqual([
+        { id: "1", content: "A", timestamp: 1 },
+      ])
+
+      // CounterRef
+      expect(root.meta.count.toJSON()).toBe(10)
+
+      // TextRef (inside message)
+      // root.messages[0] is a MapRef. content is TextRef.
+      expect(root.messages[0].content.toJSON()).toBe("A")
+    })
   })
 })

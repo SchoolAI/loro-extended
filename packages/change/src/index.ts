@@ -5,6 +5,7 @@ export {
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
+export { createPlaceholderProxy } from "./placeholder-proxy.js"
 export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
 export type {
   ArrayValueShape,
