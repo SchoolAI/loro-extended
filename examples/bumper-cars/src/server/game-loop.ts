@@ -1,12 +1,11 @@
-import { createTypedDoc, type Draft } from "@loro-extended/change"
-import type { DocHandle, PeerID } from "@loro-extended/repo"
+import type { PeerID, TypedDocHandle } from "@loro-extended/repo"
 import {
-  ArenaSchema,
+  type ArenaSchema,
   type CarState,
   type ClientPresence,
   type Collision,
   type GamePresence,
-  type ServerPresence,
+  type GamePresenceSchema,
   TICK_INTERVAL,
 } from "../shared/types.js"
 import { logger } from "./config.js"
@@ -32,19 +31,12 @@ export class GameLoop {
   private recentCollisions: Map<string, number> = new Map()
   private readonly COLLISION_COOLDOWN = 500 // ms
 
-  private handle: DocHandle
-  private getPresence: () => Record<string, GamePresence>
-  private setPresence: (presence: ServerPresence) => void
-
   constructor(
-    handle: DocHandle,
-    getPresence: () => Record<string, GamePresence>,
-    setPresence: (presence: ServerPresence) => void,
-  ) {
-    this.handle = handle
-    this.getPresence = getPresence
-    this.setPresence = setPresence
-  }
+    private handle: TypedDocHandle<
+      typeof ArenaSchema,
+      typeof GamePresenceSchema
+    >,
+  ) {}
 
   /**
    * Start the game loop
@@ -76,8 +68,8 @@ export class GameLoop {
   private update(): void {
     this.tick++
 
-    // Get all client presences
-    const allPresence = this.getPresence()
+    // Get all client presences - TypedPresence provides type-safe access
+    const allPresence = this.handle.presence.all
     const clientInputs = this.getClientInputs(allPresence)
 
     // Update existing cars and remove disconnected ones
@@ -260,9 +252,8 @@ export class GameLoop {
    * Ensure a player has a score entry in the document
    */
   private ensurePlayerScore(peerId: PeerID, name: string, color: string): void {
-    // Use TypedDoc for schema-aware mutations
-    const typedDoc = createTypedDoc(ArenaSchema, this.handle.doc)
-    typedDoc.change((draft: Draft<typeof ArenaSchema>) => {
+    // TypedDocHandle provides direct type-safe document mutations
+    this.handle.change(draft => {
       if (!draft.scores.has(peerId)) {
         // For records with container values, we need to access the nested container
         // via get() which creates it, then modify its properties
@@ -278,9 +269,8 @@ export class GameLoop {
    * Increment a player's bump score
    */
   private incrementScore(peerId: PeerID): void {
-    // Use TypedDoc for schema-aware mutations
-    const typedDoc = createTypedDoc(ArenaSchema, this.handle.doc)
-    typedDoc.change((draft: Draft<typeof ArenaSchema>) => {
+    // TypedDocHandle provides direct type-safe document mutations
+    this.handle.change(draft => {
       const score = draft.scores.get(peerId)
       if (score) {
         score.bumps.increment(1)
@@ -297,7 +287,8 @@ export class GameLoop {
       carsRecord[peerId] = { ...car }
     }
 
-    this.setPresence({
+    // TypedPresence provides type-safe presence updates
+    this.handle.presence.set({
       type: "server",
       cars: carsRecord,
       tick: this.tick,

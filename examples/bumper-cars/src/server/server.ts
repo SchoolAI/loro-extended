@@ -19,7 +19,8 @@ import express from "express"
 import { WebSocketServer } from "ws"
 import {
   ARENA_DOC_ID,
-  type GamePresence,
+  ArenaSchema,
+  GamePresenceSchema,
   type ServerPresence,
 } from "../shared/types.js"
 import { logger } from "./config.js"
@@ -58,24 +59,12 @@ startupLog(`Repo created with peerId: ${repo.identity.peerId}`)
 
 logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
-// Get or create the arena document
-const arenaHandle = repo.get(ARENA_DOC_ID)
+// Get or create the arena document with typed schemas
+// This provides type-safe access to both document and presence data
+const arenaHandle = repo.get(ARENA_DOC_ID, ArenaSchema, GamePresenceSchema)
 
-// Server presence state
-let serverPresence: ServerPresence
-
-// Create game loop
-const gameLoop = new GameLoop(
-  arenaHandle,
-  () => {
-    // Get all presence from the handle
-    return arenaHandle.untypedPresence.all as Record<string, GamePresence>
-  },
-  (presence: ServerPresence) => {
-    serverPresence = presence
-    arenaHandle.untypedPresence.set(presence)
-  },
-)
+// Create game loop with the typed handle - no manual presence wiring needed
+const gameLoop = new GameLoop(arenaHandle)
 
 // Start game loop
 startupLog("Starting game loop...")
@@ -117,11 +106,13 @@ wss.on("connection", (ws, req) => {
 
 // Health check endpoint
 app.get("/health", (_req, res) => {
+  // Access server presence through the typed handle
+  const serverPresence = arenaHandle.presence.self as ServerPresence
   res.json({
     status: "ok",
     connections: wss.clients.size,
-    tick: serverPresence.tick,
-    cars: Object.keys(serverPresence.cars).length,
+    tick: serverPresence?.tick ?? 0,
+    cars: Object.keys(serverPresence?.cars ?? {}).length,
   })
 })
 
