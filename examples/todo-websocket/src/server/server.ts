@@ -72,7 +72,7 @@ wss.on("connection", (ws, req) => {
   start()
 })
 
-const PORT = process.env.PORT || 5170
+const PORT = process.env.PORT || 5171
 server.listen(PORT, () => {
   console.log(
     `Loro-Extended Todo WebSocket App Server listening on http://localhost:${PORT}`,
