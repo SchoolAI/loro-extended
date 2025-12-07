@@ -14,6 +14,7 @@
       "@loro-extended/adapter-postgres",
 
       "@loro-extended/change",
+      "@loro-extended/hooks-core",
       "@loro-extended/hono",
       "@loro-extended/react",
       "@loro-extended/repo"
