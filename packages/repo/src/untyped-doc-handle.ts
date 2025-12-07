@@ -78,8 +78,21 @@ export class UntypedDocHandle {
         return synchronizer.getEphemeralValues(docId, myPeerId)
       },
 
+      get peers() {
+        // Return all peers EXCEPT self as a Map
+        const allStates = synchronizer.getAllEphemeralStates(docId)
+        const result = new Map<string, ObjectValue>()
+        for (const [peerId, value] of Object.entries(allStates)) {
+          if (peerId !== myPeerId) {
+            result.set(peerId, value)
+          }
+        }
+        return result
+      },
+
       get all() {
-        // Return all peers' presence data aggregated by peerId
+        // Return all peers' presence data aggregated by peerId (includes self)
+        // @deprecated - use peers and self separately
         return synchronizer.getAllEphemeralStates(docId)
       },
 

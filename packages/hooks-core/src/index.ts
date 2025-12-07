@@ -248,6 +248,8 @@ export function createHooks(framework: FrameworkHooks) {
 
   type PresenceContext<T> = {
     self: T
+    peers: Map<string, T>
+    /** @deprecated Use `peers` and `self` separately */
     all: Record<string, T>
     setSelf: (value: Partial<T>) => void
   }
@@ -291,9 +293,10 @@ export function createHooks(framework: FrameworkHooks) {
 
       const computeState = () => {
         const all = handle.presence.all as Record<string, T>
+        const peers = handle.presence.peers as Map<string, T>
         const self = handle.presence.self as T
 
-        return { self, all, setSelf }
+        return { self, peers, all, setSelf }
       }
 
       let cachedState = computeState()
@@ -365,6 +368,7 @@ export function createHooks(framework: FrameworkHooks) {
       const computeState = () => {
         return {
           self: typedPresence.self,
+          peers: typedPresence.peers,
           all: typedPresence.all,
           setSelf,
         }

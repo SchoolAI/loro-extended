@@ -32,7 +32,24 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
   }
 
   /**
+   * Get other peers' presence states with placeholder values merged in.
+   * Does NOT include self. Use this for iterating over remote peers.
+   */
+  get peers(): Map<string, Infer<S>> {
+    const result = new Map<string, Infer<S>>()
+    for (const [peerId, value] of this.presence.peers) {
+      result.set(
+        peerId,
+        mergeValue(this.shape, value, this.placeholder) as Infer<S>,
+      )
+    }
+    return result
+  }
+
+  /**
    * Get all peers' presence states with placeholder values merged in.
+   * @deprecated Use `peers` and `self` separately. This property is synthesized
+   * from `peers` and `self` for backward compatibility.
    */
   get all(): Record<string, Infer<S>> {
     const result: Record<string, Infer<S>> = {}
@@ -62,13 +79,18 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
    * @returns Unsubscribe function
    */
   subscribe(
-    cb: (state: { self: Infer<S>; all: Record<string, Infer<S>> }) => void,
+    cb: (state: {
+      self: Infer<S>
+      peers: Map<string, Infer<S>>
+      /** @deprecated Use `peers` and `self` separately */
+      all: Record<string, Infer<S>>
+    }) => void,
   ): () => void {
     // Initial call
-    cb({ self: this.self, all: this.all })
+    cb({ self: this.self, peers: this.peers, all: this.all })
 
     return this.presence.subscribe(() => {
-      cb({ self: this.self, all: this.all })
+      cb({ self: this.self, peers: this.peers, all: this.all })
     })
   }
 }

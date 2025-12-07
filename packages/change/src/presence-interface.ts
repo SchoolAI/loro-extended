@@ -26,7 +26,15 @@ export interface PresenceInterface {
   readonly self: ObjectValue
 
   /**
-   * All peers' presence states, keyed by peer ID.
+   * Other peers' presence states, keyed by peer ID.
+   * Does NOT include self. Use this for iterating over remote peers.
+   */
+  readonly peers: Map<string, ObjectValue>
+
+  /**
+   * All peers' presence states, keyed by peer ID (includes self).
+   * @deprecated Use `peers` and `self` separately. This property is synthesized
+   * from `peers` and `self` for backward compatibility.
    */
   readonly all: Record<string, ObjectValue>
 

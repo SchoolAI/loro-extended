@@ -52,9 +52,24 @@ describe("TypedPresence", () => {
     )
     peerStore.set("name", "Bob")
 
+    // Test the deprecated 'all' property (includes self)
     expect(presence.all[peerId]).toEqual({
       name: "Bob",
       cursor: { x: 0, y: 0 }, // Default applied
     })
+
+    // Test the new 'peers' property (Map, excludes self)
+    expect(presence.peers).toBeInstanceOf(Map)
+    expect(presence.peers.get(peerId)).toEqual({
+      name: "Bob",
+      cursor: { x: 0, y: 0 }, // Default applied
+    })
+
+    // peers should NOT include self
+    const myPeerId = synchronizer.identity.peerId
+    expect(presence.peers.has(myPeerId)).toBe(false)
+
+    // all should include self
+    expect(presence.all[myPeerId]).toBeDefined()
   })
 })

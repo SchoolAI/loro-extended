@@ -1,12 +1,7 @@
 import { useDocument, usePresence, useRepo } from "@loro-extended/react"
 import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
-import {
-  ChatSchema,
-  EmptyPresence,
-  type Message,
-  PresenceSchema,
-} from "../shared/types"
+import { ChatSchema, PresenceSchema, type Message } from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
@@ -87,13 +82,10 @@ function ChatApp() {
   }, [docId])
 
   // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useDocument(docId, ChatSchema, {
-    messages: [],
-    preferences: {},
-  })
+  const [doc, changeDoc, handle] = useDocument(docId, ChatSchema)
 
   // Use ephemeral state for presence
-  const { all, setSelf } = usePresence(docId, PresenceSchema, EmptyPresence)
+  const { peers, self, setSelf } = usePresence(docId, PresenceSchema)
 
   // Set self presence with name
   useEffect(() => {
@@ -122,7 +114,11 @@ function ChatApp() {
     setIsEditingName(false)
   }
 
-  const memberCount = Object.values(all).filter(p => p.type === "user").length
+  // Count members: self + all peers with type "user"
+  const peerCount = Array.from(peers.values()).filter(
+    p => p.type === "user",
+  ).length
+  const memberCount = (self.type === "user" ? 1 : 0) + peerCount
 
   // Auto-scroll to bottom when messages change
   useAutoScroll(messagesEndRef, doc.messages)
@@ -348,51 +344,52 @@ function ChatApp() {
             doc.messages.map(msg => {
               const isMyMessage = msg.author === myPeerId
               return (
-              <div
-                key={msg.id}
-                className={`flex gap-3 ${isMyMessage ? "flex-row-reverse" : "flex-row"}`}
-              >
-                {/* Avatar */}
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-sm shrink-0 ${
-                    msg.role === "user"
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-purple-100 text-purple-600"
-                  }`}
+                  key={msg.id}
+                  className={`flex gap-3 ${isMyMessage ? "flex-row-reverse" : "flex-row"}`}
                 >
-                  {msg.role === "user" ? "👤" : "🤖"}
-                </div>
-
-                {/* Message Bubble */}
-                <div
-                  className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isMyMessage ? "items-end" : "items-start"}`}
-                >
-                  <div className="flex items-baseline gap-2 mb-1 px-1">
-                    <span className="text-xs font-medium text-gray-500">
-                      {getAuthorName(msg as Message, myPeerId)}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
+                  {/* Avatar */}
                   <div
-                    className={`px-4 py-2.5 rounded-2xl shadow-sm text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words ${
-                      isMyMessage
-                        ? "bg-blue-500 text-white rounded-tr-none"
-                        : "bg-white text-gray-800 border border-gray-100 rounded-tl-none"
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-sm shrink-0 ${
+                      msg.role === "user"
+                        ? "bg-blue-100 text-blue-600"
+                        : "bg-purple-100 text-purple-600"
                     }`}
                   >
-                    {msg.content}
-                    {msg.role === "assistant" && msg.content.length === 0 && (
-                      <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1 align-middle" />
-                    )}
+                    {msg.role === "user" ? "👤" : "🤖"}
+                  </div>
+
+                  {/* Message Bubble */}
+                  <div
+                    className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isMyMessage ? "items-end" : "items-start"}`}
+                  >
+                    <div className="flex items-baseline gap-2 mb-1 px-1">
+                      <span className="text-xs font-medium text-gray-500">
+                        {getAuthorName(msg as Message, myPeerId)}
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div
+                      className={`px-4 py-2.5 rounded-2xl shadow-sm text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words ${
+                        isMyMessage
+                          ? "bg-blue-500 text-white rounded-tr-none"
+                          : "bg-white text-gray-800 border border-gray-100 rounded-tl-none"
+                      }`}
+                    >
+                      {msg.content}
+                      {msg.role === "assistant" && msg.content.length === 0 && (
+                        <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1 align-middle" />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )})
+              )
+            })
           )}
           <div ref={messagesEndRef} />
         </div>
