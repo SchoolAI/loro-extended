@@ -3,12 +3,17 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/server"
-import { type InferPlainType, TypedDoc } from "@loro-extended/change"
-import { type DocHandle, type DocId, generateUUID, Repo } from "@loro-extended/repo"
+import { type Infer, TypedDoc } from "@loro-extended/change"
+import {
+  type DocHandle,
+  type DocId,
+  generateUUID,
+  Repo,
+} from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
-import { ChatSchema, EmptyPresence, PresenceSchema } from "../shared/types.js"
+import { ChatSchema, PresenceSchema } from "../shared/types.js"
 import { logger, model } from "./config.js"
 import { requestLogger } from "./request-logger.js"
 
@@ -21,10 +26,7 @@ app.use(requestLogger())
 
 // Track active subscriptions to avoid double-subscribing
 const subscriptions = new Map<DocId, () => void>()
-const presences = new Map<
-  DocId,
-  Record<string, InferPlainType<typeof PresenceSchema>>
->()
+const presences = new Map<DocId, Record<string, Infer<typeof PresenceSchema>>>()
 
 // Stream LLM response into a message
 async function streamLLMResponse(
@@ -144,11 +146,7 @@ function processDocumentUpdate(
 }
 
 function getChatDoc(handle: DocHandle) {
-  const typedDoc = new TypedDoc(
-    ChatSchema,
-    { messages: [], preferences: {} },
-    handle.doc,
-  )
+  const typedDoc = new TypedDoc(ChatSchema, handle.doc)
 
   return typedDoc
 }
@@ -171,7 +169,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  const typedPresence = handle.presence(PresenceSchema, EmptyPresence)
+  const typedPresence = handle.presence(PresenceSchema)
   const unsubscribePresence = typedPresence.subscribe(({ all }) => {
     presences.set(docId, all)
   })
