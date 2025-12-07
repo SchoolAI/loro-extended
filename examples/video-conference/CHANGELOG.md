@@ -1,5 +1,20 @@
 # example-video-conference
 
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [1a80326]
+- Updated dependencies [3599dae]
+- Updated dependencies [907cdce]
+- Updated dependencies [90f1c84]
+  - @loro-extended/change@0.8.0
+  - @loro-extended/react@0.8.0
+  - @loro-extended/repo@0.8.0
+  - @loro-extended/adapter-leveldb@0.8.0
+  - @loro-extended/adapter-sse@0.8.0
+  - @loro-extended/adapter-webrtc@0.8.0
+
 ## 1.2.0
 
 ### Minor Changes

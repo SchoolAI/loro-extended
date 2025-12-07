@@ -1,5 +1,12 @@
 # @loro-extended/adapter-webrtc
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [907cdce]
+  - @loro-extended/repo@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes

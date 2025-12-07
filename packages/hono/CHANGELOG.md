@@ -1,5 +1,13 @@
 # @loro-extended/hono
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [907cdce]
+  - @loro-extended/repo@0.8.0
+  - @loro-extended/hooks-core@0.2.0
+
 ## 0.7.0
 
 ### Patch Changes
