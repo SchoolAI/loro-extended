@@ -504,7 +504,7 @@ describe("Channel JSON Serialization", () => {
         if (restored.type === "channel/sync-response") {
           expect(restored.ephemeral).toBeDefined()
           expect(restored.ephemeral).toHaveLength(1)
-          if (restored.ephemeral && restored.ephemeral[0]) {
+          if (restored.ephemeral?.[0]) {
             expect(restored.ephemeral[0].peerId).toBe("123456789")
             expect(Array.from(restored.ephemeral[0].data)).toEqual(
               Array.from(ephemeralData),

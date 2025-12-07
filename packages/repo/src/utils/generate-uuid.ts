@@ -8,7 +8,10 @@
  * @returns A UUID v4 string (e.g., "550e8400-e29b-41d4-a716-446655440000")
  */
 export function generateUUID(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID()
   }
   // Fallback using crypto.getRandomValues (available in all browser contexts)

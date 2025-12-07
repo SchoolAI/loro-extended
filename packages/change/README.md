@@ -32,7 +32,7 @@ import { TypedDoc, Shape } from "@loro-extended/change";
 
 // Define your document schema
 const schema = Shape.doc({
-  title: Shape.text(),
+  title: Shape.text().placeholder("My Todo List"),
   todos: Shape.list(
     Shape.plain.object({
       id: Shape.plain.string(),
@@ -42,14 +42,8 @@ const schema = Shape.doc({
   ),
 });
 
-// Define empty state (default values)
-const emptyState = {
-  title: "My Todo List",
-  todos: [],
-};
-
 // Create a typed document
-const doc = new TypedDoc(schema, emptyState);
+const doc = new TypedDoc(schema);
 
 // Make changes with natural syntax
 const result = doc.change((draft) => {
@@ -109,19 +103,26 @@ const blogSchema = Shape.doc({
 Empty state provides default values that are merged when CRDT containers are empty, keeping the whole document typesafe:
 
 ```typescript
-const emptyState = {
-  title: "Untitled Document", // unusual empty state, but technically ok
-  viewCount: 0,
-  tags: [],
-  metadata: {
-    author: "Anonymous",
-    publishedAt: "",
-    featured: false,
-  },
-  sections: [],
-};
+// Use .placeholder() to set default values
+const blogSchemaWithDefaults = Shape.doc({
+  title: Shape.text().placeholder("Untitled Document"),
+  viewCount: Shape.counter(), // defaults to 0
+  tags: Shape.list(Shape.plain.string()), // defaults to []
+  metadata: Shape.map({
+    author: Shape.plain.string().placeholder("Anonymous"),
+    publishedAt: Shape.plain.string(), // defaults to ""
+    featured: Shape.plain.boolean(), // defaults to false
+  }),
+  sections: Shape.movableList(
+    Shape.map({
+      heading: Shape.text(),
+      content: Shape.text(),
+      order: Shape.plain.number(),
+    })
+  ),
+});
 
-const doc = new TypedDoc(blogSchema, emptyState);
+const doc = new TypedDoc(blogSchemaWithDefaults);
 
 // Initially returns empty state
 console.log(doc.value);
@@ -351,13 +352,13 @@ doc.change((draft) => {
 
 ### Core Functions
 
-#### `new TypedDoc<T>(schema, emptyState, existingDoc?)`
+#### `new TypedDoc<T>(schema, existingDoc?)`
 
 Creates a new typed Loro document.
 
 ```typescript
-const doc = new TypedDoc(schema, emptyState);
-const docFromExisting = new TypedDoc(schema, emptyState, existingLoroDoc);
+const doc = new TypedDoc(schema);
+const docFromExisting = new TypedDoc(schema, existingLoroDoc);
 ```
 
 #### `doc.change(mutator)`
@@ -571,14 +572,8 @@ const todoSchema = Shape.doc({
   ),
 });
 
-// Define empty state that matches your interface
-const emptyState: TodoDoc = {
-  title: "My Todos",
-  todos: [],
-};
-
 // TypeScript will ensure the schema produces the correct type
-const doc = new TypedDoc(todoSchema, emptyState);
+const doc = new TypedDoc(todoSchema);
 
 // The result will be properly typed as TodoDoc
 const result: TodoDoc = doc.change((draft) => {
@@ -610,7 +605,7 @@ import { LoroDoc } from "loro-crdt";
 
 // Wrap existing LoroDoc
 const existingDoc = new LoroDoc();
-const typedDoc = new TypedDoc(schema, emptyState, existingDoc);
+const typedDoc = new TypedDoc(schema, existingDoc);
 
 // Access underlying LoroDoc
 const loroDoc = typedDoc.loroDoc;

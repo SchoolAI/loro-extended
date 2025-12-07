@@ -121,7 +121,7 @@ import { useDocument, Shape } from "@loro-extended/react";
 
 // Define your document schema (see @loro-extended/change for details)
 const todoSchema = Shape.doc({
-  title: Shape.text(),
+  title: Shape.text().placeholder("My Todo List"),
   todos: Shape.list(
     Shape.plain.object({
       id: Shape.plain.string(),
@@ -131,18 +131,8 @@ const todoSchema = Shape.doc({
   ),
 });
 
-// Define empty state (default values)
-const emptyState = {
-  title: "My Todo List",
-  todos: [],
-};
-
 function TypedTodoApp() {
-  const [doc, changeDoc, handle] = useDocument(
-    "todo-doc",
-    todoSchema,
-    emptyState
-  );
+  const [doc, changeDoc, handle] = useDocument("todo-doc", todoSchema);
 
   // doc is ALWAYS defined - no loading check needed!
   return (
@@ -244,8 +234,7 @@ For schema-aware documents with type safety and empty state management.
 ```typescript
 function useDocument<T extends DocShape>(
   documentId: string,
-  schema: T,
-  emptyState: InferPlainType<T>
+  schema: T
 ): [
   doc: InferPlainType<T>,
   changeDoc: (fn: ChangeFn<T>) => void,
@@ -257,7 +246,6 @@ function useDocument<T extends DocShape>(
 
 - **`documentId`**: Unique identifier for the document
 - **`schema`**: Document schema (see [`@loro-extended/change`](../change/README.md) for schema documentation)
-- **`emptyState`**: Default values shown before/during sync
 
 #### Returns
 
@@ -344,7 +332,7 @@ const [doc, changeDoc] = useUntypedDocument("doc-id");
 if (!doc) return <div>Loading...</div>;
 
 // Typed API - always available
-const [doc, changeDoc] = useDocument("doc-id", schema, emptyState);
+const [doc, changeDoc] = useDocument("doc-id", schema);
 return <h1>{doc.title}</h1>; // Always works!
 ```
 
@@ -391,8 +379,8 @@ function MultiDocApp() {
 
 // Typed API
 function MultiDocApp() {
-  const [todos, changeTodos] = useDocument("todos", todoSchema, todoEmptyState);
-  const [notes, changeNotes] = useDocument("notes", noteSchema, noteEmptyState);
+  const [todos, changeTodos] = useDocument("todos", todoSchema);
+  const [notes, changeNotes] = useDocument("notes", noteSchema);
 
   return (
     <div>
@@ -423,11 +411,7 @@ function ConditionalDoc({ documentId }: { documentId: string | null }) {
 
 // Typed API
 function ConditionalDoc({ documentId }: { documentId: string | null }) {
-  const [doc, changeDoc] = useDocument(
-    documentId || "default",
-    schema,
-    emptyState
-  );
+  const [doc, changeDoc] = useDocument(documentId || "default", schema);
 
   if (!documentId) {
     return <div>Select a document</div>;
@@ -441,7 +425,7 @@ function ConditionalDoc({ documentId }: { documentId: string | null }) {
 
 ```tsx
 function DocumentWithStatus() {
-  const [doc, changeDoc, handle] = useDocument(id, schema, emptyState);
+  const [doc, changeDoc, handle] = useDocument(id, schema);
 
   // Check readyStates to determine sync status
   const isSyncing = handle?.readyStates.some(
@@ -471,7 +455,7 @@ Full TypeScript support with automatic type inference:
 
 ```typescript
 // Types are automatically inferred from your schema
-const [doc, changeDoc] = useDocument(documentId, schema, emptyState);
+const [doc, changeDoc] = useDocument(documentId, schema);
 // doc: { title: string; todos: Array<{id: string; text: string; completed: boolean}> }
 // changeDoc: (fn: (draft: DraftType) => void) => void
 ```

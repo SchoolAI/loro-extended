@@ -1,6 +1,6 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
-import { generateUUID, type DocId, type PeerID } from "@loro-extended/repo"
+import { type DocId, generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   EmptyRoom,
