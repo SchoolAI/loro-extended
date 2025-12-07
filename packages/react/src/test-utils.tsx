@@ -1,26 +1,38 @@
-import type { DocHandle, DocId, RepoParams } from "@loro-extended/repo"
+import type { DocId, RepoParams, UntypedDocHandle } from "@loro-extended/repo"
 import { InMemoryStorageAdapter } from "@loro-extended/repo"
 import { type RenderOptions, render } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { vi } from "vitest"
-import type { DocWrapper } from "./index.js"
 import { RepoProvider } from "./repo-context.js"
 
-// Mock DocHandle for testing
+// Mock UntypedDocHandle for testing
+// Note: This creates a partial mock - for full integration tests, use createRepoWrapper instead
 export function createMockDocHandle(
-  overrides: Partial<DocHandle<DocWrapper>> = {},
-): DocHandle<DocWrapper> {
-  const mockHandle: DocHandle<DocWrapper> = {
-    state: "ready",
-    doc: vi.fn().mockReturnValue({
+  overrides: Partial<UntypedDocHandle> = {},
+): Partial<UntypedDocHandle> {
+  const mockHandle: Partial<UntypedDocHandle> = {
+    docId: "mock-doc-id",
+    peerId: "mock-peer-id",
+    doc: {
       opCount: vi.fn().mockReturnValue(1),
       getMap: vi.fn().mockReturnValue(new Map()),
-    }),
-    change: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn(),
+      subscribe: vi.fn().mockReturnValue(() => {}),
+      commit: vi.fn(),
+    } as any,
+    change: vi.fn().mockReturnThis(),
+    readyStates: [],
+    onReadyStateChange: vi.fn().mockReturnValue(() => {}),
+    presence: {
+      set: vi.fn(),
+      get: vi.fn(),
+      self: {},
+      peers: new Map(),
+      all: {},
+      setRaw: vi.fn(),
+      subscribe: vi.fn().mockReturnValue(() => {}),
+    },
     ...overrides,
-  } as any
+  }
 
   return mockHandle
 }
