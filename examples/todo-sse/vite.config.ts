@@ -15,11 +15,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 4000,
   },
   server: {
+    port: 8000,
     // Allow serving on ngrok or similar
     allowedHosts: true,
     proxy: {
       "/loro": {
-        target: "http://localhost:5170",
+        target: "http://localhost:8001",
         changeOrigin: true,
         // Required for SSE
         configure: proxy => {

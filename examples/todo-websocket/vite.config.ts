@@ -30,12 +30,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 4000,
   },
   server: {
-    port: 5174,
+    port: 8002,
     // Allow serving on ngrok or similar
     allowedHosts: true,
     proxy: {
       "/ws": {
-        target: "ws://localhost:5171",
+        target: "ws://localhost:8003",
         ws: true,
       },
     },

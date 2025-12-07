@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: "list",
 
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://localhost:8000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -27,13 +27,13 @@ export default defineConfig({
   webServer: [
     {
       command: "pnpm dev:client",
-      port: 5173,
+      port: 8000,
       timeout: 120 * 1000,
       reuseExistingServer: true, // Add this to prevent server restarts
     },
     {
       command: "pnpm dev:server",
-      port: 5170,
+      port: 8001,
       timeout: 120 * 1000,
       reuseExistingServer: true, // Add this to prevent server restarts
     },

@@ -63,7 +63,7 @@ app.use(
   }),
 )
 
-const PORT = process.env.PORT || 5170
+const PORT = process.env.PORT || 8001
 app.listen(PORT, () => {
   console.log(
     `Loro-Extended Todo App Server listening on http://localhost:${PORT}`,
