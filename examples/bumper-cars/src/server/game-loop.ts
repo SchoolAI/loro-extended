@@ -5,7 +5,6 @@ import {
   type CarState,
   type ClientPresence,
   type Collision,
-  EmptyArena,
   type GamePresence,
   type ServerPresence,
   TICK_INTERVAL,
@@ -262,7 +261,7 @@ export class GameLoop {
    */
   private ensurePlayerScore(peerId: PeerID, name: string, color: string): void {
     // Use TypedDoc for schema-aware mutations
-    const typedDoc = createTypedDoc(ArenaSchema, EmptyArena, this.handle.doc)
+    const typedDoc = createTypedDoc(ArenaSchema, this.handle.doc)
     typedDoc.change((draft: Draft<typeof ArenaSchema>) => {
       if (!draft.scores.has(peerId)) {
         // For records with container values, we need to access the nested container
@@ -280,7 +279,7 @@ export class GameLoop {
    */
   private incrementScore(peerId: PeerID): void {
     // Use TypedDoc for schema-aware mutations
-    const typedDoc = createTypedDoc(ArenaSchema, EmptyArena, this.handle.doc)
+    const typedDoc = createTypedDoc(ArenaSchema, this.handle.doc)
     typedDoc.change((draft: Draft<typeof ArenaSchema>) => {
       const score = draft.scores.get(peerId)
       if (score) {

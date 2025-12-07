@@ -19,7 +19,6 @@ import express from "express"
 import { WebSocketServer } from "ws"
 import {
   ARENA_DOC_ID,
-  EmptyServerPresence,
   type GamePresence,
   type ServerPresence,
 } from "../shared/types.js"
@@ -63,7 +62,7 @@ logger.info`Repo created with peerId: ${repo.identity.peerId}`
 const arenaHandle = repo.get(ARENA_DOC_ID)
 
 // Server presence state
-let serverPresence: ServerPresence = EmptyServerPresence
+let serverPresence: ServerPresence
 
 // Create game loop
 const gameLoop = new GameLoop(

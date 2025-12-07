@@ -3,7 +3,6 @@ import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
 import { type DocId, generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
-  EmptyRoom,
   RoomSchema,
   type SignalingPresence,
   type UserPresence,
@@ -65,7 +64,7 @@ export default function VideoConferenceApp({
   }, [roomId])
 
   // Use room document for persistent state
-  const [doc, changeDoc, handle] = useDocument(roomId, RoomSchema, EmptyRoom)
+  const [doc, changeDoc, handle] = useDocument(roomId, RoomSchema)
 
   // ============================================================================
   // Separated Presence Channels (Phase 3)

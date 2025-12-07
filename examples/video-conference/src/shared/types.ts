@@ -1,5 +1,5 @@
 import { Shape } from "@loro-extended/change"
-import type { PeerID } from "@loro-extended/repo"
+import type { Infer, PeerID } from "@loro-extended/repo"
 
 // ============================================================================
 // Room Document Schema (Persistent CRDT)
@@ -30,14 +30,6 @@ export type Participant = {
   joinedAt: number
 }
 
-export const EmptyRoom = {
-  metadata: {
-    name: "",
-    createdAt: 0,
-  },
-  participants: [],
-}
-
 // ============================================================================
 // Presence Types (Ephemeral)
 // ============================================================================
@@ -53,6 +45,10 @@ export type SignalData = {
 
 export type SignalsMap = Record<string, SignalData[]>
 
+// ============================================================================
+// Presence Schemas (for reference, we use untyped presence API)
+// ============================================================================
+
 /**
  * User presence - stable metadata that changes infrequently.
  * Used for displaying participant info in the UI.
@@ -60,17 +56,12 @@ export type SignalsMap = Record<string, SignalData[]>
  * This is separate from signaling to avoid mixing high-frequency signal updates
  * with stable user metadata.
  */
-export type UserPresence = {
-  name: string
-  wantsAudio: boolean
-  wantsVideo: boolean
-}
-
-export const EmptyUserPresence: UserPresence = {
-  name: "Anonymous",
-  wantsAudio: true,
-  wantsVideo: true,
-}
+export type UserPresence = Infer<typeof UserPresenceSchema>
+export const UserPresenceSchema = Shape.plain.object({
+  name: Shape.plain.string().placeholder("Anonymous"),
+  wantsAudio: Shape.plain.boolean().placeholder(true),
+  wantsVideo: Shape.plain.boolean().placeholder(true),
+})
 
 /**
  * Signaling presence - high-frequency, transient WebRTC signals.
@@ -79,31 +70,8 @@ export const EmptyUserPresence: UserPresence = {
  * Signals are keyed by target peer ID, with an array of signal data
  * to send to that peer.
  */
-export type SignalingPresence = {
-  instanceId: string // Unique ID for this client instance (refreshes on reload)
-  signals: SignalsMap
-}
-
-export const EmptySignalingPresence: SignalingPresence = {
-  instanceId: "",
-  signals: {},
-}
-
-// ============================================================================
-// Presence Schemas (for reference, we use untyped presence API)
-// ============================================================================
-
-// NOTE: We intentionally DON'T use Shape.plain.object for the presence
-// because the mergeValue function in @loro-extended/change iterates over
-// schema-defined keys and may not properly handle dynamic keys like peer IDs.
-// Instead, we'll use the untyped presence API directly.
-
-export const UserPresenceSchema = Shape.plain.object({
-  name: Shape.plain.string(),
-  wantsAudio: Shape.plain.boolean(),
-  wantsVideo: Shape.plain.boolean(),
-})
-
+export type SignalingPresence = Infer<typeof SignalingPresenceSchema>
 export const SignalingPresenceSchema = Shape.plain.object({
+  instanceId: Shape.plain.string(),
   signals: Shape.plain.record(Shape.plain.array(Shape.plain.object({}))),
 })

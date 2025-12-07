@@ -171,10 +171,13 @@ describe("SseClientNetworkAdapter", () => {
       const channel = Array.from(adapter.channels)[0]
 
       // Store reference to the old EventSource before it gets replaced
-      const oldEventSource = currentMockEventSource!
+      if (!currentMockEventSource) {
+        throw new Error("EventSource should be created")
+      }
+      const oldEventSource = currentMockEventSource
 
       // Simulate EventSource being closed
-      currentMockEventSource!.readyState = 2 // CLOSED
+      currentMockEventSource.readyState = 2 // CLOSED
 
       // Try to send a message
       const message = {
@@ -199,7 +202,10 @@ describe("SseClientNetworkAdapter", () => {
       const channel = Array.from(adapter.channels)[0]
 
       // Simulate EventSource being closed
-      currentMockEventSource!.readyState = 2 // CLOSED
+      if (!currentMockEventSource) {
+        throw new Error("EventSource should be created")
+      }
+      currentMockEventSource.readyState = 2 // CLOSED
 
       // Try to send a message
       const message = {
@@ -223,7 +229,10 @@ describe("SseClientNetworkAdapter", () => {
       const channel = Array.from(adapter.channels)[0]
 
       // EventSource is open (readyState = 1)
-      currentMockEventSource!.readyState = 1
+      if (!currentMockEventSource) {
+        throw new Error("EventSource should be created")
+      }
+      currentMockEventSource.readyState = 1
 
       // Send a message
       const message = {

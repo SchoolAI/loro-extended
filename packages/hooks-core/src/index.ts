@@ -20,6 +20,7 @@ export interface FrameworkHooks {
     initialState: T | (() => T),
   ) => [T, (newState: T | ((prevState: T) => T)) => void]
   useEffect: (effect: () => undefined | (() => void), deps?: unknown[]) => void
+  // biome-ignore lint/complexity/noBannedTypes: same as original
   useCallback: <T extends Function>(callback: T, deps: unknown[]) => T
   useMemo: <T>(factory: () => T, deps: unknown[]) => T
   useRef: <T>(initialValue: T) => { current: T | null }
@@ -82,6 +83,7 @@ export function createHooks(framework: FrameworkHooks) {
     useEffect(() => {
       const newHandle = repo.get<DocWrapper>(documentId)
       setHandle(newHandle)
+      return undefined
     }, [repo, documentId])
 
     // Event subscription management
@@ -253,10 +255,20 @@ export function createHooks(framework: FrameworkHooks) {
     [key: string]: Value
   }
 
-  function useUntypedPresence<T extends ObjectValue = ObjectValue, R = any>(
+  // Overload 1: With selector - returns R
+  function useUntypedPresence<T extends ObjectValue, R>(
+    docId: DocId,
+    selector: (state: PresenceContext<T>) => R,
+  ): R
+  // Overload 2: Without selector - returns PresenceContext<T>
+  function useUntypedPresence<T extends ObjectValue = ObjectValue>(
+    docId: DocId,
+  ): PresenceContext<T>
+  // Implementation
+  function useUntypedPresence<T extends ObjectValue = ObjectValue, R = unknown>(
     docId: DocId,
     selector?: (state: PresenceContext<T>) => R,
-  ) {
+  ): R | PresenceContext<T> {
     const { handle } = useDocHandleState(docId)
 
     const store = useMemo(() => {
@@ -306,11 +318,23 @@ export function createHooks(framework: FrameworkHooks) {
     return state as PresenceContext<T>
   }
 
-  function usePresence<S extends ContainerShape | ValueShape, R = any>(
+  // Overload 1: With selector - returns R
+  function usePresence<S extends ContainerShape | ValueShape, R>(
+    docId: DocId,
+    shape: S,
+    selector: (state: PresenceContext<Infer<S>>) => R,
+  ): R
+  // Overload 2: Without selector - returns PresenceContext<Infer<S>>
+  function usePresence<S extends ContainerShape | ValueShape>(
+    docId: DocId,
+    shape: S,
+  ): PresenceContext<Infer<S>>
+  // Implementation
+  function usePresence<S extends ContainerShape | ValueShape, R>(
     docId: DocId,
     shape: S,
     selector?: (state: PresenceContext<Infer<S>>) => R,
-  ) {
+  ): R | PresenceContext<Infer<S>> {
     const { handle } = useDocHandleState(docId)
 
     // Derive placeholder from schema

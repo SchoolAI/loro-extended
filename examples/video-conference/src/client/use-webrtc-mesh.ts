@@ -179,7 +179,7 @@ export function useWebRtcMesh(
       const signalsForMe = presence.signals?.[myPeerIdStr]
 
       if (signalsForMe && signalsForMe.length > 0) {
-        processIncomingSignals(peerId as PeerID, signalsForMe)
+        processIncomingSignals(peerId as PeerID, signalsForMe as any)
       }
     }
   }, [signalingPresence, myPeerId, processIncomingSignals])

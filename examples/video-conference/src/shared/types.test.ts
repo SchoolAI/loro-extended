@@ -1,38 +1,7 @@
 import { describe, expect, it } from "vitest"
-import {
-  EmptyRoom,
-  EmptySignalingPresence,
-  EmptyUserPresence,
-  type SignalingPresence,
-  type SignalsMap,
-  type UserPresence,
-} from "./types"
-
-describe("Room Schema", () => {
-  describe("EmptyRoom", () => {
-    it("has empty metadata", () => {
-      expect(EmptyRoom.metadata.name).toBe("")
-      expect(EmptyRoom.metadata.createdAt).toBe(0)
-    })
-
-    it("has empty participants list", () => {
-      expect(EmptyRoom.participants).toEqual([])
-    })
-  })
-})
+import type { SignalingPresence, SignalsMap, UserPresence } from "./types"
 
 describe("User Presence", () => {
-  describe("EmptyUserPresence", () => {
-    it("has default name", () => {
-      expect(EmptyUserPresence.name).toBe("Anonymous")
-    })
-
-    it("has audio and video enabled by default", () => {
-      expect(EmptyUserPresence.wantsAudio).toBe(true)
-      expect(EmptyUserPresence.wantsVideo).toBe(true)
-    })
-  })
-
   describe("UserPresence type", () => {
     it("can be created with custom values", () => {
       const presence: UserPresence = {
@@ -45,33 +14,10 @@ describe("User Presence", () => {
       expect(presence.wantsAudio).toBe(false)
       expect(presence.wantsVideo).toBe(true)
     })
-
-    it("can be spread-updated", () => {
-      const original: UserPresence = { ...EmptyUserPresence }
-
-      const updated: UserPresence = {
-        ...original,
-        wantsAudio: false,
-      }
-
-      expect(updated.wantsAudio).toBe(false)
-      expect(updated.wantsVideo).toBe(true) // unchanged
-      expect(updated.name).toBe("Anonymous") // unchanged
-    })
   })
 })
 
 describe("Signaling Presence", () => {
-  describe("EmptySignalingPresence", () => {
-    it("has empty signals", () => {
-      expect(EmptySignalingPresence.signals).toEqual({})
-    })
-
-    it("has empty instanceId", () => {
-      expect(EmptySignalingPresence.instanceId).toBe("")
-    })
-  })
-
   describe("SignalingPresence type", () => {
     it("can hold signals for multiple peers", () => {
       const presence: SignalingPresence = {
@@ -100,19 +46,6 @@ describe("Signaling Presence", () => {
       }
 
       expect(presence.signals["peer-1"]).toHaveLength(3)
-    })
-
-    it("can be spread-updated", () => {
-      const original: SignalingPresence = { ...EmptySignalingPresence }
-
-      const updated: SignalingPresence = {
-        ...original,
-        signals: {
-          "peer-1": [{ type: "offer", sdp: "..." }],
-        },
-      }
-
-      expect(updated.signals["peer-1"]).toHaveLength(1)
     })
   })
 })

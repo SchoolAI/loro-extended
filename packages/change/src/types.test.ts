@@ -1,4 +1,5 @@
 import { describe, expectTypeOf, it } from "vitest"
+import type { ContainerShape, ValueShape } from "./shape.js"
 import { Shape } from "./shape.js"
 import type { Infer } from "./types.js"
 
@@ -152,6 +153,35 @@ describe("Infer type helper", () => {
         sessionStatus: { status: "not_started" } | { status: "active" }
       }
     }
+
+    expectTypeOf<Result>().toEqualTypeOf<Expected>()
+  })
+
+  it("infers discriminated union type correctly when used with generic constraint", () => {
+    // This test verifies the fix for usePresence type inference
+    // The issue was that DiscriminatedUnionValueShape<any, any> in the ValueShape union
+    // caused type information to be lost when inferring through generic constraints
+    const ClientPresenceShape = Shape.plain.object({
+      type: Shape.plain.string("client"),
+      name: Shape.plain.string(),
+    })
+    const ServerPresenceShape = Shape.plain.object({
+      type: Shape.plain.string("server"),
+      tick: Shape.plain.number(),
+    })
+    const GamePresenceSchema = Shape.plain.discriminatedUnion("type", {
+      client: ClientPresenceShape,
+      server: ServerPresenceShape,
+    })
+
+    // Simulate the constraint used in usePresence: <S extends ContainerShape | ValueShape>
+    type TestInfer<S extends ContainerShape | ValueShape> = Infer<S>
+
+    type Result = TestInfer<typeof GamePresenceSchema>
+
+    type Expected =
+      | { type: "client"; name: string }
+      | { type: "server"; tick: number }
 
     expectTypeOf<Result>().toEqualTypeOf<Expected>()
   })

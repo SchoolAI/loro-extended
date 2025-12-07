@@ -222,9 +222,6 @@ export interface DiscriminatedUnionValueShape<
 }
 
 // Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
-// NOTE: DiscriminatedUnionValueShape uses `any` for its type parameters to avoid invariance
-// issues when checking assignability. This allows specific shapes like
-// `DiscriminatedUnionValueShape<"status", {...}>` to be assignable to `ValueShape`.
 export type ValueShape =
   | StringValueShape
   | NumberValueShape
@@ -236,7 +233,7 @@ export type ValueShape =
   | RecordValueShape
   | ArrayValueShape
   | UnionValueShape
-  | DiscriminatedUnionValueShape<any, any>
+  | DiscriminatedUnionValueShape
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
