@@ -1,7 +1,6 @@
 import {
   type DocShape,
   type Draft,
-  type InferEmptyStateType,
   TypedDoc,
 } from "@loro-extended/change"
 import type { DocHandle } from "@loro-extended/repo"
@@ -24,16 +23,16 @@ export type ChangeFn<T extends DocShape> = (draft: Draft<T>) => void
 export function useTypedDocChanger<T extends DocShape>(
   handle: DocHandle<DocWrapper> | null,
   schema: T,
-  emptyState: InferEmptyStateType<T>,
 ) {
   // Create a transformer that converts LoroDoc to typed draft
   // Note: The loroDoc parameter is already the LoroDoc from handle.doc (property, not method)
+  // TypedDoc now automatically derives placeholder from schema
   const transformer = useCallback(
     (loroDoc: LoroDoc) => {
-      const typedDoc = new TypedDoc(schema, emptyState, loroDoc)
+      const typedDoc = new TypedDoc(schema, loroDoc)
       return typedDoc
     },
-    [schema, emptyState],
+    [schema],
   )
 
   // Use the unified changer with our transformer

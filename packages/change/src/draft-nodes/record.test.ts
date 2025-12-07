@@ -8,7 +8,7 @@ describe("Record Types", () => {
         scores: Shape.record(Shape.counter()),
       })
 
-      const doc = new TypedDoc(schema, { scores: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.scores.getOrCreateNode("alice").increment(10)
@@ -35,7 +35,7 @@ describe("Record Types", () => {
         notes: Shape.record(Shape.text()),
       })
 
-      const doc = new TypedDoc(schema, { notes: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.notes.getOrCreateNode("todo").insert(0, "Buy milk")
@@ -53,7 +53,7 @@ describe("Record Types", () => {
         groups: Shape.record(Shape.list(Shape.plain.string())),
       })
 
-      const doc = new TypedDoc(schema, { groups: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         const groupA = draft.groups.getOrCreateNode("groupA")
@@ -79,7 +79,7 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema, { wrapper: { config: {} } })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.wrapper.config.theme = "dark"
@@ -108,8 +108,7 @@ describe("Record Types", () => {
         }),
       })
 
-      // Empty state must use empty record - add initial data via change()
-      const doc = new TypedDoc(schema, { wrapper: { stats: {} } })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.wrapper.stats.visits = 100
@@ -131,7 +130,7 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema, { wrapper: { settings: {} } })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.wrapper.settings.ui = {
@@ -168,7 +167,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema, { users: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         const alice = draft.users.getOrCreateNode("u1")
@@ -198,7 +197,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema, { participants: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.participants["student-1"] = {
@@ -228,7 +227,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema, { data: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.data["item-1"] = {
@@ -250,7 +249,7 @@ describe("Record Types", () => {
         histories: Shape.record(Shape.list(Shape.plain.string())),
       })
 
-      const doc = new TypedDoc(schema, { histories: {} })
+      const doc = new TypedDoc(schema)
 
       doc.change(draft => {
         draft.histories.user1 = ["a", "b"]

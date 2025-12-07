@@ -7,7 +7,6 @@ import {
   CAR_COLORS,
   type CarColor,
   type ClientPresence,
-  EmptyArena,
   EmptyClientPresence,
   GamePresenceSchema,
   type PlayerScore,
@@ -44,11 +43,7 @@ export default function BumperCarsApp({
   )
 
   // Use arena document for persistent scores
-  const [doc, _changeDoc, handle] = useDocument(
-    ARENA_DOC_ID,
-    ArenaSchema,
-    EmptyArena,
-  )
+  const [doc, _changeDoc, handle] = useDocument(ARENA_DOC_ID, ArenaSchema)
 
   // Use typed presence with discriminated union schema
   // This provides type-safe access to both client and server presence

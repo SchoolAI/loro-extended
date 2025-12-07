@@ -67,13 +67,12 @@ const TimelineEventSchema = Shape.map({
 
 // --- Meta (Global State) ---
 const MetaSchema = Shape.map({
-  playerLocationName: Shape.plain.union([
-    Shape.plain.string(),
-    Shape.plain.null(),
-  ]),
-  worldMood: Shape.plain.string(), // "peace" | "rising-tensions" | "falling-tensions"
-  currentAct: Shape.plain.string(), // "hook" | ...
-  flourish: Shape.plain.string(), // "normal" | "brief"
+  playerLocationName: Shape.plain
+    .union([Shape.plain.null(), Shape.plain.string()])
+    .placeholder(null),
+  worldMood: Shape.plain.string().placeholder("peace"), // "peace" | "rising-tensions" | "falling-tensions"
+  currentAct: Shape.plain.string().placeholder("hook"), // "hook" | ...
+  flourish: Shape.plain.string().placeholder("normal"), // "normal" | "brief"
 })
 
 // --- World State ---
@@ -85,8 +84,8 @@ const WorldStateSchema = Shape.doc({
   meta: MetaSchema,
 })
 
-// --- Initial Empty State ---
-const initialWorldState = {
+// --- Expected Initial State (derived from schema placeholders) ---
+const expectedInitialState = {
   inventory: [],
   map: {
     locations: [],
@@ -105,13 +104,13 @@ const initialWorldState = {
 describe("WorldStateSchema", () => {
   describe("Schema Creation and Initialization", () => {
     it("should create a typed document with initial empty state", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
-      expect(typedDoc.toJSON()).toEqual(initialWorldState)
+      expect(typedDoc.toJSON()).toEqual(expectedInitialState)
     })
 
     it("should have correct initial meta values", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       expect(typedDoc.toJSON().meta.playerLocationName).toBeNull()
       expect(typedDoc.toJSON().meta.worldMood).toBe("peace")
@@ -120,7 +119,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should have empty collections initially", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       expect(typedDoc.toJSON().inventory).toHaveLength(0)
       expect(typedDoc.toJSON().map.locations).toHaveLength(0)
@@ -132,7 +131,7 @@ describe("WorldStateSchema", () => {
 
   describe("Meta Operations", () => {
     it("should update playerLocationName from null to string", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.meta.set("playerLocationName", "Starting Village")
@@ -142,7 +141,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should update playerLocationName back to null", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.meta.set("playerLocationName", "Starting Village")
@@ -156,7 +155,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should update worldMood", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.meta.set("worldMood", "rising-tensions")
@@ -166,7 +165,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should update currentAct", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.meta.set("currentAct", "confrontation")
@@ -176,7 +175,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should update flourish", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.meta.set("flourish", "brief")
@@ -188,7 +187,7 @@ describe("WorldStateSchema", () => {
 
   describe("Character Operations", () => {
     it("should add a character", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.characters.push({
@@ -206,7 +205,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add multiple characters", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.characters.push({
@@ -231,7 +230,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should find and modify a character", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.characters.push({
@@ -256,7 +255,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should delete a character", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.characters.push({
@@ -291,7 +290,7 @@ describe("WorldStateSchema", () => {
 
   describe("Timeline Operations", () => {
     it("should add a timeline event with text content", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.timeline.push({
@@ -309,7 +308,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add multiple timeline events", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.timeline.push({
@@ -339,7 +338,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should modify timeline event content using text operations", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.timeline.push({
@@ -363,7 +362,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should stream content to timeline event using text insert", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.timeline.push({
@@ -402,7 +401,7 @@ describe("WorldStateSchema", () => {
 
   describe("Map and Location Operations", () => {
     it("should add a location to the map", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.map.locations.push({
@@ -418,7 +417,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add multiple locations", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.map.locations.push({
@@ -445,7 +444,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add connections between locations", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         // Add locations first
@@ -471,7 +470,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add items to a location", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.map.locations.push({
@@ -495,7 +494,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should find and modify a location", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.map.locations.push({
@@ -521,7 +520,7 @@ describe("WorldStateSchema", () => {
 
   describe("Inventory Operations", () => {
     it("should add an item to inventory", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -542,7 +541,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle item with null imageUrl", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -562,7 +561,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should add item state with various status types", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -590,7 +589,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should find and modify inventory item", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.inventory.push({
@@ -618,7 +617,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should remove item from inventory", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.inventory.push({
@@ -659,7 +658,7 @@ describe("WorldStateSchema", () => {
 
   describe("Complex Scenarios", () => {
     it("should handle a complete game state update", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         // Add a location
@@ -711,7 +710,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should persist state across multiple changes", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       // First change: setup
       typedDoc.change(draft => {
@@ -754,7 +753,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle deeply nested item state modifications", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       typedDoc.change(draft => {
         draft.map.locations.push({
@@ -798,7 +797,7 @@ describe("WorldStateSchema", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty strings in text fields", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.characters.push({
@@ -814,7 +813,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle special characters and unicode", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.characters.push({
@@ -833,7 +832,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle large numbers in quantity", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -852,7 +851,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle negative numbers in quantity", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -871,7 +870,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle floating point numbers in quantity", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -890,7 +889,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle status with number 0", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -909,7 +908,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle status with empty string", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({
@@ -928,7 +927,7 @@ describe("WorldStateSchema", () => {
     })
 
     it("should handle status with false boolean", () => {
-      const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
+      const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = typedDoc.change(draft => {
         draft.inventory.push({

@@ -67,13 +67,13 @@ export class MapDraftNode<
     key: string,
     shape: S,
   ): DraftNodeParams<ContainerShape> {
-    const emptyState = (this.emptyState as any)?.[key]
+    const placeholder = (this.placeholder as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
 
     return {
       shape,
-      emptyState,
+      placeholder,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
       readonly: this.readonly,
@@ -96,12 +96,12 @@ export class MapDraftNode<
         if (containerValue !== undefined) {
           node = containerValue as Value
         } else {
-          // Only fall back to empty state if the container doesn't have the value
-          const emptyState = (this.emptyState as any)?.[key]
-          if (emptyState === undefined) {
-            throw new Error("empty state required")
+          // Only fall back to placeholder if the container doesn't have the value
+          const placeholder = (this.placeholder as any)?.[key]
+          if (placeholder === undefined) {
+            throw new Error("placeholder required")
           }
-          node = emptyState as Value
+          node = placeholder as Value
         }
 
         // In readonly mode, we DO NOT cache primitive values.
@@ -114,11 +114,11 @@ export class MapDraftNode<
     }
 
     if (this.readonly && isContainerShape(shape)) {
-      // In readonly mode, if the container doesn't exist, return the empty state
+      // In readonly mode, if the container doesn't exist, return the placeholder
       // This ensures we respect default values (e.g. counter: 1)
       const existing = this.container.get(key)
       if (existing === undefined) {
-        return (this.emptyState as any)?.[key]
+        return (this.placeholder as any)?.[key]
       }
 
       if (shape._type === "counter") {

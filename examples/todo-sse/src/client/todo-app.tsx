@@ -19,9 +19,7 @@ function TodoApp() {
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
   // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useDocument(docId, schema, {
-    todos: [],
-  })
+  const [doc, changeDoc, handle] = useDocument(docId, schema)
 
   useEffect(() => {
     console.log("doc state", doc)

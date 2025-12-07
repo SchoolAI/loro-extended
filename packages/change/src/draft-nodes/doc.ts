@@ -1,5 +1,5 @@
 import type { LoroDoc } from "loro-crdt"
-import type { InferPlainType } from "../index.js"
+import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { createContainerDraftNode } from "./utils.js"
@@ -18,7 +18,7 @@ const containerGetter = {
 export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
   private doc: LoroDoc
   private propertyCache = new Map<string, DraftNode<ContainerShape>>()
-  private requiredEmptyState!: InferPlainType<Shape>
+  private requiredPlaceholder!: Infer<Shape>
 
   constructor(
     _params: Omit<DraftNodeParams<Shape>, "getContainer"> & { doc: LoroDoc },
@@ -29,9 +29,9 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
         throw new Error("can't get container on DraftDoc")
       },
     })
-    if (!_params.emptyState) throw new Error("emptyState required")
+    if (!_params.placeholder) throw new Error("placeholder required")
     this.doc = _params.doc
-    this.requiredEmptyState = _params.emptyState
+    this.requiredPlaceholder = _params.placeholder
     this.createLazyProperties()
   }
 
@@ -43,7 +43,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
 
     return {
       shape,
-      emptyState: this.requiredEmptyState[key],
+      placeholder: this.requiredPlaceholder[key],
       getContainer: () => getter(key),
       readonly: this.readonly,
     }
@@ -60,7 +60,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
       // Check if the container exists in the doc without creating it
       const shallow = this.doc.getShallowValue()
       if (!shallow[key]) {
-        return this.requiredEmptyState[key] as any
+        return this.requiredPlaceholder[key] as any
       }
     }
 

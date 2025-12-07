@@ -12,10 +12,7 @@ describe("TypedDoc Readonly Mode", () => {
   })
 
   it("should read values correctly", () => {
-    const doc = createTypedDoc(schema, {
-      meta: { count: 0, title: "test" },
-      list: [],
-    })
+    const doc = createTypedDoc(schema)
 
     doc.change(d => {
       d.meta.count = 1
@@ -29,10 +26,7 @@ describe("TypedDoc Readonly Mode", () => {
   })
 
   it("should reflect updates immediately (live view)", () => {
-    const doc = createTypedDoc(schema, {
-      meta: { count: 0, title: "test" },
-      list: [],
-    })
+    const doc = createTypedDoc(schema)
 
     // Get a reference to the live view
     const liveMeta = doc.value.meta
@@ -48,10 +42,7 @@ describe("TypedDoc Readonly Mode", () => {
   })
 
   it("should throw on mutation attempts", () => {
-    const doc = createTypedDoc(schema, {
-      meta: { count: 0, title: "test" },
-      list: [],
-    })
+    const doc = createTypedDoc(schema)
 
     const liveMeta = doc.value.meta as any
     const liveList = doc.value.list as any
@@ -80,12 +71,11 @@ describe("TypedDoc Readonly Mode", () => {
   })
 
   it("should support toJSON for full serialization", () => {
-    const doc = createTypedDoc(schema, {
-      meta: { count: 1, title: "json" },
-      list: [],
-    })
+    const doc = createTypedDoc(schema)
 
     doc.change(d => {
+      d.meta.count = 1
+      d.meta.title = "json"
       d.list.push("a")
       d.list.push("b")
     })

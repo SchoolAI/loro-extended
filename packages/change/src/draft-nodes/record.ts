@@ -63,13 +63,13 @@ export class RecordDraftNode<
     key: string,
     shape: S,
   ): DraftNodeParams<ContainerShape> {
-    const emptyState = (this.emptyState as any)?.[key]
+    const placeholder = (this.placeholder as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
 
     return {
       shape,
-      emptyState,
+      placeholder,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
       readonly: this.readonly,
@@ -92,14 +92,14 @@ export class RecordDraftNode<
         if (containerValue !== undefined) {
           node = containerValue as Value
         } else {
-          // Only fall back to empty state if the container doesn't have the value
-          const emptyState = (this.emptyState as any)?.[key]
-          if (emptyState === undefined) {
-            // If it's a value type and not in container or empty state,
+          // Only fall back to placeholder if the container doesn't have the value
+          const placeholder = (this.placeholder as any)?.[key]
+          if (placeholder === undefined) {
+            // If it's a value type and not in container or placeholder,
             // fallback to the default value from the shape
             node = (shape as any)._plain
           } else {
-            node = emptyState as Value
+            node = placeholder as Value
           }
         }
         // Only cache primitive values if NOT readonly

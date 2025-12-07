@@ -84,7 +84,7 @@ export abstract class ListDraftNodeBase<
   ): DraftNodeParams<ContainerShape> {
     return {
       shape,
-      emptyState: undefined, // List items don't have empty state
+      placeholder: undefined, // List items don't have placeholder
       getContainer: () => {
         const containerItem = this.container.get(index)
         if (!containerItem || !isContainer(containerItem)) {

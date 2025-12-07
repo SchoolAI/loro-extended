@@ -9,11 +9,7 @@ describe("CRDT Operations", () => {
         title: Shape.text(),
       })
 
-      const emptyState = {
-        title: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.title.insert(0, "Hello")
@@ -29,11 +25,7 @@ describe("CRDT Operations", () => {
         content: Shape.text(),
       })
 
-      const emptyState = {
-        content: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.content.insert(0, "Initial content")
@@ -48,11 +40,7 @@ describe("CRDT Operations", () => {
         richText: Shape.text(),
       })
 
-      const emptyState = {
-        richText: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.richText.insert(0, "Bold text")
@@ -68,11 +56,7 @@ describe("CRDT Operations", () => {
         deltaText: Shape.text(),
       })
 
-      const emptyState = {
-        deltaText: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.deltaText.insert(0, "Hello World")
@@ -92,11 +76,7 @@ describe("CRDT Operations", () => {
         measuredText: Shape.text(),
       })
 
-      const emptyState = {
-        measuredText: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.measuredText.insert(0, "Hello")
@@ -114,11 +94,7 @@ describe("CRDT Operations", () => {
         count: Shape.counter(),
       })
 
-      const emptyState = {
-        count: 0,
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.count.increment(5)
@@ -134,11 +110,7 @@ describe("CRDT Operations", () => {
         counter: Shape.counter(),
       })
 
-      const emptyState = {
-        counter: 0,
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.counter.increment(7)
@@ -154,11 +126,7 @@ describe("CRDT Operations", () => {
         negativeCounter: Shape.counter(),
       })
 
-      const emptyState = {
-        negativeCounter: 0,
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.negativeCounter.increment(-5) // Negative increment
@@ -175,11 +143,7 @@ describe("CRDT Operations", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.items.push("first")
@@ -196,11 +160,7 @@ describe("CRDT Operations", () => {
         numbers: Shape.list(Shape.plain.number()),
       })
 
-      const emptyState = {
-        numbers: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.numbers.push(1)
@@ -216,11 +176,7 @@ describe("CRDT Operations", () => {
         flags: Shape.list(Shape.plain.boolean()),
       })
 
-      const emptyState = {
-        flags: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.flags.push(true)
@@ -236,11 +192,7 @@ describe("CRDT Operations", () => {
         testList: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        testList: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.testList.push("a")
@@ -258,11 +210,7 @@ describe("CRDT Operations", () => {
         containerList: Shape.list(Shape.text()),
       })
 
-      const emptyState = {
-        containerList: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         // Note: pushContainer and insertContainer expect actual container instances
@@ -279,11 +227,7 @@ describe("CRDT Operations", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add initial items
       typedDoc.change(draft => {
@@ -314,11 +258,7 @@ describe("CRDT Operations", () => {
         ),
       })
 
-      const emptyState = {
-        tasks: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.tasks.push({ id: "1", title: "Task 1" })
@@ -338,11 +278,7 @@ describe("CRDT Operations", () => {
         editableList: Shape.movableList(Shape.plain.string()),
       })
 
-      const emptyState = {
-        editableList: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.editableList.push("original")
@@ -357,11 +293,7 @@ describe("CRDT Operations", () => {
         movableItems: Shape.movableList(Shape.plain.number()),
       })
 
-      const emptyState = {
-        movableItems: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.movableItems.push(10)
@@ -379,20 +311,12 @@ describe("CRDT Operations", () => {
       const schema = Shape.doc({
         metadata: Shape.map({
           title: Shape.plain.string(),
-          count: Shape.plain.number(),
+          count: Shape.plain.number().placeholder(1),
           enabled: Shape.plain.boolean(),
         }),
       })
 
-      const emptyState = {
-        metadata: {
-          title: "",
-          count: 1,
-          enabled: false,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.metadata.set("title", "Test Title")
@@ -414,14 +338,7 @@ describe("CRDT Operations", () => {
         }),
       })
 
-      const emptyState = {
-        config: {
-          tags: [],
-          numbers: [],
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.config.set("tags", ["tag1", "tag2", "tag3"])
@@ -440,14 +357,7 @@ describe("CRDT Operations", () => {
         }),
       })
 
-      const emptyState = {
-        testMap: {
-          key1: "",
-          key2: 0,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.testMap.set("key1", "value1")
@@ -471,13 +381,7 @@ describe("CRDT Operations", () => {
         }),
       })
 
-      const emptyState = {
-        containerMap: {
-          textField: "",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         // Note: setContainer expects actual container instances
@@ -497,11 +401,7 @@ describe("CRDT Operations", () => {
         tree: Shape.tree(Shape.map({ name: Shape.text() })),
       })
 
-      const emptyState = {
-        tree: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         const root = draft.tree.createNode()
@@ -518,11 +418,7 @@ describe("CRDT Operations", () => {
         hierarchy: Shape.tree(Shape.map({ name: Shape.text() })),
       })
 
-      const emptyState = {
-        hierarchy: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         const parent1 = draft.hierarchy.createNode()
@@ -540,11 +436,7 @@ describe("CRDT Operations", () => {
         searchableTree: Shape.tree(Shape.map({ name: Shape.text() })),
       })
 
-      const emptyState = {
-        searchableTree: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         const node = draft.searchableTree.createNode()
@@ -573,20 +465,7 @@ describe("Nested Operations", () => {
         }),
       })
 
-      const emptyState = {
-        article: {
-          title: "",
-          metadata: {
-            views: 0,
-            author: {
-              name: "",
-              email: "",
-            },
-          },
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.article.title.insert(0, "Nested Article")
@@ -611,16 +490,7 @@ describe("Nested Operations", () => {
         }),
       })
 
-      const emptyState = {
-        mixed: {
-          plainString: "",
-          plainArray: [],
-          loroText: "",
-          loroCounter: 0,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.mixed.set("plainString", "Hello")
@@ -651,11 +521,7 @@ describe("Nested Operations", () => {
         ),
       })
 
-      const emptyState = {
-        articles: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.articles.push({
@@ -696,17 +562,7 @@ describe("Nested Operations", () => {
         }),
       })
 
-      const emptyState = {
-        articles: {
-          metadata: {
-            views: {
-              page: 0,
-            },
-          },
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result1 = typedDoc.change(draft => {
         // natural object access & assignment for Value nodes
@@ -736,11 +592,7 @@ describe("Nested Operations", () => {
         matrix: Shape.list(Shape.list(Shape.plain.number())),
       })
 
-      const emptyState = {
-        matrix: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.matrix.push([1, 2, 3])
@@ -768,14 +620,7 @@ describe("Nested Operations", () => {
         }),
       })
 
-      const emptyState = {
-        categories: {
-          tech: [],
-          design: [],
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.categories.tech.push("JavaScript")
@@ -793,18 +638,12 @@ describe("TypedLoroDoc", () => {
   describe("Empty State Overlay", () => {
     it("should return empty state when document is empty", () => {
       const schema = Shape.doc({
-        title: Shape.text(),
+        title: Shape.text().placeholder("Default Title"),
         count: Shape.counter(),
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        title: "Default Title",
-        count: 0,
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       expect(typedDoc.toJSON()).toEqual({
         title: "Default Title",
@@ -815,18 +654,12 @@ describe("TypedLoroDoc", () => {
 
     it("should overlay CRDT values over empty state", () => {
       const schema = Shape.doc({
-        title: Shape.text(),
+        title: Shape.text().placeholder("Default Title"),
         count: Shape.counter(),
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        title: "Default Title",
-        count: 0,
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.title.insert(0, "Hello World")
@@ -841,16 +674,16 @@ describe("TypedLoroDoc", () => {
     it("should handle nested empty state structures", () => {
       const schema = Shape.doc({
         article: Shape.map({
-          title: Shape.text(),
+          title: Shape.text().placeholder("Default Title"),
           metadata: Shape.map({
             views: Shape.counter(),
             tags: Shape.plain.array(Shape.plain.string()),
-            author: Shape.plain.string(),
+            author: Shape.plain.string().placeholder("Anonymous"),
           }),
         }),
       })
 
-      const emptyState = {
+      const expectedPlaceholder = {
         article: {
           title: "Default Title",
           metadata: {
@@ -861,9 +694,9 @@ describe("TypedLoroDoc", () => {
         },
       }
 
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
-      expect(typedDoc.toJSON()).toEqual(emptyState)
+      expect(typedDoc.toJSON()).toEqual(expectedPlaceholder)
 
       const result = typedDoc.change(draft => {
         draft.article.title.insert(0, "New Title")
@@ -880,21 +713,17 @@ describe("TypedLoroDoc", () => {
     it("should handle empty state with optional fields", () => {
       const schema = Shape.doc({
         profile: Shape.map({
-          name: Shape.plain.string(),
-          email: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
-          age: Shape.plain.union([Shape.plain.number(), Shape.plain.null()]),
+          name: Shape.plain.string().placeholder("Anonymous"),
+          email: Shape.plain
+            .union([Shape.plain.null(), Shape.plain.string()])
+            .placeholder(null),
+          age: Shape.plain
+            .union([Shape.plain.null(), Shape.plain.number()])
+            .placeholder(null),
         }),
       })
 
-      const emptyState = {
-        profile: {
-          name: "Anonymous",
-          email: null,
-          age: null,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.profile.set("name", "John Doe")
@@ -912,18 +741,11 @@ describe("TypedLoroDoc", () => {
       const schema = Shape.doc({
         title: Shape.text(),
         metadata: Shape.map({
-          optional: Shape.plain.string(),
+          optional: Shape.plain.string().placeholder("default-optional"),
         }),
       })
 
-      const emptyState = {
-        title: "Default",
-        metadata: {
-          optional: "default-optional",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.title.insert(0, "Hello")
@@ -948,50 +770,36 @@ describe("TypedLoroDoc", () => {
         count: Shape.counter(),
       })
 
-      const validEmptyState = {
-        title: "",
-        count: 0,
-      }
-
       expect(() => {
-        createTypedDoc(schema, validEmptyState)
+        createTypedDoc(schema)
       }).not.toThrow()
     })
 
-    it("should throw on invalid empty state", () => {
+    it("should derive valid placeholder from schema", () => {
       const schema = Shape.doc({
         title: Shape.text(),
         count: Shape.counter(),
       })
 
-      const invalidEmptyState = {
-        title: 123, // Should be string
-        count: "invalid", // Should be number
-      }
-
+      // With the new API, placeholder is always derived from schema
+      // so it's always valid - this test verifies that
       expect(() => {
-        createTypedDoc(schema, invalidEmptyState as any)
-      }).toThrow()
+        createTypedDoc(schema)
+      }).not.toThrow()
     })
-    it("should handle null values in empty state correctly", () => {
+
+    it("should handle null values in placeholder correctly", () => {
       const schema = Shape.doc({
         interjection: Shape.map({
-          currentPrediction: Shape.plain.union([
-            Shape.plain.string(),
-            Shape.plain.null(),
-          ]),
+          currentPrediction: Shape.plain
+            .union([Shape.plain.null(), Shape.plain.string()])
+            .placeholder(null),
         }),
       })
 
-      const emptyState = {
-        interjection: {
-          currentPrediction: null,
-        },
-      }
+      const typedDoc = createTypedDoc(schema)
 
-      const typedDoc = createTypedDoc(schema, emptyState)
-
-      // This should not throw "empty state required"
+      // This should not throw "placeholder required"
       expect(() => {
         typedDoc.change(draft => {
           // Accessing the property triggers getOrCreateNode
@@ -1015,13 +823,7 @@ describe("TypedLoroDoc", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        title: "",
-        count: 0,
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // First change
       let result = typedDoc.change(draft => {
@@ -1058,11 +860,7 @@ describe("TypedLoroDoc", () => {
         ),
       })
 
-      const emptyState = {
-        articles: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.articles.push({
@@ -1087,11 +885,7 @@ describe("TypedLoroDoc", () => {
         ),
       })
 
-      const emptyState = {
-        tasks: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.tasks.push({
@@ -1120,11 +914,7 @@ describe("TypedLoroDoc", () => {
         ),
       })
 
-      const emptyState = {
-        posts: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.posts.push({
@@ -1150,20 +940,12 @@ describe("Edge Cases and Error Handling", () => {
       const schema = Shape.doc({
         title: Shape.text(),
         metadata: Shape.map({
-          author: Shape.plain.string(),
-          publishedAt: Shape.plain.string(),
+          author: Shape.plain.string().placeholder("Anonymous"),
+          publishedAt: Shape.plain.string().placeholder("2025-01-01"),
         }),
       })
 
-      const emptyState = {
-        title: "",
-        metadata: {
-          author: "Anonymous",
-          publishedAt: "2024-01-01",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Multiple changes
       typedDoc.change(draft => {
@@ -1174,18 +956,18 @@ describe("Edge Cases and Error Handling", () => {
       let result = typedDoc.value
       expect(result.title).toBe("First Title")
       expect(result.metadata.author).toBe("John Doe")
-      expect(result.metadata.publishedAt).toBe("2024-01-01")
+      expect(result.metadata.publishedAt).toBe("2025-01-01")
 
       // More changes
       typedDoc.change(draft => {
         draft.title.update("Updated Title")
-        draft.metadata.set("publishedAt", "2024-12-01")
+        draft.metadata.set("publishedAt", "2025-12-01")
       })
 
       result = typedDoc.value
       expect(result.title).toBe("Updated Title")
       expect(result.metadata.author).toBe("John Doe") // Preserved from previous change
-      expect(result.metadata.publishedAt).toBe("2024-12-01")
+      expect(result.metadata.publishedAt).toBe("2025-12-01")
     })
 
     it("should handle empty containers gracefully", () => {
@@ -1198,11 +980,7 @@ describe("Edge Cases and Error Handling", () => {
         ),
       })
 
-      const emptyState = {
-        todos: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add a todo item with minimal data
       const result = typedDoc.change(draft => {
@@ -1225,12 +1003,7 @@ describe("Edge Cases and Error Handling", () => {
         counter: Shape.counter(),
       })
 
-      const emptyState = {
-        items: [],
-        counter: 0,
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         // Add many items
@@ -1255,13 +1028,7 @@ describe("Edge Cases and Error Handling", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        text: "",
-        count: 0,
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.text.insert(0, "")
@@ -1280,12 +1047,7 @@ describe("Edge Cases and Error Handling", () => {
         emoji: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        unicode: "",
-        emoji: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const result = typedDoc.change(draft => {
         draft.unicode.insert(0, "Hello 世界 🌍")
@@ -1305,11 +1067,7 @@ describe("Edge Cases and Error Handling", () => {
           items: Shape.list(Shape.plain.string()),
         })
 
-        const emptyState = {
-          items: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.items.push("apple")
@@ -1330,11 +1088,7 @@ describe("Edge Cases and Error Handling", () => {
           numbers: Shape.list(Shape.plain.number()),
         })
 
-        const emptyState = {
-          numbers: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.numbers.push(10)
@@ -1355,11 +1109,7 @@ describe("Edge Cases and Error Handling", () => {
           words: Shape.list(Shape.plain.string()),
         })
 
-        const emptyState = {
-          words: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.words.push("hello")
@@ -1386,11 +1136,7 @@ describe("Edge Cases and Error Handling", () => {
           numbers: Shape.list(Shape.plain.number()),
         })
 
-        const emptyState = {
-          numbers: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.numbers.push(1)
@@ -1413,11 +1159,7 @@ describe("Edge Cases and Error Handling", () => {
           items: Shape.list(Shape.plain.string()),
         })
 
-        const emptyState = {
-          items: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.items.push("a")
@@ -1443,11 +1185,7 @@ describe("Edge Cases and Error Handling", () => {
           numbers: Shape.list(Shape.plain.number()),
         })
 
-        const emptyState = {
-          numbers: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.numbers.push(1)
@@ -1473,11 +1211,7 @@ describe("Edge Cases and Error Handling", () => {
           numbers: Shape.list(Shape.plain.number()),
         })
 
-        const emptyState = {
-          numbers: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.numbers.push(2)
@@ -1509,11 +1243,7 @@ describe("Edge Cases and Error Handling", () => {
           ),
         })
 
-        const emptyState = {
-          todos: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.todos.push({ id: "1", text: "Buy milk", completed: false })
@@ -1562,11 +1292,7 @@ describe("Edge Cases and Error Handling", () => {
           ),
         })
 
-        const emptyState = {
-          articles: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.articles.push({
@@ -1608,11 +1334,7 @@ describe("Edge Cases and Error Handling", () => {
           ),
         })
 
-        const emptyState = {
-          tasks: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.tasks.push({ id: "1", priority: 1 })
@@ -1656,11 +1378,7 @@ describe("Edge Cases and Error Handling", () => {
           items: Shape.list(Shape.plain.string()),
         })
 
-        const emptyState = {
-          items: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           // Test all methods on empty list
@@ -1684,11 +1402,7 @@ describe("Edge Cases and Error Handling", () => {
           items: Shape.list(Shape.plain.number()),
         })
 
-        const emptyState = {
-          items: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.items.push(42)
@@ -1717,11 +1431,7 @@ describe("Edge Cases and Error Handling", () => {
           items: Shape.list(Shape.plain.string()),
         })
 
-        const emptyState = {
-          items: [],
-        }
-
-        const typedDoc = createTypedDoc(schema, emptyState)
+        const typedDoc = createTypedDoc(schema)
 
         typedDoc.change(draft => {
           draft.items.push("a")
@@ -1777,11 +1487,7 @@ describe("Edge Cases and Error Handling", () => {
             ),
           })
 
-          const emptyState = {
-            todos: [],
-          }
-
-          const typedDoc = createTypedDoc(schema, emptyState)
+          const typedDoc = createTypedDoc(schema)
 
           // Add initial todos
           typedDoc.change(draft => {
@@ -1842,11 +1548,7 @@ describe("Edge Cases and Error Handling", () => {
             ),
           })
 
-          const emptyState = {
-            articles: [],
-          }
-
-          const typedDoc = createTypedDoc(schema, emptyState)
+          const typedDoc = createTypedDoc(schema)
 
           // Add initial articles
           typedDoc.change(draft => {
@@ -1915,11 +1617,7 @@ describe("Edge Cases and Error Handling", () => {
             ),
           })
 
-          const emptyState = {
-            users: [],
-          }
-
-          const typedDoc = createTypedDoc(schema, emptyState)
+          const typedDoc = createTypedDoc(schema)
 
           // Add initial users
           typedDoc.change(draft => {
@@ -1989,11 +1687,7 @@ describe("Edge Cases and Error Handling", () => {
             ),
           })
 
-          const emptyState = {
-            items: [],
-          }
-
-          const typedDoc = createTypedDoc(schema, emptyState)
+          const typedDoc = createTypedDoc(schema)
 
           const result = typedDoc.change(draft => {
             // Add some items

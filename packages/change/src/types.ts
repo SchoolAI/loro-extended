@@ -36,20 +36,16 @@ import type { ContainerShape, DocShape, Shape } from "./shape.js"
  */
 export type Infer<T> = T extends Shape<infer P, any, any> ? P : never
 
-// Input type inference - what developers can pass to push/insert methods
-// @deprecated Use `Infer<T>` instead for a simpler, unified API
-export type InferPlainType<T> = T extends Shape<infer P, any, any> ? P : never
-
 export type InferDraftType<T> = T extends Shape<any, infer D, any> ? D : never
 
 /**
- * Extracts the valid empty state type from a shape.
+ * Extracts the valid placeholder type from a shape.
  *
  * For dynamic containers (list, record, etc.), this will be constrained to
  * empty values ([] or {}) to prevent users from expecting per-entry merging.
  */
-export type InferEmptyStateType<T> = T extends Shape<any, any, infer E>
-  ? E
+export type InferPlaceholderType<T> = T extends Shape<any, any, infer P>
+  ? P
   : never
 
 // Draft-specific type inference that properly handles the draft context

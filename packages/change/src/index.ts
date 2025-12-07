@@ -1,6 +1,10 @@
 // Main API exports
 
-export { mergeValue, overlayEmptyState } from "./overlay.js"
+export {
+  derivePlaceholder,
+  deriveShapePlaceholder,
+} from "./derive-placeholder.js"
+export { mergeValue, overlayPlaceholder } from "./overlay.js"
 export type {
   ArrayValueShape,
   ContainerOrValueShape,
@@ -23,7 +27,8 @@ export type {
   UnionValueShape,
   // Value shapes
   ValueShape,
-  // ...
+  // WithPlaceholder type for shapes that support .placeholder()
+  WithPlaceholder,
 } from "./shape.js"
 // Schema and type exports
 export { Shape } from "./shape.js"
@@ -34,8 +39,7 @@ export type {
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
   InferDraftType,
-  InferEmptyStateType,
-  InferPlainType,
+  InferPlaceholderType,
 } from "./types.js"
 // Utility exports
-export { validateEmptyState } from "./validation.js"
+export { validatePlaceholder } from "./validation.js"

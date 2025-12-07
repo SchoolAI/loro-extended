@@ -12,7 +12,7 @@ describe("ListDraftNode", () => {
         ),
       })
 
-      const doc = createTypedDoc(schema, { users: [] })
+      const doc = createTypedDoc(schema)
 
       doc.change(draft => {
         draft.users.push({ name: "Alice" })
@@ -29,7 +29,7 @@ describe("ListDraftNode", () => {
         tags: Shape.list(Shape.plain.string()),
       })
 
-      const doc = createTypedDoc(schema, { tags: [] })
+      const doc = createTypedDoc(schema)
 
       doc.change(draft => {
         draft.tags.push("a")

@@ -12,7 +12,7 @@ describe("MovableListDraftNode", () => {
         ),
       })
 
-      const doc = createTypedDoc(schema, { users: [] })
+      const doc = createTypedDoc(schema)
 
       doc.change(draft => {
         draft.users.push({ name: "Alice" })

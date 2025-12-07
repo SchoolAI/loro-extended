@@ -107,7 +107,7 @@ describe("discriminatedUnion", () => {
       EmptyClientPresence,
     )
 
-    // Should use client variant based on emptyState's type
+    // Should use client variant based on placeholder's type
     expect(result).toEqual({
       type: "client",
       name: "Bob",
@@ -216,15 +216,11 @@ describe("discriminatedUnion", () => {
       it("should allow setting a discriminated union property in a MapDraftNode", () => {
         const DocSchema = Shape.doc({
           state: Shape.map({
-            presence: GamePresenceSchema,
+            presence: GamePresenceSchema.placeholder(EmptyClientPresence),
           }),
         })
 
-        const doc = new TypedDoc(DocSchema, {
-          state: {
-            presence: EmptyClientPresence,
-          },
-        })
+        const doc = new TypedDoc(DocSchema)
 
         doc.change(draft => {
           // This should work now that MapDraftNode recognizes discriminatedUnion as a value shape

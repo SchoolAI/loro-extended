@@ -1,9 +1,5 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type {
-  ContainerShape,
-  InferPlainType,
-  ValueShape,
-} from "@loro-extended/change"
+import type { ContainerShape, Infer, ValueShape } from "@loro-extended/change"
 import type { LoroDoc, Value } from "loro-crdt"
 import type { ObjectValue, Synchronizer } from "./synchronizer.js"
 import { TypedPresence } from "./typed-presence.js"
@@ -205,7 +201,7 @@ export class DocHandle<T extends DocContent = DocContent> {
    */
   presence<S extends ContainerShape | ValueShape>(
     shape: S,
-    emptyState: InferPlainType<S>,
+    emptyState: Infer<S>,
   ): TypedPresence<S> {
     return new TypedPresence(shape, emptyState, this)
   }

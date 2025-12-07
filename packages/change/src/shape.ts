@@ -16,11 +16,16 @@ import type { MovableListDraftNode } from "./draft-nodes/movable-list.js"
 import type { RecordDraftNode } from "./draft-nodes/record.js"
 import type { TextDraftNode } from "./draft-nodes/text.js"
 
-export interface Shape<Plain, Draft, EmptyState = Plain> {
+export interface Shape<Plain, Draft, Placeholder = Plain> {
   readonly _type: string
   readonly _plain: Plain
   readonly _draft: Draft
-  readonly _emptyState: EmptyState
+  readonly _placeholder: Placeholder
+}
+
+// Type for shapes that support placeholder customization
+export type WithPlaceholder<S extends Shape<any, any, any>> = S & {
+  placeholder(value: S["_placeholder"]): S
 }
 
 export interface DocShape<
@@ -31,7 +36,7 @@ export interface DocShape<
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
     { [K in keyof NestedShapes]: NestedShapes[K]["_draft"] },
-    { [K in keyof NestedShapes]: NestedShapes[K]["_emptyState"] }
+    { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
   readonly _type: "doc"
   // A doc's root containers each separately has its own shape, hence 'shapes'
@@ -54,8 +59,8 @@ export interface TreeContainerShape<NestedShape = ContainerOrValueShape>
 }
 
 // Container schemas using interfaces for recursive references
-// NOTE: List and Record use never[] and Record<string, never> for EmptyState
-// to enforce that only empty values ([] and {}) are valid in empty state.
+// NOTE: List and Record use never[] and Record<string, never> for Placeholder
+// to enforce that only empty values ([] and {}) are valid in placeholder state.
 // This prevents users from expecting per-entry merging behavior.
 export interface ListContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
@@ -87,7 +92,7 @@ export interface MapContainerShape<
     MapDraftNode<NestedShapes> & {
       [K in keyof NestedShapes]: NestedShapes[K]["_draft"]
     },
-    { [K in keyof NestedShapes]: NestedShapes[K]["_emptyState"] }
+    { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
   readonly _type: "map"
   // Each map property has its own shape, hence 'shapes'
@@ -151,7 +156,7 @@ export interface ObjectValueShape<
 > extends Shape<
     { [K in keyof T]: T[K]["_plain"] },
     { [K in keyof T]: T[K]["_draft"] },
-    { [K in keyof T]: T[K]["_emptyState"] }
+    { [K in keyof T]: T[K]["_placeholder"] }
   > {
   readonly _type: "value"
   readonly valueType: "object"
@@ -159,7 +164,7 @@ export interface ObjectValueShape<
 }
 
 // NOTE: RecordValueShape and ArrayValueShape use Record<string, never> and never[]
-// for EmptyState to enforce that only empty values ({} and []) are valid.
+// for Placeholder to enforce that only empty values ({} and []) are valid.
 export interface RecordValueShape<T extends ValueShape = ValueShape>
   extends Shape<
     Record<string, T["_plain"]>,
@@ -182,7 +187,7 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
   extends Shape<
     T[number]["_plain"],
     T[number]["_draft"],
-    T[number]["_emptyState"]
+    T[number]["_placeholder"]
   > {
   readonly _type: "value"
   readonly valueType: "union"
@@ -208,7 +213,7 @@ export interface DiscriminatedUnionValueShape<
 > extends Shape<
     T[keyof T]["_plain"],
     T[keyof T]["_draft"],
-    T[keyof T]["_emptyState"]
+    T[keyof T]["_placeholder"]
   > {
   readonly _type: "value"
   readonly valueType: "discriminatedUnion"
@@ -248,24 +253,31 @@ export const Shape = {
     shapes: shape,
     _plain: {} as any,
     _draft: {} as any,
-    _emptyState: {} as any,
+    _placeholder: {} as any,
   }),
 
   // CRDTs are represented by Loro Containers--they converge on state using Loro's
   // various CRDT algorithms
-  counter: (): CounterContainerShape => ({
-    _type: "counter" as const,
-    _plain: 0,
-    _draft: {} as CounterDraftNode,
-    _emptyState: 0,
-  }),
+  counter: (): WithPlaceholder<CounterContainerShape> => {
+    const base: CounterContainerShape = {
+      _type: "counter" as const,
+      _plain: 0,
+      _draft: {} as CounterDraftNode,
+      _placeholder: 0,
+    }
+    return Object.assign(base, {
+      placeholder(value: number): CounterContainerShape {
+        return { ...base, _placeholder: value }
+      },
+    })
+  },
 
   list: <T extends ContainerOrValueShape>(shape: T): ListContainerShape<T> => ({
     _type: "list" as const,
     shape,
     _plain: [] as any,
     _draft: {} as any,
-    _emptyState: [] as never[],
+    _placeholder: [] as never[],
   }),
 
   map: <T extends Record<string, ContainerOrValueShape>>(
@@ -275,7 +287,7 @@ export const Shape = {
     shapes: shape,
     _plain: {} as any,
     _draft: {} as any,
-    _emptyState: {} as any,
+    _placeholder: {} as any,
   }),
 
   record: <T extends ContainerOrValueShape>(
@@ -285,7 +297,7 @@ export const Shape = {
     shape,
     _plain: {} as any,
     _draft: {} as any,
-    _emptyState: {} as Record<string, never>,
+    _placeholder: {} as Record<string, never>,
   }),
 
   movableList: <T extends ContainerOrValueShape>(
@@ -295,22 +307,29 @@ export const Shape = {
     shape,
     _plain: [] as any,
     _draft: {} as any,
-    _emptyState: [] as never[],
+    _placeholder: [] as never[],
   }),
 
-  text: (): TextContainerShape => ({
-    _type: "text" as const,
-    _plain: "",
-    _draft: {} as TextDraftNode,
-    _emptyState: "",
-  }),
+  text: (): WithPlaceholder<TextContainerShape> => {
+    const base: TextContainerShape = {
+      _type: "text" as const,
+      _plain: "",
+      _draft: {} as TextDraftNode,
+      _placeholder: "",
+    }
+    return Object.assign(base, {
+      placeholder(value: string): TextContainerShape {
+        return { ...base, _placeholder: value }
+      },
+    })
+  },
 
   tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
     _type: "tree" as const,
     shape,
     _plain: {} as any,
     _draft: {} as any,
-    _emptyState: [] as never[],
+    _placeholder: [] as never[],
   }),
 
   // Values are represented as plain JS objects, with the limitation that they MUST be
@@ -320,37 +339,58 @@ export const Shape = {
   plain: {
     string: <T extends string = string>(
       ...options: T[]
-    ): StringValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "string" as const,
-      _plain: (options[0] ?? "") as T,
-      _draft: (options[0] ?? "") as T,
-      _emptyState: (options[0] ?? "") as T,
-      options: options.length > 0 ? options : undefined,
-    }),
+    ): WithPlaceholder<StringValueShape<T>> => {
+      const base: StringValueShape<T> = {
+        _type: "value" as const,
+        valueType: "string" as const,
+        _plain: (options[0] ?? "") as T,
+        _draft: (options[0] ?? "") as T,
+        _placeholder: (options[0] ?? "") as T,
+        options: options.length > 0 ? options : undefined,
+      }
+      return Object.assign(base, {
+        placeholder(value: T): StringValueShape<T> {
+          return { ...base, _placeholder: value }
+        },
+      })
+    },
 
-    number: (): NumberValueShape => ({
-      _type: "value" as const,
-      valueType: "number" as const,
-      _plain: 0,
-      _draft: 0,
-      _emptyState: 0,
-    }),
+    number: (): WithPlaceholder<NumberValueShape> => {
+      const base: NumberValueShape = {
+        _type: "value" as const,
+        valueType: "number" as const,
+        _plain: 0,
+        _draft: 0,
+        _placeholder: 0,
+      }
+      return Object.assign(base, {
+        placeholder(value: number): NumberValueShape {
+          return { ...base, _placeholder: value }
+        },
+      })
+    },
 
-    boolean: (): BooleanValueShape => ({
-      _type: "value" as const,
-      valueType: "boolean" as const,
-      _plain: false,
-      _draft: false,
-      _emptyState: false,
-    }),
+    boolean: (): WithPlaceholder<BooleanValueShape> => {
+      const base: BooleanValueShape = {
+        _type: "value" as const,
+        valueType: "boolean" as const,
+        _plain: false,
+        _draft: false,
+        _placeholder: false,
+      }
+      return Object.assign(base, {
+        placeholder(value: boolean): BooleanValueShape {
+          return { ...base, _placeholder: value }
+        },
+      })
+    },
 
     null: (): NullValueShape => ({
       _type: "value" as const,
       valueType: "null" as const,
       _plain: null,
       _draft: null,
-      _emptyState: null,
+      _placeholder: null,
     }),
 
     undefined: (): UndefinedValueShape => ({
@@ -358,7 +398,7 @@ export const Shape = {
       valueType: "undefined" as const,
       _plain: undefined,
       _draft: undefined,
-      _emptyState: undefined,
+      _placeholder: undefined,
     }),
 
     uint8Array: (): Uint8ArrayValueShape => ({
@@ -366,7 +406,7 @@ export const Shape = {
       valueType: "uint8array" as const,
       _plain: new Uint8Array(),
       _draft: new Uint8Array(),
-      _emptyState: new Uint8Array(),
+      _placeholder: new Uint8Array(),
     }),
 
     object: <T extends Record<string, ValueShape>>(
@@ -377,7 +417,7 @@ export const Shape = {
       shape,
       _plain: {} as any,
       _draft: {} as any,
-      _emptyState: {} as any,
+      _placeholder: {} as any,
     }),
 
     record: <T extends ValueShape>(shape: T): RecordValueShape<T> => ({
@@ -386,7 +426,7 @@ export const Shape = {
       shape,
       _plain: {} as any,
       _draft: {} as any,
-      _emptyState: {} as Record<string, never>,
+      _placeholder: {} as Record<string, never>,
     }),
 
     array: <T extends ValueShape>(shape: T): ArrayValueShape<T> => ({
@@ -395,19 +435,28 @@ export const Shape = {
       shape,
       _plain: [] as any,
       _draft: [] as any,
-      _emptyState: [] as never[],
+      _placeholder: [] as never[],
     }),
 
     // Special value type that helps make things like `string | null` representable
     // TODO(duane): should this be a more general type for containers too?
-    union: <T extends ValueShape[]>(shapes: T): UnionValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "union" as const,
-      shapes,
-      _plain: {} as any,
-      _draft: {} as any,
-      _emptyState: {} as any,
-    }),
+    union: <T extends ValueShape[]>(
+      shapes: T,
+    ): WithPlaceholder<UnionValueShape<T>> => {
+      const base: UnionValueShape<T> = {
+        _type: "value" as const,
+        valueType: "union" as const,
+        shapes,
+        _plain: {} as any,
+        _draft: {} as any,
+        _placeholder: {} as any,
+      }
+      return Object.assign(base, {
+        placeholder(value: T[number]["_placeholder"]): UnionValueShape<T> {
+          return { ...base, _placeholder: value }
+        },
+      })
+    },
 
     /**
      * Creates a discriminated union shape for type-safe tagged unions.
@@ -441,15 +490,24 @@ export const Shape = {
     >(
       discriminantKey: K,
       variants: T,
-    ): DiscriminatedUnionValueShape<K, T> => ({
-      _type: "value" as const,
-      valueType: "discriminatedUnion" as const,
-      discriminantKey,
-      variants,
-      _plain: {} as any,
-      _draft: {} as any,
-      _emptyState: {} as any,
-    }),
+    ): WithPlaceholder<DiscriminatedUnionValueShape<K, T>> => {
+      const base: DiscriminatedUnionValueShape<K, T> = {
+        _type: "value" as const,
+        valueType: "discriminatedUnion" as const,
+        discriminantKey,
+        variants,
+        _plain: {} as any,
+        _draft: {} as any,
+        _placeholder: {} as any,
+      }
+      return Object.assign(base, {
+        placeholder(
+          value: T[keyof T]["_placeholder"],
+        ): DiscriminatedUnionValueShape<K, T> {
+          return { ...base, _placeholder: value }
+        },
+      })
+    },
   },
 }
 

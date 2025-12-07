@@ -13,7 +13,7 @@ import type {
   UnionValueShape,
   ValueShape,
 } from "./shape.js"
-import type { InferPlainType } from "./types.js"
+import type { Infer } from "./types.js"
 
 /**
  * Validates a value against a ContainerShape or ValueShape schema
@@ -275,28 +275,28 @@ export function validateValue(
 }
 
 /**
- * Validates empty state against schema structure without using Zod
- * Combines the functionality of createEmptyStateValidator and createValueValidator
+ * Validates placeholder against schema structure without using Zod
+ * Combines the functionality of createPlaceholderValidator and createValueValidator
  */
-export function validateEmptyState<T extends DocShape>(
-  emptyState: unknown,
+export function validatePlaceholder<T extends DocShape>(
+  placeholder: unknown,
   schema: T,
-): InferPlainType<T> {
+): Infer<T> {
   if (
-    !emptyState ||
-    typeof emptyState !== "object" ||
-    Array.isArray(emptyState)
+    !placeholder ||
+    typeof placeholder !== "object" ||
+    Array.isArray(placeholder)
   ) {
-    throw new Error("Empty state must be an object")
+    throw new Error("Placeholder must be an object")
   }
 
   const result: Record<string, unknown> = {}
 
   // Validate each property in the document schema
   for (const [key, schemaValue] of Object.entries(schema.shapes)) {
-    const value = (emptyState as Record<string, unknown>)[key]
+    const value = (placeholder as Record<string, unknown>)[key]
     result[key] = validateValue(value, schemaValue, key)
   }
 
-  return result as InferPlainType<T>
+  return result as Infer<T>
 }

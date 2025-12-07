@@ -4,13 +4,14 @@ import { describe, expect, it, vi } from "vitest"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 import { useDocument } from "./use-document.js"
 
-// Test schema and empty state
+// Test schema with placeholder values
 const testSchema = Shape.doc({
-  title: Shape.text(),
+  title: Shape.text().placeholder("Test Document"),
   count: Shape.counter(),
 })
 
-const testEmptyState = {
+// Expected placeholder values (derived from schema)
+const expectedPlaceholder = {
   title: "Test Document",
   count: 0,
 }
@@ -20,12 +21,9 @@ describe("useDocument", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(
-      () => useDocument(documentId, testSchema, testEmptyState),
-      {
-        wrapper: RepoWrapper,
-      },
-    )
+    const { result } = renderHook(() => useDocument(documentId, testSchema), {
+      wrapper: RepoWrapper,
+    })
 
     expect(Array.isArray(result.current)).toBe(true)
     expect(result.current).toHaveLength(3)
@@ -33,8 +31,8 @@ describe("useDocument", () => {
     const [doc, changeDoc, handle] = result.current
 
     // Check properties individually since doc is a Proxy
-    expect(doc.title).toBe(testEmptyState.title)
-    expect(doc.count).toBe(testEmptyState.count)
+    expect(doc.title).toBe(expectedPlaceholder.title)
+    expect(doc.count).toBe(expectedPlaceholder.count)
     expect(typeof changeDoc).toBe("function")
     expect(handle).not.toBeNull() // Handle is immediately available with new API
   })
@@ -44,15 +42,14 @@ describe("useDocument", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
-      () =>
-        useDocument(documentId, testSchema, testEmptyState, doc => doc.title),
+      () => useDocument(documentId, testSchema, doc => doc.title),
       {
         wrapper: RepoWrapper,
       },
     )
 
     const [title] = result.current
-    expect(title).toBe(testEmptyState.title)
+    expect(title).toBe(expectedPlaceholder.title)
   })
 
   it("should support selector for plain object return", () => {
@@ -61,7 +58,7 @@ describe("useDocument", () => {
 
     const { result } = renderHook(
       () =>
-        useDocument(documentId, testSchema, testEmptyState, doc => ({
+        useDocument(documentId, testSchema, doc => ({
           title: doc.title,
           count: doc.count,
         })),
@@ -73,26 +70,23 @@ describe("useDocument", () => {
     const [doc] = result.current
 
     // With selector returning plain object, toEqual works
-    expect(doc).toEqual(testEmptyState)
+    expect(doc).toEqual(expectedPlaceholder)
   })
 
   it("should compose useLoroDocState and useLoroDocChanger correctly", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
-    const { result } = renderHook(
-      () => useDocument(documentId, testSchema, testEmptyState),
-      {
-        wrapper: RepoWrapper,
-      },
-    )
+    const { result } = renderHook(() => useDocument(documentId, testSchema), {
+      wrapper: RepoWrapper,
+    })
 
     const [doc, changeDoc, handle] = result.current
 
     // With the new synchronous API, handle is immediately available
     expect(handle).not.toBeNull()
-    expect(doc.title).toBe(testEmptyState.title)
-    expect(doc.count).toBe(testEmptyState.count)
+    expect(doc.title).toBe(expectedPlaceholder.title)
+    expect(doc.count).toBe(expectedPlaceholder.count)
 
     // Test that changeDoc works correctly
     const mockChangeFn = vi.fn()
@@ -107,7 +101,7 @@ describe("useDocument", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result, rerender } = renderHook(
-      () => useDocument(documentId, testSchema, testEmptyState),
+      () => useDocument(documentId, testSchema),
       {
         wrapper: RepoWrapper,
       },
@@ -128,7 +122,7 @@ describe("useDocument", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result, rerender } = renderHook(
-      ({ docId }) => useDocument(docId, testSchema, testEmptyState),
+      ({ docId }) => useDocument(docId, testSchema),
       {
         initialProps: { docId: documentId1 },
         wrapper: RepoWrapper,
@@ -141,9 +135,9 @@ describe("useDocument", () => {
 
     const [doc2, changeDoc2, handle2] = result.current
 
-    // Both docs should show empty state, handles are immediately available
-    expect(doc1.title).toBe(testEmptyState.title)
-    expect(doc2.title).toBe(testEmptyState.title)
+    // Both docs should show placeholder, handles are immediately available
+    expect(doc1.title).toBe(expectedPlaceholder.title)
+    expect(doc2.title).toBe(expectedPlaceholder.title)
     expect(handle1).not.toBeNull()
     expect(handle2).not.toBeNull()
 

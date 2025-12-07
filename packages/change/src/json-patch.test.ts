@@ -13,14 +13,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        metadata: {
-          title: "",
-          count: 0,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: "/metadata/title", value: "Hello World" },
@@ -36,19 +29,12 @@ describe("JSON Patch Integration", () => {
     it("should handle remove operations on map properties", () => {
       const schema = Shape.doc({
         config: Shape.map({
-          theme: Shape.plain.string(),
-          debug: Shape.plain.boolean(),
+          theme: Shape.plain.string().placeholder("light"),
+          debug: Shape.plain.boolean().placeholder(true),
         }),
       })
 
-      const emptyState = {
-        config: {
-          theme: "light",
-          debug: true,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // First set some values
       typedDoc.change(draft => {
@@ -67,19 +53,12 @@ describe("JSON Patch Integration", () => {
     it("should handle replace operations on map properties", () => {
       const schema = Shape.doc({
         settings: Shape.map({
-          language: Shape.plain.string(),
-          volume: Shape.plain.number(),
+          language: Shape.plain.string().placeholder("en"),
+          volume: Shape.plain.number().placeholder(50),
         }),
       })
 
-      const emptyState = {
-        settings: {
-          language: "en",
-          volume: 50,
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Set initial values
       typedDoc.change(draft => {
@@ -105,11 +84,7 @@ describe("JSON Patch Integration", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: "/items/0", value: "first" },
@@ -127,11 +102,7 @@ describe("JSON Patch Integration", () => {
         tasks: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        tasks: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add initial items
       typedDoc.change(draft => {
@@ -154,11 +125,7 @@ describe("JSON Patch Integration", () => {
         numbers: Shape.list(Shape.plain.number()),
       })
 
-      const emptyState = {
-        numbers: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add initial items
       typedDoc.change(draft => {
@@ -184,12 +151,7 @@ describe("JSON Patch Integration", () => {
         content: Shape.text(),
       })
 
-      const emptyState = {
-        title: "",
-        content: "",
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Note: For text containers, we can't directly patch the text content
       // since it's a CRDT container. This test verifies the path navigation works
@@ -207,12 +169,7 @@ describe("JSON Patch Integration", () => {
         likes: Shape.counter(),
       })
 
-      const emptyState = {
-        views: 0,
-        likes: 0,
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Note: Similar to text, counters are CRDT containers
       // The path navigation should work, but actual counter operations
@@ -231,26 +188,14 @@ describe("JSON Patch Integration", () => {
           profile: Shape.map({
             name: Shape.plain.string(),
             settings: Shape.map({
-              theme: Shape.plain.string(),
-              notifications: Shape.plain.boolean(),
+              theme: Shape.plain.string().placeholder("light"),
+              notifications: Shape.plain.boolean().placeholder(true),
             }),
           }),
         }),
       })
 
-      const emptyState = {
-        user: {
-          profile: {
-            name: "",
-            settings: {
-              theme: "light",
-              notifications: true,
-            },
-          },
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: "/user/profile/name", value: "Alice" },
@@ -280,11 +225,7 @@ describe("JSON Patch Integration", () => {
         ),
       })
 
-      const emptyState = {
-        todos: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         {
@@ -326,11 +267,7 @@ describe("JSON Patch Integration", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add initial items
       typedDoc.change(draft => {
@@ -353,11 +290,7 @@ describe("JSON Patch Integration", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Test move from 0 to 3 (move first item to end of 4-item list)
       typedDoc.change(draft => {
@@ -398,12 +331,7 @@ describe("JSON Patch Integration", () => {
         target: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        source: [],
-        target: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Add initial items
       typedDoc.change(draft => {
@@ -427,17 +355,11 @@ describe("JSON Patch Integration", () => {
     it("should handle test operations that pass", () => {
       const schema = Shape.doc({
         config: Shape.map({
-          version: Shape.plain.string(),
+          version: Shape.plain.string().placeholder("1.0.0"),
         }),
       })
 
-      const emptyState = {
-        config: {
-          version: "1.0.0",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       typedDoc.change(draft => {
         draft.config.set("version", "2.0.0")
@@ -456,17 +378,11 @@ describe("JSON Patch Integration", () => {
     it("should throw on test operations that fail", () => {
       const schema = Shape.doc({
         config: Shape.map({
-          version: Shape.plain.string(),
+          version: Shape.plain.string().placeholder("1.0.0"),
         }),
       })
 
-      const emptyState = {
-        config: {
-          version: "1.0.0",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "test", path: "/config/version", value: "2.0.0" }, // This should fail
@@ -493,20 +409,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        users: {
-          alice: {
-            name: "",
-            email: "",
-          },
-          bob: {
-            name: "",
-            email: "",
-          },
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Apply patch with path prefix to scope operations to alice
       const patch: JsonPatch = [
@@ -530,13 +433,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        data: {
-          items: [],
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: "/data/items/0", value: "first" },
@@ -555,13 +452,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        data: {
-          items: [],
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: ["data", "items", 0], value: "first" },
@@ -582,13 +473,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        data: {
-          value: "",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "add", path: "/nonexistent/path", value: "test" },
@@ -604,11 +489,7 @@ describe("JSON Patch Integration", () => {
         items: Shape.list(Shape.plain.string()),
       })
 
-      const emptyState = {
-        items: [],
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       const patch: JsonPatch = [
         { op: "remove", path: "/items/5" }, // Index out of bounds
@@ -630,15 +511,7 @@ describe("JSON Patch Integration", () => {
         }),
       })
 
-      const emptyState = {
-        counter: 0,
-        text: "",
-        data: {
-          items: [],
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // Use regular change operations
       typedDoc.change(draft => {
@@ -662,19 +535,12 @@ describe("JSON Patch Integration", () => {
     it("should maintain state across multiple patch applications", () => {
       const schema = Shape.doc({
         settings: Shape.map({
-          theme: Shape.plain.string(),
-          language: Shape.plain.string(),
+          theme: Shape.plain.string().placeholder("light"),
+          language: Shape.plain.string().placeholder("en"),
         }),
       })
 
-      const emptyState = {
-        settings: {
-          theme: "light",
-          language: "en",
-        },
-      }
-
-      const typedDoc = createTypedDoc(schema, emptyState)
+      const typedDoc = createTypedDoc(schema)
 
       // First patch
       const patch1: JsonPatch = [

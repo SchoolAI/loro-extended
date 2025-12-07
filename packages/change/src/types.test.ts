@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest"
 import { Shape } from "./shape.js"
-import type { Infer, InferPlainType } from "./types.js"
+import type { Infer } from "./types.js"
 
 describe("Infer type helper", () => {
   it("infers DocShape plain type", () => {
@@ -154,16 +154,5 @@ describe("Infer type helper", () => {
     }
 
     expectTypeOf<Result>().toEqualTypeOf<Expected>()
-  })
-
-  it("InferPlainType works the same as Infer", () => {
-    const schema = Shape.doc({
-      title: Shape.text(),
-    })
-
-    type InferResult = Infer<typeof schema>
-    type InferPlainResult = InferPlainType<typeof schema>
-
-    expectTypeOf<InferResult>().toEqualTypeOf<InferPlainResult>()
   })
 })

@@ -1,9 +1,9 @@
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
-import type { InferPlainType } from "../types.js"
+import type { Infer } from "../types.js"
 
 export type DraftNodeParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
-  emptyState?: InferPlainType<Shape>
+  placeholder?: Infer<Shape>
   getContainer: () => ShapeToContainer<Shape>
   readonly?: boolean
 }
@@ -20,8 +20,8 @@ export abstract class DraftNode<Shape extends DocShape | ContainerShape> {
     return this._params.shape
   }
 
-  protected get emptyState(): InferPlainType<Shape> | undefined {
-    return this._params.emptyState
+  protected get placeholder(): Infer<Shape> | undefined {
+    return this._params.placeholder
   }
 
   protected get readonly(): boolean {
