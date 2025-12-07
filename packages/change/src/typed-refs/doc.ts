@@ -88,8 +88,22 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
       const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateTypedRef(key, shape),
+        enumerable: true,
       })
     }
+  }
+
+  toJSON(): Infer<Shape> {
+    const result: any = {}
+    for (const key in this.shape.shapes) {
+      const value = (this as any)[key]
+      if (value && typeof value === "object" && "toJSON" in value) {
+        result[key] = value.toJSON()
+      } else {
+        result[key] = value
+      }
+    }
+    return result
   }
 
   absorbPlainValues(): void {

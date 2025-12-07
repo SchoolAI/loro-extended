@@ -303,7 +303,30 @@ export abstract class ListRefBase<
   }
 
   toArray(): Item[] {
-    return this.container.toArray() as Item[]
+    const result: Item[] = []
+    for (let i = 0; i < this.length; i++) {
+      result.push(this.getPredicateItem(i))
+    }
+    return result
+  }
+
+  toJSON(): Item[] {
+    return this.toArray()
+  }
+
+  [Symbol.iterator](): IterableIterator<MutableItem> {
+    let index = 0
+    return {
+      next: (): IteratorResult<MutableItem> => {
+        if (index < this.length) {
+          return { value: this.getMutableItem(index++), done: false }
+        }
+        return { value: undefined, done: true }
+      },
+      [Symbol.iterator]() {
+        return this
+      },
+    }
   }
 
   get length(): number {

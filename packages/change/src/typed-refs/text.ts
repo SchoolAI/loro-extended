@@ -22,6 +22,10 @@ export class TextRef extends TypedRef<TextContainerShape> {
     return this.container.toString()
   }
 
+  toJSON(): string {
+    return this.toString()
+  }
+
   update(text: string): void {
     if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.update(text)

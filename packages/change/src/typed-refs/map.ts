@@ -152,8 +152,22 @@ export class MapRef<
             )
           }
         },
+        enumerable: true,
       })
     }
+  }
+
+  toJSON(): any {
+    const result: any = {}
+    for (const key in this.shape.shapes) {
+      const value = (this as any)[key]
+      if (value && typeof value === "object" && "toJSON" in value) {
+        result[key] = value.toJSON()
+      } else {
+        result[key] = value
+      }
+    }
+    return result
   }
 
   // TOOD(duane): return correct type here

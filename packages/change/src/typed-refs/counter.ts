@@ -20,4 +20,8 @@ export class CounterRef extends TypedRef<CounterContainerShape> {
   get value(): number {
     return this.container.value
   }
+
+  toJSON(): number {
+    return this.value
+  }
 }

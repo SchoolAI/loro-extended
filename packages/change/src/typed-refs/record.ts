@@ -181,4 +181,17 @@ export class RecordRef<
   get size(): number {
     return this.container.size
   }
+
+  toJSON(): Record<string, any> {
+    const result: Record<string, any> = {}
+    for (const key of this.keys()) {
+      const value = this.get(key)
+      if (value && typeof value === "object" && "toJSON" in value) {
+        result[key] = (value as any).toJSON()
+      } else {
+        result[key] = value
+      }
+    }
+    return result
+  }
 }
