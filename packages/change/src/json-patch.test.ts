@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc } from "./change.js"
+import { createTypedDoc } from "./typed-doc.js"
 import type { JsonPatch } from "./json-patch.js"
 import { Shape } from "./shape.js"
 

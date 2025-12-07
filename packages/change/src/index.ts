@@ -1,5 +1,5 @@
 // Main API exports
-export { createTypedDoc, TypedDoc } from "./change.js"
+export { createTypedDoc, TypedDoc } from "./typed-doc.js"
 export { mergeValue, overlayEmptyState } from "./overlay.js"
 export type {
   ArrayValueShape,

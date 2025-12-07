@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { TypedDoc } from "./change.js"
+import { TypedDoc } from "./typed-doc.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
 import { validateValue } from "./validation.js"

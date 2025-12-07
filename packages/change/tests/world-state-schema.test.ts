@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc } from "../src/change.js"
+import { createTypedDoc } from "../src/typed-doc.js"
 import { Shape } from "../src/shape.js"
 
 // --- Item ---
