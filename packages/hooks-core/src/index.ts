@@ -10,8 +10,9 @@ import {
   derivePlaceholder,
   deriveShapePlaceholder,
   TypedDoc,
+  TypedPresence,
 } from "@loro-extended/change"
-import type { DocHandle, DocId, Repo } from "@loro-extended/repo"
+import type { DocId, Repo, UntypedDocHandle } from "@loro-extended/repo"
 import type { LoroDoc, LoroMap, Value } from "loro-crdt"
 
 // Define the shape of the React/Hono library object we need
@@ -77,11 +78,11 @@ export function createHooks(framework: FrameworkHooks) {
 
   function useDocHandleState(documentId: DocId) {
     const repo = useRepo()
-    const [handle, setHandle] = useState<DocHandle<DocWrapper> | null>(null)
+    const [handle, setHandle] = useState<UntypedDocHandle | null>(null)
 
     // Handle lifecycle management
     useEffect(() => {
-      const newHandle = repo.get<DocWrapper>(documentId)
+      const newHandle = repo.getUntyped(documentId)
       setHandle(newHandle)
       return undefined
     }, [repo, documentId])
@@ -131,7 +132,7 @@ export function createHooks(framework: FrameworkHooks) {
   // --- useDocChanger ---
 
   function useDocChanger<TInput = LoroDoc>(
-    handle: DocHandle<DocWrapper> | null,
+    handle: UntypedDocHandle | null,
     transformer?: DocTransformer<TInput>,
   ) {
     return useCallback(
@@ -152,7 +153,7 @@ export function createHooks(framework: FrameworkHooks) {
     )
   }
 
-  function useUntypedDocChanger(handle: DocHandle<DocWrapper> | null) {
+  function useUntypedDocChanger(handle: UntypedDocHandle | null) {
     return useDocChanger<LoroDoc>(handle)
   }
 
@@ -188,7 +189,7 @@ export function createHooks(framework: FrameworkHooks) {
   // --- useTypedDocChanger ---
 
   function useTypedDocChanger<T extends DocShape>(
-    handle: DocHandle<DocWrapper> | null,
+    handle: UntypedDocHandle | null,
     schema: T,
   ) {
     const transformer = useCallback(
@@ -285,12 +286,12 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       const setSelf = (values: Partial<T>) => {
-        handle.untypedPresence.set(values)
+        handle.presence.set(values)
       }
 
       const computeState = () => {
-        const all = handle.untypedPresence.all as Record<string, T>
-        const self = handle.untypedPresence.self as T
+        const all = handle.presence.all as Record<string, T>
+        const self = handle.presence.self as T
 
         return { self, all, setSelf }
       }
@@ -298,7 +299,7 @@ export function createHooks(framework: FrameworkHooks) {
       let cachedState = computeState()
 
       const subscribe = (callback: () => void) => {
-        return handle.untypedPresence.subscribe(() => {
+        return handle.presence.subscribe(() => {
           cachedState = computeState()
           callback()
         })
@@ -356,7 +357,7 @@ export function createHooks(framework: FrameworkHooks) {
         }
       }
 
-      const typedPresence = handle.presence(shape)
+      const typedPresence = new TypedPresence(shape, handle.presence)
       const setSelf = (values: Partial<Infer<S>>) => {
         typedPresence.set(values)
       }

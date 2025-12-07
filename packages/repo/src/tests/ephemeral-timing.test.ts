@@ -78,10 +78,10 @@ describe("Ephemeral Store - Timing Issues", () => {
 
       // Simulate what React does: get handle and immediately set presence
       const handleA = clientA.get(docId)
-      handleA.untypedPresence.set({ type: "user", name: "Alice" })
+      handleA.presence.set({ type: "user", name: "Alice" })
 
       const handleB = clientB.get(docId)
-      handleB.untypedPresence.set({ type: "user", name: "Bob" })
+      handleB.presence.set({ type: "user", name: "Bob" })
 
       server.get(docId)
 
@@ -92,11 +92,11 @@ describe("Ephemeral Store - Timing Issues", () => {
       const peerIdB = clientB.identity.peerId
 
       // Both clients should see each other
-      expect(handleA.untypedPresence.all[peerIdB]).toEqual({
+      expect(handleA.presence.all[peerIdB]).toEqual({
         type: "user",
         name: "Bob",
       })
-      expect(handleB.untypedPresence.all[peerIdA]).toEqual({
+      expect(handleB.presence.all[peerIdA]).toEqual({
         type: "user",
         name: "Alice",
       })
@@ -107,14 +107,14 @@ describe("Ephemeral Store - Timing Issues", () => {
 
       // ClientA gets handle and sets presence immediately (before sync)
       const handleA = clientA.get(docId)
-      handleA.untypedPresence.set({ status: "connecting" })
+      handleA.presence.set({ status: "connecting" })
 
       // Small delay
       await wait(10)
 
       // ClientB connects
       const handleB = clientB.get(docId)
-      handleB.untypedPresence.set({ status: "connecting" })
+      handleB.presence.set({ status: "connecting" })
 
       server.get(docId)
 
@@ -125,10 +125,10 @@ describe("Ephemeral Store - Timing Issues", () => {
       const peerIdB = clientB.identity.peerId
 
       // Both should see each other
-      expect(handleA.untypedPresence.all[peerIdB]).toEqual({
+      expect(handleA.presence.all[peerIdB]).toEqual({
         status: "connecting",
       })
-      expect(handleB.untypedPresence.all[peerIdA]).toEqual({
+      expect(handleB.presence.all[peerIdA]).toEqual({
         status: "connecting",
       })
     })
@@ -144,11 +144,11 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(200)
 
       // Rapid updates from clientA - each should trigger a broadcast
-      handleA.untypedPresence.set({ count: 1 })
+      handleA.presence.set({ count: 1 })
       await wait(50) // Small delay between updates
-      handleA.untypedPresence.set({ count: 2 })
+      handleA.presence.set({ count: 2 })
       await wait(50)
-      handleA.untypedPresence.set({ count: 3 })
+      handleA.presence.set({ count: 3 })
 
       // Wait for propagation
       await wait(200)
@@ -156,7 +156,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       const peerIdA = clientA.identity.peerId
 
       // ClientB should see the final value
-      expect(handleB.untypedPresence.all[peerIdA]).toEqual({ count: 3 })
+      expect(handleB.presence.all[peerIdA]).toEqual({ count: 3 })
     })
   })
 
@@ -170,7 +170,7 @@ describe("Ephemeral Store - Timing Issues", () => {
 
       await wait(100)
 
-      handleA.untypedPresence.set({ early: true })
+      handleA.presence.set({ early: true })
 
       await wait(100)
 
@@ -182,7 +182,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       const peerIdA = clientA.identity.peerId
 
       // ClientB should have received ClientA's presence
-      expect(handleB.untypedPresence.all[peerIdA]).toEqual({ early: true })
+      expect(handleB.presence.all[peerIdA]).toEqual({ early: true })
     })
 
     it("should propagate presence from late joiner to early joiner", async () => {
@@ -194,13 +194,13 @@ describe("Ephemeral Store - Timing Issues", () => {
 
       await wait(100)
 
-      handleA.untypedPresence.set({ first: true })
+      handleA.presence.set({ first: true })
 
       await wait(100)
 
       // ClientB connects and sets presence
       const handleB = clientB.get(docId)
-      handleB.untypedPresence.set({ second: true })
+      handleB.presence.set({ second: true })
 
       await wait(200)
 
@@ -208,8 +208,8 @@ describe("Ephemeral Store - Timing Issues", () => {
       const peerIdB = clientB.identity.peerId
 
       // Both should see each other
-      expect(handleA.untypedPresence.all[peerIdB]).toEqual({ second: true })
-      expect(handleB.untypedPresence.all[peerIdA]).toEqual({ first: true })
+      expect(handleA.presence.all[peerIdB]).toEqual({ second: true })
+      expect(handleB.presence.all[peerIdA]).toEqual({ first: true })
     })
   })
 
@@ -251,7 +251,7 @@ describe("Ephemeral Store - Timing Issues", () => {
 
         await wait(100)
 
-        handleA.untypedPresence.set({ type: "user", name: "Alice" })
+        handleA.presence.set({ type: "user", name: "Alice" })
 
         await wait(100)
 
@@ -271,7 +271,7 @@ describe("Ephemeral Store - Timing Issues", () => {
 
         // Set presence IMMEDIATELY - before sync completes
         // This is what React's useEffect does
-        handleB.untypedPresence.set({ type: "user", name: "Bob" })
+        handleB.presence.set({ type: "user", name: "Bob" })
 
         // Wait for sync to complete and presence to propagate
         // Using 500ms which is much less than the 10s heartbeat
@@ -281,7 +281,7 @@ describe("Ephemeral Store - Timing Issues", () => {
         const peerIdB = clientB.identity.peerId
 
         // Client B should see Client A's presence (server sends it during sync)
-        const clientBPresenceOfA = handleB.untypedPresence.all[peerIdA]
+        const clientBPresenceOfA = handleB.presence.all[peerIdA]
         expect(clientBPresenceOfA).toBeDefined()
         expect((clientBPresenceOfA as Record<string, unknown>)?.name).toBe(
           "Alice",
@@ -289,7 +289,7 @@ describe("Ephemeral Store - Timing Issues", () => {
 
         // THIS IS THE KEY ASSERTION:
         // Client A should see Client B's presence even though B set it before sync completed
-        const clientAPresenceOfB = handleA.untypedPresence.all[peerIdB]
+        const clientAPresenceOfB = handleA.presence.all[peerIdB]
         expect(clientAPresenceOfB).toBeDefined()
         expect((clientAPresenceOfB as Record<string, unknown>)?.name).toBe(
           "Bob",

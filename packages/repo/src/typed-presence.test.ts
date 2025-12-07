@@ -1,8 +1,8 @@
-import { Shape } from "@loro-extended/change"
+import { Shape, TypedPresence } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
-import { DocHandle } from "./doc-handle.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import { Synchronizer } from "./synchronizer.js"
+import { UntypedDocHandle } from "./untyped-doc-handle.js"
 
 describe("TypedPresence", () => {
   it("should provide typed access to presence", () => {
@@ -11,7 +11,7 @@ describe("TypedPresence", () => {
       identity: { peerId: "1", name: "test-peer", type: "user" },
       adapters: [storage],
     })
-    const handle = new DocHandle({ docId: "test-doc", synchronizer })
+    const handle = new UntypedDocHandle({ docId: "test-doc", synchronizer })
 
     // Schema with placeholder annotations
     const PresenceSchema = Shape.plain.object({
@@ -28,8 +28,8 @@ describe("TypedPresence", () => {
       cursor: { x: 0, y: 0 },
     }
 
-    // No emptyState needed - placeholder is derived from schema
-    const presence = handle.presence(PresenceSchema)
+    // Create TypedPresence using the handle's presence interface
+    const presence = new TypedPresence(PresenceSchema, handle.presence)
 
     // Check default values are derived from schema placeholders
     expect(presence.self).toEqual(expectedPlaceholder)

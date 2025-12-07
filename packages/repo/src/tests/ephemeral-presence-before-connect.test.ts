@@ -66,7 +66,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     server.get(docId)
 
     await new Promise(r => setTimeout(r, 100))
-    handleA.untypedPresence.set({ name: "Alice", status: "online" })
+    handleA.presence.set({ name: "Alice", status: "online" })
     await new Promise(r => setTimeout(r, 50))
 
     // Now simulate the problematic scenario:
@@ -88,14 +88,14 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     // IMMEDIATELY get handle and set presence
     // This happens before the channel is established (simulating React useEffect)
     const handleB = clientB.get(docId)
-    handleB.untypedPresence.set({ name: "Bob", status: "online" })
+    handleB.presence.set({ name: "Bob", status: "online" })
 
     // Now wait for everything to sync (increased timeout for reliability)
     await new Promise(r => setTimeout(r, 300))
 
     // Verify server has clientB's presence
     const serverHandle = server.get(docId)
-    const serverPresence = serverHandle.untypedPresence.all
+    const serverPresence = serverHandle.presence.all
     const peerIdB = clientB.identity.peerId
 
     // Server should have clientB's presence (this was the bug)
@@ -106,7 +106,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     })
 
     // Verify clientA also receives clientB's presence (via server relay)
-    const clientAPresence = handleA.untypedPresence.all
+    const clientAPresence = handleA.presence.all
     expect(clientAPresence).toHaveProperty(peerIdB)
     expect(clientAPresence[peerIdB]).toMatchObject({
       name: "Bob",
@@ -144,7 +144,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     server.get(docId)
 
     await new Promise(r => setTimeout(r, 100))
-    handleA.untypedPresence.set({ name: "Alice" })
+    handleA.presence.set({ name: "Alice" })
     await new Promise(r => setTimeout(r, 50))
 
     // ClientB joins and immediately sets presence
@@ -160,7 +160,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     repos.push(clientB)
 
     const handleB = clientB.get(docId)
-    handleB.untypedPresence.set({ name: "Bob" })
+    handleB.presence.set({ name: "Bob" })
 
     await new Promise(r => setTimeout(r, 300))
 
@@ -168,13 +168,13 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     const peerIdB = clientB.identity.peerId
 
     // ClientA should see both Alice and Bob
-    const clientAPresence = handleA.untypedPresence.all
+    const clientAPresence = handleA.presence.all
     expect(Object.keys(clientAPresence).length).toBeGreaterThanOrEqual(2)
     expect(clientAPresence).toHaveProperty(peerIdA)
     expect(clientAPresence).toHaveProperty(peerIdB)
 
     // ClientB should see both Alice and Bob
-    const clientBPresence = handleB.untypedPresence.all
+    const clientBPresence = handleB.presence.all
     expect(Object.keys(clientBPresence).length).toBeGreaterThanOrEqual(2)
     expect(clientBPresence).toHaveProperty(peerIdA)
     expect(clientBPresence).toHaveProperty(peerIdB)
@@ -203,14 +203,14 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
 
     const docId = "test-doc-3"
     const handle = client.get(docId)
-    handle.untypedPresence.set({ type: "user", lastSeen: Date.now() })
+    handle.presence.set({ type: "user", lastSeen: Date.now() })
 
     // Now wait for async operations to complete (increased timeout for reliability)
     await new Promise(r => setTimeout(r, 300))
 
     // Server should have client's presence
     const serverHandle = server.get(docId)
-    const serverPresence = serverHandle.untypedPresence.all
+    const serverPresence = serverHandle.presence.all
     const clientPeerId = client.identity.peerId
 
     expect(serverPresence).toHaveProperty(clientPeerId)

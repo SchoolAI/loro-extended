@@ -616,6 +616,64 @@ loroDoc.subscribe((event) => {
 });
 ```
 
+## TypedPresence
+
+The `TypedPresence` class provides type-safe access to ephemeral presence data with placeholder defaults:
+
+```typescript
+import { TypedPresence, Shape } from "@loro-extended/change";
+
+// Define a presence schema with placeholders
+const PresenceSchema = Shape.plain.object({
+  cursor: Shape.plain.object({
+    x: Shape.plain.number(),
+    y: Shape.plain.number(),
+  }),
+  name: Shape.plain.string().placeholder("Anonymous"),
+  status: Shape.plain.string().placeholder("online"),
+});
+
+// Create typed presence from a PresenceInterface
+// (Usually obtained from handle.presence in @loro-extended/repo)
+const typedPresence = new TypedPresence(PresenceSchema, presenceInterface);
+
+// Read your presence (with placeholder defaults merged in)
+console.log(typedPresence.self);
+// { cursor: { x: 0, y: 0 }, name: "Anonymous", status: "online" }
+
+// Set presence values
+typedPresence.set({ cursor: { x: 100, y: 200 }, name: "Alice" });
+
+// Read all peers' presence
+console.log(typedPresence.all);
+// { "peer-1": { cursor: { x: 100, y: 200 }, name: "Alice", status: "online" } }
+
+// Subscribe to presence changes
+typedPresence.subscribe(({ self, all }) => {
+  console.log("My presence:", self);
+  console.log("All peers:", all);
+});
+```
+
+### PresenceInterface
+
+`TypedPresence` works with any object implementing `PresenceInterface`:
+
+```typescript
+import type { PresenceInterface, ObjectValue } from "@loro-extended/change";
+
+interface PresenceInterface {
+  set: (values: ObjectValue) => void;
+  get: (key: string) => Value;
+  readonly self: ObjectValue;
+  readonly all: Record<string, ObjectValue>;
+  setRaw: (key: string, value: Value) => void;
+  subscribe: (cb: (values: ObjectValue) => void) => () => void;
+}
+```
+
+This is typically provided by `UntypedDocHandle.presence` in `@loro-extended/repo`.
+
 ## Performance Considerations
 
 - All changes within a `change()` block are batched into a single transaction

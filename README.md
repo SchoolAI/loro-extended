@@ -212,7 +212,7 @@ Here is a complete collaborative "Counter" app in React.
 ```tsx
 import { useDocument, Shape } from "@loro-extended/react";
 
-// 1. Define Schema
+// 1. Define Schema (with placeholder defaults)
 const counterSchema = Shape.doc({
   count: Shape.counter(),
   users: Shape.list(Shape.plain.string()),
@@ -220,10 +220,8 @@ const counterSchema = Shape.doc({
 
 function App() {
   // 2. Use the hook (Auto-syncs, Auto-persists)
-  const [doc, changeDoc] = useDocument("global-counter", counterSchema, {
-    count: 0,
-    users: [],
-  });
+  // Returns [value, changeDoc, handle] - value has placeholder defaults applied
+  const [doc, changeDoc] = useDocument("global-counter", counterSchema);
 
   return (
     <div>

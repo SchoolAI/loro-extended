@@ -5,6 +5,7 @@ export {
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
+export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
 export type {
   ArrayValueShape,
   ContainerOrValueShape,
@@ -33,6 +34,7 @@ export type {
 // Schema and type exports
 export { Shape } from "./shape.js"
 export { createTypedDoc, TypedDoc } from "./typed-doc.js"
+export { TypedPresence } from "./typed-presence.js"
 export type {
   DeepReadonly,
   Draft,

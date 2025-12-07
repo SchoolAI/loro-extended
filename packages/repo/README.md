@@ -33,6 +33,24 @@ const repo = new Repo({
 
 // Get or create a document (immediately available)
 const docHandle = repo.get("my-doc");
+
+// Or get a typed document with schema
+import { Shape } from "@loro-extended/change";
+
+const TodoSchema = Shape.doc({
+  title: Shape.text(),
+  todos: Shape.list(Shape.plain.object({
+    id: Shape.plain.string(),
+    text: Shape.plain.string(),
+    done: Shape.plain.boolean(),
+  })),
+});
+
+const typedHandle = repo.get("my-doc", TodoSchema);
+typedHandle.doc.change(draft => {
+  draft.title.insert(0, "My Todos");
+  draft.todos.push({ id: "1", text: "Learn Loro", done: false });
+});
 ```
 
 ## Core Concepts
@@ -41,17 +59,26 @@ const docHandle = repo.get("my-doc");
 
 The `Repo` class is the central orchestrator for the Loro state synchronization system. It manages the lifecycle of documents and coordinates the synchronization subsystem.
 
-- **Document Management**: Gets or creates documents via [`DocHandle`](./src/doc-handle.ts)
+- **Document Management**: Gets or creates documents via `TypedDocHandle` or `UntypedDocHandle`
 - **Adapter Coordination**: Manages storage and network adapters through channels
 - **Identity Management**: Provides peer identity for synchronization
 
-### DocHandle
+### TypedDocHandle
 
-The [`DocHandle`](./src/doc-handle.ts) is an always-available wrapper around a single Loro document. It provides immediate access to the document while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
+The `TypedDocHandle` wraps an `UntypedDocHandle` and provides strongly-typed access to documents and presence. Use `repo.get(docId, docShape, presenceShape?)` to get a typed handle.
+
+- **Type-Safe Mutations**: Use `handle.doc.change(draft => { ... })` with full TypeScript support
+- **Typed Presence**: Access `handle.presence` for type-safe ephemeral state
+- **Schema-Driven**: Define your document structure once, get type safety everywhere
+
+### UntypedDocHandle
+
+The `UntypedDocHandle` (formerly `DocHandle`) is an always-available wrapper around a single Loro document. It provides immediate access to the raw document while offering flexible readiness APIs for applications that need to coordinate loading from storage or network sources.
 
 - **Always Available**: Documents are immediately accessible without complex loading states
 - **Flexible Readiness**: Applications can define custom readiness criteria using predicates
 - **Simple Mutations**: Use the `change()` method to modify documents
+- **Backward Compatible**: Use `repo.get(docId)` without a schema to get an untyped handle
 
 ### Adapters
 
@@ -83,8 +110,27 @@ const repo = new Repo(params);
 #### Document Management
 
 ```typescript
-// Get or create a document (immediately available)
-const handle = repo.get<T>(docId);
+import { Shape } from "@loro-extended/change";
+
+// Define schemas
+const DocSchema = Shape.doc({
+  title: Shape.text(),
+  count: Shape.counter(),
+});
+
+const PresenceSchema = Shape.plain.object({
+  cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() }),
+  name: Shape.plain.string().placeholder("Anonymous"),
+});
+
+// Get a typed document handle (recommended)
+const typedHandle = repo.get("my-doc", DocSchema, PresenceSchema);
+
+// Get a typed handle without presence schema
+const docOnlyHandle = repo.get("my-doc", DocSchema);
+
+// Get an untyped handle (backward compatible)
+const untypedHandle = repo.get("my-doc");
 
 // Delete a document
 await repo.delete(docId);
@@ -93,7 +139,51 @@ await repo.delete(docId);
 repo.reset();
 ```
 
-### DocHandle Class
+### TypedDocHandle Class
+
+#### Type-Safe Document Access
+
+```typescript
+// Access the typed document
+const doc = typedHandle.doc; // TypedDoc instance
+
+// Read current value (with empty state overlay)
+console.log(typedHandle.value); // { title: "", count: 0 }
+
+// Make type-safe changes
+typedHandle.change(draft => {
+  draft.title.insert(0, "Hello World");
+  draft.count.increment(1);
+});
+
+// Or use the doc directly
+typedHandle.doc.change(draft => {
+  draft.title.insert(0, "Hello");
+});
+```
+
+#### Typed Presence
+
+```typescript
+// Access typed presence
+const presence = typedHandle.presence;
+
+// Set your presence
+presence.set({ cursor: { x: 100, y: 200 }, name: "Alice" });
+
+// Read your presence (with placeholder defaults)
+console.log(presence.self); // { cursor: { x: 100, y: 200 }, name: "Alice" }
+
+// Read all peers' presence
+console.log(presence.all); // { "peer-1": { ... }, "peer-2": { ... } }
+
+// Subscribe to presence changes
+presence.subscribe(({ self, all }) => {
+  console.log("Presence updated:", self, all);
+});
+```
+
+### UntypedDocHandle Class
 
 #### Always-Available Document Access
 
@@ -131,23 +221,37 @@ handle.doc.getMap("root").set("title", "Direct Access");
 handle.doc.commit(); // Don't forget to commit!
 ```
 
-#### Typed Presence
+#### Untyped Presence
 
-For type safety and default values, you can use the `presence()` API:
+Access presence directly on the untyped handle:
 
 ```typescript
-import { Shape } from "@loro-extended/change";
+// Set presence values
+handle.presence.set({ cursor: { x: 10, y: 20 }, name: "Bob" });
+
+// Read your presence
+console.log(handle.presence.self); // { cursor: { x: 10, y: 20 }, name: "Bob" }
+
+// Read all peers' presence
+console.log(handle.presence.all); // { "peer-1": { ... }, "peer-2": { ... } }
+
+// Subscribe to presence changes
+handle.presence.subscribe((allPresence) => {
+  console.log("Presence updated:", allPresence);
+});
+```
+
+For type safety with untyped handles, create a `TypedPresence` manually:
+
+```typescript
+import { TypedPresence, Shape } from "@loro-extended/change";
 
 const PresenceSchema = Shape.plain.object({
-  name: Shape.plain.string(),
+  name: Shape.plain.string().placeholder("Anonymous"),
 });
 
-const EmptyPresence = {
-  name: "Anonymous",
-};
-
-const presence = handle.presence(PresenceSchema, EmptyPresence);
-console.log(presence.self.name); // "Anonymous" (default)
+const typedPresence = new TypedPresence(PresenceSchema, handle.presence);
+console.log(typedPresence.self.name); // "Anonymous" (default from placeholder)
 ```
 
 ## Adapters
@@ -317,30 +421,37 @@ const repo = new Repo({
   identity: { name: "todo-app" },
 });
 
-// Get the todo document (immediately available)
-const todoHandle = repo.get("main-todos");
+// Define the schema
+const TodoSchema = Shape.doc({
+  todos: Shape.list(Shape.plain.object({
+    id: Shape.plain.string(),
+    text: Shape.plain.string(),
+    completed: Shape.plain.boolean(),
+  })),
+});
+
+// Get a typed document handle
+const todoHandle = repo.get("main-todos", TodoSchema);
 
 // Wait for storage to load before displaying
 await todoHandle.waitForStorage();
 
-// Document is always available
-const doc = todoHandle.doc;
-
-// Add a new todo using change()
-todoHandle.change((doc) => {
-  const todosMap = doc.getMap("root");
-  const todosList =
-    todosMap.get("todos") || todosMap.setContainer("todos", "List");
-  todosList.push({
+// Add a new todo with type-safe mutations
+todoHandle.change((draft) => {
+  draft.todos.push({
     id: crypto.randomUUID(),
     text: "Learn about Loro",
     completed: false,
   });
 });
 
+// Read the current value
+console.log(todoHandle.toJSON());
+// { todos: [{ id: "...", text: "Learn about Loro", completed: false }] }
+
 // Subscribe to changes
-doc.subscribe((event) => {
-  console.log("Document changed:", doc.toJSON());
+todoHandle.doc.loroDoc.subscribe((event) => {
+  console.log("Document changed:", todoHandle.value);
   // Update UI here
 });
 ```
@@ -373,7 +484,7 @@ The Repo package follows a layered architecture:
 
 ### Data Flow
 
-1. **Document Access**: `Repo.get()` creates a [`DocHandle`](./src/doc-handle.ts) with an immediately available document
+1. **Document Access**: `Repo.get()` creates a `TypedDocHandle` or `UntypedDocHandle` with an immediately available document
 2. **Local Changes**: `DocHandle.change()` modifies the document and notifies the [`Synchronizer`](./src/synchronizer.ts)
 3. **Channel Communication**: [`Synchronizer`](./src/synchronizer.ts) sends messages through channels managed by [`AdapterManager`](./src/adapter/adapter-manager.ts)
 4. **Adapter Routing**: [`AdapterManager`](./src/adapter/adapter-manager.ts) routes messages to appropriate adapters

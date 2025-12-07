@@ -132,10 +132,10 @@ describe("WebSocket Adapter E2E", () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Client 1 sets presence
-    const presence1 = handle1.untypedPresence
+    const presence1 = handle1.presence
 
     // Client 2 listens for presence
-    const presence2 = handle2.untypedPresence
+    const presence2 = handle2.presence
 
     const presencePromise = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(
