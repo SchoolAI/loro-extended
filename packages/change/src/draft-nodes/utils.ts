@@ -65,3 +65,32 @@ export function createContainerDraftNode(
       )
   }
 }
+
+export function assignPlainValueToDraftNode(
+  node: DraftNode<any>,
+  value: any,
+): boolean {
+  const shapeType = (node as any).shape._type
+
+  if (shapeType === "map" || shapeType === "record") {
+    for (const k in value) {
+      ;(node as any)[k] = value[k]
+    }
+    return true
+  }
+
+  if (shapeType === "list" || shapeType === "movableList") {
+    if (Array.isArray(value)) {
+      const listNode = node as any
+      if (listNode.length > 0) {
+        listNode.delete(0, listNode.length)
+      }
+      for (const item of value) {
+        listNode.push(item)
+      }
+      return true
+    }
+  }
+
+  return false
+}

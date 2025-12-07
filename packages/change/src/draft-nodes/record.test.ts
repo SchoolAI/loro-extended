@@ -244,5 +244,27 @@ describe("Record Types", () => {
         },
       })
     })
+
+    it("should allow setting a plain array for a record with list values", () => {
+      const schema = Shape.doc({
+        histories: Shape.record(Shape.list(Shape.plain.string())),
+      })
+
+      const doc = new TypedDoc(schema, { histories: {} })
+
+      doc.change(draft => {
+        draft.histories.user1 = ["a", "b"]
+      })
+
+      expect(doc.value.histories.user1).toEqual(["a", "b"])
+
+      doc.change(draft => {
+        // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
+        draft.histories["user1"] = ["c"]
+      })
+
+      // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
+      expect(doc.value.histories["user1"]).toEqual(["c"])
+    })
   })
 })

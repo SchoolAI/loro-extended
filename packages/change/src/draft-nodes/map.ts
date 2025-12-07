@@ -16,7 +16,10 @@ import type {
 } from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
-import { createContainerDraftNode } from "./utils.js"
+import {
+  assignPlainValueToDraftNode,
+  createContainerDraftNode,
+} from "./utils.js"
 
 const containerConstructor = {
   counter: LoroCounter,
@@ -118,12 +121,8 @@ export class MapDraftNode<
           } else {
             if (value && typeof value === "object") {
               const node = this.getOrCreateNode(key, shape)
-              const shapeType = (node as any).shape._type
 
-              if (shapeType === "map" || shapeType === "record") {
-                for (const k in value) {
-                  ;(node as any)[k] = value[k]
-                }
+              if (assignPlainValueToDraftNode(node as DraftNode<any>, value)) {
                 return
               }
             }

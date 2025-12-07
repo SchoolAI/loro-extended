@@ -16,7 +16,10 @@ import type {
 import type { Infer, InferDraftType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
-import { createContainerDraftNode } from "./utils.js"
+import {
+  assignPlainValueToDraftNode,
+  createContainerDraftNode,
+} from "./utils.js"
 
 const containerConstructor = {
   counter: LoroCounter,
@@ -88,20 +91,9 @@ export class RecordDraftNode<
         } else {
           // Only fall back to empty state if the container doesn't have the value
           const emptyState = (this.emptyState as any)?.[key]
-          // For records, empty state might not have the key, which is fine?
-          // But if we are accessing it, maybe we expect it to exist or be created?
-          // If it's a value type, we can't really "create" it without a value.
-          // So if it's undefined in container and empty state, we return undefined?
-          // But the return type expects Value.
-          // Let's check MapDraftNode.
-          // MapDraftNode throws "empty state required" if not found.
-          // But for Record, keys are dynamic.
           if (emptyState === undefined) {
             // If it's a value type and not in container or empty state,
-            // we should probably return undefined if the type allows it,
-            // or maybe the default value for that type?
-            // But we don't have a default value generator for shapes.
-            // Actually Shape.plain.* factories have _plain and _draft which are defaults.
+            // fallback to the default value from the shape
             node = (shape as any)._plain
           } else {
             node = emptyState as Value
@@ -123,27 +115,14 @@ export class RecordDraftNode<
   set(key: string, value: any): void {
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
-      // Update cache if needed?
-      // MapDraftNode updates container directly for values.
-      // But we also cache values in nodeCache for consistency?
-      // MapDraftNode doesn't cache values in propertyCache if they are set via setter?
-      // Actually MapDraftNode setter:
-      // set: isValueShape(shape) ? value => this.container.set(key, value) : undefined
-      // It doesn't update propertyCache.
-      // But getOrCreateNode checks propertyCache first.
-      // So if we set it, we should probably update propertyCache or clear it for that key.
       this.nodeCache.set(key, value)
     } else {
       // For containers, we can't set them directly usually.
       // But if the user passes a plain object that matches the shape, maybe we should convert it?
       if (value && typeof value === "object") {
         const node = this.getOrCreateNode(key)
-        const shapeType = (node as any).shape._type
 
-        if (shapeType === "map" || shapeType === "record") {
-          for (const k in value) {
-            ;(node as any)[k] = value[k]
-          }
+        if (assignPlainValueToDraftNode(node, value)) {
           return
         }
       }
