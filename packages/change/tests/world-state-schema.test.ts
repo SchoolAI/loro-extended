@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc } from "../src/typed-doc.js"
 import { Shape } from "../src/shape.js"
+import { createTypedDoc } from "../src/typed-doc.js"
 
 // --- Item ---
 const ItemStateSchema = Shape.list(
@@ -107,26 +107,26 @@ describe("WorldStateSchema", () => {
     it("should create a typed document with initial empty state", () => {
       const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
 
-      expect(typedDoc.value).toEqual(initialWorldState)
+      expect(typedDoc.toJSON()).toEqual(initialWorldState)
     })
 
     it("should have correct initial meta values", () => {
       const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
 
-      expect(typedDoc.value.meta.playerLocationName).toBeNull()
-      expect(typedDoc.value.meta.worldMood).toBe("peace")
-      expect(typedDoc.value.meta.currentAct).toBe("hook")
-      expect(typedDoc.value.meta.flourish).toBe("normal")
+      expect(typedDoc.toJSON().meta.playerLocationName).toBeNull()
+      expect(typedDoc.toJSON().meta.worldMood).toBe("peace")
+      expect(typedDoc.toJSON().meta.currentAct).toBe("hook")
+      expect(typedDoc.toJSON().meta.flourish).toBe("normal")
     })
 
     it("should have empty collections initially", () => {
       const typedDoc = createTypedDoc(WorldStateSchema, initialWorldState)
 
-      expect(typedDoc.value.inventory).toEqual([])
-      expect(typedDoc.value.map.locations).toEqual([])
-      expect(typedDoc.value.map.connections).toEqual([])
-      expect(typedDoc.value.characters).toEqual([])
-      expect(typedDoc.value.timeline).toEqual([])
+      expect(typedDoc.toJSON().inventory).toHaveLength(0)
+      expect(typedDoc.toJSON().map.locations).toHaveLength(0)
+      expect(typedDoc.toJSON().map.connections).toHaveLength(0)
+      expect(typedDoc.toJSON().characters).toHaveLength(0)
+      expect(typedDoc.toJSON().timeline).toHaveLength(0)
     })
   })
 

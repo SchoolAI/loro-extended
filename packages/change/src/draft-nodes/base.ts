@@ -5,6 +5,7 @@ export type DraftNodeParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
   emptyState?: InferPlainType<Shape>
   getContainer: () => ShapeToContainer<Shape>
+  readonly?: boolean
 }
 
 // Base class for all draft nodes
@@ -21,6 +22,10 @@ export abstract class DraftNode<Shape extends DocShape | ContainerShape> {
 
   protected get emptyState(): InferPlainType<Shape> | undefined {
     return this._params.emptyState
+  }
+
+  protected get readonly(): boolean {
+    return !!this._params.readonly
   }
 
   protected get container(): ShapeToContainer<Shape> {

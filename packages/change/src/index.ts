@@ -1,5 +1,5 @@
 // Main API exports
-export { createTypedDoc, TypedDoc } from "./typed-doc.js"
+
 export { mergeValue, overlayEmptyState } from "./overlay.js"
 export type {
   ArrayValueShape,
@@ -27,6 +27,7 @@ export type {
 } from "./shape.js"
 // Schema and type exports
 export { Shape } from "./shape.js"
+export { createTypedDoc, TypedDoc } from "./typed-doc.js"
 export type {
   Draft,
   // Type inference - Infer<T> is the recommended unified helper

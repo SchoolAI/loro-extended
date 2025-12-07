@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc } from "./typed-doc.js"
 import { Shape } from "./shape.js"
+import { createTypedDoc } from "./typed-doc.js"
 
 describe("CRDT Operations", () => {
   describe("Text Operations", () => {
@@ -806,7 +806,7 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema, emptyState)
 
-      expect(typedDoc.value).toEqual({
+      expect(typedDoc.toJSON()).toEqual({
         title: "Default Title",
         count: 0,
         items: [],
@@ -863,7 +863,7 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema, emptyState)
 
-      expect(typedDoc.value).toEqual(emptyState)
+      expect(typedDoc.toJSON()).toEqual(emptyState)
 
       const result = typedDoc.change(draft => {
         draft.article.title.insert(0, "New Title")
@@ -1003,7 +1003,7 @@ describe("TypedLoroDoc", () => {
         })
       }).not.toThrow()
 
-      expect(typedDoc.value.interjection.currentPrediction).toBe("new value")
+      expect(typedDoc.toJSON().interjection.currentPrediction).toBe("new value")
     })
   })
 

@@ -55,3 +55,7 @@ export type InferEmptyStateType<T> = T extends Shape<any, any, infer E>
 // Draft-specific type inference that properly handles the draft context
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
   InferDraftType<T>
+
+export type DeepReadonly<T> = {
+  readonly [P in keyof T]: DeepReadonly<T[P]>
+}

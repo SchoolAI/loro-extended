@@ -10,7 +10,12 @@ import {
 } from "./json-patch.js"
 import { overlayEmptyState } from "./overlay.js"
 import type { DocShape } from "./shape.js"
-import type { Draft, InferEmptyStateType, InferPlainType } from "./types.js"
+import type {
+  DeepReadonly,
+  Draft,
+  InferEmptyStateType,
+  InferPlainType,
+} from "./types.js"
 import { validateEmptyState } from "./validation.js"
 
 // Core TypedDoc abstraction around LoroDoc
@@ -32,7 +37,25 @@ export class TypedDoc<Shape extends DocShape> {
     validateEmptyState(emptyState, shape)
   }
 
-  get value(): InferPlainType<Shape> {
+  /**
+   * Returns a read-only, live view of the document.
+   * Accessing properties on this object will read directly from the underlying CRDT.
+   * This is efficient (O(1) per access) and always up-to-date.
+   */
+  get value(): DeepReadonly<InferPlainType<Shape>> {
+    return new DraftDoc({
+      shape: this.shape,
+      emptyState: this.emptyState as any,
+      doc: this.doc,
+      readonly: true,
+    }) as unknown as DeepReadonly<InferPlainType<Shape>>
+  }
+
+  /**
+   * Returns the full plain JavaScript object representation of the document.
+   * This is an expensive O(N) operation that serializes the entire document.
+   */
+  toJSON(): InferPlainType<Shape> {
     const crdtValue = this.doc.toJSON()
     return overlayEmptyState(
       this.shape,
@@ -51,7 +74,7 @@ export class TypedDoc<Shape extends DocShape> {
     fn(draft as unknown as Draft<Shape>)
     draft.absorbPlainValues()
     this.doc.commit()
-    return this.value
+    return this.toJSON()
   }
 
   /**

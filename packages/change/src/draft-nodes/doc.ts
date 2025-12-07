@@ -45,18 +45,39 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
       shape,
       emptyState: this.requiredEmptyState[key],
       getContainer: () => getter(key),
+      readonly: this.readonly,
     }
   }
 
   getOrCreateDraftNode(
     key: string,
     shape: ContainerShape,
-  ): DraftNode<ContainerShape> {
+  ): DraftNode<ContainerShape> | number | string {
+    if (
+      this.readonly &&
+      (shape._type === "counter" || shape._type === "text")
+    ) {
+      // Check if the container exists in the doc without creating it
+      const shallow = this.doc.getShallowValue()
+      if (!shallow[key]) {
+        return this.requiredEmptyState[key] as any
+      }
+    }
+
     let node = this.propertyCache.get(key)
 
     if (!node) {
       node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
       this.propertyCache.set(key, node)
+    }
+
+    if (this.readonly) {
+      if (shape._type === "counter") {
+        return (node as any).value
+      }
+      if (shape._type === "text") {
+        return (node as any).toString()
+      }
     }
 
     return node

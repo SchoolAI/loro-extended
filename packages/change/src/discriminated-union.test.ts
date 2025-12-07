@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { TypedDoc } from "./typed-doc.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
+import { TypedDoc } from "./typed-doc.js"
 import { validateValue } from "./validation.js"
 
 describe("discriminatedUnion", () => {
@@ -235,7 +235,7 @@ describe("discriminatedUnion", () => {
           }
         })
 
-        expect(doc.value.state.presence).toEqual({
+        expect(doc.toJSON().state.presence).toEqual({
           type: "server",
           cars: { p1: { x: 10, y: 20 } },
           tick: 100,

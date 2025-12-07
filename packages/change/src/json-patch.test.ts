@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc } from "./typed-doc.js"
 import type { JsonPatch } from "./json-patch.js"
 import { Shape } from "./shape.js"
+import { createTypedDoc } from "./typed-doc.js"
 
 describe("JSON Patch Integration", () => {
   describe("Basic Operations", () => {

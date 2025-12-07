@@ -21,7 +21,7 @@ describe("ListDraftNode", () => {
         draft.users[0] = { name: "Bob" }
       })
 
-      expect(doc.value.users[0]).toEqual({ name: "Bob" })
+      expect(doc.toJSON().users[0]).toEqual({ name: "Bob" })
     })
 
     it("should allow setting a primitive value via index", () => {
@@ -37,7 +37,7 @@ describe("ListDraftNode", () => {
         draft.tags[1] = "c"
       })
 
-      expect(doc.value.tags).toEqual(["a", "c"])
+      expect(doc.toJSON().tags).toEqual(["a", "c"])
     })
   })
 })

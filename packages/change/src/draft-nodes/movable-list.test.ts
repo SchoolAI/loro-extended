@@ -21,7 +21,7 @@ describe("MovableListDraftNode", () => {
         draft.users[0] = { name: "Bob" }
       })
 
-      expect(doc.value.users[0]).toEqual({ name: "Bob" })
+      expect(doc.toJSON().users[0]).toEqual({ name: "Bob" })
     })
   })
 })

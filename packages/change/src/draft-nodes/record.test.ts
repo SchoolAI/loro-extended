@@ -15,7 +15,7 @@ describe("Record Types", () => {
         draft.scores.getOrCreateNode("bob").increment(5)
       })
 
-      expect(doc.value.scores).toEqual({
+      expect(doc.toJSON().scores).toEqual({
         alice: 10,
         bob: 5,
       })
@@ -25,7 +25,7 @@ describe("Record Types", () => {
         draft.scores.delete("bob")
       })
 
-      expect(doc.value.scores).toEqual({
+      expect(doc.toJSON().scores).toEqual({
         alice: 15,
       })
     })
@@ -42,7 +42,7 @@ describe("Record Types", () => {
         draft.notes.getOrCreateNode("reminders").insert(0, "Call mom")
       })
 
-      expect(doc.value.notes).toEqual({
+      expect(doc.toJSON().notes).toEqual({
         todo: "Buy milk",
         reminders: "Call mom",
       })
@@ -64,7 +64,7 @@ describe("Record Types", () => {
         groupB.push("charlie")
       })
 
-      expect(doc.value.groups).toEqual({
+      expect(doc.toJSON().groups).toEqual({
         groupA: ["alice", "bob"],
         groupB: ["charlie"],
       })
@@ -86,7 +86,7 @@ describe("Record Types", () => {
         draft.wrapper.config.lang = "en"
       })
 
-      expect(doc.value.wrapper.config).toEqual({
+      expect(doc.toJSON().wrapper.config).toEqual({
         theme: "dark",
         lang: "en",
       })
@@ -96,7 +96,7 @@ describe("Record Types", () => {
         draft.wrapper.config.lang = "fr"
       })
 
-      expect(doc.value.wrapper.config).toEqual({
+      expect(doc.toJSON().wrapper.config).toEqual({
         lang: "fr",
       })
     })
@@ -116,7 +116,7 @@ describe("Record Types", () => {
         draft.wrapper.stats.clicks = 50
       })
 
-      expect(doc.value.wrapper.stats).toEqual({
+      expect(doc.toJSON().wrapper.stats).toEqual({
         visits: 100,
         clicks: 50,
       })
@@ -144,7 +144,7 @@ describe("Record Types", () => {
         }
       })
 
-      expect(doc.value.wrapper.settings).toEqual({
+      expect(doc.toJSON().wrapper.settings).toEqual({
         ui: {
           darkMode: true,
           sidebar: false,
@@ -180,7 +180,7 @@ describe("Record Types", () => {
         bob.age = 25
       })
 
-      expect(doc.value.users).toEqual({
+      expect(doc.toJSON().users).toEqual({
         u1: { name: "Alice", age: 30 },
         u2: { name: "Bob", age: 25 },
       })
@@ -209,7 +209,7 @@ describe("Record Types", () => {
         }
       })
 
-      expect(doc.value.participants["student-1"]).toEqual({
+      expect(doc.toJSON().participants["student-1"]).toEqual({
         id: "student-1",
         role: "student",
         name: "Alice",
@@ -238,7 +238,7 @@ describe("Record Types", () => {
         }
       })
 
-      expect(doc.value.data["item-1"]).toEqual({
+      expect(doc.toJSON().data["item-1"]).toEqual({
         info: {
           name: "Item 1",
         },
@@ -256,7 +256,7 @@ describe("Record Types", () => {
         draft.histories.user1 = ["a", "b"]
       })
 
-      expect(doc.value.histories.user1).toEqual(["a", "b"])
+      expect(doc.toJSON().histories.user1).toEqual(["a", "b"])
 
       doc.change(draft => {
         // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
@@ -264,7 +264,7 @@ describe("Record Types", () => {
       })
 
       // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
-      expect(doc.value.histories["user1"]).toEqual(["c"])
+      expect(doc.toJSON().histories["user1"]).toEqual(["c"])
     })
   })
 })

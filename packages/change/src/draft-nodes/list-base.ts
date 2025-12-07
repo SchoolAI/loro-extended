@@ -92,6 +92,7 @@ export abstract class ListDraftNodeBase<
         }
         return containerItem
       },
+      readonly: this.readonly,
     }
   }
 
@@ -142,7 +143,7 @@ export abstract class ListDraftNodeBase<
   }
 
   // Get item for return values - returns DraftItem that can be mutated
-  protected getDraftItem(index: number): DraftItem {
+  protected getDraftItem(index: number): any {
     // Check if we already have a cached item for this index
     let cachedItem = this.itemCache.get(index)
     if (cachedItem) {
@@ -167,14 +168,29 @@ export abstract class ListDraftNodeBase<
         // For primitives, just use the value directly
         cachedItem = containerItem
       }
-      this.itemCache.set(index, cachedItem)
+      // Only cache primitive values if NOT readonly
+      if (!this.readonly) {
+        this.itemCache.set(index, cachedItem)
+      }
       return cachedItem as DraftItem
     } else {
       // For container shapes, create a proper draft node using the new pattern
       cachedItem = createContainerDraftNode(
         this.getDraftNodeParams(index, this.shape.shape as ContainerShape),
       )
+      // Cache container nodes
       this.itemCache.set(index, cachedItem)
+
+      if (this.readonly) {
+        const shape = this.shape.shape as ContainerShape
+        if (shape._type === "counter") {
+          return (cachedItem as any).value
+        }
+        if (shape._type === "text") {
+          return (cachedItem as any).toString()
+        }
+      }
+
       return cachedItem as DraftItem
     }
   }
@@ -254,26 +270,31 @@ export abstract class ListDraftNodeBase<
   }
 
   insert(index: number, item: Item): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     // Update cache indices before performing the insert operation
     this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
   }
 
   delete(index: number, len: number): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     // Update cache indices before performing the delete operation
     this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
   }
 
   push(item: Item): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     this.pushWithConversion(item)
   }
 
   pushContainer(container: Container): Container {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     return this.container.pushContainer(container)
   }
 
   insertContainer(index: number, container: Container): Container {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     return this.container.insertContainer(index, container)
   }
 

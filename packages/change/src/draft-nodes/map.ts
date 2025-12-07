@@ -76,17 +76,20 @@ export class MapDraftNode<
       emptyState,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
+      readonly: this.readonly,
     }
   }
 
   getOrCreateNode<Shape extends ContainerShape | ValueShape>(
     key: string,
     shape: Shape,
-  ): Shape extends ContainerShape ? DraftNode<Shape> : Value {
+  ): any {
     let node = this.propertyCache.get(key)
     if (!node) {
       if (isContainerShape(shape)) {
         node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
+        // We cache container nodes even in readonly mode because they are just handles
+        this.propertyCache.set(key, node)
       } else {
         // For value shapes, first try to get the value from the container
         const containerValue = this.container.get(key)
@@ -100,9 +103,30 @@ export class MapDraftNode<
           }
           node = emptyState as Value
         }
+
+        // In readonly mode, we DO NOT cache primitive values.
+        // This ensures we always get the latest value from the CRDT on next access.
+        if (!this.readonly) {
+          this.propertyCache.set(key, node)
+        }
       }
       if (node === undefined) throw new Error("no container made")
-      this.propertyCache.set(key, node)
+    }
+
+    if (this.readonly && isContainerShape(shape)) {
+      // In readonly mode, if the container doesn't exist, return the empty state
+      // This ensures we respect default values (e.g. counter: 1)
+      const existing = this.container.get(key)
+      if (existing === undefined) {
+        return (this.emptyState as any)?.[key]
+      }
+
+      if (shape._type === "counter") {
+        return (node as any).value
+      }
+      if (shape._type === "text") {
+        return (node as any).toString()
+      }
     }
 
     return node as Shape extends ContainerShape ? DraftNode<Shape> : Value
@@ -114,8 +138,8 @@ export class MapDraftNode<
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateNode(key, shape),
         set: value => {
+          if (this.readonly) throw new Error("Cannot modify readonly doc")
           if (isValueShape(shape)) {
-            // console.log("set value", value)
             this.container.set(key, value)
             this.propertyCache.set(key, value)
           } else {
@@ -141,14 +165,17 @@ export class MapDraftNode<
   }
 
   set(key: string, value: Value): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     this.container.set(key, value)
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     this.container.delete(key)
   }
 

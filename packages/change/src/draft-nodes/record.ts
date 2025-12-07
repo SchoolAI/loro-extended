@@ -72,10 +72,11 @@ export class RecordDraftNode<
       emptyState,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
+      readonly: this.readonly,
     }
   }
 
-  getOrCreateNode(key: string): InferDraftType<NestedShape> {
+  getOrCreateNode(key: string): any {
     let node = this.nodeCache.get(key)
     if (!node) {
       const shape = this.shape.shape
@@ -83,6 +84,8 @@ export class RecordDraftNode<
         node = createContainerDraftNode(
           this.getDraftNodeParams(key, shape as ContainerShape),
         )
+        // Cache container nodes
+        this.nodeCache.set(key, node)
       } else {
         // For value shapes, first try to get the value from the container
         const containerValue = this.container.get(key)
@@ -99,9 +102,20 @@ export class RecordDraftNode<
             node = emptyState as Value
           }
         }
+        // Only cache primitive values if NOT readonly
+        if (node !== undefined && !this.readonly) {
+          this.nodeCache.set(key, node)
+        }
       }
-      if (node !== undefined) {
-        this.nodeCache.set(key, node)
+    }
+
+    if (this.readonly && isContainerShape(this.shape.shape)) {
+      const shape = this.shape.shape as ContainerShape
+      if (shape._type === "counter") {
+        return (node as any).value
+      }
+      if (shape._type === "text") {
+        return (node as any).toString()
       }
     }
 
@@ -113,6 +127,7 @@ export class RecordDraftNode<
   }
 
   set(key: string, value: any): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
       this.nodeCache.set(key, value)
@@ -134,10 +149,12 @@ export class RecordDraftNode<
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
+    if (this.readonly) throw new Error("Cannot modify readonly doc")
     this.container.delete(key)
     this.nodeCache.delete(key)
   }
