@@ -210,11 +210,10 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
 export interface DiscriminatedUnionValueShape<
   K extends string = string,
   T extends Record<string, ObjectValueShape> = Record<string, ObjectValueShape>,
-> extends Shape<
-    T[keyof T]["_plain"],
-    T[keyof T]["_draft"],
-    T[keyof T]["_placeholder"]
-  > {
+  Plain = T[keyof T]["_plain"],
+  Draft = T[keyof T]["_draft"],
+  Placeholder = T[keyof T]["_placeholder"],
+> extends Shape<Plain, Draft, Placeholder> {
   readonly _type: "value"
   readonly valueType: "discriminatedUnion"
   readonly discriminantKey: K
