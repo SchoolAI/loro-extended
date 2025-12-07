@@ -266,4 +266,73 @@ describe("Record Types", () => {
       expect(doc.toJSON().histories["user1"]).toEqual(["c"])
     })
   })
+
+  describe("Readonly access to non-existent keys", () => {
+    it("should not throw 'placeholder required' when accessing nested map values in a record", () => {
+      // This schema mirrors a real-world scenario:
+      // preferences: Record<string, { showTip: boolean }>
+      const schema = Shape.doc({
+        preferences: Shape.record(
+          Shape.map({
+            showTip: Shape.plain.boolean(),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema)
+
+      // First, set a value for a specific peer
+      doc.change(d => {
+        d.preferences.peer1 = { showTip: true }
+      })
+
+      // This should work - accessing an existing key
+      expect(doc.value.preferences.peer1?.showTip).toBe(true)
+
+      // Accessing a non-existent key should NOT throw "placeholder required"
+      // It should return undefined so optional chaining works correctly
+      expect(() => {
+        const result = doc.value.preferences.nonexistent?.showTip
+        return result
+      }).not.toThrow()
+    })
+
+    it("should return undefined for non-existent record keys in readonly mode", () => {
+      const schema = Shape.doc({
+        preferences: Shape.record(
+          Shape.map({
+            showTip: Shape.plain.boolean(),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema)
+
+      // Access a key that doesn't exist - should return undefined
+      const prefs = doc.value.preferences.nonexistent
+      expect(prefs).toBeUndefined()
+    })
+
+    it("should work with the exact user scenario pattern", () => {
+      // Exact reproduction of a user's schema and access pattern
+      const schema = Shape.doc({
+        preferences: Shape.record(
+          Shape.map({
+            showTip: Shape.plain.boolean(),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema)
+      const myPeerId = "some-peer-id"
+
+      // This is the exact code pattern from the user's app:
+      // doc.preferences[myPeerId]?.showTip !== false
+      expect(() => {
+        const showTip = doc.value.preferences[myPeerId]?.showTip
+        const result = showTip !== false
+        return result
+      }).not.toThrow()
+    })
+  })
 })

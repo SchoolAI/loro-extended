@@ -74,6 +74,16 @@ export class RecordRef<
   }
 
   getOrCreateNode(key: string): any {
+    // For readonly mode with container shapes, check if the key exists first
+    // This allows optional chaining (?.) to work correctly for non-existent keys
+    // Similar to how ListRefBase.getMutableItem() handles non-existent indices
+    if (this.readonly && isContainerShape(this.shape.shape)) {
+      const existing = this.container.get(key)
+      if (existing === undefined) {
+        return undefined
+      }
+    }
+
     let node = this.nodeCache.get(key)
     if (!node) {
       const shape = this.shape.shape
