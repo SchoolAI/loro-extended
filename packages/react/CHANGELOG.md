@@ -1,5 +1,14 @@
 # @loro-extended/react
 
+## 0.8.1
+
+### Patch Changes
+
+- a6d3fc8: Need to publish hooks-core
+- Updated dependencies [a6d3fc8]
+  - @loro-extended/hooks-core@0.8.1
+  - @loro-extended/repo@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-websocket",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "WebSocket network adapter implementing the Loro Syncing Protocol for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",

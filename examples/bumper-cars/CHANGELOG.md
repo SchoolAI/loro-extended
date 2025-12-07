@@ -1,5 +1,17 @@
 # example-bumper-cars
 
+## 0.1.4
+
+### Patch Changes
+
+- a6d3fc8: Need to publish hooks-core
+- Updated dependencies [a6d3fc8]
+  - @loro-extended/adapter-leveldb@0.8.1
+  - @loro-extended/adapter-websocket@0.8.1
+  - @loro-extended/change@0.8.1
+  - @loro-extended/react@0.8.1
+  - @loro-extended/repo@0.8.1
+
 ## 0.1.3
 
 ### Patch Changes

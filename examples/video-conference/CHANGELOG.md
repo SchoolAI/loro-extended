@@ -1,5 +1,18 @@
 # example-video-conference
 
+## 1.2.2
+
+### Patch Changes
+
+- a6d3fc8: Need to publish hooks-core
+- Updated dependencies [a6d3fc8]
+  - @loro-extended/adapter-leveldb@0.8.1
+  - @loro-extended/adapter-sse@0.8.1
+  - @loro-extended/adapter-webrtc@0.8.1
+  - @loro-extended/change@0.8.1
+  - @loro-extended/react@0.8.1
+  - @loro-extended/repo@0.8.1
+
 ## 1.2.1
 
 ### Patch Changes

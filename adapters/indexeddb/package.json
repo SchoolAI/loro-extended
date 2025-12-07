@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-indexeddb",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "IndexedDB storage adapter for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",

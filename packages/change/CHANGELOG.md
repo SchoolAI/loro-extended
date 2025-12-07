@@ -1,5 +1,11 @@
 # @loro-extended/change
 
+## 0.8.1
+
+### Patch Changes
+
+- a6d3fc8: Need to publish hooks-core
+
 ## 0.8.0
 
 ### Minor Changes
