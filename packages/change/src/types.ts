@@ -70,8 +70,45 @@ export type Mutable<T extends DocShape<Record<string, ContainerShape>>> =
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
   Mutable<T>
 
+/**
+ * Interface for objects that have a toJSON method.
+ * This is separate from the data type to avoid polluting Object.values().
+ */
+export interface HasToJSON<T> {
+  toJSON(): T
+}
+
+/**
+ * Deep readonly wrapper for plain objects (no index signature).
+ * Includes toJSON() method.
+ */
+export type DeepReadonlyObject<T extends object> = {
+  readonly [P in keyof T]: DeepReadonly<T[P]>
+} & HasToJSON<T>
+
+/**
+ * Deep readonly wrapper for Record types (with string index signature).
+ * The toJSON() method is available but NOT part of the index signature,
+ * so Object.values() returns clean types.
+ */
+export type DeepReadonlyRecord<T> = {
+  readonly [K in keyof T]: DeepReadonly<T[K]>
+} & HasToJSON<Record<string, T[keyof T]>>
+
+/**
+ * Deep readonly wrapper that makes all properties readonly recursively
+ * and adds a toJSON() method for JSON serialization.
+ *
+ * For arrays: Returns ReadonlyArray with toJSON()
+ * For objects with string index signature (Records): toJSON() is available
+ *   but doesn't pollute Object.values() type inference
+ * For plain objects: Returns readonly properties with toJSON()
+ * For primitives: Returns as-is
+ */
 export type DeepReadonly<T> = T extends any[]
-  ? ReadonlyArray<DeepReadonly<T[number]>> & { toJSON(): T }
+  ? ReadonlyArray<DeepReadonly<T[number]>> & HasToJSON<T>
   : T extends object
-    ? { readonly [P in keyof T]: DeepReadonly<T[P]> } & { toJSON(): T }
+    ? string extends keyof T
+      ? DeepReadonlyRecord<T>
+      : DeepReadonlyObject<T>
     : T

@@ -1,7 +1,8 @@
-import { describe, expectTypeOf, it } from "vitest"
+import { describe, expect, expectTypeOf, it } from "vitest"
 import type { ContainerShape, ValueShape } from "./shape.js"
 import { Shape } from "./shape.js"
-import type { Infer } from "./types.js"
+import { createTypedDoc } from "./typed-doc.js"
+import type { DeepReadonly, Infer } from "./types.js"
 
 describe("Infer type helper", () => {
   it("infers DocShape plain type", () => {
@@ -184,5 +185,99 @@ describe("Infer type helper", () => {
       | { type: "server"; tick: number }
 
     expectTypeOf<Result>().toEqualTypeOf<Expected>()
+  })
+})
+
+describe("DeepReadonly type helper", () => {
+  it("Object.values returns clean types without toJSON function in union", () => {
+    const ParticipantSchema = Shape.plain.object({
+      id: Shape.plain.string(),
+      name: Shape.plain.string(),
+    })
+
+    const GroupSessionSchema = Shape.doc({
+      participants: Shape.record(ParticipantSchema),
+    })
+
+    const doc = createTypedDoc(GroupSessionSchema)
+
+    doc.change((root: any) => {
+      root.participants.set("p1", { id: "1", name: "Alice" })
+      root.participants.set("p2", { id: "2", name: "Bob" })
+    })
+
+    const participants = doc.value.participants
+
+    // Object.values should return clean types
+    const values = Object.values(participants)
+
+    type Participant = Infer<typeof ParticipantSchema>
+
+    // FIXED: Object.values now returns clean DeepReadonly<Participant>[]
+    // Previously it returned: (DeepReadonly<Participant> | (() => Record<...>))[]
+    expectTypeOf(values).toEqualTypeOf<DeepReadonly<Participant>[]>()
+
+    // Runtime check
+    expect(values).toHaveLength(2)
+    expect(values.map(p => p.name).sort()).toEqual(["Alice", "Bob"])
+  })
+
+  it("toJSON is still callable on Records", () => {
+    const ParticipantSchema = Shape.plain.object({
+      id: Shape.plain.string(),
+      name: Shape.plain.string(),
+    })
+
+    const GroupSessionSchema = Shape.doc({
+      participants: Shape.record(ParticipantSchema),
+    })
+
+    const doc = createTypedDoc(GroupSessionSchema)
+
+    doc.change((root: any) => {
+      root.participants.set("p1", { id: "1", name: "Alice" })
+    })
+
+    const participants = doc.value.participants
+
+    // toJSON should be callable
+    const json = participants.toJSON()
+
+    // Type check: toJSON returns the plain Record type
+    expectTypeOf(json).toEqualTypeOf<
+      Record<string, { id: string; name: string }>
+    >()
+
+    // Runtime check
+    expect(json).toEqual({ p1: { id: "1", name: "Alice" } })
+  })
+
+  it("toJSON is still callable on Maps", () => {
+    const MetaSchema = Shape.map({
+      title: Shape.plain.string(),
+      count: Shape.plain.number(),
+    })
+
+    const DocSchema = Shape.doc({
+      meta: MetaSchema,
+    })
+
+    const doc = createTypedDoc(DocSchema)
+
+    doc.change((root: any) => {
+      root.meta.title = "Test"
+      root.meta.count = 42
+    })
+
+    const meta = doc.value.meta
+
+    // toJSON should be callable
+    const json = meta.toJSON()
+
+    // Type check
+    expectTypeOf(json).toEqualTypeOf<{ title: string; count: number }>()
+
+    // Runtime check
+    expect(json).toEqual({ title: "Test", count: 42 })
   })
 })
