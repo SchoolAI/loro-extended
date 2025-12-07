@@ -13,6 +13,11 @@ import { CounterDraftNode } from "./counter.js"
 import { ListDraftNode } from "./list.js"
 import { MapDraftNode } from "./map.js"
 import { MovableListDraftNode } from "./movable-list.js"
+import {
+  listProxyHandler,
+  movableListProxyHandler,
+  recordProxyHandler,
+} from "./proxy-handlers.js"
 import { RecordDraftNode } from "./record.js"
 import { TextDraftNode } from "./text.js"
 import { TreeDraftNode } from "./tree.js"
@@ -32,16 +37,23 @@ export function createContainerDraftNode(
         params as DraftNodeParams<CounterContainerShape>,
       )
     case "list":
-      return new ListDraftNode(params as DraftNodeParams<ListContainerShape>)
+      return new Proxy(
+        new ListDraftNode(params as DraftNodeParams<ListContainerShape>),
+        listProxyHandler,
+      )
     case "map":
       return new MapDraftNode(params as DraftNodeParams<MapContainerShape>)
     case "movableList":
-      return new MovableListDraftNode(
-        params as DraftNodeParams<MovableListContainerShape>,
+      return new Proxy(
+        new MovableListDraftNode(
+          params as DraftNodeParams<MovableListContainerShape>,
+        ),
+        movableListProxyHandler,
       )
     case "record":
-      return new RecordDraftNode(
-        params as DraftNodeParams<RecordContainerShape>,
+      return new Proxy(
+        new RecordDraftNode(params as DraftNodeParams<RecordContainerShape>),
+        recordProxyHandler,
       )
     case "text":
       return new TextDraftNode(params as DraftNodeParams<TextContainerShape>)

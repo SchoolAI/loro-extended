@@ -13,7 +13,7 @@ import type {
   ContainerShape,
   RecordContainerShape,
 } from "../shape.js"
-import type { InferDraftType } from "../types.js"
+import type { Infer, InferDraftType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { DraftNode, type DraftNodeParams } from "./base.js"
 import { createContainerDraftNode } from "./utils.js"
@@ -32,53 +32,8 @@ const containerConstructor = {
 export class RecordDraftNode<
   NestedShape extends ContainerOrValueShape,
 > extends DraftNode<any> {
+  [key: string]: Infer<NestedShape> | any
   private nodeCache = new Map<string, DraftNode<ContainerShape> | Value>()
-
-  constructor(params: DraftNodeParams<RecordContainerShape<NestedShape>>) {
-    super(params)
-    // We don't need to create lazy properties because keys are dynamic
-    // But we could use a Proxy if we wanted property access syntax like record.key
-    // However, for now let's stick to get/set methods or maybe Proxy for better DX?
-    // The requirement says "records with uniform specific key type and value".
-    // Usually records are accessed via keys.
-    // If we want `draft.record.key`, we need a Proxy.
-    // biome-ignore lint/correctness/noConstructorReturn: Proxy return is intentional
-    return new Proxy(this, {
-      get: (target, prop) => {
-        if (typeof prop === "string" && !(prop in target)) {
-          return target.get(prop)
-        }
-        return Reflect.get(target, prop)
-      },
-      set: (target, prop, value) => {
-        if (typeof prop === "string" && !(prop in target)) {
-          target.set(prop, value)
-          return true
-        }
-        return Reflect.set(target, prop, value)
-      },
-      deleteProperty: (target, prop) => {
-        if (typeof prop === "string" && !(prop in target)) {
-          target.delete(prop)
-          return true
-        }
-        return Reflect.deleteProperty(target, prop)
-      },
-      ownKeys: target => {
-        return target.keys()
-      },
-      getOwnPropertyDescriptor: (target, prop) => {
-        if (typeof prop === "string" && target.has(prop)) {
-          return {
-            configurable: true,
-            enumerable: true,
-            value: target.get(prop),
-          }
-        }
-        return Reflect.getOwnPropertyDescriptor(target, prop)
-      },
-    })
-  }
 
   protected get shape(): RecordContainerShape<NestedShape> {
     return super.shape as RecordContainerShape<NestedShape>
@@ -181,7 +136,18 @@ export class RecordDraftNode<
     } else {
       // For containers, we can't set them directly usually.
       // But if the user passes a plain object that matches the shape, maybe we should convert it?
-      // But typically we modify the draft node.
+      if (value && typeof value === "object") {
+        const node = this.getOrCreateNode(key)
+        const shapeType = (node as any).shape._type
+
+        if (shapeType === "map" || shapeType === "record") {
+          for (const k in value) {
+            ;(node as any)[k] = value[k]
+          }
+          return
+        }
+      }
+
       throw new Error(
         "Cannot set container directly, modify the draft node instead",
       )

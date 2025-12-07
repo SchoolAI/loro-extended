@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { Shape, TypedDoc } from "./index.js"
+import { Shape, TypedDoc } from "../index.js"
 
 describe("Record Types", () => {
   describe("Shape.record (Container)", () => {
@@ -183,6 +183,65 @@ describe("Record Types", () => {
       expect(doc.value.users).toEqual({
         u1: { name: "Alice", age: 30 },
         u2: { name: "Bob", age: 25 },
+      })
+    })
+
+    it("should allow setting a plain object for a record with map values", () => {
+      const schema = Shape.doc({
+        participants: Shape.record(
+          Shape.map({
+            id: Shape.plain.string(),
+            role: Shape.plain.string(),
+            name: Shape.plain.string(),
+            color: Shape.plain.string(),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema, { participants: {} })
+
+      doc.change(draft => {
+        draft.participants["student-1"] = {
+          id: "student-1",
+          role: "student",
+          name: "Alice",
+          color: "indigo",
+        }
+      })
+
+      expect(doc.value.participants["student-1"]).toEqual({
+        id: "student-1",
+        role: "student",
+        name: "Alice",
+        color: "indigo",
+      })
+    })
+
+    it("should allow setting a plain object for a record with nested map values", () => {
+      const schema = Shape.doc({
+        data: Shape.record(
+          Shape.map({
+            info: Shape.map({
+              name: Shape.plain.string(),
+            }),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema, { data: {} })
+
+      doc.change(draft => {
+        draft.data["item-1"] = {
+          info: {
+            name: "Item 1",
+          },
+        }
+      })
+
+      expect(doc.value.data["item-1"]).toEqual({
+        info: {
+          name: "Item 1",
+        },
       })
     })
   })

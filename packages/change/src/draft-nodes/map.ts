@@ -110,13 +110,28 @@ export class MapDraftNode<
       const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateNode(key, shape),
-        set: isValueShape(shape)
-          ? value => {
-              // console.log("set value", value)
-              this.container.set(key, value)
-              this.propertyCache.set(key, value)
+        set: value => {
+          if (isValueShape(shape)) {
+            // console.log("set value", value)
+            this.container.set(key, value)
+            this.propertyCache.set(key, value)
+          } else {
+            if (value && typeof value === "object") {
+              const node = this.getOrCreateNode(key, shape)
+              const shapeType = (node as any).shape._type
+
+              if (shapeType === "map" || shapeType === "record") {
+                for (const k in value) {
+                  ;(node as any)[k] = value[k]
+                }
+                return
+              }
             }
-          : undefined,
+            throw new Error(
+              "Cannot set container directly, modify the draft node instead",
+            )
+          }
+        },
       })
     }
   }
