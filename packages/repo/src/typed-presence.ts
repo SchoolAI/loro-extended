@@ -1,5 +1,6 @@
 import {
   type ContainerShape,
+  deriveShapePlaceholder,
   type Infer,
   mergeValue,
   type ValueShape,
@@ -7,17 +8,20 @@ import {
 import type { DocHandle } from "./doc-handle.js"
 
 export class TypedPresence<S extends ContainerShape | ValueShape> {
+  private placeholder: Infer<S>
+
   constructor(
     public shape: S,
-    public emptyState: Infer<S>,
     private handle: DocHandle,
-  ) {}
+  ) {
+    this.placeholder = deriveShapePlaceholder(shape) as Infer<S>
+  }
 
   get self(): Infer<S> {
     return mergeValue(
       this.shape,
       this.handle.untypedPresence.self,
-      this.emptyState,
+      this.placeholder,
     ) as Infer<S>
   }
 
@@ -28,7 +32,7 @@ export class TypedPresence<S extends ContainerShape | ValueShape> {
       result[peerId] = mergeValue(
         this.shape,
         all[peerId],
-        this.emptyState,
+        this.placeholder,
       ) as Infer<S>
     }
     return result

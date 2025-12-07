@@ -13,23 +13,26 @@ describe("TypedPresence", () => {
     })
     const handle = new DocHandle({ docId: "test-doc", synchronizer })
 
+    // Schema with placeholder annotations
     const PresenceSchema = Shape.plain.object({
-      name: Shape.plain.string(),
+      name: Shape.plain.string().placeholder("Anonymous"),
       cursor: Shape.plain.object({
         x: Shape.plain.number(),
         y: Shape.plain.number(),
       }),
     })
 
-    const EmptyPresence = {
+    // Expected placeholder values derived from schema
+    const expectedPlaceholder = {
       name: "Anonymous",
       cursor: { x: 0, y: 0 },
     }
 
-    const presence = handle.presence(PresenceSchema, EmptyPresence)
+    // No emptyState needed - placeholder is derived from schema
+    const presence = handle.presence(PresenceSchema)
 
-    // Check default values
-    expect(presence.self).toEqual(EmptyPresence)
+    // Check default values are derived from schema placeholders
+    expect(presence.self).toEqual(expectedPlaceholder)
 
     // Update values
     presence.set({ name: "Alice" })

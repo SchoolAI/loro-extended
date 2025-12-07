@@ -1,5 +1,5 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type { ContainerShape, Infer, ValueShape } from "@loro-extended/change"
+import type { ContainerShape, ValueShape } from "@loro-extended/change"
 import type { LoroDoc, Value } from "loro-crdt"
 import type { ObjectValue, Synchronizer } from "./synchronizer.js"
 import { TypedPresence } from "./typed-presence.js"
@@ -196,13 +196,10 @@ export class DocHandle<T extends DocContent = DocContent> {
   }
   /**
    * Get a typed presence interface for this document.
+   * Placeholder values are automatically derived from the schema's `.placeholder()` annotations.
    * @param shape The shape of the presence data
-   * @param emptyState The default values for the presence data
    */
-  presence<S extends ContainerShape | ValueShape>(
-    shape: S,
-    emptyState: Infer<S>,
-  ): TypedPresence<S> {
-    return new TypedPresence(shape, emptyState, this)
+  presence<S extends ContainerShape | ValueShape>(shape: S): TypedPresence<S> {
+    return new TypedPresence(shape, this)
   }
 }

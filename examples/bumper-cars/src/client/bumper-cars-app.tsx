@@ -7,7 +7,6 @@ import {
   CAR_COLORS,
   type CarColor,
   type ClientPresence,
-  EmptyClientPresence,
   GamePresenceSchema,
   type PlayerScore,
   type ServerPresence,
@@ -47,10 +46,10 @@ export default function BumperCarsApp({
 
   // Use typed presence with discriminated union schema
   // This provides type-safe access to both client and server presence
+  // Placeholder values are automatically derived from schema annotations
   const { all: allPresence, setSelf: setPresence } = usePresence(
     ARENA_DOC_ID,
     GamePresenceSchema,
-    EmptyClientPresence, // Default to client presence for self
   )
 
   // Get server presence (game state) - type-safe filtering

@@ -65,14 +65,15 @@ export type PlayerScore = {
 
 // ============================================================================
 // Presence Schemas (Ephemeral) - Using Discriminated Union
+// Placeholder values are derived from schema annotations - no separate empty state needed
 // ============================================================================
 
 /**
  * Input state from a client's joystick/keyboard
  */
 const InputStateSchema = Shape.plain.object({
-  force: Shape.plain.number(), // 0-1 normalized force
-  angle: Shape.plain.number(), // radians
+  force: Shape.plain.number(), // 0-1 normalized force, default 0
+  angle: Shape.plain.number(), // radians, default 0
 })
 
 export type InputState = {
@@ -83,11 +84,12 @@ export type InputState = {
 /**
  * Client presence schema - sent by each player
  * Contains their input state and identity info
+ * Placeholder values are derived from .placeholder() annotations
  */
 export const ClientPresenceSchema = Shape.plain.object({
   type: Shape.plain.string("client"),
-  name: Shape.plain.string(),
-  color: Shape.plain.string(),
+  name: Shape.plain.string(), // default ""
+  color: Shape.plain.string().placeholder(CAR_COLORS[0]),
   input: InputStateSchema,
 })
 
@@ -98,12 +100,7 @@ export type ClientPresence = {
   input: InputState
 }
 
-export const EmptyClientPresence: ClientPresence = {
-  type: "client",
-  name: "",
-  color: CAR_COLORS[0],
-  input: { force: 0, angle: 0 },
-}
+// EmptyClientPresence removed - placeholder is derived from schema
 
 /**
  * Car state in the game world
@@ -133,11 +130,12 @@ export type CarState = {
 /**
  * Server presence schema - broadcast by the server
  * Contains the authoritative game state
+ * Placeholder values are derived from .placeholder() annotations
  */
 export const ServerPresenceSchema = Shape.plain.object({
   type: Shape.plain.string("server"),
-  cars: Shape.plain.record(CarStateSchema),
-  tick: Shape.plain.number(),
+  cars: Shape.plain.record(CarStateSchema), // default {}
+  tick: Shape.plain.number(), // default 0
 })
 
 export type ServerPresence = {
@@ -146,11 +144,7 @@ export type ServerPresence = {
   tick: number
 }
 
-export const EmptyServerPresence: ServerPresence = {
-  type: "server",
-  cars: {},
-  tick: 0,
-}
+// EmptyServerPresence removed - placeholder is derived from schema
 
 /**
  * Combined presence schema using discriminated union

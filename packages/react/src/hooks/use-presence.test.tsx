@@ -1,8 +1,8 @@
 import { Shape } from "@loro-extended/change"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
-import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 import { usePresence, useUntypedPresence } from "../index.js"
+import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 
 describe("useUntypedPresence", () => {
   it("should provide self and all", async () => {
@@ -98,16 +98,18 @@ describe("useUntypedPresence", () => {
 })
 
 describe("usePresence (typed)", () => {
+  // Schema with placeholder annotations - no separate EmptyPresence needed
   const PresenceSchema = Shape.plain.object({
     cursor: Shape.plain.object({
       x: Shape.plain.number(),
       y: Shape.plain.number(),
     }),
-    name: Shape.plain.string(),
-    status: Shape.plain.string(),
+    name: Shape.plain.string().placeholder("Anonymous"),
+    status: Shape.plain.string().placeholder("offline"),
   })
 
-  const EmptyPresence = {
+  // Expected placeholder values derived from schema
+  const expectedPlaceholder = {
     cursor: { x: 0, y: 0 },
     name: "Anonymous",
     status: "offline",
@@ -118,13 +120,13 @@ describe("usePresence (typed)", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
-      () => usePresence(documentId, PresenceSchema, EmptyPresence),
+      () => usePresence(documentId, PresenceSchema),
       {
         wrapper: RepoWrapper,
       },
     )
 
-    expect(result.current.self).toEqual(EmptyPresence)
+    expect(result.current.self).toEqual(expectedPlaceholder)
     expect(result.current.all).toEqual({})
     expect(typeof result.current.setSelf).toBe("function")
   })
@@ -134,7 +136,7 @@ describe("usePresence (typed)", () => {
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
-      () => usePresence(documentId, PresenceSchema, EmptyPresence),
+      () => usePresence(documentId, PresenceSchema),
       {
         wrapper: RepoWrapper,
       },
@@ -160,10 +162,9 @@ describe("usePresence (typed)", () => {
         const cursor = usePresence(
           documentId,
           PresenceSchema,
-          EmptyPresence,
           state => state.self.cursor,
         )
-        const full = usePresence(documentId, PresenceSchema, EmptyPresence)
+        const full = usePresence(documentId, PresenceSchema)
         return { cursor, full }
       },
       {
@@ -180,5 +181,36 @@ describe("usePresence (typed)", () => {
     await waitFor(() => {
       expect(result.current.cursor).toEqual({ x: 100, y: 200 })
     })
+  })
+
+  it("should work with discriminated unions", () => {
+    // Schema with placeholder on the discriminated union
+    const ClientSchema = Shape.plain.object({
+      type: Shape.plain.string("client"),
+      name: Shape.plain.string().placeholder("test"),
+    })
+    const ServerSchema = Shape.plain.object({
+      type: Shape.plain.string("server"),
+      tick: Shape.plain.number(),
+    })
+    const UnionSchema = Shape.plain.discriminatedUnion("type", {
+      client: ClientSchema,
+      server: ServerSchema,
+    })
+
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(() => usePresence(documentId, UnionSchema), {
+      wrapper: RepoWrapper,
+    })
+
+    const presence = result.current.self
+    if (presence.type === "client") {
+      expect(presence.name).toBe("test")
+    } else {
+      // This branch should be reachable type-wise
+      expect(presence.tick).toBeUndefined()
+    }
   })
 })

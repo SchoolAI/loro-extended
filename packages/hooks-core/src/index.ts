@@ -6,14 +6,20 @@ import type {
   Infer,
   ValueShape,
 } from "@loro-extended/change"
-import { TypedDoc, derivePlaceholder } from "@loro-extended/change"
-import { Repo, type DocHandle, type DocId } from "@loro-extended/repo"
+import {
+  derivePlaceholder,
+  deriveShapePlaceholder,
+  TypedDoc,
+} from "@loro-extended/change"
+import type { DocHandle, DocId, Repo } from "@loro-extended/repo"
 import type { LoroDoc, LoroMap, Value } from "loro-crdt"
 
 // Define the shape of the React/Hono library object we need
 export interface FrameworkHooks {
-  useState: <T>(initialState: T | (() => T)) => [T, (newState: T | ((prevState: T) => T)) => void]
-  useEffect: (effect: () => void | (() => void), deps?: unknown[]) => void
+  useState: <T>(
+    initialState: T | (() => T),
+  ) => [T, (newState: T | ((prevState: T) => T)) => void]
+  useEffect: (effect: () => undefined | (() => void), deps?: unknown[]) => void
   useCallback: <T extends Function>(callback: T, deps: unknown[]) => T
   useMemo: <T>(factory: () => T, deps: unknown[]) => T
   useRef: <T>(initialValue: T) => { current: T | null }
@@ -303,15 +309,20 @@ export function createHooks(framework: FrameworkHooks) {
   function usePresence<S extends ContainerShape | ValueShape, R = any>(
     docId: DocId,
     shape: S,
-    emptyState: Infer<S>,
     selector?: (state: PresenceContext<Infer<S>>) => R,
   ) {
     const { handle } = useDocHandleState(docId)
 
+    // Derive placeholder from schema
+    const placeholder = useMemo(
+      () => deriveShapePlaceholder(shape) as Infer<S>,
+      [shape],
+    )
+
     const store = useMemo(() => {
       if (!handle) {
         const empty = {
-          self: emptyState,
+          self: placeholder,
           all: {},
           setSelf: (_: any) => {},
         }
@@ -321,7 +332,7 @@ export function createHooks(framework: FrameworkHooks) {
         }
       }
 
-      const typedPresence = handle.presence(shape, emptyState)
+      const typedPresence = handle.presence(shape)
       const setSelf = (values: Partial<Infer<S>>) => {
         typedPresence.set(values)
       }
@@ -345,7 +356,7 @@ export function createHooks(framework: FrameworkHooks) {
 
       const getSnapshot = () => cachedState
       return { subscribe, getSnapshot }
-    }, [handle, shape, emptyState])
+    }, [handle, shape, placeholder])
 
     const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
 
