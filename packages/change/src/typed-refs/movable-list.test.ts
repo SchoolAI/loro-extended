@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createTypedDoc, Shape } from "../index.js"
 
-describe("MovableListDraftNode", () => {
+describe("MovableListRef", () => {
   describe("set via index", () => {
     it("should allow setting a plain object for a list item via index", () => {
       const schema = Shape.doc({

@@ -7,15 +7,15 @@ import type {
   MovableListContainerShape,
 } from "../shape.js"
 import { isContainer, isValueShape } from "../utils/type-guards.js"
-import { DraftNode, type DraftNodeParams } from "./base.js"
-import { createContainerDraftNode } from "./utils.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
+import { createContainerTypedRef } from "./utils.js"
 
 // Shared logic for list operations
-export abstract class ListDraftNodeBase<
+export abstract class ListRefBase<
   NestedShape extends ContainerOrValueShape,
   Item = NestedShape["_plain"],
-  DraftItem = NestedShape["_draft"],
-> extends DraftNode<any> {
+  MutableItem = NestedShape["_mutable"],
+> extends TypedRef<any> {
   // Cache for items returned by array methods to track mutations
   private itemCache = new Map<number, any>()
 
@@ -40,7 +40,7 @@ export abstract class ListDraftNodeBase<
           // For value shapes, delegate to subclass-specific absorption logic
           this.absorbValueAtIndex(index, cachedItem)
         } else {
-          // For container shapes, the item should be a draft node that handles its own absorption
+          // For container shapes, the item should be a typed ref that handles its own absorption
           if (
             cachedItem &&
             typeof cachedItem === "object" &&
@@ -78,10 +78,10 @@ export abstract class ListDraftNodeBase<
     }
   }
 
-  getDraftNodeParams(
+  getTypedRefParams(
     index: number,
     shape: ContainerShape,
-  ): DraftNodeParams<ContainerShape> {
+  ): TypedRefParams<ContainerShape> {
     return {
       shape,
       placeholder: undefined, // List items don't have placeholder
@@ -142,8 +142,8 @@ export abstract class ListDraftNodeBase<
     }
   }
 
-  // Get item for return values - returns DraftItem that can be mutated
-  protected getDraftItem(index: number): any {
+  // Get item for return values - returns MutableItem that can be mutated
+  protected getMutableItem(index: number): any {
     // Check if we already have a cached item for this index
     let cachedItem = this.itemCache.get(index)
     if (cachedItem) {
@@ -153,7 +153,7 @@ export abstract class ListDraftNodeBase<
     // Get the raw container item
     const containerItem = this.container.get(index)
     if (containerItem === undefined) {
-      return undefined as DraftItem
+      return undefined as MutableItem
     }
 
     if (isValueShape(this.shape.shape)) {
@@ -172,11 +172,11 @@ export abstract class ListDraftNodeBase<
       if (!this.readonly) {
         this.itemCache.set(index, cachedItem)
       }
-      return cachedItem as DraftItem
+      return cachedItem as MutableItem
     } else {
-      // For container shapes, create a proper draft node using the new pattern
-      cachedItem = createContainerDraftNode(
-        this.getDraftNodeParams(index, this.shape.shape as ContainerShape),
+      // For container shapes, create a proper typed ref using the new pattern
+      cachedItem = createContainerTypedRef(
+        this.getTypedRefParams(index, this.shape.shape as ContainerShape),
       )
       // Cache container nodes
       this.itemCache.set(index, cachedItem)
@@ -191,20 +191,20 @@ export abstract class ListDraftNodeBase<
         }
       }
 
-      return cachedItem as DraftItem
+      return cachedItem as MutableItem
     }
   }
 
   // Array-like methods for better developer experience
-  // DUAL INTERFACE: Predicates get Item (plain data), return values are DraftItem (mutable)
+  // DUAL INTERFACE: Predicates get Item (plain data), return values are MutableItem (mutable)
 
   find(
     predicate: (item: Item, index: number) => boolean,
-  ): DraftItem | undefined {
+  ): MutableItem | undefined {
     for (let i = 0; i < this.length; i++) {
       const predicateItem = this.getPredicateItem(i)
       if (predicate(predicateItem, i)) {
-        return this.getDraftItem(i) // Return mutable draft item
+        return this.getMutableItem(i) // Return mutable item
       }
     }
     return undefined
@@ -231,12 +231,12 @@ export abstract class ListDraftNodeBase<
     return result
   }
 
-  filter(predicate: (item: Item, index: number) => boolean): DraftItem[] {
-    const result: DraftItem[] = []
+  filter(predicate: (item: Item, index: number) => boolean): MutableItem[] {
+    const result: MutableItem[] = []
     for (let i = 0; i < this.length; i++) {
       const predicateItem = this.getPredicateItem(i)
       if (predicate(predicateItem, i)) {
-        result.push(this.getDraftItem(i)) // Return mutable draft items
+        result.push(this.getMutableItem(i)) // Return mutable items
       }
     }
     return result
@@ -270,36 +270,36 @@ export abstract class ListDraftNodeBase<
   }
 
   insert(index: number, item: Item): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     // Update cache indices before performing the insert operation
     this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
   }
 
   delete(index: number, len: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     // Update cache indices before performing the delete operation
     this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
   }
 
   push(item: Item): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.pushWithConversion(item)
   }
 
   pushContainer(container: Container): Container {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.pushContainer(container)
   }
 
   insertContainer(index: number, container: Container): Container {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.insertContainer(index, container)
   }
 
-  get(index: number): DraftItem {
-    return this.getDraftItem(index)
+  get(index: number): MutableItem {
+    return this.getMutableItem(index)
   }
 
   toArray(): Item[] {

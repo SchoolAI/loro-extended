@@ -1,8 +1,8 @@
-import type { ListDraftNode } from "./list.js"
-import type { MovableListDraftNode } from "./movable-list.js"
-import type { RecordDraftNode } from "./record.js"
+import type { ListRef } from "./list.js"
+import type { MovableListRef } from "./movable-list.js"
+import type { RecordRef } from "./record.js"
 
-export const recordProxyHandler: ProxyHandler<RecordDraftNode<any>> = {
+export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
   get: (target, prop) => {
     if (typeof prop === "string" && !(prop in target)) {
       return target.get(prop)
@@ -38,7 +38,7 @@ export const recordProxyHandler: ProxyHandler<RecordDraftNode<any>> = {
   },
 }
 
-export const listProxyHandler: ProxyHandler<ListDraftNode<any>> = {
+export const listProxyHandler: ProxyHandler<ListRef<any>> = {
   get: (target, prop) => {
     if (typeof prop === "string") {
       const index = Number(prop)
@@ -62,26 +62,25 @@ export const listProxyHandler: ProxyHandler<ListDraftNode<any>> = {
   },
 }
 
-export const movableListProxyHandler: ProxyHandler<MovableListDraftNode<any>> =
-  {
-    get: (target, prop) => {
-      if (typeof prop === "string") {
-        const index = Number(prop)
-        if (!Number.isNaN(index)) {
-          return target.get(index)
-        }
+export const movableListProxyHandler: ProxyHandler<MovableListRef<any>> = {
+  get: (target, prop) => {
+    if (typeof prop === "string") {
+      const index = Number(prop)
+      if (!Number.isNaN(index)) {
+        return target.get(index)
       }
-      return Reflect.get(target, prop)
-    },
-    set: (target, prop, value) => {
-      if (typeof prop === "string") {
-        const index = Number(prop)
-        if (!Number.isNaN(index)) {
-          // MovableList supports set directly
-          target.set(index, value)
-          return true
-        }
+    }
+    return Reflect.get(target, prop)
+  },
+  set: (target, prop, value) => {
+    if (typeof prop === "string") {
+      const index = Number(prop)
+      if (!Number.isNaN(index)) {
+        // MovableList supports set directly
+        target.set(index, value)
+        return true
       }
-      return Reflect.set(target, prop, value)
-    },
-  }
+    }
+    return Reflect.set(target, prop, value)
+  },
+}

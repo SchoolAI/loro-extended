@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 
-describe("Counter Draft Node", () => {
+describe("Counter Ref", () => {
   it("should return placeholder value without materializing the container", () => {
     const schema = Shape.doc({
       counter: Shape.counter().placeholder(10),

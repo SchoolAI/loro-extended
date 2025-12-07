@@ -6,7 +6,7 @@ import { batchAsNeeded } from "../utils.js"
 
 export function handleEphemeral(
   message: ChannelMsgEphemeral,
-  { model, fromChannelId, logger }: ChannelHandlerContext,
+  { model, fromChannelId }: ChannelHandlerContext,
 ): Command | undefined {
   const commands: Command[] = []
 

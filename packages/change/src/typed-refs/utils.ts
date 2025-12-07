@@ -8,57 +8,53 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
-import type { DraftNode, DraftNodeParams } from "./base.js"
-import { CounterDraftNode } from "./counter.js"
-import { ListDraftNode } from "./list.js"
-import { MapDraftNode } from "./map.js"
-import { MovableListDraftNode } from "./movable-list.js"
+import type { TypedRef, TypedRefParams } from "./base.js"
+import { CounterRef } from "./counter.js"
+import { ListRef } from "./list.js"
+import { MapRef } from "./map.js"
+import { MovableListRef } from "./movable-list.js"
 import {
   listProxyHandler,
   movableListProxyHandler,
   recordProxyHandler,
 } from "./proxy-handlers.js"
-import { RecordDraftNode } from "./record.js"
-import { TextDraftNode } from "./text.js"
-import { TreeDraftNode } from "./tree.js"
+import { RecordRef } from "./record.js"
+import { TextRef } from "./text.js"
+import { TreeRef } from "./tree.js"
 
 // Generic catch-all overload
-export function createContainerDraftNode<T extends ContainerShape>(
-  params: DraftNodeParams<T>,
-): DraftNode<T>
+export function createContainerTypedRef<T extends ContainerShape>(
+  params: TypedRefParams<T>,
+): TypedRef<T>
 
 // Implementation
-export function createContainerDraftNode(
-  params: DraftNodeParams<ContainerShape>,
-): DraftNode<ContainerShape> {
+export function createContainerTypedRef(
+  params: TypedRefParams<ContainerShape>,
+): TypedRef<ContainerShape> {
   switch (params.shape._type) {
     case "counter":
-      return new CounterDraftNode(
-        params as DraftNodeParams<CounterContainerShape>,
-      )
+      return new CounterRef(params as TypedRefParams<CounterContainerShape>)
     case "list":
       return new Proxy(
-        new ListDraftNode(params as DraftNodeParams<ListContainerShape>),
+        new ListRef(params as TypedRefParams<ListContainerShape>),
         listProxyHandler,
       )
     case "map":
-      return new MapDraftNode(params as DraftNodeParams<MapContainerShape>)
+      return new MapRef(params as TypedRefParams<MapContainerShape>)
     case "movableList":
       return new Proxy(
-        new MovableListDraftNode(
-          params as DraftNodeParams<MovableListContainerShape>,
-        ),
+        new MovableListRef(params as TypedRefParams<MovableListContainerShape>),
         movableListProxyHandler,
       )
     case "record":
       return new Proxy(
-        new RecordDraftNode(params as DraftNodeParams<RecordContainerShape>),
+        new RecordRef(params as TypedRefParams<RecordContainerShape>),
         recordProxyHandler,
       )
     case "text":
-      return new TextDraftNode(params as DraftNodeParams<TextContainerShape>)
+      return new TextRef(params as TypedRefParams<TextContainerShape>)
     case "tree":
-      return new TreeDraftNode(params as DraftNodeParams<TreeContainerShape>)
+      return new TreeRef(params as TypedRefParams<TreeContainerShape>)
     default:
       throw new Error(
         `Unknown container type: ${(params.shape as ContainerShape)._type}`,
@@ -66,8 +62,8 @@ export function createContainerDraftNode(
   }
 }
 
-export function assignPlainValueToDraftNode(
-  node: DraftNode<any>,
+export function assignPlainValueToTypedRef(
+  node: TypedRef<any>,
   value: any,
 ): boolean {
   const shapeType = (node as any).shape._type

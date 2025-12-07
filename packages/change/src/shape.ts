@@ -9,17 +9,17 @@ import type {
   LoroTree,
 } from "loro-crdt"
 
-import type { CounterDraftNode } from "./draft-nodes/counter.js"
-import type { ListDraftNode } from "./draft-nodes/list.js"
-import type { MapDraftNode } from "./draft-nodes/map.js"
-import type { MovableListDraftNode } from "./draft-nodes/movable-list.js"
-import type { RecordDraftNode } from "./draft-nodes/record.js"
-import type { TextDraftNode } from "./draft-nodes/text.js"
+import type { CounterRef } from "./typed-refs/counter.js"
+import type { ListRef } from "./typed-refs/list.js"
+import type { MapRef } from "./typed-refs/map.js"
+import type { MovableListRef } from "./typed-refs/movable-list.js"
+import type { RecordRef } from "./typed-refs/record.js"
+import type { TextRef } from "./typed-refs/text.js"
 
-export interface Shape<Plain, Draft, Placeholder = Plain> {
+export interface Shape<Plain, Mutable, Placeholder = Plain> {
   readonly _type: string
   readonly _plain: Plain
-  readonly _draft: Draft
+  readonly _mutable: Mutable
   readonly _placeholder: Placeholder
 }
 
@@ -35,7 +35,7 @@ export interface DocShape<
   >,
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
-    { [K in keyof NestedShapes]: NestedShapes[K]["_draft"] },
+    { [K in keyof NestedShapes]: NestedShapes[K]["_mutable"] },
     { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
   readonly _type: "doc"
@@ -43,12 +43,11 @@ export interface DocShape<
   readonly shapes: NestedShapes
 }
 
-export interface TextContainerShape
-  extends Shape<string, TextDraftNode, string> {
+export interface TextContainerShape extends Shape<string, TextRef, string> {
   readonly _type: "text"
 }
 export interface CounterContainerShape
-  extends Shape<number, CounterDraftNode, number> {
+  extends Shape<number, CounterRef, number> {
   readonly _type: "counter"
 }
 export interface TreeContainerShape<NestedShape = ContainerOrValueShape>
@@ -64,7 +63,7 @@ export interface TreeContainerShape<NestedShape = ContainerOrValueShape>
 // This prevents users from expecting per-entry merging behavior.
 export interface ListContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
-> extends Shape<NestedShape["_plain"][], ListDraftNode<NestedShape>, never[]> {
+> extends Shape<NestedShape["_plain"][], ListRef<NestedShape>, never[]> {
   readonly _type: "list"
   // A list contains many elements, all of the same 'shape'
   readonly shape: NestedShape
@@ -72,11 +71,7 @@ export interface ListContainerShape<
 
 export interface MovableListContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
-> extends Shape<
-    NestedShape["_plain"][],
-    MovableListDraftNode<NestedShape>,
-    never[]
-  > {
+> extends Shape<NestedShape["_plain"][], MovableListRef<NestedShape>, never[]> {
   readonly _type: "movableList"
   // A list contains many elements, all of the same 'shape'
   readonly shape: NestedShape
@@ -89,8 +84,8 @@ export interface MapContainerShape<
   >,
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
-    MapDraftNode<NestedShapes> & {
-      [K in keyof NestedShapes]: NestedShapes[K]["_draft"]
+    MapRef<NestedShapes> & {
+      [K in keyof NestedShapes]: NestedShapes[K]["_mutable"]
     },
     { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
@@ -103,7 +98,7 @@ export interface RecordContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
 > extends Shape<
     Record<string, NestedShape["_plain"]>,
-    RecordDraftNode<NestedShape>,
+    RecordRef<NestedShape>,
     Record<string, never>
   > {
   readonly _type: "record"
@@ -155,7 +150,7 @@ export interface ObjectValueShape<
   T extends Record<string, ValueShape> = Record<string, ValueShape>,
 > extends Shape<
     { [K in keyof T]: T[K]["_plain"] },
-    { [K in keyof T]: T[K]["_draft"] },
+    { [K in keyof T]: T[K]["_mutable"] },
     { [K in keyof T]: T[K]["_placeholder"] }
   > {
   readonly _type: "value"
@@ -168,7 +163,7 @@ export interface ObjectValueShape<
 export interface RecordValueShape<T extends ValueShape = ValueShape>
   extends Shape<
     Record<string, T["_plain"]>,
-    Record<string, T["_draft"]>,
+    Record<string, T["_mutable"]>,
     Record<string, never>
   > {
   readonly _type: "value"
@@ -177,7 +172,7 @@ export interface RecordValueShape<T extends ValueShape = ValueShape>
 }
 
 export interface ArrayValueShape<T extends ValueShape = ValueShape>
-  extends Shape<T["_plain"][], T["_draft"][], never[]> {
+  extends Shape<T["_plain"][], T["_mutable"][], never[]> {
   readonly _type: "value"
   readonly valueType: "array"
   readonly shape: T
@@ -186,7 +181,7 @@ export interface ArrayValueShape<T extends ValueShape = ValueShape>
 export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
   extends Shape<
     T[number]["_plain"],
-    T[number]["_draft"],
+    T[number]["_mutable"],
     T[number]["_placeholder"]
   > {
   readonly _type: "value"
@@ -211,9 +206,9 @@ export interface DiscriminatedUnionValueShape<
   K extends string = string,
   T extends Record<string, ObjectValueShape> = Record<string, ObjectValueShape>,
   Plain = T[keyof T]["_plain"],
-  Draft = T[keyof T]["_draft"],
+  Mutable = T[keyof T]["_mutable"],
   Placeholder = T[keyof T]["_placeholder"],
-> extends Shape<Plain, Draft, Placeholder> {
+> extends Shape<Plain, Mutable, Placeholder> {
   readonly _type: "value"
   readonly valueType: "discriminatedUnion"
   readonly discriminantKey: K
@@ -248,7 +243,7 @@ export const Shape = {
     _type: "doc" as const,
     shapes: shape,
     _plain: {} as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: {} as any,
   }),
 
@@ -258,7 +253,7 @@ export const Shape = {
     const base: CounterContainerShape = {
       _type: "counter" as const,
       _plain: 0,
-      _draft: {} as CounterDraftNode,
+      _mutable: {} as CounterRef,
       _placeholder: 0,
     }
     return Object.assign(base, {
@@ -272,7 +267,7 @@ export const Shape = {
     _type: "list" as const,
     shape,
     _plain: [] as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: [] as never[],
   }),
 
@@ -282,7 +277,7 @@ export const Shape = {
     _type: "map" as const,
     shapes: shape,
     _plain: {} as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: {} as any,
   }),
 
@@ -292,7 +287,7 @@ export const Shape = {
     _type: "record" as const,
     shape,
     _plain: {} as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: {} as Record<string, never>,
   }),
 
@@ -302,7 +297,7 @@ export const Shape = {
     _type: "movableList" as const,
     shape,
     _plain: [] as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: [] as never[],
   }),
 
@@ -310,7 +305,7 @@ export const Shape = {
     const base: TextContainerShape = {
       _type: "text" as const,
       _plain: "",
-      _draft: {} as TextDraftNode,
+      _mutable: {} as TextRef,
       _placeholder: "",
     }
     return Object.assign(base, {
@@ -324,7 +319,7 @@ export const Shape = {
     _type: "tree" as const,
     shape,
     _plain: {} as any,
-    _draft: {} as any,
+    _mutable: {} as any,
     _placeholder: [] as never[],
   }),
 
@@ -340,7 +335,7 @@ export const Shape = {
         _type: "value" as const,
         valueType: "string" as const,
         _plain: (options[0] ?? "") as T,
-        _draft: (options[0] ?? "") as T,
+        _mutable: (options[0] ?? "") as T,
         _placeholder: (options[0] ?? "") as T,
         options: options.length > 0 ? options : undefined,
       }
@@ -356,7 +351,7 @@ export const Shape = {
         _type: "value" as const,
         valueType: "number" as const,
         _plain: 0,
-        _draft: 0,
+        _mutable: 0,
         _placeholder: 0,
       }
       return Object.assign(base, {
@@ -371,7 +366,7 @@ export const Shape = {
         _type: "value" as const,
         valueType: "boolean" as const,
         _plain: false,
-        _draft: false,
+        _mutable: false,
         _placeholder: false,
       }
       return Object.assign(base, {
@@ -385,7 +380,7 @@ export const Shape = {
       _type: "value" as const,
       valueType: "null" as const,
       _plain: null,
-      _draft: null,
+      _mutable: null,
       _placeholder: null,
     }),
 
@@ -393,7 +388,7 @@ export const Shape = {
       _type: "value" as const,
       valueType: "undefined" as const,
       _plain: undefined,
-      _draft: undefined,
+      _mutable: undefined,
       _placeholder: undefined,
     }),
 
@@ -401,7 +396,7 @@ export const Shape = {
       _type: "value" as const,
       valueType: "uint8array" as const,
       _plain: new Uint8Array(),
-      _draft: new Uint8Array(),
+      _mutable: new Uint8Array(),
       _placeholder: new Uint8Array(),
     }),
 
@@ -412,7 +407,7 @@ export const Shape = {
       valueType: "object" as const,
       shape,
       _plain: {} as any,
-      _draft: {} as any,
+      _mutable: {} as any,
       _placeholder: {} as any,
     }),
 
@@ -421,7 +416,7 @@ export const Shape = {
       valueType: "record" as const,
       shape,
       _plain: {} as any,
-      _draft: {} as any,
+      _mutable: {} as any,
       _placeholder: {} as Record<string, never>,
     }),
 
@@ -430,7 +425,7 @@ export const Shape = {
       valueType: "array" as const,
       shape,
       _plain: [] as any,
-      _draft: [] as any,
+      _mutable: [] as any,
       _placeholder: [] as never[],
     }),
 
@@ -444,7 +439,7 @@ export const Shape = {
         valueType: "union" as const,
         shapes,
         _plain: {} as any,
-        _draft: {} as any,
+        _mutable: {} as any,
         _placeholder: {} as any,
       }
       return Object.assign(base, {
@@ -493,7 +488,7 @@ export const Shape = {
         discriminantKey,
         variants,
         _plain: {} as any,
-        _draft: {} as any,
+        _mutable: {} as any,
         _placeholder: {} as any,
       }
       return Object.assign(base, {

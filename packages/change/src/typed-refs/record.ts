@@ -15,11 +15,8 @@ import type {
 } from "../shape.js"
 import type { Infer, InferDraftType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
-import { DraftNode, type DraftNodeParams } from "./base.js"
-import {
-  assignPlainValueToDraftNode,
-  createContainerDraftNode,
-} from "./utils.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
+import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
 
 const containerConstructor = {
   counter: LoroCounter,
@@ -31,12 +28,12 @@ const containerConstructor = {
   tree: LoroTree,
 } as const
 
-// Record draft node
-export class RecordDraftNode<
+// Record typed ref
+export class RecordRef<
   NestedShape extends ContainerOrValueShape,
-> extends DraftNode<any> {
+> extends TypedRef<any> {
   [key: string]: Infer<NestedShape> | any
-  private nodeCache = new Map<string, DraftNode<ContainerShape> | Value>()
+  private nodeCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
   protected get shape(): RecordContainerShape<NestedShape> {
     return super.shape as RecordContainerShape<NestedShape>
@@ -48,8 +45,8 @@ export class RecordDraftNode<
 
   absorbPlainValues() {
     for (const [key, node] of this.nodeCache.entries()) {
-      if (node instanceof DraftNode) {
-        // Contains a DraftNode, not a plain Value: keep recursing
+      if (node instanceof TypedRef) {
+        // Contains a TypedRef, not a plain Value: keep recursing
         node.absorbPlainValues()
         continue
       }
@@ -59,10 +56,10 @@ export class RecordDraftNode<
     }
   }
 
-  getDraftNodeParams<S extends ContainerShape>(
+  getTypedRefParams<S extends ContainerShape>(
     key: string,
     shape: S,
-  ): DraftNodeParams<ContainerShape> {
+  ): TypedRefParams<ContainerShape> {
     const placeholder = (this.placeholder as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
@@ -81,8 +78,8 @@ export class RecordDraftNode<
     if (!node) {
       const shape = this.shape.shape
       if (isContainerShape(shape)) {
-        node = createContainerDraftNode(
-          this.getDraftNodeParams(key, shape as ContainerShape),
+        node = createContainerTypedRef(
+          this.getTypedRefParams(key, shape as ContainerShape),
         )
         // Cache container nodes
         this.nodeCache.set(key, node)
@@ -127,7 +124,7 @@ export class RecordDraftNode<
   }
 
   set(key: string, value: any): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
       this.nodeCache.set(key, value)
@@ -137,24 +134,24 @@ export class RecordDraftNode<
       if (value && typeof value === "object") {
         const node = this.getOrCreateNode(key)
 
-        if (assignPlainValueToDraftNode(node, value)) {
+        if (assignPlainValueToTypedRef(node, value)) {
           return
         }
       }
 
       throw new Error(
-        "Cannot set container directly, modify the draft node instead",
+        "Cannot set container directly, modify the typed ref instead",
       )
     }
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.delete(key)
     this.nodeCache.delete(key)
   }

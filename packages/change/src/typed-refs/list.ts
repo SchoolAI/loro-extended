@@ -1,12 +1,12 @@
 import type { LoroList } from "loro-crdt"
 import type { ContainerOrValueShape } from "../shape.js"
 import type { Infer } from "../types.js"
-import { ListDraftNodeBase } from "./list-base.js"
+import { ListRefBase } from "./list-base.js"
 
-// List draft node
-export class ListDraftNode<
+// List typed ref
+export class ListRef<
   NestedShape extends ContainerOrValueShape,
-> extends ListDraftNodeBase<NestedShape> {
+> extends ListRefBase<NestedShape> {
   [index: number]: Infer<NestedShape>
 
   protected get container(): LoroList {

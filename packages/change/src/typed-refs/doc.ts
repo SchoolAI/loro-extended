@@ -1,8 +1,8 @@
 import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
-import { DraftNode, type DraftNodeParams } from "./base.js"
-import { createContainerDraftNode } from "./utils.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
+import { createContainerTypedRef } from "./utils.js"
 
 const containerGetter = {
   counter: "getCounter",
@@ -14,19 +14,19 @@ const containerGetter = {
   tree: "getTree",
 } as const
 
-// Draft Document class -- the actual object passed to the change `mutation` function
-export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
+// Doc Ref class -- the actual object passed to the change `mutation` function
+export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
   private doc: LoroDoc
-  private propertyCache = new Map<string, DraftNode<ContainerShape>>()
+  private propertyCache = new Map<string, TypedRef<ContainerShape>>()
   private requiredPlaceholder!: Infer<Shape>
 
   constructor(
-    _params: Omit<DraftNodeParams<Shape>, "getContainer"> & { doc: LoroDoc },
+    _params: Omit<TypedRefParams<Shape>, "getContainer"> & { doc: LoroDoc },
   ) {
     super({
       ..._params,
       getContainer: () => {
-        throw new Error("can't get container on DraftDoc")
+        throw new Error("can't get container on DocRef")
       },
     })
     if (!_params.placeholder) throw new Error("placeholder required")
@@ -35,10 +35,10 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     this.createLazyProperties()
   }
 
-  getDraftNodeParams<S extends ContainerShape>(
+  getTypedRefParams<S extends ContainerShape>(
     key: string,
     shape: S,
-  ): DraftNodeParams<ContainerShape> {
+  ): TypedRefParams<ContainerShape> {
     const getter = this.doc[containerGetter[shape._type]].bind(this.doc)
 
     return {
@@ -49,10 +49,10 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     }
   }
 
-  getOrCreateDraftNode(
+  getOrCreateTypedRef(
     key: string,
     shape: ContainerShape,
-  ): DraftNode<ContainerShape> | number | string {
+  ): TypedRef<ContainerShape> | number | string {
     if (
       this.readonly &&
       (shape._type === "counter" || shape._type === "text")
@@ -67,7 +67,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     let node = this.propertyCache.get(key)
 
     if (!node) {
-      node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
+      node = createContainerTypedRef(this.getTypedRefParams(key, shape))
       this.propertyCache.set(key, node)
     }
 
@@ -87,7 +87,7 @@ export class DraftDoc<Shape extends DocShape> extends DraftNode<Shape> {
     for (const key in this.shape.shapes) {
       const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
-        get: () => this.getOrCreateDraftNode(key, shape),
+        get: () => this.getOrCreateTypedRef(key, shape),
       })
     }
   }

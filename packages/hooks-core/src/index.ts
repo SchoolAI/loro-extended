@@ -2,8 +2,8 @@ import type {
   ContainerShape,
   DeepReadonly,
   DocShape,
-  Draft,
   Infer,
+  Mutable,
   ValueShape,
 } from "@loro-extended/change"
 import {
@@ -44,8 +44,8 @@ export type SimpleChangeFn = (doc: LoroDoc) => void
 /** A function that transforms a LoroDoc before applying changes. */
 export type DocTransformer<TInput> = (doc: LoroDoc) => TInput
 
-/** A function that mutates a Loro document using schema-aware drafts. */
-export type ChangeFn<T extends DocShape> = (draft: Draft<T>) => void
+/** A function that mutates a Loro document using schema-aware mutable refs. */
+export type ChangeFn<T extends DocShape> = (draft: Mutable<T>) => void
 
 export function createHooks(framework: FrameworkHooks) {
   const {

@@ -1,8 +1,8 @@
 import type {
   DeepReadonly,
   DocShape,
-  Draft,
   Infer,
+  Mutable,
   ValueShape,
 } from "@loro-extended/change"
 import { TypedDoc, TypedPresence } from "@loro-extended/change"
@@ -73,7 +73,7 @@ export class TypedDocHandle<
   /**
    * Convenience method: Mutate the document.
    */
-  change(fn: (draft: Draft<D>) => void): Infer<D> {
+  change(fn: (draft: Mutable<D>) => void): Infer<D> {
     return this._doc.change(fn)
   }
 

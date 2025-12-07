@@ -1,7 +1,9 @@
 // Re-export schema-related types from @loro-extended/change for convenience
 export type {
   DocShape,
+  /** @deprecated Use Mutable instead */
   Draft,
+  Mutable,
 } from "@loro-extended/change"
 export { Shape } from "@loro-extended/change"
 // Common types

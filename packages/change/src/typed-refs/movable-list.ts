@@ -1,13 +1,13 @@
 import type { Container, LoroMovableList } from "loro-crdt"
 import type { ContainerOrValueShape } from "../shape.js"
 import type { Infer } from "../types.js"
-import { ListDraftNodeBase } from "./list-base.js"
+import { ListRefBase } from "./list-base.js"
 
-// Movable list draft node
-export class MovableListDraftNode<
+// Movable list typed ref
+export class MovableListRef<
   NestedShape extends ContainerOrValueShape,
   Item = NestedShape["_plain"],
-> extends ListDraftNodeBase<NestedShape> {
+> extends ListRefBase<NestedShape> {
   [index: number]: Infer<NestedShape>
 
   protected get container(): LoroMovableList {
@@ -20,12 +20,12 @@ export class MovableListDraftNode<
   }
 
   move(from: number, to: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.move(from, to)
   }
 
   set(index: number, item: Exclude<Item, Container>) {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.set(index, item)
   }
 }

@@ -37,11 +37,15 @@ export { createTypedDoc, TypedDoc } from "./typed-doc.js"
 export { TypedPresence } from "./typed-presence.js"
 export type {
   DeepReadonly,
+  /** @deprecated Use Mutable instead */
   Draft,
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
+  /** @deprecated Use InferMutableType instead */
   InferDraftType,
+  InferMutableType,
   InferPlaceholderType,
+  Mutable,
 } from "./types.js"
 // Utility exports
 export { validatePlaceholder } from "./validation.js"

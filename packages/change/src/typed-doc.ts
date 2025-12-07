@@ -2,7 +2,6 @@
 
 import { LoroDoc } from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
-import { DraftDoc } from "./draft-nodes/doc.js"
 import {
   type JsonPatch,
   JsonPatchApplicator,
@@ -11,6 +10,7 @@ import {
 } from "./json-patch.js"
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
+import { DocRef } from "./typed-refs/doc.js"
 import type {
   DeepReadonly,
   Draft,
@@ -46,7 +46,7 @@ export class TypedDoc<Shape extends DocShape> {
    * This is efficient (O(1) per access) and always up-to-date.
    */
   get value(): DeepReadonly<Infer<Shape>> {
-    return new DraftDoc({
+    return new DocRef({
       shape: this.shape,
       placeholder: this.placeholder as any,
       doc: this.doc,
@@ -68,8 +68,8 @@ export class TypedDoc<Shape extends DocShape> {
   }
 
   change(fn: (draft: Draft<Shape>) => void): Infer<Shape> {
-    // Reuse existing DocumentDraft system with placeholder integration
-    const draft = new DraftDoc({
+    // Reuse existing DocRef system with placeholder integration
+    const draft = new DocRef({
       shape: this.shape,
       placeholder: this.placeholder as any,
       doc: this.doc,

@@ -15,11 +15,8 @@ import type {
   ValueShape,
 } from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
-import { DraftNode, type DraftNodeParams } from "./base.js"
-import {
-  assignPlainValueToDraftNode,
-  createContainerDraftNode,
-} from "./utils.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
+import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
 
 const containerConstructor = {
   counter: LoroCounter,
@@ -31,13 +28,13 @@ const containerConstructor = {
   tree: LoroTree,
 } as const
 
-// Map draft node
-export class MapDraftNode<
+// Map typed ref
+export class MapRef<
   NestedShapes extends Record<string, ContainerOrValueShape>,
-> extends DraftNode<any> {
-  private propertyCache = new Map<string, DraftNode<ContainerShape> | Value>()
+> extends TypedRef<any> {
+  private propertyCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
-  constructor(params: DraftNodeParams<MapContainerShape<NestedShapes>>) {
+  constructor(params: TypedRefParams<MapContainerShape<NestedShapes>>) {
     super(params)
     this.createLazyProperties()
   }
@@ -52,8 +49,8 @@ export class MapDraftNode<
 
   absorbPlainValues() {
     for (const [key, node] of this.propertyCache.entries()) {
-      if (node instanceof DraftNode) {
-        // Contains a DraftNode, not a plain Value: keep recursing
+      if (node instanceof TypedRef) {
+        // Contains a TypedRef, not a plain Value: keep recursing
         node.absorbPlainValues()
         continue
       }
@@ -63,10 +60,10 @@ export class MapDraftNode<
     }
   }
 
-  getDraftNodeParams<S extends ContainerShape>(
+  getTypedRefParams<S extends ContainerShape>(
     key: string,
     shape: S,
-  ): DraftNodeParams<ContainerShape> {
+  ): TypedRefParams<ContainerShape> {
     const placeholder = (this.placeholder as any)?.[key]
 
     const LoroContainer = containerConstructor[shape._type]
@@ -87,7 +84,7 @@ export class MapDraftNode<
     let node = this.propertyCache.get(key)
     if (!node) {
       if (isContainerShape(shape)) {
-        node = createContainerDraftNode(this.getDraftNodeParams(key, shape))
+        node = createContainerTypedRef(this.getTypedRefParams(key, shape))
         // We cache container nodes even in readonly mode because they are just handles
         this.propertyCache.set(key, node)
       } else {
@@ -129,7 +126,7 @@ export class MapDraftNode<
       }
     }
 
-    return node as Shape extends ContainerShape ? DraftNode<Shape> : Value
+    return node as Shape extends ContainerShape ? TypedRef<Shape> : Value
   }
 
   private createLazyProperties(): void {
@@ -138,7 +135,7 @@ export class MapDraftNode<
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateNode(key, shape),
         set: value => {
-          if (this.readonly) throw new Error("Cannot modify readonly doc")
+          if (this.readonly) throw new Error("Cannot modify readonly ref")
           if (isValueShape(shape)) {
             this.container.set(key, value)
             this.propertyCache.set(key, value)
@@ -146,12 +143,12 @@ export class MapDraftNode<
             if (value && typeof value === "object") {
               const node = this.getOrCreateNode(key, shape)
 
-              if (assignPlainValueToDraftNode(node as DraftNode<any>, value)) {
+              if (assignPlainValueToTypedRef(node as TypedRef<any>, value)) {
                 return
               }
             }
             throw new Error(
-              "Cannot set container directly, modify the draft node instead",
+              "Cannot set container directly, modify the typed ref instead",
             )
           }
         },
@@ -165,17 +162,17 @@ export class MapDraftNode<
   }
 
   set(key: string, value: Value): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.set(key, value)
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly doc")
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.delete(key)
   }
 

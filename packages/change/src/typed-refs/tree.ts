@@ -1,21 +1,24 @@
 import type { TreeContainerShape } from "../shape.js"
-import { DraftNode } from "./base.js"
+import { TypedRef } from "./base.js"
 
-// Tree draft node
-export class TreeDraftNode<T extends TreeContainerShape> extends DraftNode<T> {
+// Tree typed ref
+export class TreeRef<T extends TreeContainerShape> extends TypedRef<T> {
   absorbPlainValues() {
     // TODO(duane): implement for trees
   }
 
   createNode(parent?: any, index?: number): any {
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     return this.container.createNode(parent, index)
   }
 
   move(target: any, parent?: any, index?: number): void {
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.move(target, parent, index)
   }
 
   delete(target: any): void {
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.delete(target)
   }
 

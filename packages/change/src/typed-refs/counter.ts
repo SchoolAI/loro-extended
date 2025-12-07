@@ -1,17 +1,19 @@
 import type { CounterContainerShape } from "../shape.js"
-import { DraftNode } from "./base.js"
+import { TypedRef } from "./base.js"
 
-// Counter draft node
-export class CounterDraftNode extends DraftNode<CounterContainerShape> {
+// Counter typed ref
+export class CounterRef extends TypedRef<CounterContainerShape> {
   absorbPlainValues() {
     // no plain values contained within
   }
 
   increment(value: number): void {
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.increment(value)
   }
 
   decrement(value: number): void {
+    if (this.readonly) throw new Error("Cannot modify readonly ref")
     this.container.decrement(value)
   }
 
