@@ -547,6 +547,26 @@ draft.metadata.values();
 const value = draft.metadata.get("key");
 ```
 
+### JSON Serialization and Snapshots
+
+You can easily get a plain JavaScript object snapshot of any part of the document using `JSON.stringify()` or `.toJSON()`. This works for the entire document, nested containers, and even during loading states (placeholders).
+
+```typescript
+// Get full document snapshot
+const snapshot = doc.toJSON();
+
+// Get snapshot of a specific list
+const todos = doc.value.todos.toJSON(); // returns plain array of todos
+
+// Works with nested structures
+const metadata = doc.value.metadata.toJSON(); // returns plain object
+
+// Serialize as JSON
+const serializedMetadata = JSON.stringify(doc.value.metadata); // returns string
+```
+
+**Note:** `JSON.stringify()` is recommended for serialization as it handles all data types correctly. `.toJSON()` is available on all `TypedRef` objects and proxied placeholders for convenience when you need a direct object snapshot.
+
 ## Type Safety
 
 Full TypeScript support with compile-time validation:
