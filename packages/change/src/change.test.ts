@@ -1727,6 +1727,223 @@ describe("Edge Cases and Error Handling", () => {
           expect(result.items.find(item => item.id === "999")).toBeUndefined()
         })
       })
+
+      describe("slice method", () => {
+        it("should return a slice of the list with start and end", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push("a")
+            draft.items.push("b")
+            draft.items.push("c")
+            draft.items.push("d")
+            draft.items.push("e")
+
+            // slice(1, 3) returns items at indices 1 and 2
+            const sliced = draft.items.slice(1, 3)
+            expect(sliced).toEqual(["b", "c"])
+          })
+        })
+
+        it("should handle negative indices", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push("a")
+            draft.items.push("b")
+            draft.items.push("c")
+            draft.items.push("d")
+            draft.items.push("e")
+
+            // slice(-2) returns last 2 items
+            const lastTwo = draft.items.slice(-2)
+            expect(lastTwo).toEqual(["d", "e"])
+
+            // slice(1, -1) returns items from index 1 to second-to-last
+            const middle = draft.items.slice(1, -1)
+            expect(middle).toEqual(["b", "c", "d"])
+
+            // slice(-3, -1) returns items from third-to-last to second-to-last
+            const negativeRange = draft.items.slice(-3, -1)
+            expect(negativeRange).toEqual(["c", "d"])
+          })
+        })
+
+        it("should handle missing end parameter", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push("a")
+            draft.items.push("b")
+            draft.items.push("c")
+            draft.items.push("d")
+
+            // slice(2) returns items from index 2 to end
+            const fromTwo = draft.items.slice(2)
+            expect(fromTwo).toEqual(["c", "d"])
+          })
+        })
+
+        it("should handle no parameters", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push("a")
+            draft.items.push("b")
+            draft.items.push("c")
+
+            // slice() returns all items (shallow copy)
+            const all = draft.items.slice()
+            expect(all).toEqual(["a", "b", "c"])
+          })
+        })
+
+        it("should handle out-of-bounds indices", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push("a")
+            draft.items.push("b")
+            draft.items.push("c")
+
+            // slice(0, 100) on 3-item list returns all 3 items
+            const overEnd = draft.items.slice(0, 100)
+            expect(overEnd).toEqual(["a", "b", "c"])
+
+            // slice(100) returns empty array
+            const overStart = draft.items.slice(100)
+            expect(overStart).toEqual([])
+
+            // slice(-100) returns all items (clamped to 0)
+            const underStart = draft.items.slice(-100)
+            expect(underStart).toEqual(["a", "b", "c"])
+          })
+        })
+
+        it("should return empty array for empty list", () => {
+          const schema = Shape.doc({
+            items: Shape.list(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            // slice() on empty list returns []
+            expect(draft.items.slice()).toEqual([])
+            expect(draft.items.slice(0, 10)).toEqual([])
+            expect(draft.items.slice(-5)).toEqual([])
+          })
+        })
+
+        it("should allow mutations to persist", () => {
+          const schema = Shape.doc({
+            items: Shape.list(
+              Shape.plain.object({
+                id: Shape.plain.string(),
+                value: Shape.plain.number(),
+              }),
+            ),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.items.push({ id: "1", value: 10 })
+            draft.items.push({ id: "2", value: 20 })
+            draft.items.push({ id: "3", value: 30 })
+            draft.items.push({ id: "4", value: 40 })
+          })
+
+          // Modify items from slice and verify changes persist
+          const result = typedDoc.change(draft => {
+            const middleItems = draft.items.slice(1, 3)
+            // Mutate the sliced items
+            middleItems[0].value = 200
+            middleItems[1].value = 300
+          })
+
+          // Verify mutations persisted to the original list
+          expect(result.items[0].value).toBe(10) // unchanged
+          expect(result.items[1].value).toBe(200) // mutated via slice
+          expect(result.items[2].value).toBe(300) // mutated via slice
+          expect(result.items[3].value).toBe(40) // unchanged
+        })
+
+        it("should work with MovableListRef", () => {
+          const schema = Shape.doc({
+            tasks: Shape.movableList(Shape.plain.string()),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.tasks.push("task1")
+            draft.tasks.push("task2")
+            draft.tasks.push("task3")
+            draft.tasks.push("task4")
+
+            // Test slice on movable list
+            const sliced = draft.tasks.slice(1, 3)
+            expect(sliced).toEqual(["task2", "task3"])
+
+            const lastTwo = draft.tasks.slice(-2)
+            expect(lastTwo).toEqual(["task3", "task4"])
+          })
+        })
+
+        it("should work with nested container items", () => {
+          const schema = Shape.doc({
+            articles: Shape.list(
+              Shape.map({
+                title: Shape.text(),
+                views: Shape.counter(),
+              }),
+            ),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          typedDoc.change(draft => {
+            draft.articles.push({ title: "Article 1", views: 10 })
+            draft.articles.push({ title: "Article 2", views: 20 })
+            draft.articles.push({ title: "Article 3", views: 30 })
+          })
+
+          const result = typedDoc.change(draft => {
+            const sliced = draft.articles.slice(0, 2)
+            // Mutate nested containers in sliced items
+            sliced[0].title.update("Updated Article 1")
+            sliced[0].views.increment(5)
+            sliced[1].views.increment(10)
+          })
+
+          // Verify mutations persisted
+          expect(result.articles[0].title).toBe("Updated Article 1")
+          expect(result.articles[0].views).toBe(15) // 10 + 5
+          expect(result.articles[1].views).toBe(30) // 20 + 10
+          expect(result.articles[2].views).toBe(30) // unchanged
+        })
+      })
     })
   })
 })

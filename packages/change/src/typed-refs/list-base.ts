@@ -269,6 +269,32 @@ export abstract class ListRefBase<
     return true
   }
 
+  slice(start?: number, end?: number): MutableItem[] {
+    const len = this.length
+
+    // Normalize start index (following JavaScript Array.prototype.slice semantics)
+    let startIndex =
+      start === undefined
+        ? 0
+        : start < 0
+          ? Math.max(len + start, 0)
+          : Math.min(start, len)
+
+    // Normalize end index
+    let endIndex =
+      end === undefined
+        ? len
+        : end < 0
+          ? Math.max(len + end, 0)
+          : Math.min(end, len)
+
+    const result: MutableItem[] = []
+    for (let i = startIndex; i < endIndex; i++) {
+      result.push(this.getMutableItem(i))
+    }
+    return result
+  }
+
   insert(index: number, item: Item): void {
     if (this.readonly) throw new Error("Cannot modify readonly ref")
     // Update cache indices before performing the insert operation
