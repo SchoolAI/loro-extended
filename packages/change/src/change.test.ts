@@ -1,6 +1,7 @@
+import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { Shape } from "./shape.js"
-import { createTypedDoc } from "./typed-doc.js"
+import { createTypedDoc, TypedDoc } from "./typed-doc.js"
 
 describe("CRDT Operations", () => {
   describe("Text Operations", () => {
@@ -1944,6 +1945,64 @@ describe("Edge Cases and Error Handling", () => {
           expect(result.articles[2].views).toBe(30) // unchanged
         })
       })
+    })
+  })
+
+  describe("Record with nested Map containers", () => {
+    /**
+     * Regression test for "placeholder required" error when calling toJSON()
+     * on a document with Records containing Maps where the CRDT has partial data.
+     *
+     * The bug: When a Record contains Map entries that exist in the CRDT but not
+     * in the placeholder (which is always {} for Records), the nested MapRef was
+     * created with placeholder: undefined. When MapRef.toJSON() tried to access
+     * value properties that don't exist in the CRDT, it threw "placeholder required".
+     *
+     * The fix: RecordRef.getTypedRefParams() now derives a placeholder from the
+     * schema's shape when the Record's placeholder doesn't have an entry for that key.
+     */
+    it("should call toJSON() without error when Record has entries with partial CRDT data", () => {
+      // Schema with a Record containing Maps (similar to user's tomState schema)
+      const StudentStateSchema = Shape.map({
+        peerId: Shape.plain.string(),
+        authorName: Shape.plain.string(),
+        authorColor: Shape.plain.string(),
+        history: Shape.list(
+          Shape.map({
+            timestamp: Shape.plain.number(),
+            value: Shape.plain.string(),
+          }),
+        ),
+      })
+
+      const DocSchema = Shape.doc({
+        students: Shape.record(StudentStateSchema),
+      })
+
+      // Simulate loading an existing document that has Record entries with partial data
+      const loroDoc = new LoroDoc()
+
+      // Add an entry to the students record with only some fields populated
+      const studentsMap = loroDoc.getMap("students")
+      const studentMap = studentsMap.setContainer("peer-123", new LoroMap())
+
+      // Set some but not all properties - this simulates partial data from CRDT sync
+      studentMap.set("peerId", "peer-123")
+      studentMap.set("authorName", "Alice")
+      // Note: authorColor is NOT set - this should fall back to placeholder default
+
+      // Wrap with TypedDoc
+      const typedDoc = new TypedDoc(DocSchema, loroDoc)
+
+      // This should not throw "placeholder required"
+      expect(() => {
+        const json = typedDoc.value.toJSON()
+        // Verify the result has placeholder defaults for missing fields
+        expect(json.students["peer-123"].peerId).toBe("peer-123")
+        expect(json.students["peer-123"].authorName).toBe("Alice")
+        expect(json.students["peer-123"].authorColor).toBe("") // placeholder default
+        expect(json.students["peer-123"].history).toEqual([]) // placeholder default
+      }).not.toThrow()
     })
   })
 })

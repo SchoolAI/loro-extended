@@ -273,7 +273,7 @@ export abstract class ListRefBase<
     const len = this.length
 
     // Normalize start index (following JavaScript Array.prototype.slice semantics)
-    let startIndex =
+    const startIndex =
       start === undefined
         ? 0
         : start < 0
@@ -281,7 +281,7 @@ export abstract class ListRefBase<
           : Math.min(start, len)
 
     // Normalize end index
-    let endIndex =
+    const endIndex =
       end === undefined
         ? len
         : end < 0

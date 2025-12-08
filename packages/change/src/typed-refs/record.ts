@@ -8,6 +8,7 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
+import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -60,7 +61,15 @@ export class RecordRef<
     key: string,
     shape: S,
   ): TypedRefParams<ContainerShape> {
-    const placeholder = (this.placeholder as any)?.[key]
+    // First try to get placeholder from the Record's placeholder (if it has an entry for this key)
+    let placeholder = (this.placeholder as any)?.[key]
+
+    // If no placeholder exists for this key, derive one from the schema's shape
+    // This is critical for Records where the placeholder is always {} but nested
+    // containers need valid placeholders to fall back to for missing values
+    if (placeholder === undefined) {
+      placeholder = deriveShapePlaceholder(shape)
+    }
 
     const LoroContainer = containerConstructor[shape._type]
 
