@@ -1,5 +1,31 @@
 # example-bumper-cars
 
+## 0.1.5
+
+### Patch Changes
+
+- a083e1f: Upgraded bumper-cars example to use new TypedDocHandle and TypedPresence APIs
+
+  - Simplified GameLoop constructor from 3 parameters to 1 (TypedDocHandle)
+  - Replaced `createTypedDoc()` pattern with direct `handle.change(draft => ...)`
+  - Replaced manual presence callbacks with `handle.presence.all` and `handle.presence.set()`
+  - Updated server.ts to use `repo.get(docId, docShape, presenceShape)` for type-safe handle
+  - Reduced ~25 lines of boilerplate code and eliminated manual type casting
+
+- Updated dependencies [492af24]
+- Updated dependencies [9ba361d]
+- Updated dependencies [173be61]
+- Updated dependencies [463c5b4]
+- Updated dependencies [8de0ce7]
+- Updated dependencies [e2dcf3f]
+- Updated dependencies [d9ea24e]
+- Updated dependencies [702af3c]
+  - @loro-extended/change@0.9.0
+  - @loro-extended/repo@0.9.0
+  - @loro-extended/adapter-websocket@0.9.0
+  - @loro-extended/react@0.9.0
+  - @loro-extended/adapter-leveldb@0.9.0
+
 ## 0.1.4
 
 ### Patch Changes

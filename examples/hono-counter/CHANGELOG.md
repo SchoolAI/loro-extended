@@ -1,5 +1,23 @@
 # example-hono-counter
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [492af24]
+- Updated dependencies [9ba361d]
+- Updated dependencies [173be61]
+- Updated dependencies [463c5b4]
+- Updated dependencies [8de0ce7]
+- Updated dependencies [e2dcf3f]
+- Updated dependencies [d9ea24e]
+- Updated dependencies [702af3c]
+  - @loro-extended/change@0.9.0
+  - @loro-extended/repo@0.9.0
+  - @loro-extended/hono@0.9.0
+  - @loro-extended/adapter-indexeddb@0.9.0
+  - @loro-extended/adapter-sse@0.9.0
+
 ## 0.1.4
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @loro-extended/adapter-http-polling
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [9ba361d]
+- Updated dependencies [d9ea24e]
+- Updated dependencies [702af3c]
+  - @loro-extended/repo@0.9.0
+
 ## 0.8.1
 
 ### Patch Changes

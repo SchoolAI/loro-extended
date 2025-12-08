@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/react",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "React hooks and utilities for Loro",
   "author": "Duane Johnson",
   "license": "MIT",
