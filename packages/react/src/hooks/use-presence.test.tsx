@@ -66,6 +66,35 @@ describe("useUntypedPresence", () => {
     })
   })
 
+  it("should support functional updater for setSelf", async () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(() => useUntypedPresence(documentId), {
+      wrapper: RepoWrapper,
+    })
+
+    // Set initial state
+    act(() => {
+      result.current.setSelf({ count: 5 })
+    })
+
+    await waitFor(() => {
+      expect(result.current.self).toEqual({ count: 5 })
+    })
+
+    // Use functional updater
+    act(() => {
+      result.current.setSelf(current => ({
+        count: (current.count as number) + 1,
+      }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.self).toEqual({ count: 6 })
+    })
+  })
+
   it("should support selectors", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
@@ -150,6 +179,38 @@ describe("usePresence (typed)", () => {
       expect(result.current.self.cursor).toEqual({ x: 10, y: 20 })
       // Other fields should remain default
       expect(result.current.self.name).toBe("Anonymous")
+    })
+  })
+
+  it("should support functional updater for setSelf", async () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => usePresence(documentId, PresenceSchema),
+      {
+        wrapper: RepoWrapper,
+      },
+    )
+
+    // Set initial cursor position
+    act(() => {
+      result.current.setSelf({ cursor: { x: 10, y: 20 } })
+    })
+
+    await waitFor(() => {
+      expect(result.current.self.cursor).toEqual({ x: 10, y: 20 })
+    })
+
+    // Use functional updater to increment x
+    act(() => {
+      result.current.setSelf(current => ({
+        cursor: { x: current.cursor.x + 5, y: current.cursor.y },
+      }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.self.cursor).toEqual({ x: 15, y: 20 })
     })
   })
 

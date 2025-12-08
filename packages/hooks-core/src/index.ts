@@ -254,7 +254,7 @@ export function createHooks(framework: FrameworkHooks) {
     peers: Map<string, T>
     /** @deprecated Use `peers` and `self` separately */
     all: Record<string, T>
-    setSelf: (value: Partial<T>) => void
+    setSelf: (value: Partial<T> | ((current: T) => Partial<T>)) => void
   }
 
   type ObjectValue = {
@@ -290,7 +290,13 @@ export function createHooks(framework: FrameworkHooks) {
         }
       }
 
-      const setSelf = (values: Partial<T>) => {
+      const setSelf = (
+        valueOrUpdater: Partial<T> | ((current: T) => Partial<T>),
+      ) => {
+        const values =
+          typeof valueOrUpdater === "function"
+            ? valueOrUpdater(handle.presence.self as T)
+            : valueOrUpdater
         handle.presence.set(values)
       }
 
@@ -364,7 +370,15 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       const typedPresence = new TypedPresence(shape, handle.presence)
-      const setSelf = (values: Partial<Infer<S>>) => {
+      const setSelf = (
+        valueOrUpdater:
+          | Partial<Infer<S>>
+          | ((current: Infer<S>) => Partial<Infer<S>>),
+      ) => {
+        const values =
+          typeof valueOrUpdater === "function"
+            ? valueOrUpdater(typedPresence.self)
+            : valueOrUpdater
         typedPresence.set(values)
       }
 

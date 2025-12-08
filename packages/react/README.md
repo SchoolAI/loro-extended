@@ -268,18 +268,30 @@ function useDocument<T extends DocShape>(
 
 ### `usePresence` - Typed Presence
 
-For schema-aware presence with type safety and default values.
+For schema-aware presence with type safety. Default values are derived from the schema's placeholder annotations.
 
 ```typescript
-const { self, all, setSelf } = usePresence(
-  documentId,
-  presenceSchema,
-  emptyPresence
-);
+const { self, peers, setSelf } = usePresence(documentId, presenceSchema);
 
-// self: InferPlainType<PresenceSchema>
-// all: Record<string, InferPlainType<PresenceSchema>>
+// self: Infer<PresenceSchema> - always defined with placeholder values
+// peers: Map<string, Infer<PresenceSchema>> - other connected peers
 ```
+
+#### Functional Updaters
+
+The `setSelf` function supports both direct values and functional updaters, similar to React's `useState`:
+
+```typescript
+// Direct value
+setSelf({ cursor: { x: 10, y: 20 } });
+
+// Functional updater - receives current state, returns partial update
+setSelf((current) => ({
+  cursor: { x: current.cursor.x + 1, y: current.cursor.y },
+}));
+```
+
+This is useful when you need to update presence based on the current state, such as incrementing counters or toggling values.
 
 ### `useUntypedPresence` - Untyped Presence
 
@@ -290,6 +302,12 @@ const { self, all, setSelf } = useUntypedPresence(documentId);
 
 // self: any
 // all: Record<string, any>
+```
+
+The `setSelf` function also supports functional updaters:
+
+```typescript
+setSelf((current) => ({ count: (current.count || 0) + 1 }));
 ```
 
 ## Choosing Between APIs
