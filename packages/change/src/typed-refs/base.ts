@@ -28,6 +28,16 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
     return !!this._params.readonly
   }
 
+  /**
+   * Throws an error if this ref is in readonly mode.
+   * Call this at the start of any mutating method.
+   */
+  protected assertMutable(): void {
+    if (this.readonly) {
+      throw new Error("Cannot modify readonly ref")
+    }
+  }
+
   protected get container(): ShapeToContainer<Shape> {
     if (!this._cachedContainer) {
       const container = this._params.getContainer()

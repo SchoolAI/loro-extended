@@ -1,3 +1,11 @@
+import {
+  LoroCounter,
+  LoroList,
+  LoroMap,
+  LoroMovableList,
+  LoroText,
+  LoroTree,
+} from "loro-crdt"
 import type {
   ContainerShape,
   CounterContainerShape,
@@ -21,6 +29,38 @@ import {
 import { RecordRef } from "./record.js"
 import { TextRef } from "./text.js"
 import { TreeRef } from "./tree.js"
+
+/**
+ * Mapping from container shape types to their Loro constructor classes.
+ * Used when creating new containers via getOrCreateContainer().
+ */
+export const containerConstructor = {
+  counter: LoroCounter,
+  list: LoroList,
+  map: LoroMap,
+  movableList: LoroMovableList,
+  record: LoroMap, // Records use LoroMap as their underlying container
+  text: LoroText,
+  tree: LoroTree,
+} as const
+
+/**
+ * Unwraps a TypedRef to its primitive value for readonly access.
+ * Counter refs return their numeric value, Text refs return their string.
+ * Other container types are returned as-is.
+ */
+export function unwrapReadonlyPrimitive(
+  node: TypedRef<any>,
+  shape: ContainerShape,
+): any {
+  if (shape._type === "counter") {
+    return (node as any).value
+  }
+  if (shape._type === "text") {
+    return (node as any).toString()
+  }
+  return node
+}
 
 // Generic catch-all overload
 export function createContainerTypedRef<T extends ContainerShape>(

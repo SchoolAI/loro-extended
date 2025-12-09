@@ -20,12 +20,12 @@ export class MovableListRef<
   }
 
   move(from: number, to: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.move(from, to)
   }
 
   set(index: number, item: Exclude<Item, Container>) {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     return this.container.set(index, item)
   }
 }

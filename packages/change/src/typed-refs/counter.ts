@@ -8,12 +8,12 @@ export class CounterRef extends TypedRef<CounterContainerShape> {
   }
 
   increment(value: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.increment(value)
   }
 
   decrement(value: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.decrement(value)
   }
 

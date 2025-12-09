@@ -2,7 +2,7 @@ import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { createContainerTypedRef } from "./utils.js"
+import { createContainerTypedRef, unwrapReadonlyPrimitive } from "./utils.js"
 
 const containerGetter = {
   counter: "getCounter",
@@ -72,12 +72,7 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     }
 
     if (this.readonly) {
-      if (shape._type === "counter") {
-        return (node as any).value
-      }
-      if (shape._type === "text") {
-        return (node as any).toString()
-      }
+      return unwrapReadonlyPrimitive(node, shape)
     }
 
     return node

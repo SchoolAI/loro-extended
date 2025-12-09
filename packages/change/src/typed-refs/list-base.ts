@@ -14,7 +14,7 @@ import {
   isValueShape,
 } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { createContainerTypedRef } from "./utils.js"
+import { createContainerTypedRef, unwrapReadonlyPrimitive } from "./utils.js"
 
 // Shared logic for list operations
 export abstract class ListRefBase<
@@ -188,13 +188,10 @@ export abstract class ListRefBase<
       this.itemCache.set(index, cachedItem)
 
       if (this.readonly) {
-        const shape = this.shape.shape as ContainerShape
-        if (shape._type === "counter") {
-          return (cachedItem as any).value
-        }
-        if (shape._type === "text") {
-          return (cachedItem as any).toString()
-        }
+        return unwrapReadonlyPrimitive(
+          cachedItem,
+          this.shape.shape as ContainerShape,
+        )
       }
 
       return cachedItem as MutableItem
@@ -302,31 +299,31 @@ export abstract class ListRefBase<
   }
 
   insert(index: number, item: Item): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     // Update cache indices before performing the insert operation
     this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
   }
 
   delete(index: number, len: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     // Update cache indices before performing the delete operation
     this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
   }
 
   push(item: Item): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.pushWithConversion(item)
   }
 
   pushContainer(container: Container): Container {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     return this.container.pushContainer(container)
   }
 
   insertContainer(index: number, container: Container): Container {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     return this.container.insertContainer(index, container)
   }
 

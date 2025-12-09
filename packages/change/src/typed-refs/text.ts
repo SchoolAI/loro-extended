@@ -9,12 +9,12 @@ export class TextRef extends TypedRef<TextContainerShape> {
 
   // Text methods
   insert(index: number, content: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.insert(index, content)
   }
 
   delete(index: number, len: number): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.delete(index, len)
   }
 
@@ -27,17 +27,17 @@ export class TextRef extends TypedRef<TextContainerShape> {
   }
 
   update(text: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.update(text)
   }
 
   mark(range: { start: number; end: number }, key: string, value: any): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.mark(range, key, value)
   }
 
   unmark(range: { start: number; end: number }, key: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.unmark(range, key)
   }
 
@@ -46,7 +46,7 @@ export class TextRef extends TypedRef<TextContainerShape> {
   }
 
   applyDelta(delta: any[]): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.applyDelta(delta)
   }
 

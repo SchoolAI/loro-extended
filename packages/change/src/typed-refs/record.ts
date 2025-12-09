@@ -1,13 +1,4 @@
-import {
-  type Container,
-  LoroCounter,
-  LoroList,
-  LoroMap,
-  LoroMovableList,
-  LoroText,
-  LoroTree,
-  type Value,
-} from "loro-crdt"
+import type { Container, LoroMap, Value } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import { mergeValue } from "../overlay.js"
 import type {
@@ -18,17 +9,12 @@ import type {
 import type { Infer, InferMutableType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
-
-const containerConstructor = {
-  counter: LoroCounter,
-  list: LoroList,
-  map: LoroMap,
-  movableList: LoroMovableList,
-  record: LoroMap,
-  text: LoroText,
-  tree: LoroTree,
-} as const
+import {
+  assignPlainValueToTypedRef,
+  containerConstructor,
+  createContainerTypedRef,
+  unwrapReadonlyPrimitive,
+} from "./utils.js"
 
 // Record typed ref
 export class RecordRef<
@@ -127,13 +113,10 @@ export class RecordRef<
     }
 
     if (this.readonly && isContainerShape(this.shape.shape)) {
-      const shape = this.shape.shape as ContainerShape
-      if (shape._type === "counter") {
-        return (node as any).value
-      }
-      if (shape._type === "text") {
-        return (node as any).toString()
-      }
+      return unwrapReadonlyPrimitive(
+        node as TypedRef<any>,
+        this.shape.shape as ContainerShape,
+      )
     }
 
     return node as any
@@ -144,7 +127,7 @@ export class RecordRef<
   }
 
   set(key: string, value: any): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
       this.nodeCache.set(key, value)
@@ -166,12 +149,12 @@ export class RecordRef<
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.delete(key)
     this.nodeCache.delete(key)
   }

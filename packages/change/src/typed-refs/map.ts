@@ -1,13 +1,4 @@
-import {
-  type Container,
-  LoroCounter,
-  LoroList,
-  LoroMap,
-  LoroMovableList,
-  LoroText,
-  LoroTree,
-  type Value,
-} from "loro-crdt"
+import type { Container, LoroMap, Value } from "loro-crdt"
 import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
@@ -17,17 +8,12 @@ import type {
 } from "../shape.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
-
-const containerConstructor = {
-  counter: LoroCounter,
-  list: LoroList,
-  map: LoroMap,
-  movableList: LoroMovableList,
-  record: LoroMap,
-  text: LoroText,
-  tree: LoroTree,
-} as const
+import {
+  assignPlainValueToTypedRef,
+  containerConstructor,
+  createContainerTypedRef,
+  unwrapReadonlyPrimitive,
+} from "./utils.js"
 
 // Map typed ref
 export class MapRef<
@@ -119,12 +105,7 @@ export class MapRef<
         return (this.placeholder as any)?.[key]
       }
 
-      if (shape._type === "counter") {
-        return (node as any).value
-      }
-      if (shape._type === "text") {
-        return (node as any).toString()
-      }
+      return unwrapReadonlyPrimitive(node as TypedRef<any>, shape)
     }
 
     return node as Shape extends ContainerShape ? TypedRef<Shape> : Value
@@ -136,7 +117,7 @@ export class MapRef<
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateNode(key, shape),
         set: value => {
-          if (this.readonly) throw new Error("Cannot modify readonly ref")
+          this.assertMutable()
           if (isValueShape(shape)) {
             this.container.set(key, value)
             this.propertyCache.set(key, value)
@@ -178,23 +159,23 @@ export class MapRef<
     return result
   }
 
-  // TOOD(duane): return correct type here
+  // TODO(duane): return correct type here
   get(key: string): any {
     return this.container.get(key)
   }
 
   set(key: string, value: Value): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.set(key, value)
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     return this.container.setContainer(key, container)
   }
 
   delete(key: string): void {
-    if (this.readonly) throw new Error("Cannot modify readonly ref")
+    this.assertMutable()
     this.container.delete(key)
   }
 
