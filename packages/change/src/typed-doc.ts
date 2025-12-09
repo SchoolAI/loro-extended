@@ -9,6 +9,7 @@ import {
   normalizePath,
 } from "./json-patch.js"
 import { overlayPlaceholder } from "./overlay.js"
+import { SchemaGC, type SchemaGCOptions } from "./schema-gc.js"
 import type { DocShape } from "./shape.js"
 import { DocRef } from "./typed-refs/doc.js"
 import type {
@@ -109,6 +110,19 @@ export class TypedDoc<Shape extends DocShape> {
 
       applicator.applyPatch(prefixedPatch)
     })
+  }
+
+  /**
+   * Performs garbage collection on the document to remove deprecated fields.
+   *
+   * This method scans the document for fields that have been migrated to new storage keys
+   * and deletes the old data if the new data exists.
+   *
+   * @param options Configuration options for the GC process.
+   */
+  gc(options: SchemaGCOptions = {}): void {
+    const gc = new SchemaGC(this.doc)
+    gc.collect(this.shape, options)
   }
 
   // Expose underlying doc for advanced use cases

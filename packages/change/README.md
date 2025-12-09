@@ -701,6 +701,138 @@ This is typically provided by `UntypedDocHandle.presence` in `@loro-extended/rep
 - Container creation is lazy - containers are only created when accessed
 - Type validation occurs at development time, not runtime
 
+## Schema Migration
+
+As your application evolves, your data schema will change. `change` provides a robust "Mapped Schema" system to handle these changes gracefully without breaking older clients or requiring global migrations.
+
+### Core Concept
+
+Decouple the **Logical Schema** (public API) from the **Physical Storage** (CRDT keys). This allows you to version individual fields independently.
+
+Migration methods (`.key()` and `.migrateFrom()`) are available directly on all container shapes returned by `Shape.*` factory functions.
+
+### Example: Renaming a Field
+
+Suppose you want to rename `content` to `messages` in your chat app.
+
+### Step 1: Original Schema (V1)
+
+Initially, your schema uses `content` for both the logical API and physical storage.
+
+```typescript
+const ChatSchemaV1 = Shape.doc({
+  content: Shape.list(Shape.text())
+});
+```
+
+### Step 2: Logical Rename (V1.5)
+
+You want to rename the field to `messages` in your code, but you don't want to break existing data. You can use `.key()` to map the new logical name to the old physical key.
+
+```typescript
+import { Shape } from "@loro-extended/change";
+
+const ChatSchemaV1_5 = Shape.doc({
+  // Logical name: 'messages'
+  messages: Shape.list(Shape.text())
+    .key("content") // Physical key: 'content' (same as V1)
+});
+```
+
+This allows you to use `doc.messages` in your code while reading/writing to the `"content"` key in the CRDT. No data migration is needed yet.
+
+### Step 3: Physical Migration (V2)
+
+Later, you decide to move to a new storage key `_v2_messages` to clean up the CRDT or change the data structure. You can define a migration from the old key.
+
+```typescript
+const ChatSchemaV2 = Shape.doc({
+  messages: Shape.list(Shape.text())
+    .key("_v2_messages") // New physical key
+    .migrateFrom({
+      key: "content", // Old physical key (from V1)
+      sourceShape: Shape.list(Shape.text()),
+      transform: (oldContent) => oldContent, // No data transformation needed
+    }),
+});
+```
+
+### How Migration Works
+
+1.  **Read-Time Check**: When you access `doc.messages`, the system checks if `_v2_messages` exists.
+2.  **Fallback**: If missing, it looks for the source key `"content"`.
+3.  **Eager Migration**: If `"content"` exists, it reads the data, runs the `transform` function, and **immediately writes** the result to `_v2_messages`.
+4.  **Future Access**: Subsequent reads use `_v2_messages` directly.
+
+### Complex Migration: Type Change
+
+You can also transform data types. For example, upgrading from a simple string to a rich object.
+
+```typescript
+const TaskSchema = Shape.doc({
+  task: Shape.map({
+    title: Shape.plain.string(),
+    status: Shape.plain.string("todo", "done"),
+  })
+    .key("task_v2")
+    .migrateFrom({
+      key: "task_v1",
+      sourceShape: Shape.plain.string(), // Old schema was just a string
+      transform: (oldString) => ({
+        title: oldString,
+        status: "todo",
+      }),
+    }),
+});
+```
+
+### Chained Migrations
+
+You can chain multiple `.migrateFrom()` calls to support migrating from multiple older versions:
+
+```typescript
+const TaskSchemaV3 = Shape.doc({
+  task: Shape.map({
+    title: Shape.plain.string(),
+    status: Shape.plain.string("todo", "done", "archived"),
+    assignee: Shape.plain.string(),
+  })
+    .key("task_v3")
+    .migrateFrom({
+      key: "task_v2",
+      sourceShape: Shape.plain.object({
+        title: Shape.plain.string(),
+        done: Shape.plain.boolean(),
+      }),
+      transform: (v2Data) => ({
+        title: v2Data.title,
+        status: v2Data.done ? "done" : "todo",
+        assignee: "unassigned",
+      }),
+    })
+    .migrateFrom({
+      key: "task_v1",
+      sourceShape: Shape.plain.string(),
+      transform: (v1Data) => ({
+        title: v1Data,
+        status: "todo",
+        assignee: "unassigned",
+      }),
+    }),
+});
+```
+
+### Garbage Collection
+
+After migration, the old data (V1) remains in the document. To clean it up:
+
+```typescript
+// Removes old keys (V1) if the new key (V2) exists
+doc.gc({
+  onCleanup: (deletedKeys) => console.log("Cleaned up:", deletedKeys),
+});
+```
+
 ## Contributing
 
 This package is part of the loro-extended ecosystem. Contributions welcome!

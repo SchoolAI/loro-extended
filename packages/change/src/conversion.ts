@@ -7,9 +7,11 @@ import {
   LoroText,
   type Value,
 } from "loro-crdt"
+import { getStorageKey } from "./migration.js"
 import type {
   ArrayValueShape,
   ContainerOrValueShape,
+  ContainerShape,
   ListContainerShape,
   MapContainerShape,
   MovableListContainerShape,
@@ -111,11 +113,13 @@ function convertMapInput(
   for (const [k, v] of Object.entries(value)) {
     const nestedSchema = shape.shapes[k]
     if (nestedSchema) {
+      // Use storage key for CRDT access - this respects .key() configuration
+      const storageKey = getStorageKey(nestedSchema, k)
       const convertedValue = convertInputToRef(v, nestedSchema)
       if (isContainer(convertedValue)) {
-        map.setContainer(k, convertedValue)
+        map.setContainer(storageKey, convertedValue)
       } else {
-        map.set(k, convertedValue)
+        map.set(storageKey, convertedValue)
       }
     } else {
       map.set(k, value)
@@ -213,5 +217,70 @@ export function convertInputToRef<Shape extends ContainerOrValueShape>(
 
     default:
       throw new Error(`unexpected type: ${(shape as Shape)._type}`)
+  }
+}
+
+/**
+ * Populates an existing container with data from a plain value.
+ * This is useful for initializing root containers in LoroDoc or migrating data into existing containers.
+ */
+export function populateContainer(
+  container: Container,
+  value: any,
+  shape: ContainerShape,
+): void {
+  if (shape._type === "list" || shape._type === "movableList") {
+    const list = container as LoroList | LoroMovableList
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const converted = convertInputToRef(item, shape.shape)
+        if (isContainer(converted)) {
+          list.pushContainer(converted)
+        } else {
+          list.push(converted)
+        }
+      }
+    }
+  } else if (shape._type === "map") {
+    const map = container as LoroMap
+    if (typeof value === "object" && value !== null) {
+      for (const [k, v] of Object.entries(value)) {
+        const propShape = shape.shapes[k]
+        if (propShape) {
+          // Use storage key for CRDT access - this respects .key() configuration
+          const storageKey = getStorageKey(propShape, k)
+          const converted = convertInputToRef(v as Value, propShape)
+          if (isContainer(converted)) {
+            map.setContainer(storageKey, converted)
+          } else {
+            map.set(storageKey, converted as Value)
+          }
+        }
+      }
+    }
+  } else if (shape._type === "record") {
+    const map = container as LoroMap
+    if (typeof value === "object" && value !== null) {
+      for (const [k, v] of Object.entries(value)) {
+        const converted = convertInputToRef(v as Value, shape.shape)
+        if (isContainer(converted)) {
+          map.setContainer(k, converted)
+        } else {
+          map.set(k, converted as Value)
+        }
+      }
+    }
+  } else if (shape._type === "text") {
+    const text = container as LoroText
+    if (typeof value === "string") {
+      // Clear existing content if any? Or assume empty?
+      // For migration, we assume empty.
+      text.insert(0, value)
+    }
+  } else if (shape._type === "counter") {
+    const counter = container as LoroCounter
+    if (typeof value === "number") {
+      counter.increment(value)
+    }
   }
 }

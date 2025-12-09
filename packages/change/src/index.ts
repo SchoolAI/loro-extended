@@ -4,6 +4,18 @@ export {
   derivePlaceholder,
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
+// Migration support
+export type {
+  MigratableContainerShape,
+  MigrationDefinition,
+  MigrationMethods,
+} from "./migration.js"
+export {
+  getMigrations,
+  getStorageKey,
+  hasCustomStorageKey,
+  hasMigrations,
+} from "./migration.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
 export type { ObjectValue, PresenceInterface } from "./presence-interface.js"

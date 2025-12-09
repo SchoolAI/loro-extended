@@ -23,6 +23,145 @@ export interface Shape<Plain, Mutable, Placeholder = Plain> {
   readonly _placeholder: Placeholder
 }
 
+/**
+ * Defines a migration from an older schema version to the current one.
+ * Used internally by the migration system.
+ */
+export interface MigrationDefinition<
+  SourceShape extends ContainerOrValueShape = ContainerOrValueShape,
+  TargetShape extends ContainerOrValueShape = ContainerOrValueShape,
+> {
+  readonly sourceKey: string
+  readonly sourceShape: SourceShape
+  readonly transform: (
+    sourceData: SourceShape["_plain"],
+  ) => TargetShape["_plain"]
+}
+
+/**
+ * Migration properties that are added to container shapes.
+ */
+export interface MigrationProperties<S extends ContainerOrValueShape> {
+  /**
+   * The physical storage key in the CRDT.
+   * If not set, defaults to the logical field name.
+   */
+  readonly _storageKey?: string
+
+  /**
+   * Migration definitions for this field, ordered from newest to oldest.
+   */
+  readonly _migrations?: MigrationDefinition<ContainerOrValueShape, S>[]
+}
+
+/**
+ * Migration method extensions that are added to container shapes.
+ * These enable fluent schema migration configuration.
+ */
+export interface MigrationMethods<
+  S extends ContainerOrValueShape,
+  ReturnType = MigratableContainerShape<S>,
+> extends MigrationProperties<S> {
+  /**
+   * Set the physical storage key for this field.
+   * Use this when the logical field name differs from the CRDT key.
+   *
+   * @example
+   * ```typescript
+   * messages: Shape.list(Shape.map({ ... }))
+   *   .key("_v2_messages")
+   * ```
+   */
+  key(storageKey: string): ReturnType
+
+  /**
+   * Define a migration from an older schema version.
+   * Multiple migrations can be chained for multi-version upgrades.
+   *
+   * @example
+   * ```typescript
+   * messages: Shape.list(Shape.map({ ... }))
+   *   .key("_v2_messages")
+   *   .migrateFrom({
+   *     key: "_v1_messages",
+   *     sourceShape: Shape.list(Shape.text()),
+   *     transform: (v1Data) => v1Data.map(text => ({ type: 'text', content: text }))
+   *   })
+   * ```
+   */
+  migrateFrom<SourceShape extends ContainerOrValueShape>(migration: {
+    key: string
+    sourceShape: SourceShape
+    transform: (sourceData: SourceShape["_plain"]) => S["_plain"]
+  }): ReturnType
+}
+
+/**
+ * A container shape with migration methods (.key() and .migrateFrom()).
+ * All container shape factory functions return this type.
+ */
+export type MigratableContainerShape<S extends ContainerOrValueShape> = S &
+  MigrationMethods<S>
+
+/**
+ * A migratable container shape that also supports .placeholder().
+ * The placeholder method preserves migration methods on the returned shape.
+ */
+export type MigratableWithPlaceholder<S extends ContainerShape> = S &
+  MigrationMethods<S, MigratableWithPlaceholder<S>> & {
+    placeholder(value: S["_placeholder"]): MigratableWithPlaceholder<S>
+  }
+
+/**
+ * Helper function to add migration methods to a shape.
+ * @internal
+ */
+function withMigrationMethods<S extends ContainerOrValueShape>(
+  shape: S,
+  storageKey?: string,
+  migrations?: MigrationDefinition[],
+): MigratableContainerShape<S> {
+  const result: any = {
+    ...shape,
+    _storageKey: storageKey,
+    _migrations: migrations,
+
+    key(newStorageKey: string): MigratableContainerShape<S> {
+      return withMigrationMethods(shape, newStorageKey, migrations)
+    },
+
+    migrateFrom<SourceShape extends ContainerOrValueShape>(migration: {
+      key: string
+      sourceShape: SourceShape
+      transform: (sourceData: SourceShape["_plain"]) => S["_plain"]
+    }): MigratableContainerShape<S> {
+      const migrationDef: MigrationDefinition = {
+        sourceKey: migration.key,
+        sourceShape: migration.sourceShape,
+        transform: migration.transform as (sourceData: unknown) => unknown,
+      }
+      return withMigrationMethods(shape, storageKey, [
+        ...(migrations ?? []),
+        migrationDef,
+      ])
+    },
+  }
+
+  // If the shape has a placeholder method, wrap it to preserve migration methods
+  if (
+    "placeholder" in shape &&
+    typeof (shape as any).placeholder === "function"
+  ) {
+    const originalPlaceholder = (shape as any).placeholder
+    result.placeholder = (value: any) => {
+      const newShape = originalPlaceholder.call(shape, value)
+      return withMigrationMethods(newShape, storageKey, migrations)
+    }
+  }
+
+  return result as MigratableContainerShape<S>
+}
+
 // Type for shapes that support placeholder customization
 export type WithPlaceholder<S extends Shape<any, any, any>> = S & {
   placeholder(value: S["_placeholder"]): S
@@ -249,79 +388,104 @@ export const Shape = {
 
   // CRDTs are represented by Loro Containers--they converge on state using Loro's
   // various CRDT algorithms
-  counter: (): WithPlaceholder<CounterContainerShape> => {
+  counter: (): MigratableWithPlaceholder<CounterContainerShape> => {
     const base: CounterContainerShape = {
       _type: "counter" as const,
       _plain: 0,
       _mutable: {} as CounterRef,
       _placeholder: 0,
     }
-    return Object.assign(base, {
+    const withPlaceholder = Object.assign(base, {
       placeholder(value: number): CounterContainerShape {
         return { ...base, _placeholder: value }
       },
     })
+    return withMigrationMethods(
+      withPlaceholder,
+    ) as MigratableWithPlaceholder<CounterContainerShape>
   },
 
-  list: <T extends ContainerOrValueShape>(shape: T): ListContainerShape<T> => ({
-    _type: "list" as const,
-    shape,
-    _plain: [] as any,
-    _mutable: {} as any,
-    _placeholder: [] as never[],
-  }),
+  list: <T extends ContainerOrValueShape>(
+    shape: T,
+  ): MigratableContainerShape<ListContainerShape<T>> => {
+    const base: ListContainerShape<T> = {
+      _type: "list" as const,
+      shape,
+      _plain: [] as any,
+      _mutable: {} as any,
+      _placeholder: [] as never[],
+    }
+    return withMigrationMethods(base)
+  },
 
   map: <T extends Record<string, ContainerOrValueShape>>(
     shape: T,
-  ): MapContainerShape<T> => ({
-    _type: "map" as const,
-    shapes: shape,
-    _plain: {} as any,
-    _mutable: {} as any,
-    _placeholder: {} as any,
-  }),
+  ): MigratableContainerShape<MapContainerShape<T>> => {
+    const base: MapContainerShape<T> = {
+      _type: "map" as const,
+      shapes: shape,
+      _plain: {} as any,
+      _mutable: {} as any,
+      _placeholder: {} as any,
+    }
+    return withMigrationMethods(base)
+  },
 
   record: <T extends ContainerOrValueShape>(
     shape: T,
-  ): RecordContainerShape<T> => ({
-    _type: "record" as const,
-    shape,
-    _plain: {} as any,
-    _mutable: {} as any,
-    _placeholder: {} as Record<string, never>,
-  }),
+  ): MigratableContainerShape<RecordContainerShape<T>> => {
+    const base: RecordContainerShape<T> = {
+      _type: "record" as const,
+      shape,
+      _plain: {} as any,
+      _mutable: {} as any,
+      _placeholder: {} as Record<string, never>,
+    }
+    return withMigrationMethods(base)
+  },
 
   movableList: <T extends ContainerOrValueShape>(
     shape: T,
-  ): MovableListContainerShape<T> => ({
-    _type: "movableList" as const,
-    shape,
-    _plain: [] as any,
-    _mutable: {} as any,
-    _placeholder: [] as never[],
-  }),
+  ): MigratableContainerShape<MovableListContainerShape<T>> => {
+    const base: MovableListContainerShape<T> = {
+      _type: "movableList" as const,
+      shape,
+      _plain: [] as any,
+      _mutable: {} as any,
+      _placeholder: [] as never[],
+    }
+    return withMigrationMethods(base)
+  },
 
-  text: (): WithPlaceholder<TextContainerShape> => {
+  text: (): MigratableWithPlaceholder<TextContainerShape> => {
     const base: TextContainerShape = {
       _type: "text" as const,
       _plain: "",
       _mutable: {} as TextRef,
       _placeholder: "",
     }
-    return Object.assign(base, {
+    const withPlaceholder = Object.assign(base, {
       placeholder(value: string): TextContainerShape {
         return { ...base, _placeholder: value }
       },
     })
+    return withMigrationMethods(
+      withPlaceholder,
+    ) as MigratableWithPlaceholder<TextContainerShape>
   },
 
-  tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
-    _type: "tree" as const,
-    shape,
-    _plain: {} as any,
-    _mutable: {} as any,
-    _placeholder: [] as never[],
-  }),
+  tree: <T extends MapContainerShape>(
+    shape: T,
+  ): MigratableContainerShape<TreeContainerShape<T>> => {
+    const base: TreeContainerShape<T> = {
+      _type: "tree" as const,
+      shape,
+      _plain: {} as any,
+      _mutable: {} as any,
+      _placeholder: [] as never[],
+    }
+    return withMigrationMethods(base)
+  },
 
   // Values are represented as plain JS objects, with the limitation that they MUST be
   // representable as a Loro "Value"--basically JSON. The behavior of a Value is basically
@@ -330,7 +494,9 @@ export const Shape = {
   plain: {
     string: <T extends string = string>(
       ...options: T[]
-    ): WithPlaceholder<StringValueShape<T>> => {
+    ): MigratableContainerShape<StringValueShape<T>> & {
+      placeholder(value: T): MigratableContainerShape<StringValueShape<T>>
+    } => {
       const base: StringValueShape<T> = {
         _type: "value" as const,
         valueType: "string" as const,
@@ -339,14 +505,17 @@ export const Shape = {
         _placeholder: (options[0] ?? "") as T,
         options: options.length > 0 ? options : undefined,
       }
-      return Object.assign(base, {
+      const withPlaceholder = Object.assign(base, {
         placeholder(value: T): StringValueShape<T> {
           return { ...base, _placeholder: value }
         },
       })
+      return withMigrationMethods(withPlaceholder) as any
     },
 
-    number: (): WithPlaceholder<NumberValueShape> => {
+    number: (): MigratableContainerShape<NumberValueShape> & {
+      placeholder(value: number): MigratableContainerShape<NumberValueShape>
+    } => {
       const base: NumberValueShape = {
         _type: "value" as const,
         valueType: "number" as const,
@@ -354,14 +523,17 @@ export const Shape = {
         _mutable: 0,
         _placeholder: 0,
       }
-      return Object.assign(base, {
+      const withPlaceholder = Object.assign(base, {
         placeholder(value: number): NumberValueShape {
           return { ...base, _placeholder: value }
         },
       })
+      return withMigrationMethods(withPlaceholder) as any
     },
 
-    boolean: (): WithPlaceholder<BooleanValueShape> => {
+    boolean: (): MigratableContainerShape<BooleanValueShape> & {
+      placeholder(value: boolean): MigratableContainerShape<BooleanValueShape>
+    } => {
       const base: BooleanValueShape = {
         _type: "value" as const,
         valueType: "boolean" as const,
@@ -369,11 +541,12 @@ export const Shape = {
         _mutable: false,
         _placeholder: false,
       }
-      return Object.assign(base, {
+      const withPlaceholder = Object.assign(base, {
         placeholder(value: boolean): BooleanValueShape {
           return { ...base, _placeholder: value }
         },
       })
+      return withMigrationMethods(withPlaceholder) as any
     },
 
     null: (): NullValueShape => ({
@@ -402,14 +575,17 @@ export const Shape = {
 
     object: <T extends Record<string, ValueShape>>(
       shape: T,
-    ): ObjectValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "object" as const,
-      shape,
-      _plain: {} as any,
-      _mutable: {} as any,
-      _placeholder: {} as any,
-    }),
+    ): MigratableContainerShape<ObjectValueShape<T>> => {
+      const base: ObjectValueShape<T> = {
+        _type: "value" as const,
+        valueType: "object" as const,
+        shape,
+        _plain: {} as any,
+        _mutable: {} as any,
+        _placeholder: {} as any,
+      }
+      return withMigrationMethods(base)
+    },
 
     record: <T extends ValueShape>(shape: T): RecordValueShape<T> => ({
       _type: "value" as const,

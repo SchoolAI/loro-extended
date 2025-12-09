@@ -1,6 +1,9 @@
 import type { Value } from "loro-crdt"
 import { deriveShapePlaceholder } from "./derive-placeholder.js"
+import { getStorageKey, hasMigrations } from "./migration.js"
+import { getValueWithMigrationFallback } from "./migration-executor.js"
 import type {
+  ContainerOrValueShape,
   ContainerShape,
   DiscriminatedUnionValueShape,
   DocShape,
@@ -9,7 +12,16 @@ import type {
 import { isObjectValue } from "./utils/type-guards.js"
 
 /**
- * Overlays CRDT state with placeholder defaults
+ * Overlays CRDT state with placeholder defaults.
+ *
+ * This function handles the mapping between logical field names (used in the schema)
+ * and physical storage keys (used in the CRDT). It also handles migration fallback
+ * when the primary key is missing but a migration source exists.
+ *
+ * @param shape - The document schema
+ * @param crdtValue - The raw CRDT value (uses physical keys)
+ * @param placeholderValue - The placeholder defaults (uses logical keys)
+ * @returns The merged value (uses logical keys)
  */
 export function overlayPlaceholder<Shape extends DocShape>(
   shape: Shape,
@@ -26,13 +38,18 @@ export function overlayPlaceholder<Shape extends DocShape>(
 
   const result = { ...placeholderValue }
 
-  for (const [key, propShape] of Object.entries(shape.shapes)) {
-    const propCrdtValue = crdtValue[key]
+  for (const [logicalKey, propShape] of Object.entries(shape.shapes)) {
+    // Get the CRDT value, handling storage key mapping and migrations
+    const propCrdtValue = getCrdtValueWithMigration(
+      crdtValue,
+      logicalKey,
+      propShape,
+    )
 
     const propPlaceholderValue =
-      placeholderValue[key as keyof typeof placeholderValue]
+      placeholderValue[logicalKey as keyof typeof placeholderValue]
 
-    result[key as keyof typeof result] = mergeValue(
+    result[logicalKey as keyof typeof result] = mergeValue(
       propShape,
       propCrdtValue,
       propPlaceholderValue,
@@ -40,6 +57,29 @@ export function overlayPlaceholder<Shape extends DocShape>(
   }
 
   return result
+}
+
+/**
+ * Gets the CRDT value for a logical key, handling storage key mapping and migrations.
+ *
+ * @param crdtValue - The raw CRDT value object
+ * @param logicalKey - The logical field name
+ * @param shape - The shape definition (may include migration info)
+ * @returns The value from the CRDT (from primary key or migrated source)
+ */
+function getCrdtValueWithMigration(
+  crdtValue: { [key: string]: Value },
+  logicalKey: string,
+  shape: ContainerOrValueShape,
+): Value {
+  // If the shape has migrations, use the migration-aware lookup
+  if (hasMigrations(shape)) {
+    return getValueWithMigrationFallback(crdtValue, logicalKey, shape) as Value
+  }
+
+  // Otherwise, just use the storage key (which may be the same as logical key)
+  const storageKey = getStorageKey(shape, logicalKey)
+  return crdtValue[storageKey]
 }
 
 /**
@@ -78,20 +118,28 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
         throw new Error("map crdt must be object")
       }
 
-      const crdtMapValue = crdtValue ?? {}
+      const crdtMapValue = (crdtValue ?? {}) as Record<string, Value>
 
       if (!isObjectValue(placeholderValue) && placeholderValue !== undefined) {
         throw new Error("map placeholder must be object")
       }
 
-      const placeholderMapValue = placeholderValue ?? {}
+      const placeholderMapValue = (placeholderValue ?? {}) as Record<
+        string,
+        Value
+      >
 
       const result = { ...placeholderMapValue }
-      for (const [key, nestedShape] of Object.entries(shape.shapes)) {
-        const nestedCrdtValue = crdtMapValue[key]
-        const nestedPlaceholderValue = placeholderMapValue[key]
+      for (const [logicalKey, nestedShape] of Object.entries(shape.shapes)) {
+        // Get the CRDT value, handling storage key mapping and migrations
+        const nestedCrdtValue = getCrdtValueWithMigration(
+          crdtMapValue,
+          logicalKey,
+          nestedShape,
+        )
+        const nestedPlaceholderValue = placeholderMapValue[logicalKey]
 
-        result[key as keyof typeof result] = mergeValue(
+        result[logicalKey as keyof typeof result] = mergeValue(
           nestedShape,
           nestedCrdtValue,
           nestedPlaceholderValue,

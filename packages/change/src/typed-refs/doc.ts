@@ -1,5 +1,7 @@
 import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
+import { getStorageKey } from "../migration.js"
+import { migrateAndGetContainer } from "../migration-executor.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import {
@@ -44,11 +46,20 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     shape: S,
   ): TypedRefParams<ContainerShape> {
     const getter = this.doc[containerGetter[shape._type]].bind(this.doc)
+    // Use storage key for CRDT access, logical key for placeholder
+    const storageKey = getStorageKey(shape, key)
 
     return {
       shape,
       placeholder: this.requiredPlaceholder[key],
-      getContainer: () => getter(key),
+      getContainer: () =>
+        migrateAndGetContainer(
+          this.doc,
+          key,
+          shape,
+          () => getter(storageKey),
+          this.readonly,
+        ),
       readonly: this.readonly,
     }
   }
@@ -57,13 +68,16 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     key: string,
     shape: ContainerShape,
   ): TypedRef<ContainerShape> | number | string {
+    // Use storage key for CRDT access
+    const storageKey = getStorageKey(shape, key)
+
     if (
       this.readonly &&
       (shape._type === "counter" || shape._type === "text")
     ) {
       // Check if the container exists in the doc without creating it
       const shallow = this.doc.getShallowValue()
-      if (!shallow[key]) {
+      if (!shallow[storageKey]) {
         return this.requiredPlaceholder[key] as any
       }
     }

@@ -1,4 +1,6 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
+import { getStorageKey } from "../migration.js"
+import { migrateAndGetContainer } from "../migration-executor.js"
 import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
@@ -45,6 +47,8 @@ export class MapRef<
     shape: S,
   ): TypedRefParams<ContainerShape> {
     const placeholder = (this.placeholder as any)?.[key]
+    // Use storage key for CRDT access, logical key for placeholder
+    const storageKey = getStorageKey(shape, key)
 
     const LoroContainer = containerConstructor[shape._type]
 
@@ -52,7 +56,17 @@ export class MapRef<
       shape,
       placeholder,
       getContainer: () =>
-        this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
+        migrateAndGetContainer(
+          this.container,
+          key,
+          shape,
+          () =>
+            this.container.getOrCreateContainer(
+              storageKey,
+              new (LoroContainer as any)(),
+            ),
+          this.readonly,
+        ),
       readonly: this.readonly,
     }
   }
@@ -61,6 +75,9 @@ export class MapRef<
     key: string,
     shape: Shape,
   ): any {
+    // Use storage key for CRDT access - applies to BOTH container and value shapes
+    const storageKey = getStorageKey(shape, key)
+
     let ref = this.propertyCache.get(key)
     if (!ref) {
       if (isContainerShape(shape)) {
@@ -69,7 +86,7 @@ export class MapRef<
         this.propertyCache.set(key, ref)
       } else {
         // For value shapes, first try to get the value from the container
-        const containerValue = this.container.get(key)
+        const containerValue = this.container.get(storageKey)
         if (containerValue !== undefined) {
           ref = containerValue as Value
         } else {
@@ -93,7 +110,7 @@ export class MapRef<
     if (this.readonly && isContainerShape(shape)) {
       // In readonly mode, if the container doesn't exist, return the placeholder
       // This ensures we respect default values (e.g. counter: 1)
-      const existing = this.container.get(key)
+      const existing = this.container.get(storageKey)
       if (existing === undefined) {
         return (this.placeholder as any)?.[key]
       }
@@ -107,12 +124,15 @@ export class MapRef<
   private createLazyProperties(): void {
     for (const key in this.shape.shapes) {
       const shape = this.shape.shapes[key]
+      // Use storage key for CRDT access - applies to BOTH container and value shapes
+      const storageKey = getStorageKey(shape, key)
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateRef(key, shape),
         set: value => {
           this.assertMutable()
           if (isValueShape(shape)) {
-            this.container.set(key, value)
+            // Use storage key when writing to the container
+            this.container.set(storageKey, value)
             this.propertyCache.set(key, value)
           } else {
             if (value && typeof value === "object") {
