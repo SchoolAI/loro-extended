@@ -9,6 +9,12 @@ import {
   serializeChannelMsg,
 } from "@loro-extended/repo"
 
+export type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+
 export interface HttpPollingClientOptions {
   /**
    * URL for polling (GET requests).
@@ -28,6 +34,15 @@ export interface HttpPollingClientOptions {
    * postUrl: () => `/api/sync`
    */
   postUrl: string | ((peerId: PeerID) => string)
+
+  /**
+   * Retry options for POST requests.
+   */
+  postRetry?: {
+    maxAttempts?: number // default: 3
+    baseDelay?: number // default: 1000ms
+    maxDelay?: number // default: 10000ms
+  }
 
   /**
    * How long to ask the server to wait for messages (hint, not guarantee).
@@ -93,11 +108,18 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
   private minPollInterval: number
   private pollDelay: number
   private fetchOptions?: RequestInit
+  private postRetryOptions = {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    maxDelay: 10000,
+  }
 
   private serverChannel?: Channel
   private isPolling = false
   private shouldStop = false
   private pollAbortController?: AbortController
+  public connectionState: ConnectionState = "disconnected"
+  private listeners = new Set<(state: ConnectionState) => void>()
 
   constructor(options: HttpPollingClientOptions) {
     super({ adapterType: "http-polling-client" })
@@ -107,6 +129,32 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
     this.minPollInterval = options.minPollInterval ?? 100
     this.pollDelay = options.pollDelay ?? 0
     this.fetchOptions = options.fetchOptions
+    if (options.postRetry) {
+      this.postRetryOptions = { ...this.postRetryOptions, ...options.postRetry }
+    }
+  }
+
+  /**
+   * Subscribe to connection state changes.
+   * @param listener Callback function that receives the new state
+   * @returns Unsubscribe function
+   */
+  public subscribe(listener: (state: ConnectionState) => void): () => void {
+    this.listeners.add(listener)
+    // Emit current state immediately
+    listener(this.connectionState)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  private setConnectionState(state: ConnectionState) {
+    if (this.connectionState !== state) {
+      this.connectionState = state
+      for (const listener of this.listeners) {
+        listener(state)
+      }
+    }
   }
 
   protected generate(): GeneratedChannel {
@@ -126,20 +174,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
 
         // Serialize and send via HTTP POST
         const serialized = serializeChannelMsg(msg)
-        const response = await fetch(resolvedPostUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Peer-Id": this.peerId,
-            ...this.fetchOptions?.headers,
-          },
-          body: JSON.stringify(serialized),
-          ...this.fetchOptions,
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to send message: ${response.statusText}`)
-        }
+        await this.sendWithRetry(resolvedPostUrl, serialized)
       },
       stop: () => {
         this.stopPolling()
@@ -162,6 +197,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
 
   async onStop(): Promise<void> {
     this.stopPolling()
+    this.setConnectionState("disconnected")
 
     if (this.serverChannel) {
       this.removeChannel(this.serverChannel.channelId)
@@ -179,6 +215,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
 
     this.isPolling = true
     this.shouldStop = false
+    this.setConnectionState("connecting")
     this.pollLoop()
   }
 
@@ -208,10 +245,12 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
       try {
         await this.poll()
         success = true
+        this.setConnectionState("connected")
       } catch (error) {
         // Log error but continue polling
         if (!this.shouldStop) {
           this.logger.warn("Poll error", { error })
+          this.setConnectionState("reconnecting")
         }
       }
 
@@ -307,5 +346,54 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private async sendWithRetry(url: string, data: any): Promise<void> {
+    let attempt = 0
+    const { maxAttempts, baseDelay, maxDelay } = this.postRetryOptions
+
+    while (attempt < maxAttempts) {
+      try {
+        if (!this.peerId) {
+          throw new Error("PeerID not available for retry")
+        }
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Peer-Id": this.peerId,
+            ...this.fetchOptions?.headers,
+          },
+          body: JSON.stringify(data),
+          ...this.fetchOptions,
+        })
+
+        if (!response.ok) {
+          // Don't retry on client errors (4xx), except maybe 429 (Too Many Requests)
+          if (response.status >= 400 && response.status < 500) {
+            throw new Error(`Failed to send message: ${response.statusText}`)
+          }
+          throw new Error(`Server error: ${response.statusText}`)
+        }
+
+        return
+      } catch (error: any) {
+        attempt++
+
+        // If max attempts reached, throw the last error
+        if (attempt >= maxAttempts) {
+          throw error
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const delay = Math.min(
+          baseDelay * 2 ** (attempt - 1) + Math.random() * 100,
+          maxDelay,
+        )
+
+        await this.sleep(delay)
+      }
+    }
   }
 }
