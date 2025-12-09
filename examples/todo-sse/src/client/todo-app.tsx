@@ -1,5 +1,5 @@
 import { Shape, useDocument } from "@loro-extended/react"
-import { generateUUID, type DocId } from "@loro-extended/repo"
+import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
@@ -60,9 +60,7 @@ function TodoApp() {
     <div className="app-container">
       <header>
         <h1>Loro Todo</h1>
-        <div
-          className={`connection-status status-${connectionState}`}
-        >
+        <div className={`connection-status status-${connectionState}`}>
           {connectionState === "connected"
             ? "Connected"
             : connectionState === "connecting"

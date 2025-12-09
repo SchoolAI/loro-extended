@@ -21,6 +21,12 @@ import {
 } from "./protocol/translation.js"
 import type { ProtocolMessage } from "./protocol/types.js"
 
+export type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+
 /**
  * Options for the WebSocket client adapter.
  */
@@ -86,12 +92,37 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private WebSocketImpl: typeof globalThis.WebSocket
   private isConnecting = false
   private shouldReconnect = true
+  public connectionState: ConnectionState = "disconnected"
+  private listeners = new Set<(state: ConnectionState) => void>()
 
   constructor(options: WsClientOptions) {
     super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
     this.translationContext = createTranslationContext()
+  }
+
+  /**
+   * Subscribe to connection state changes.
+   * @param listener Callback function that receives the new state
+   * @returns Unsubscribe function
+   */
+  public subscribe(listener: (state: ConnectionState) => void): () => void {
+    this.listeners.add(listener)
+    // Emit current state immediately
+    listener(this.connectionState)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  private setConnectionState(state: ConnectionState) {
+    if (this.connectionState !== state) {
+      this.connectionState = state
+      for (const listener of this.listeners) {
+        listener(state)
+      }
+    }
   }
 
   protected generate(): GeneratedChannel {
@@ -144,6 +175,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     }
 
     this.isConnecting = true
+    this.setConnectionState("connecting")
 
     // Resolve URL
     const url =
@@ -194,6 +226,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
       this.isConnecting = false
       this.reconnectAttempts = 0
+      this.setConnectionState("connected")
 
       this.logger.info("WebSocket connected to {url} (peerId: {peerId})", {
         url,
@@ -243,6 +276,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         "WebSocket connection failed to {url} (peerId: {peerId}): {error}",
         { error, url, peerId: this.peerId },
       )
+      this.setConnectionState("disconnected")
       this.scheduleReconnect()
     }
   }
@@ -263,6 +297,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       this.removeChannel(this.serverChannel.channelId)
       this.serverChannel = undefined
     }
+    this.setConnectionState("disconnected")
   }
 
   /**
@@ -324,7 +359,10 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     }
 
     if (this.shouldReconnect) {
+      this.setConnectionState("disconnected")
       this.scheduleReconnect()
+    } else {
+      this.setConnectionState("disconnected")
     }
   }
 
@@ -391,6 +429,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     )
 
     this.reconnectAttempts++
+    this.setConnectionState("reconnecting")
 
     this.logger.info("Scheduling reconnect attempt {attempt} in {delay}ms", {
       attempt: this.reconnectAttempts,
@@ -419,25 +458,4 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     return this.socket?.readyState === WebSocket.OPEN
   }
 
-  /**
-   * Get the current connection state.
-   */
-  get connectionState(): "connecting" | "open" | "closing" | "closed" {
-    if (!this.socket) {
-      return "closed"
-    }
-
-    switch (this.socket.readyState) {
-      case WebSocket.CONNECTING:
-        return "connecting"
-      case WebSocket.OPEN:
-        return "open"
-      case WebSocket.CLOSING:
-        return "closing"
-      case WebSocket.CLOSED:
-        return "closed"
-      default:
-        return "closed"
-    }
-  }
 }

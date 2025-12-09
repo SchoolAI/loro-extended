@@ -10,6 +10,8 @@
     "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx --watch src/server/server.ts",
+    "format": "biome format --write .",
+    "lint": "biome check --write .",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
     "test": "pnpm test:e2e",

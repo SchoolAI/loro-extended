@@ -59,7 +59,7 @@ const wss = new WebSocketServer({ server, path: "/ws" })
 // 4. Handle WebSocket connections
 wss.on("connection", (ws, req) => {
   // Extract peerId from query string
-  const url = new URL(req.url!, `http://${req.headers.host}`)
+  const url = new URL(req.url || "/", `http://${req.headers.host}`)
   const peerId = url.searchParams.get("peerId")
 
   console.log(`WebSocket connection from peerId: ${peerId}`)

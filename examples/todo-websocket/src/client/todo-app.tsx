@@ -1,9 +1,10 @@
 import { Shape, useDocument } from "@loro-extended/react"
-import { generateUUID, type DocId } from "@loro-extended/repo"
+import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
 import { TodoList } from "./components/todo-list"
+import { useConnectionState } from "./use-connection-state"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
@@ -20,6 +21,7 @@ function TodoApp() {
 
   // Use our custom hook to get a reactive state of the document
   const [doc, changeDoc, handle] = useDocument(docId, schema)
+  const connectionState = useConnectionState()
 
   useEffect(() => {
     console.log("doc state", doc)
@@ -58,10 +60,14 @@ function TodoApp() {
     <div className="app-container">
       <header>
         <h1>Loro Todo (WebSocket)</h1>
-        <div
-          className={`connection-status ${handle ? "status-ready" : "status-initializing"}`}
-        >
-          {handle ? "Connected" : "Initializing..."}
+        <div className={`connection-status status-${connectionState}`}>
+          {connectionState === "connected"
+            ? "Connected"
+            : connectionState === "connecting"
+              ? "Connecting..."
+              : connectionState === "reconnecting"
+                ? "Reconnecting..."
+                : "Disconnected"}
         </div>
       </header>
       <div className="todo-app">
