@@ -12,14 +12,14 @@ test.describe("Storage Persistence", () => {
   test.skip("should persist client state in IndexedDB", async ({ page }) => {
     const testDocId = generateTestDocumentId()
     await page.goto(`/#${testDocId}`)
-    await waitForRepoState(page, "ready")
+    await waitForRepoState(page, "connected")
 
     // Create a todo
     await createTodo(page, "Client Persistence Test")
 
     // Reload page (without server restart)
     await page.reload()
-    await waitForRepoState(page, "ready")
+    await waitForRepoState(page, "connected")
 
     // Verify todos still present (loaded from IndexedDB)
     await expect(
@@ -34,7 +34,7 @@ test.describe("Storage Persistence", () => {
     // First client creates a todo
     const page1 = await browser.newPage()
     await page1.goto(`/#${testDocId}`)
-    await waitForRepoState(page1, "ready")
+    await waitForRepoState(page1, "connected")
 
     // Create a unique todo
     const todoText = `Persist Test ${Date.now()}`
@@ -46,7 +46,7 @@ test.describe("Storage Persistence", () => {
     // Second client should see the todo (loaded from server)
     const page2 = await browser.newPage()
     await page2.goto(`/#${testDocId}`)
-    await waitForRepoState(page2, "ready")
+    await waitForRepoState(page2, "connected")
 
     // Should see the todo created by first client
     await expect(

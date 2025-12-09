@@ -9,7 +9,7 @@ test.describe("Basic Todo Functionality", () => {
   test.beforeEach(async ({ page }) => {
     const testDocId = generateTestDocumentId()
     await page.goto(`/#${testDocId}`)
-    await waitForRepoState(page, "ready")
+    await waitForRepoState(page, "connected")
   })
 
   test("should create and display a todo", async ({ page }) => {

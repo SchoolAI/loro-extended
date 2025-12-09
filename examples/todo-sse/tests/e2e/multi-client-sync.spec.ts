@@ -21,8 +21,8 @@ test.describe("Multi-Client Synchronization", () => {
 
     // Wait for ready state
     await Promise.all([
-      waitForRepoState(client1, "ready"),
-      waitForRepoState(client2, "ready"),
+      waitForRepoState(client1, "connected"),
+      waitForRepoState(client2, "connected"),
     ])
 
     // Client 1 creates a todo
@@ -50,8 +50,8 @@ test.describe("Multi-Client Synchronization", () => {
       client2.goto(`/#${testDocId}`),
     ])
     await Promise.all([
-      waitForRepoState(client1, "ready"),
-      waitForRepoState(client2, "ready"),
+      waitForRepoState(client1, "connected"),
+      waitForRepoState(client2, "connected"),
     ])
     await createTodo(client1, "Toggle Sync Test")
 
@@ -82,8 +82,8 @@ test.describe("Multi-Client Synchronization", () => {
       client2.goto(`/#${testDocId}`),
     ])
     await Promise.all([
-      waitForRepoState(client1, "ready"),
-      waitForRepoState(client2, "ready"),
+      waitForRepoState(client1, "connected"),
+      waitForRepoState(client2, "connected"),
     ])
     await createTodo(client1, "Delete Sync Test")
 
@@ -112,8 +112,8 @@ test.describe("Multi-Client Synchronization", () => {
       client2.goto(`/#${testDocId}`),
     ])
     await Promise.all([
-      waitForRepoState(client1, "ready"),
-      waitForRepoState(client2, "ready"),
+      waitForRepoState(client1, "connected"),
+      waitForRepoState(client2, "connected"),
     ])
 
     // Client 1 creates a todo first

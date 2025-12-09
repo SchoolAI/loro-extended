@@ -457,5 +457,4 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   get isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN
   }
-
 }
