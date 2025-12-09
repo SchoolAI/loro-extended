@@ -1,5 +1,14 @@
 # @loro-extended/repo
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [05343c9]
+- Updated dependencies [2d554c6]
+- Updated dependencies [54ac30d]
+  - @loro-extended/change@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes

@@ -1,5 +1,28 @@
 # @loro-extended/change
 
+## 0.9.1
+
+### Patch Changes
+
+- 05343c9: ### Refactoring: Reduce code duplication in typed-refs
+
+  Implemented Phase 1 refactoring to improve maintainability:
+
+  1. **Extracted `containerConstructor`** to `utils.ts` - removed duplicate Loro container mappings from `map.ts` and `record.ts`
+
+  2. **Added `assertMutable()` helper** to `base.ts` - consolidated 20+ inline readonly checks into a single reusable method across all typed ref classes
+
+  3. **Extracted `unwrapReadonlyPrimitive()`** to `utils.ts` - consolidated counter/text value unwrapping logic from `map.ts`, `record.ts`, `doc.ts`, and `list-base.ts`
+
+  These changes reduce cognitive load and ensure consistent behavior across the codebase.
+
+- 2d554c6: Optimized `toJSON()` performance for nested TypedRefs by leveraging Loro's native `toJSON()` in readonly mode. Also fixed a bug where placeholders were not correctly applied to nested items in lists and records.
+- 54ac30d: refactor: extract shared logic for typed refs (phase 2)
+
+  - Extracted `absorbCachedPlainValues` utility to consolidate logic for persisting cached values to Loro containers
+  - Extracted `serializeRefToJSON` utility to consolidate mutable-mode JSON serialization logic
+  - Updated `MapRef`, `RecordRef`, and `DocRef` to use these shared utilities
+
 ## 0.9.0
 
 ### Minor Changes
