@@ -9,6 +9,8 @@
 
 // Client adapter
 export { WsClientNetworkAdapter, type WsClientOptions } from "./client.js"
+// WebSocket interface types
+export type { WebSocketConstructorLike, WebSocketLike } from "./types.js"
 // Connection
 export { WsConnection } from "./connection.js"
 // Handler types

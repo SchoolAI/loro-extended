@@ -20,6 +20,10 @@ import {
   toProtocolMessages,
 } from "./protocol/translation.js"
 import type { ProtocolMessage } from "./protocol/types.js"
+import type {
+  WebSocketConstructorLike,
+  WebSocketLike,
+} from "./types.js"
 
 export type ConnectionState =
   | "disconnected"
@@ -30,12 +34,12 @@ export type ConnectionState =
 /**
  * Options for the WebSocket client adapter.
  */
-export interface WsClientOptions {
+export interface WsClientOptions<TWebSocket extends WebSocketLike = WebSocket> {
   /** WebSocket URL to connect to */
   url: string | ((peerId: PeerID) => string)
 
   /** Optional: Custom WebSocket implementation (for Node.js) */
-  WebSocket?: typeof globalThis.WebSocket
+  WebSocket?: WebSocketConstructorLike<TWebSocket>
 
   /** Reconnection options */
   reconnect?: {
@@ -80,25 +84,28 @@ const DEFAULT_RECONNECT = {
  * })
  * ```
  */
-export class WsClientNetworkAdapter extends Adapter<void> {
+export class WsClientNetworkAdapter<
+  TWebSocket extends WebSocketLike = WebSocket,
+> extends Adapter<void> {
   private peerId?: PeerID
-  private socket?: WebSocket
+  private socket?: TWebSocket
   private serverChannel?: Channel
   private keepaliveTimer?: ReturnType<typeof setInterval>
   private reconnectAttempts = 0
   private reconnectTimer?: ReturnType<typeof setTimeout>
-  private translationContext: TranslationContext
-  private options: WsClientOptions
-  private WebSocketImpl: typeof globalThis.WebSocket
+  private readonly translationContext: TranslationContext
+  private readonly options: WsClientOptions<TWebSocket>
+  private readonly WebSocketImpl: WebSocketConstructorLike<TWebSocket>
   private isConnecting = false
   private shouldReconnect = true
   public connectionState: ConnectionState = "disconnected"
   private listeners = new Set<(state: ConnectionState) => void>()
 
-  constructor(options: WsClientOptions) {
+  constructor(options: WsClientOptions<TWebSocket>) {
     super({ adapterType: "websocket-client" })
     this.options = options
-    this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
+    this.WebSocketImpl =
+      options.WebSocket ?? (globalThis.WebSocket as unknown as WebSocketConstructorLike<TWebSocket>)
     this.translationContext = createTranslationContext()
   }
 
@@ -130,7 +137,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       kind: "network",
       adapterType: this.adapterType,
       send: (msg: ChannelMsg) => {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        if (!this.socket || this.socket.readyState !== this.WebSocketImpl.OPEN) {
           this.logger.warn("Cannot send: WebSocket not connected")
           return
         }
@@ -370,7 +377,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
    * Send a protocol message.
    */
   private sendProtocolMessage(msg: ProtocolMessage): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || this.socket.readyState !== this.WebSocketImpl.OPEN) {
       return
     }
 
@@ -387,7 +394,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     const interval = this.options.keepaliveInterval ?? 30000
 
     this.keepaliveTimer = setInterval(() => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
+      if (this.socket?.readyState === this.WebSocketImpl.OPEN) {
         this.socket.send("ping")
       }
     }, interval)
@@ -455,6 +462,6 @@ export class WsClientNetworkAdapter extends Adapter<void> {
    * Check if the client is connected.
    */
   get isConnected(): boolean {
-    return this.socket?.readyState === WebSocket.OPEN
+    return this.socket?.readyState === this.WebSocketImpl.OPEN
   }
 }
