@@ -1,4 +1,5 @@
 import type { Value } from "loro-crdt"
+import { deriveShapePlaceholder } from "./derive-placeholder.js"
 import type {
   ContainerShape,
   DiscriminatedUnionValueShape,
@@ -55,12 +56,23 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
 
   switch (shape._type) {
     case "text":
-      return crdtValue ?? placeholderValue ?? ""
+      return crdtValue !== undefined ? crdtValue : (placeholderValue ?? "")
     case "counter":
-      return crdtValue ?? placeholderValue ?? 0
+      return crdtValue !== undefined ? crdtValue : (placeholderValue ?? 0)
     case "list":
-    case "movableList":
-      return crdtValue ?? placeholderValue ?? []
+    case "movableList": {
+      if (crdtValue === undefined) {
+        return placeholderValue ?? []
+      }
+
+      const crdtArray = crdtValue as Value[]
+      const itemShape = shape.shape
+      const itemPlaceholder = deriveShapePlaceholder(itemShape)
+
+      return crdtArray.map(item =>
+        mergeValue(itemShape, item, itemPlaceholder as Value),
+      )
+    }
     case "map": {
       if (!isObjectValue(crdtValue) && crdtValue !== undefined) {
         throw new Error("map crdt must be object")
@@ -89,7 +101,32 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
       return result
     }
     case "tree":
-      return crdtValue ?? placeholderValue ?? []
+      return crdtValue !== undefined ? crdtValue : (placeholderValue ?? [])
+    case "record": {
+      if (!isObjectValue(crdtValue) && crdtValue !== undefined) {
+        throw new Error("record crdt must be object")
+      }
+
+      const crdtRecordValue = (crdtValue as Record<string, Value>) ?? {}
+      const result: Record<string, Value> = {}
+
+      // For records, we iterate over the keys present in the CRDT value
+      // and apply the nested shape's placeholder logic to each value
+      for (const key of Object.keys(crdtRecordValue)) {
+        const nestedCrdtValue = crdtRecordValue[key]
+        // For records, the placeholder is always {}, so we need to derive
+        // the placeholder for the nested shape on the fly
+        const nestedPlaceholderValue = deriveShapePlaceholder(shape.shape)
+
+        result[key] = mergeValue(
+          shape.shape,
+          nestedCrdtValue,
+          nestedPlaceholderValue as Value,
+        )
+      }
+
+      return result
+    }
     default:
       if (shape._type === "value" && shape.valueType === "object") {
         const crdtObj = (crdtValue as any) ?? {}
@@ -97,7 +134,7 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
         const result = { ...placeholderObj }
 
         if (typeof crdtObj !== "object" || crdtObj === null) {
-          return crdtValue ?? placeholderValue
+          return crdtValue !== undefined ? crdtValue : placeholderValue
         }
 
         for (const [key, propShape] of Object.entries(shape.shape)) {
@@ -117,7 +154,7 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
         )
       }
 
-      return crdtValue ?? placeholderValue
+      return crdtValue !== undefined ? crdtValue : placeholderValue
   }
 }
 
@@ -147,7 +184,7 @@ function mergeDiscriminatedUnion(
 
   if (!variantShape) {
     // Unknown variant - return CRDT value or placeholder
-    return crdtValue ?? placeholderValue
+    return crdtValue !== undefined ? crdtValue : placeholderValue
   }
 
   // Merge using the variant's object shape

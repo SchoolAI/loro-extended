@@ -9,12 +9,13 @@ import {
   type Value,
 } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
+import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
   RecordContainerShape,
 } from "../shape.js"
-import type { Infer, InferDraftType } from "../types.js"
+import type { Infer, InferMutableType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
@@ -138,7 +139,7 @@ export class RecordRef<
     return node as any
   }
 
-  get(key: string): InferDraftType<NestedShape> {
+  get(key: string): InferMutableType<NestedShape> {
     return this.getOrCreateNode(key)
   }
 
@@ -192,6 +193,25 @@ export class RecordRef<
   }
 
   toJSON(): Record<string, any> {
+    // Fast path: readonly mode
+    if (this.readonly) {
+      const nativeJson = this.container.toJSON() as Record<string, any>
+      // For records, we need to overlay placeholders for each entry's nested shape
+      const result: Record<string, any> = {}
+      for (const key of Object.keys(nativeJson)) {
+        // For records, the placeholder is always {}, so we need to derive
+        // the placeholder for the nested shape on the fly
+        const nestedPlaceholderValue = deriveShapePlaceholder(this.shape.shape)
+
+        result[key] = mergeValue(
+          this.shape.shape,
+          nativeJson[key],
+          nestedPlaceholderValue as Value,
+        )
+      }
+      return result
+    }
+
     const result: Record<string, any> = {}
     for (const key of this.keys()) {
       const value = this.get(key)

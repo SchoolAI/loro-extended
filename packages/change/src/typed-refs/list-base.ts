@@ -1,12 +1,18 @@
 import type { Container, LoroList, LoroMovableList } from "loro-crdt"
 import { convertInputToNode } from "../conversion.js"
+import { deriveShapePlaceholder } from "../derive-placeholder.js"
+import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
   ListContainerShape,
   MovableListContainerShape,
 } from "../shape.js"
-import { isContainer, isValueShape } from "../utils/type-guards.js"
+import {
+  isContainer,
+  isContainerShape,
+  isValueShape,
+} from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import { createContainerTypedRef } from "./utils.js"
 
@@ -337,6 +343,27 @@ export abstract class ListRefBase<
   }
 
   toJSON(): Item[] {
+    // Fast path: readonly mode with no pending mutations
+    if (this.readonly) {
+      const nativeJson = this.container.toJSON() as any[]
+
+      // If the nested shape is a container shape (map, record, etc.) or an object value shape,
+      // we need to overlay placeholders for each item
+      if (
+        isContainerShape(this.shape.shape) ||
+        (isValueShape(this.shape.shape) &&
+          this.shape.shape.valueType === "object")
+      ) {
+        const itemPlaceholder = deriveShapePlaceholder(this.shape.shape)
+        return nativeJson.map(item =>
+          mergeValue(this.shape.shape, item, itemPlaceholder as any),
+        ) as Item[]
+      }
+
+      // For primitive value shapes, no overlay needed
+      return nativeJson ?? []
+    }
+
     return this.toArray()
   }
 

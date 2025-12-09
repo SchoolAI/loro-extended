@@ -8,6 +8,7 @@ import {
   LoroTree,
   type Value,
 } from "loro-crdt"
+import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -158,6 +159,13 @@ export class MapRef<
   }
 
   toJSON(): any {
+    // Fast path: readonly mode
+    if (this.readonly) {
+      const nativeJson = this.container.toJSON() as Value
+      // Overlay placeholders for missing properties
+      return mergeValue(this.shape, nativeJson, this.placeholder as Value)
+    }
+
     const result: any = {}
     for (const key in this.shape.shapes) {
       const value = (this as any)[key]
