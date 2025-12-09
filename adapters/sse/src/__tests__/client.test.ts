@@ -665,14 +665,15 @@ describe("SseClientNetworkAdapter", () => {
       // Simulate EventSource reconnect before retry happens
       currentMockEventSource?.onopen?.(new Event("open"))
 
-      // Advance time past retry delay
-      await vi.advanceTimersByTimeAsync(2000)
+      // Advance time past retry delay AND wait for rejection
+      // We use Promise.all to ensure we catch the rejection as it happens
+      await Promise.all([
+        expect(sendPromise).rejects.toThrow(),
+        vi.advanceTimersByTimeAsync(2000),
+      ])
 
       // Should NOT have retried because it was cancelled
       expect(mockFetch).toHaveBeenCalledTimes(1)
-
-      // The promise should reject with AbortError or similar
-      await expect(sendPromise).rejects.toThrow()
     })
   })
 })
