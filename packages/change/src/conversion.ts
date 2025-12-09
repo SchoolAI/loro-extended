@@ -59,7 +59,7 @@ function convertListInput(
   const list = new LoroList()
 
   for (const item of value) {
-    const convertedItem = convertInputToNode(item, shape.shape)
+    const convertedItem = convertInputToRef(item, shape.shape)
     if (isContainer(convertedItem)) {
       list.pushContainer(convertedItem)
     } else {
@@ -85,7 +85,7 @@ function convertMovableListInput(
   const list = new LoroMovableList()
 
   for (const item of value) {
-    const convertedItem = convertInputToNode(item, shape.shape)
+    const convertedItem = convertInputToRef(item, shape.shape)
     if (isContainer(convertedItem)) {
       list.pushContainer(convertedItem)
     } else {
@@ -111,7 +111,7 @@ function convertMapInput(
   for (const [k, v] of Object.entries(value)) {
     const nestedSchema = shape.shapes[k]
     if (nestedSchema) {
-      const convertedValue = convertInputToNode(v, nestedSchema)
+      const convertedValue = convertInputToRef(v, nestedSchema)
       if (isContainer(convertedValue)) {
         map.setContainer(k, convertedValue)
       } else {
@@ -138,7 +138,7 @@ function convertRecordInput(
 
   const map = new LoroMap()
   for (const [k, v] of Object.entries(value)) {
-    const convertedValue = convertInputToNode(v, shape.shape)
+    const convertedValue = convertInputToRef(v, shape.shape)
     if (isContainer(convertedValue)) {
       map.setContainer(k, convertedValue)
     } else {
@@ -153,7 +153,7 @@ function convertRecordInput(
  * Main conversion function that transforms input values to appropriate CRDT containers
  * based on schema definitions
  */
-export function convertInputToNode<Shape extends ContainerOrValueShape>(
+export function convertInputToRef<Shape extends ContainerOrValueShape>(
   value: Value,
   shape: Shape,
 ): Container | Value {

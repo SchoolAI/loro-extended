@@ -9,7 +9,7 @@ import {
   type LoroText,
 } from "loro-crdt"
 import { describe, expect, it } from "vitest"
-import { convertInputToNode } from "./conversion.js"
+import { convertInputToRef } from "./conversion.js"
 import { Shape } from "./shape.js"
 import {
   isContainer,
@@ -24,7 +24,7 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - Text Conversion", () => {
     it("should convert string to LoroText", () => {
       const shape = Shape.text()
-      const result = convertInputToNode("Hello World", shape)
+      const result = convertInputToRef("Hello World", shape)
 
       expect(isContainer(result)).toBe(true)
       expect(isLoroText(result as any)).toBe(true)
@@ -35,7 +35,7 @@ describe("Conversion Functions", () => {
 
     it("should handle empty string", () => {
       const shape = Shape.text()
-      const result = convertInputToNode("", shape)
+      const result = convertInputToRef("", shape)
 
       expect(isLoroText(result as any)).toBe(true)
       const text = result as LoroText
@@ -53,7 +53,7 @@ describe("Conversion Functions", () => {
       ]
 
       for (const testString of testStrings) {
-        const result = convertInputToNode(testString, shape)
+        const result = convertInputToRef(testString, shape)
         expect(isLoroText(result as any)).toBe(true)
         const text = result as LoroText
         expect(text.toString()).toBe(testString)
@@ -63,19 +63,19 @@ describe("Conversion Functions", () => {
     it("should throw error for non-string input", () => {
       const shape = Shape.text()
 
-      expect(() => convertInputToNode(123 as any, shape)).toThrow(
+      expect(() => convertInputToRef(123 as any, shape)).toThrow(
         "string expected",
       )
-      expect(() => convertInputToNode(null as any, shape)).toThrow(
+      expect(() => convertInputToRef(null as any, shape)).toThrow(
         "string expected",
       )
-      expect(() => convertInputToNode([] as any, shape)).toThrow(
+      expect(() => convertInputToRef([] as any, shape)).toThrow(
         "string expected",
       )
-      expect(() => convertInputToNode({} as any, shape)).toThrow(
+      expect(() => convertInputToRef({} as any, shape)).toThrow(
         "string expected",
       )
-      expect(() => convertInputToNode(true as any, shape)).toThrow(
+      expect(() => convertInputToRef(true as any, shape)).toThrow(
         "string expected",
       )
     })
@@ -84,7 +84,7 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - Counter Conversion", () => {
     it("should convert number to LoroCounter", () => {
       const shape = Shape.counter()
-      const result = convertInputToNode(42, shape)
+      const result = convertInputToRef(42, shape)
 
       expect(isContainer(result)).toBe(true)
       expect(isLoroCounter(result as any)).toBe(true)
@@ -95,7 +95,7 @@ describe("Conversion Functions", () => {
 
     it("should handle zero value", () => {
       const shape = Shape.counter()
-      const result = convertInputToNode(0, shape)
+      const result = convertInputToRef(0, shape)
 
       expect(isLoroCounter(result as any)).toBe(true)
       const counter = result as LoroCounter
@@ -104,7 +104,7 @@ describe("Conversion Functions", () => {
 
     it("should handle negative numbers", () => {
       const shape = Shape.counter()
-      const result = convertInputToNode(-15, shape)
+      const result = convertInputToRef(-15, shape)
 
       expect(isLoroCounter(result as any)).toBe(true)
       const counter = result as LoroCounter
@@ -113,7 +113,7 @@ describe("Conversion Functions", () => {
 
     it("should handle floating point numbers", () => {
       const shape = Shape.counter()
-      const result = convertInputToNode(3.14, shape)
+      const result = convertInputToRef(3.14, shape)
 
       expect(isLoroCounter(result as any)).toBe(true)
       const counter = result as LoroCounter
@@ -123,19 +123,19 @@ describe("Conversion Functions", () => {
     it("should throw error for non-number input", () => {
       const shape = Shape.counter()
 
-      expect(() => convertInputToNode("123" as any, shape)).toThrow(
+      expect(() => convertInputToRef("123" as any, shape)).toThrow(
         "number expected",
       )
-      expect(() => convertInputToNode(null as any, shape)).toThrow(
+      expect(() => convertInputToRef(null as any, shape)).toThrow(
         "number expected",
       )
-      expect(() => convertInputToNode([] as any, shape)).toThrow(
+      expect(() => convertInputToRef([] as any, shape)).toThrow(
         "number expected",
       )
-      expect(() => convertInputToNode({} as any, shape)).toThrow(
+      expect(() => convertInputToRef({} as any, shape)).toThrow(
         "number expected",
       )
-      expect(() => convertInputToNode(true as any, shape)).toThrow(
+      expect(() => convertInputToRef(true as any, shape)).toThrow(
         "number expected",
       )
     })
@@ -144,7 +144,7 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - List Conversion", () => {
     it("should convert array to LoroList with value items", () => {
       const shape = Shape.list(Shape.plain.string())
-      const result = convertInputToNode(["hello", "world"], shape)
+      const result = convertInputToRef(["hello", "world"], shape)
 
       expect(isContainer(result)).toBe(true)
       expect(isLoroList(result as any)).toBe(true)
@@ -157,7 +157,7 @@ describe("Conversion Functions", () => {
 
     it("should convert array to LoroList with container items", () => {
       const shape = Shape.list(Shape.text())
-      const result = convertInputToNode(["first", "second"], shape)
+      const result = convertInputToRef(["first", "second"], shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -172,7 +172,7 @@ describe("Conversion Functions", () => {
 
     it("should handle empty array", () => {
       const shape = Shape.list(Shape.plain.string())
-      const result = convertInputToNode([], shape)
+      const result = convertInputToRef([], shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -181,7 +181,7 @@ describe("Conversion Functions", () => {
 
     it("should handle mixed value types in list", () => {
       const shape = Shape.list(Shape.plain.number())
-      const result = convertInputToNode([1, 2.5, -3, 0], shape)
+      const result = convertInputToRef([1, 2.5, -3, 0], shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -195,7 +195,7 @@ describe("Conversion Functions", () => {
     it("should return plain array for value shape", () => {
       const shape = Shape.plain.array(Shape.plain.string())
       const input = ["hello", "world"]
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isContainer(result)).toBe(false)
       expect(Array.isArray(result)).toBe(true)
@@ -204,7 +204,7 @@ describe("Conversion Functions", () => {
 
     it("should handle nested container conversion", () => {
       const shape = Shape.list(Shape.counter())
-      const result = convertInputToNode([5, 10, 15], shape)
+      const result = convertInputToRef([5, 10, 15], shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -217,16 +217,16 @@ describe("Conversion Functions", () => {
     it("should throw error for non-array input", () => {
       const shape = Shape.list(Shape.plain.string())
 
-      expect(() => convertInputToNode("not array" as any, shape)).toThrow(
+      expect(() => convertInputToRef("not array" as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode(123 as any, shape)).toThrow(
+      expect(() => convertInputToRef(123 as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode({} as any, shape)).toThrow(
+      expect(() => convertInputToRef({} as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode(null as any, shape)).toThrow(
+      expect(() => convertInputToRef(null as any, shape)).toThrow(
         "array expected",
       )
     })
@@ -235,7 +235,7 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - MovableList Conversion", () => {
     it("should convert array to LoroMovableList with value items", () => {
       const shape = Shape.movableList(Shape.plain.string())
-      const result = convertInputToNode(["first", "second", "third"], shape)
+      const result = convertInputToRef(["first", "second", "third"], shape)
 
       expect(isContainer(result)).toBe(true)
       expect(isLoroMovableList(result as any)).toBe(true)
@@ -249,7 +249,7 @@ describe("Conversion Functions", () => {
 
     it("should convert array to LoroMovableList with container items", () => {
       const shape = Shape.movableList(Shape.counter())
-      const result = convertInputToNode([1, 5, 10], shape)
+      const result = convertInputToRef([1, 5, 10], shape)
 
       expect(isLoroMovableList(result as any)).toBe(true)
       const list = result as LoroMovableList
@@ -261,7 +261,7 @@ describe("Conversion Functions", () => {
 
     it("should handle empty movable list", () => {
       const shape = Shape.movableList(Shape.plain.boolean())
-      const result = convertInputToNode([], shape)
+      const result = convertInputToRef([], shape)
 
       expect(isLoroMovableList(result as any)).toBe(true)
       const list = result as LoroMovableList
@@ -271,7 +271,7 @@ describe("Conversion Functions", () => {
     it("should return plain array for value shape", () => {
       const shape = Shape.plain.array(Shape.plain.number())
       const input = [1, 2, 3]
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isContainer(result)).toBe(false)
       expect(Array.isArray(result)).toBe(true)
@@ -281,16 +281,16 @@ describe("Conversion Functions", () => {
     it("should throw error for non-array input", () => {
       const shape = Shape.movableList(Shape.plain.string())
 
-      expect(() => convertInputToNode("not array" as any, shape)).toThrow(
+      expect(() => convertInputToRef("not array" as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode(123 as any, shape)).toThrow(
+      expect(() => convertInputToRef(123 as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode({} as any, shape)).toThrow(
+      expect(() => convertInputToRef({} as any, shape)).toThrow(
         "array expected",
       )
-      expect(() => convertInputToNode(null as any, shape)).toThrow(
+      expect(() => convertInputToRef(null as any, shape)).toThrow(
         "array expected",
       )
     })
@@ -310,7 +310,7 @@ describe("Conversion Functions", () => {
         active: true,
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isContainer(result)).toBe(true)
       expect(isLoroMap(result as any)).toBe(true)
@@ -332,7 +332,7 @@ describe("Conversion Functions", () => {
         count: 42,
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -344,7 +344,7 @@ describe("Conversion Functions", () => {
 
     it("should handle empty object", () => {
       const shape = Shape.map({})
-      const result = convertInputToNode({}, shape)
+      const result = convertInputToRef({}, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -361,7 +361,7 @@ describe("Conversion Functions", () => {
         extraProp: "should be ignored", // This should be set as-is
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -389,7 +389,7 @@ describe("Conversion Functions", () => {
         },
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -404,7 +404,7 @@ describe("Conversion Functions", () => {
       })
 
       const input = { name: "John", age: 30 }
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isContainer(result)).toBe(false)
       expect(typeof result).toBe("object")
@@ -416,16 +416,16 @@ describe("Conversion Functions", () => {
         name: Shape.plain.string(),
       })
 
-      expect(() => convertInputToNode("not object" as any, shape)).toThrow(
+      expect(() => convertInputToRef("not object" as any, shape)).toThrow(
         "object expected",
       )
-      expect(() => convertInputToNode(123 as any, shape)).toThrow(
+      expect(() => convertInputToRef(123 as any, shape)).toThrow(
         "object expected",
       )
-      expect(() => convertInputToNode([] as any, shape)).toThrow(
+      expect(() => convertInputToRef([] as any, shape)).toThrow(
         "object expected",
       )
-      expect(() => convertInputToNode(null as any, shape)).toThrow(
+      expect(() => convertInputToRef(null as any, shape)).toThrow(
         "object expected",
       )
     })
@@ -438,10 +438,10 @@ describe("Conversion Functions", () => {
       const booleanShape = Shape.plain.boolean()
       const nullShape = Shape.plain.null()
 
-      expect(convertInputToNode("hello", stringShape)).toBe("hello")
-      expect(convertInputToNode(42, numberShape)).toBe(42)
-      expect(convertInputToNode(true, booleanShape)).toBe(true)
-      expect(convertInputToNode(null, nullShape)).toBe(null)
+      expect(convertInputToRef("hello", stringShape)).toBe("hello")
+      expect(convertInputToRef(42, numberShape)).toBe(42)
+      expect(convertInputToRef(true, booleanShape)).toBe(true)
+      expect(convertInputToRef(null, nullShape)).toBe(null)
     })
 
     it("should handle complex value shapes", () => {
@@ -454,15 +454,15 @@ describe("Conversion Functions", () => {
       const arrayInput = ["a", "b", "c"]
       const objectInput = { name: "test", count: 5 }
 
-      expect(convertInputToNode(arrayInput, arrayShape)).toEqual(arrayInput)
-      expect(convertInputToNode(objectInput, objectShape)).toEqual(objectInput)
+      expect(convertInputToRef(arrayInput, arrayShape)).toEqual(arrayInput)
+      expect(convertInputToRef(objectInput, objectShape)).toEqual(objectInput)
     })
 
     it("should handle Uint8Array values", () => {
       const shape = Shape.plain.uint8Array()
       const input = new Uint8Array([1, 2, 3, 4])
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
       expect(result).toBe(input)
       expect(result instanceof Uint8Array).toBe(true)
     })
@@ -472,7 +472,7 @@ describe("Conversion Functions", () => {
     it("should throw error for tree type (unimplemented)", () => {
       const shape = Shape.tree(Shape.map({}))
 
-      expect(() => convertInputToNode({}, shape)).toThrow(
+      expect(() => convertInputToRef({}, shape)).toThrow(
         "tree type unimplemented",
       )
     })
@@ -480,7 +480,7 @@ describe("Conversion Functions", () => {
     it("should throw error for invalid value shape", () => {
       const invalidShape = { _type: "value", valueType: "invalid" } as any
 
-      expect(() => convertInputToNode("test", invalidShape)).toThrow(
+      expect(() => convertInputToRef("test", invalidShape)).toThrow(
         "value expected",
       )
     })
@@ -515,7 +515,7 @@ describe("Conversion Functions", () => {
         },
       ]
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -545,7 +545,7 @@ describe("Conversion Functions", () => {
         },
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -564,7 +564,7 @@ describe("Conversion Functions", () => {
         [7, 8, 9],
       ]
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const outerList = result as LoroList
@@ -585,7 +585,7 @@ describe("Conversion Functions", () => {
         { id: "2", title: "Task 2", completed: true },
       ]
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMovableList(result as any)).toBe(true)
       const list = result as LoroMovableList
@@ -598,8 +598,8 @@ describe("Conversion Functions", () => {
       const nullShape = Shape.plain.null()
       const undefinedShape = Shape.plain.undefined()
 
-      expect(convertInputToNode(null, nullShape)).toBe(null)
-      expect(convertInputToNode(undefined, undefinedShape)).toBe(undefined)
+      expect(convertInputToRef(null, nullShape)).toBe(null)
+      expect(convertInputToRef(undefined, undefinedShape)).toBe(undefined)
     })
 
     it("should handle empty containers", () => {
@@ -607,9 +607,9 @@ describe("Conversion Functions", () => {
       const emptyMapShape = Shape.map({})
       const emptyMovableListShape = Shape.movableList(Shape.plain.number())
 
-      const emptyList = convertInputToNode([], emptyListShape)
-      const emptyMap = convertInputToNode({}, emptyMapShape)
-      const emptyMovableList = convertInputToNode([], emptyMovableListShape)
+      const emptyList = convertInputToRef([], emptyListShape)
+      const emptyMap = convertInputToRef({}, emptyMapShape)
+      const emptyMovableList = convertInputToRef([], emptyMovableListShape)
 
       expect(isLoroList(emptyList as any)).toBe(true)
       expect((emptyList as LoroList).length).toBe(0)
@@ -624,7 +624,7 @@ describe("Conversion Functions", () => {
     it("should handle very large numbers", () => {
       const shape = Shape.counter()
       const largeNumber = Number.MAX_SAFE_INTEGER
-      const result = convertInputToNode(largeNumber, shape)
+      const result = convertInputToRef(largeNumber, shape)
 
       expect(isLoroCounter(result as any)).toBe(true)
       expect((result as LoroCounter).value).toBe(largeNumber)
@@ -633,7 +633,7 @@ describe("Conversion Functions", () => {
     it("should handle very long strings", () => {
       const shape = Shape.text()
       const longString = "a".repeat(10000)
-      const result = convertInputToNode(longString, shape)
+      const result = convertInputToRef(longString, shape)
 
       expect(isLoroText(result as any)).toBe(true)
       expect((result as LoroText).toString()).toBe(longString)
@@ -643,7 +643,7 @@ describe("Conversion Functions", () => {
     it("should handle arrays with many items", () => {
       const shape = Shape.list(Shape.plain.number())
       const largeArray = Array.from({ length: 1000 }, (_, i) => i)
-      const result = convertInputToNode(largeArray, shape)
+      const result = convertInputToRef(largeArray, shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -663,7 +663,7 @@ describe("Conversion Functions", () => {
       }
 
       const shape = Shape.map(shapes)
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap
@@ -676,7 +676,7 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - Type Safety", () => {
     it("should maintain referential integrity for containers", () => {
       const shape = Shape.list(Shape.text())
-      const result = convertInputToNode(["test"], shape)
+      const result = convertInputToRef(["test"], shape)
 
       expect(isLoroList(result as any)).toBe(true)
       const list = result as LoroList
@@ -688,8 +688,8 @@ describe("Conversion Functions", () => {
 
     it("should create independent container instances", () => {
       const shape = Shape.counter()
-      const result1 = convertInputToNode(5, shape)
-      const result2 = convertInputToNode(5, shape)
+      const result1 = convertInputToRef(5, shape)
+      const result2 = convertInputToRef(5, shape)
 
       expect(isLoroCounter(result1 as any)).toBe(true)
       expect(isLoroCounter(result2 as any)).toBe(true)
@@ -718,7 +718,7 @@ describe("Conversion Functions", () => {
         children: ["child1", "child2"],
       }
 
-      const result = convertInputToNode(input, shape)
+      const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
       const map = result as LoroMap

@@ -57,37 +57,37 @@ export class MapRef<
     }
   }
 
-  getOrCreateNode<Shape extends ContainerShape | ValueShape>(
+  getOrCreateRef<Shape extends ContainerShape | ValueShape>(
     key: string,
     shape: Shape,
   ): any {
-    let node = this.propertyCache.get(key)
-    if (!node) {
+    let ref = this.propertyCache.get(key)
+    if (!ref) {
       if (isContainerShape(shape)) {
-        node = createContainerTypedRef(this.getTypedRefParams(key, shape))
-        // We cache container nodes even in readonly mode because they are just handles
-        this.propertyCache.set(key, node)
+        ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
+        // We cache container refs even in readonly mode because they are just handles
+        this.propertyCache.set(key, ref)
       } else {
         // For value shapes, first try to get the value from the container
         const containerValue = this.container.get(key)
         if (containerValue !== undefined) {
-          node = containerValue as Value
+          ref = containerValue as Value
         } else {
           // Only fall back to placeholder if the container doesn't have the value
           const placeholder = (this.placeholder as any)?.[key]
           if (placeholder === undefined) {
             throw new Error("placeholder required")
           }
-          node = placeholder as Value
+          ref = placeholder as Value
         }
 
         // In readonly mode, we DO NOT cache primitive values.
         // This ensures we always get the latest value from the CRDT on next access.
         if (!this.readonly) {
-          this.propertyCache.set(key, node)
+          this.propertyCache.set(key, ref)
         }
       }
-      if (node === undefined) throw new Error("no container made")
+      if (ref === undefined) throw new Error("no container made")
     }
 
     if (this.readonly && isContainerShape(shape)) {
@@ -98,17 +98,17 @@ export class MapRef<
         return (this.placeholder as any)?.[key]
       }
 
-      return unwrapReadonlyPrimitive(node as TypedRef<any>, shape)
+      return unwrapReadonlyPrimitive(ref as TypedRef<any>, shape)
     }
 
-    return node as Shape extends ContainerShape ? TypedRef<Shape> : Value
+    return ref as Shape extends ContainerShape ? TypedRef<Shape> : Value
   }
 
   private createLazyProperties(): void {
     for (const key in this.shape.shapes) {
       const shape = this.shape.shapes[key]
       Object.defineProperty(this, key, {
-        get: () => this.getOrCreateNode(key, shape),
+        get: () => this.getOrCreateRef(key, shape),
         set: value => {
           this.assertMutable()
           if (isValueShape(shape)) {
@@ -116,9 +116,9 @@ export class MapRef<
             this.propertyCache.set(key, value)
           } else {
             if (value && typeof value === "object") {
-              const node = this.getOrCreateNode(key, shape)
+              const ref = this.getOrCreateRef(key, shape)
 
-              if (assignPlainValueToTypedRef(node as TypedRef<any>, value)) {
+              if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
                 return
               }
             }

@@ -44,15 +44,19 @@ header h1 {
   color: #888;
 }
 
-.status-ready {
+.status-ready,
+.status-connected {
   color: #28a745;
 }
 .status-loading,
-.status-syncing {
+.status-syncing,
+.status-connecting,
+.status-reconnecting {
   color: #ffc107;
 }
 .status-unavailable,
-.status-deleted {
+.status-deleted,
+.status-disconnected {
   color: #dc3545;
 }
 .status-idle,

@@ -68,18 +68,18 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
       }
     }
 
-    let node = this.propertyCache.get(key)
+    let ref = this.propertyCache.get(key)
 
-    if (!node) {
-      node = createContainerTypedRef(this.getTypedRefParams(key, shape))
-      this.propertyCache.set(key, node)
+    if (!ref) {
+      ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
+      this.propertyCache.set(key, ref)
     }
 
     if (this.readonly) {
-      return unwrapReadonlyPrimitive(node, shape)
+      return unwrapReadonlyPrimitive(ref, shape)
     }
 
-    return node
+    return ref
   }
 
   private createLazyProperties(): void {
@@ -102,8 +102,8 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
   absorbPlainValues(): void {
     // By iterating over the propertyCache, we achieve a small optimization
     // by only absorbing values that have been 'touched' in some way
-    for (const [, node] of this.propertyCache.entries()) {
-      node.absorbPlainValues()
+    for (const [, ref] of this.propertyCache.entries()) {
+      ref.absorbPlainValues()
     }
   }
 }

@@ -23,7 +23,7 @@ export class RecordRef<
   NestedShape extends ContainerOrValueShape,
 > extends TypedRef<any> {
   [key: string]: Infer<NestedShape> | any
-  private nodeCache = new Map<string, TypedRef<ContainerShape> | Value>()
+  private refCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
   protected get shape(): RecordContainerShape<NestedShape> {
     return super.shape as RecordContainerShape<NestedShape>
@@ -34,7 +34,7 @@ export class RecordRef<
   }
 
   absorbPlainValues() {
-    absorbCachedPlainValues(this.nodeCache, () => this.container)
+    absorbCachedPlainValues(this.refCache, () => this.container)
   }
 
   getTypedRefParams<S extends ContainerShape>(
@@ -62,7 +62,7 @@ export class RecordRef<
     }
   }
 
-  getOrCreateNode(key: string): any {
+  getOrCreateRef(key: string): any {
     // For readonly mode with container shapes, check if the key exists first
     // This allows optional chaining (?.) to work correctly for non-existent keys
     // Similar to how ListRefBase.getMutableItem() handles non-existent indices
@@ -73,64 +73,64 @@ export class RecordRef<
       }
     }
 
-    let node = this.nodeCache.get(key)
-    if (!node) {
+    let ref = this.refCache.get(key)
+    if (!ref) {
       const shape = this.shape.shape
       if (isContainerShape(shape)) {
-        node = createContainerTypedRef(
+        ref = createContainerTypedRef(
           this.getTypedRefParams(key, shape as ContainerShape),
         )
-        // Cache container nodes
-        this.nodeCache.set(key, node)
+        // Cache container refs
+        this.refCache.set(key, ref)
       } else {
         // For value shapes, first try to get the value from the container
         const containerValue = this.container.get(key)
         if (containerValue !== undefined) {
-          node = containerValue as Value
+          ref = containerValue as Value
         } else {
           // Only fall back to placeholder if the container doesn't have the value
           const placeholder = (this.placeholder as any)?.[key]
           if (placeholder === undefined) {
             // If it's a value type and not in container or placeholder,
             // fallback to the default value from the shape
-            node = (shape as any)._plain
+            ref = (shape as any)._plain
           } else {
-            node = placeholder as Value
+            ref = placeholder as Value
           }
         }
         // Only cache primitive values if NOT readonly
-        if (node !== undefined && !this.readonly) {
-          this.nodeCache.set(key, node)
+        if (ref !== undefined && !this.readonly) {
+          this.refCache.set(key, ref)
         }
       }
     }
 
     if (this.readonly && isContainerShape(this.shape.shape)) {
       return unwrapReadonlyPrimitive(
-        node as TypedRef<any>,
+        ref as TypedRef<any>,
         this.shape.shape as ContainerShape,
       )
     }
 
-    return node as any
+    return ref as any
   }
 
   get(key: string): InferMutableType<NestedShape> {
-    return this.getOrCreateNode(key)
+    return this.getOrCreateRef(key)
   }
 
   set(key: string, value: any): void {
     this.assertMutable()
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
-      this.nodeCache.set(key, value)
+      this.refCache.set(key, value)
     } else {
       // For containers, we can't set them directly usually.
       // But if the user passes a plain object that matches the shape, maybe we should convert it?
       if (value && typeof value === "object") {
-        const node = this.getOrCreateNode(key)
+        const ref = this.getOrCreateRef(key)
 
-        if (assignPlainValueToTypedRef(node, value)) {
+        if (assignPlainValueToTypedRef(ref, value)) {
           return
         }
       }
@@ -149,7 +149,7 @@ export class RecordRef<
   delete(key: string): void {
     this.assertMutable()
     this.container.delete(key)
-    this.nodeCache.delete(key)
+    this.refCache.delete(key)
   }
 
   has(key: string): boolean {

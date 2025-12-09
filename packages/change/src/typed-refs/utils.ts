@@ -51,16 +51,16 @@ export const containerConstructor = {
  * Other container types are returned as-is.
  */
 export function unwrapReadonlyPrimitive(
-  node: TypedRef<any>,
+  ref: TypedRef<any>,
   shape: ContainerShape,
 ): any {
   if (shape._type === "counter") {
-    return (node as any).value
+    return (ref as any).value
   }
   if (shape._type === "text") {
-    return (node as any).toString()
+    return (ref as any).toString()
   }
-  return node
+  return ref
 }
 
 /**
@@ -74,14 +74,14 @@ export function absorbCachedPlainValues(
 ): void {
   let container: LoroMap | undefined
 
-  for (const [key, node] of cache.entries()) {
-    if (node instanceof TypedRef) {
+  for (const [key, ref] of cache.entries()) {
+    if (ref instanceof TypedRef) {
       // Contains a TypedRef, not a plain Value: keep recursing
-      node.absorbPlainValues()
+      ref.absorbPlainValues()
     } else {
       // Plain value!
       if (!container) container = getContainer()
-      container.set(key, node)
+      container.set(key, ref)
     }
   }
 }
@@ -148,26 +148,26 @@ export function createContainerTypedRef(
 }
 
 export function assignPlainValueToTypedRef(
-  node: TypedRef<any>,
+  ref: TypedRef<any>,
   value: any,
 ): boolean {
-  const shapeType = (node as any).shape._type
+  const shapeType = (ref as any).shape._type
 
   if (shapeType === "map" || shapeType === "record") {
     for (const k in value) {
-      ;(node as any)[k] = value[k]
+      ;(ref as any)[k] = value[k]
     }
     return true
   }
 
   if (shapeType === "list" || shapeType === "movableList") {
     if (Array.isArray(value)) {
-      const listNode = node as any
-      if (listNode.length > 0) {
-        listNode.delete(0, listNode.length)
+      const listRef = ref as any
+      if (listRef.length > 0) {
+        listRef.delete(0, listRef.length)
       }
       for (const item of value) {
-        listNode.push(item)
+        listRef.push(item)
       }
       return true
     }

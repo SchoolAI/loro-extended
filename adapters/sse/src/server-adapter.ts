@@ -126,6 +126,12 @@ export class SseServerNetworkAdapter extends Adapter<PeerID> {
    * @returns An SseConnection object that can be used to manage the connection
    */
   registerConnection(peerId: PeerID): SseConnection {
+    // Check for existing connection and clean it up
+    if (this.connections.has(peerId)) {
+      this.logger.info("Cleaning up existing connection for peer", { peerId })
+      this.unregisterConnection(peerId)
+    }
+
     // Create channel for this peer
     const channel = this.addChannel(peerId)
 

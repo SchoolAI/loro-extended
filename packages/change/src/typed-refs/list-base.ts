@@ -1,5 +1,5 @@
 import type { Container, LoroList, LoroMovableList } from "loro-crdt"
-import { convertInputToNode } from "../conversion.js"
+import { convertInputToRef } from "../conversion.js"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import { mergeValue } from "../overlay.js"
 import type {
@@ -67,7 +67,7 @@ export abstract class ListRefBase<
   protected abstract absorbValueAtIndex(index: number, value: any): void
 
   protected insertWithConversion(index: number, item: Item): void {
-    const convertedItem = convertInputToNode(item as any, this.shape.shape)
+    const convertedItem = convertInputToRef(item as any, this.shape.shape)
     if (isContainer(convertedItem)) {
       this.container.insertContainer(index, convertedItem)
     } else {
@@ -76,7 +76,7 @@ export abstract class ListRefBase<
   }
 
   protected pushWithConversion(item: Item): void {
-    const convertedItem = convertInputToNode(item as any, this.shape.shape)
+    const convertedItem = convertInputToRef(item as any, this.shape.shape)
     if (isContainer(convertedItem)) {
       this.container.pushContainer(convertedItem)
     } else {
@@ -184,7 +184,7 @@ export abstract class ListRefBase<
       cachedItem = createContainerTypedRef(
         this.getTypedRefParams(index, this.shape.shape as ContainerShape),
       )
-      // Cache container nodes
+      // Cache container refs
       this.itemCache.set(index, cachedItem)
 
       if (this.readonly) {

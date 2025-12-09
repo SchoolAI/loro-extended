@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
 import { TodoList } from "./components/todo-list"
+import { useConnectionState } from "./use-connection-state"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
@@ -20,6 +21,7 @@ function TodoApp() {
 
   // Use our custom hook to get a reactive state of the document
   const [doc, changeDoc, handle] = useDocument(docId, schema)
+  const connectionState = useConnectionState()
 
   useEffect(() => {
     console.log("doc state", doc)
@@ -59,9 +61,15 @@ function TodoApp() {
       <header>
         <h1>Loro Todo</h1>
         <div
-          className={`connection-status ${handle ? "status-ready" : "status-initializing"}`}
+          className={`connection-status status-${connectionState}`}
         >
-          {handle ? "Connected" : "Initializing..."}
+          {connectionState === "connected"
+            ? "Connected"
+            : connectionState === "connecting"
+              ? "Connecting..."
+              : connectionState === "reconnecting"
+                ? "Reconnecting..."
+                : "Disconnected"}
         </div>
       </header>
       <div className="todo-app">

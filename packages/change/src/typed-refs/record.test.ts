@@ -11,8 +11,8 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       doc.change(draft => {
-        draft.scores.getOrCreateNode("alice").increment(10)
-        draft.scores.getOrCreateNode("bob").increment(5)
+        draft.scores.getOrCreateRef("alice").increment(10)
+        draft.scores.getOrCreateRef("bob").increment(5)
       })
 
       expect(doc.toJSON().scores).toEqual({
@@ -21,7 +21,7 @@ describe("Record Types", () => {
       })
 
       doc.change(draft => {
-        draft.scores.getOrCreateNode("alice").increment(5)
+        draft.scores.getOrCreateRef("alice").increment(5)
         draft.scores.delete("bob")
       })
 
@@ -38,8 +38,8 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       doc.change(draft => {
-        draft.notes.getOrCreateNode("todo").insert(0, "Buy milk")
-        draft.notes.getOrCreateNode("reminders").insert(0, "Call mom")
+        draft.notes.getOrCreateRef("todo").insert(0, "Buy milk")
+        draft.notes.getOrCreateRef("reminders").insert(0, "Call mom")
       })
 
       expect(doc.toJSON().notes).toEqual({
@@ -56,11 +56,11 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       doc.change(draft => {
-        const groupA = draft.groups.getOrCreateNode("groupA")
+        const groupA = draft.groups.getOrCreateRef("groupA")
         groupA.push("alice")
         groupA.push("bob")
 
-        const groupB = draft.groups.getOrCreateNode("groupB")
+        const groupB = draft.groups.getOrCreateRef("groupB")
         groupB.push("charlie")
       })
 
@@ -170,11 +170,11 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       doc.change(draft => {
-        const alice = draft.users.getOrCreateNode("u1")
+        const alice = draft.users.getOrCreateRef("u1")
         alice.name = "Alice"
         alice.age = 30
 
-        const bob = draft.users.getOrCreateNode("u2")
+        const bob = draft.users.getOrCreateRef("u2")
         bob.name = "Bob"
         bob.age = 25
       })
