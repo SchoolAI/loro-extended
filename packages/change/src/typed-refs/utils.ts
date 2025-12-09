@@ -5,6 +5,7 @@ import {
   LoroMovableList,
   LoroText,
   LoroTree,
+  type Value,
 } from "loro-crdt"
 import type {
   ContainerShape,
@@ -16,7 +17,7 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
-import type { TypedRef, TypedRefParams } from "./base.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
 import { CounterRef } from "./counter.js"
 import { ListRef } from "./list.js"
 import { MapRef } from "./map.js"
@@ -60,6 +61,50 @@ export function unwrapReadonlyPrimitive(
     return (node as any).toString()
   }
   return node
+}
+
+/**
+ * Absorbs cached plain values back into a LoroMap container.
+ * For TypedRef entries, recursively calls absorbPlainValues().
+ * For plain Value entries, sets them directly on the container.
+ */
+export function absorbCachedPlainValues(
+  cache: Map<string, TypedRef<ContainerShape> | Value>,
+  getContainer: () => LoroMap,
+): void {
+  let container: LoroMap | undefined
+
+  for (const [key, node] of cache.entries()) {
+    if (node instanceof TypedRef) {
+      // Contains a TypedRef, not a plain Value: keep recursing
+      node.absorbPlainValues()
+    } else {
+      // Plain value!
+      if (!container) container = getContainer()
+      container.set(key, node)
+    }
+  }
+}
+
+/**
+ * Serializes a TypedRef to JSON by iterating over its keys.
+ * For nested TypedRefs with toJSON(), calls their toJSON method.
+ * For plain values, includes them directly.
+ */
+export function serializeRefToJSON(
+  ref: Record<string, any>,
+  keys: Iterable<string>,
+): Record<string, any> {
+  const result: Record<string, any> = {}
+  for (const key of keys) {
+    const value = ref[key]
+    if (value && typeof value === "object" && "toJSON" in value) {
+      result[key] = value.toJSON()
+    } else {
+      result[key] = value
+    }
+  }
+  return result
 }
 
 // Generic catch-all overload

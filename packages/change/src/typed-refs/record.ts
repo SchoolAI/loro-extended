@@ -10,9 +10,11 @@ import type { Infer, InferMutableType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import {
+  absorbCachedPlainValues,
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
+  serializeRefToJSON,
   unwrapReadonlyPrimitive,
 } from "./utils.js"
 
@@ -32,16 +34,7 @@ export class RecordRef<
   }
 
   absorbPlainValues() {
-    for (const [key, node] of this.nodeCache.entries()) {
-      if (node instanceof TypedRef) {
-        // Contains a TypedRef, not a plain Value: keep recursing
-        node.absorbPlainValues()
-        continue
-      }
-
-      // Plain value!
-      this.container.set(key, node)
-    }
+    absorbCachedPlainValues(this.nodeCache, () => this.container)
   }
 
   getTypedRefParams<S extends ContainerShape>(
@@ -195,15 +188,6 @@ export class RecordRef<
       return result
     }
 
-    const result: Record<string, any> = {}
-    for (const key of this.keys()) {
-      const value = this.get(key)
-      if (value && typeof value === "object" && "toJSON" in value) {
-        result[key] = (value as any).toJSON()
-      } else {
-        result[key] = value
-      }
-    }
-    return result
+    return serializeRefToJSON(this, this.keys())
   }
 }

@@ -2,7 +2,11 @@ import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { createContainerTypedRef, unwrapReadonlyPrimitive } from "./utils.js"
+import {
+  createContainerTypedRef,
+  serializeRefToJSON,
+  unwrapReadonlyPrimitive,
+} from "./utils.js"
 
 const containerGetter = {
   counter: "getCounter",
@@ -89,16 +93,10 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
   }
 
   toJSON(): Infer<Shape> {
-    const result: any = {}
-    for (const key in this.shape.shapes) {
-      const value = (this as any)[key]
-      if (value && typeof value === "object" && "toJSON" in value) {
-        result[key] = value.toJSON()
-      } else {
-        result[key] = value
-      }
-    }
-    return result
+    return serializeRefToJSON(
+      this as any,
+      Object.keys(this.shape.shapes),
+    ) as Infer<Shape>
   }
 
   absorbPlainValues(): void {

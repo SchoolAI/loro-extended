@@ -9,9 +9,11 @@ import type {
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import {
+  absorbCachedPlainValues,
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
+  serializeRefToJSON,
   unwrapReadonlyPrimitive,
 } from "./utils.js"
 
@@ -35,16 +37,7 @@ export class MapRef<
   }
 
   absorbPlainValues() {
-    for (const [key, node] of this.propertyCache.entries()) {
-      if (node instanceof TypedRef) {
-        // Contains a TypedRef, not a plain Value: keep recursing
-        node.absorbPlainValues()
-        continue
-      }
-
-      // Plain value!
-      this.container.set(key, node)
-    }
+    absorbCachedPlainValues(this.propertyCache, () => this.container)
   }
 
   getTypedRefParams<S extends ContainerShape>(
@@ -147,16 +140,7 @@ export class MapRef<
       return mergeValue(this.shape, nativeJson, this.placeholder as Value)
     }
 
-    const result: any = {}
-    for (const key in this.shape.shapes) {
-      const value = (this as any)[key]
-      if (value && typeof value === "object" && "toJSON" in value) {
-        result[key] = value.toJSON()
-      } else {
-        result[key] = value
-      }
-    }
-    return result
+    return serializeRefToJSON(this as any, Object.keys(this.shape.shapes))
   }
 
   // TODO(duane): return correct type here
