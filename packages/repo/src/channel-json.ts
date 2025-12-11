@@ -140,7 +140,23 @@ export function versionVectorFromJSON(json: VersionVectorJSON): VersionVector {
 
 export function uint8ArrayToJSON(data: Uint8Array): BinaryDataJSON {
   // Convert to base64 for JSON serialization
-  return btoa(String.fromCharCode(...data))
+  // Use chunked processing to avoid stack overflow with large arrays
+
+  // For small arrays, use the simple approach
+  if (data.length < 8192) {
+    return btoa(String.fromCharCode(...data))
+  }
+
+  // For large arrays, process in chunks to avoid stack overflow
+  const CHUNK_SIZE = 8192
+  let binary = ""
+
+  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+    const chunk = data.subarray(i, Math.min(i + CHUNK_SIZE, data.length))
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[])
+  }
+
+  return btoa(binary)
 }
 
 export function uint8ArrayFromJSON(json: BinaryDataJSON): Uint8Array {

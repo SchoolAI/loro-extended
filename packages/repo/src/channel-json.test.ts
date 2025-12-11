@@ -117,6 +117,55 @@ describe("Channel JSON Serialization", () => {
       expect(Array.from(restored)).toEqual(Array.from(original))
     })
 
+    it("should handle large Uint8Array (2MB) without stack overflow", () => {
+      // Create a 2MB array - this would cause stack overflow with spread operator
+      const size = 2 * 1024 * 1024 // 2MB
+      const data = new Uint8Array(size)
+
+      // Fill with test pattern
+      for (let i = 0; i < size; i++) {
+        data[i] = i % 256
+      }
+
+      // Should not throw
+      const json = uint8ArrayToJSON(data)
+      expect(typeof json).toBe("string")
+      expect(json.length).toBeGreaterThan(0)
+
+      // Should round-trip correctly
+      const restored = uint8ArrayFromJSON(json)
+      expect(restored.length).toBe(size)
+
+      // Verify data integrity (check first, middle, and last portions)
+      for (let i = 0; i < 1000; i++) {
+        expect(restored[i]).toBe(i % 256)
+      }
+      const midStart = Math.floor(size / 2)
+      for (let i = 0; i < 1000; i++) {
+        expect(restored[midStart + i]).toBe((midStart + i) % 256)
+      }
+      for (let i = size - 1000; i < size; i++) {
+        expect(restored[i]).toBe(i % 256)
+      }
+    })
+
+    it("should handle arrays at chunk boundary sizes", () => {
+      const sizes = [8191, 8192, 8193, 16384, 16385]
+
+      for (const size of sizes) {
+        const data = new Uint8Array(size)
+        for (let i = 0; i < size; i++) {
+          data[i] = i % 256
+        }
+
+        const json = uint8ArrayToJSON(data)
+        const restored = uint8ArrayFromJSON(json)
+
+        expect(restored.length).toBe(size)
+        expect(Array.from(restored)).toEqual(Array.from(data))
+      }
+    })
+
     it("should round-trip Loro document snapshot", () => {
       const doc = new LoroDoc()
       doc.getText("text")
