@@ -6,7 +6,7 @@ interface Message {
 
 export function useAutoScroll(
   ref: React.RefObject<HTMLElement | null>,
-  messages: Message[],
+  messages: readonly Message[],
 ) {
   const lastMessageLengthRef = useRef(0)
   const lastMessageContentLengthRef = useRef(0)

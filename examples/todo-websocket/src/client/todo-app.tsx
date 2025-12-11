@@ -1,4 +1,4 @@
-import { Shape, useDocument } from "@loro-extended/react"
+import { Shape, useDoc, useHandle } from "@loro-extended/react"
 import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
@@ -19,8 +19,9 @@ function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
-  // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useDocument(docId, schema)
+  // NEW API: Get handle first, then subscribe to doc
+  const handle = useHandle(docId, schema)
+  const doc = useDoc(handle)
   const connectionState = useConnectionState()
 
   useEffect(() => {
@@ -29,7 +30,7 @@ function TodoApp() {
   }, [doc, handle])
 
   const addTodo = (text: string) => {
-    changeDoc(d => {
+    handle.change(d => {
       d.todos.push({
         id: generateUUID(),
         text,
@@ -39,7 +40,7 @@ function TodoApp() {
   }
 
   const toggleTodo = (id: string) => {
-    changeDoc(d => {
+    handle.change(d => {
       const todo = d.todos.find(t => t.id === id)
       if (todo) {
         todo.completed = !todo.completed
@@ -48,7 +49,7 @@ function TodoApp() {
   }
 
   const deleteTodo = (id: string) => {
-    changeDoc(d => {
+    handle.change(d => {
       const index = d.todos.findIndex(t => t.id === id)
       if (index > -1) {
         d.todos.delete(index, 1)

@@ -1,4 +1,4 @@
-import { useDocument, usePresence, useRepo } from "@loro-extended/react"
+import { useHandle, useDoc, usePresence, useRepo } from "@loro-extended/react"
 import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema, PresenceSchema, type Message } from "../shared/types"
@@ -81,16 +81,15 @@ function ChatApp() {
     }
   }, [docId])
 
-  // Use our custom hook to get a reactive state of the document
-  const [doc, changeDoc, handle] = useDocument(docId, ChatSchema)
-
-  // Use ephemeral state for presence
-  const { peers, self, setSelf } = usePresence(docId, PresenceSchema)
+  // NEW API: Get handle with both doc and presence schemas
+  const handle = useHandle(docId, ChatSchema, PresenceSchema)
+  const doc = useDoc(handle)
+  const { self, peers } = usePresence(handle)
 
   // Set self presence with name
   useEffect(() => {
-    setSelf({ type: "user", name: userName })
-  }, [setSelf, userName])
+    handle.presence.set({ type: "user", name: userName })
+  }, [handle, userName])
 
   // Check if the current user has sent any messages in this conversation
   const hasUserSentMessages = doc.messages.some(
@@ -109,7 +108,7 @@ function ChatApp() {
       // Update to new name
       localStorage.setItem(NAME_STORAGE_KEY, newName)
       setUserName(newName)
-      setSelf({ type: "user", name: newName })
+      handle.presence.set({ type: "user", name: newName })
     }
     setIsEditingName(false)
   }
@@ -134,7 +133,7 @@ function ChatApp() {
       localStorage.removeItem(PREVIOUS_NAME_KEY) // Fulfill the responsibility
     }
 
-    changeDoc(d => {
+    handle.change(d => {
       d.messages.push({
         id: generateUUID(),
         role: "user",
@@ -177,15 +176,13 @@ function ChatApp() {
       : "none"
 
   const dismissTip = () => {
-    changeDoc(d => {
+    handle.change(d => {
       const prefs = d.preferences.get(myPeerId)
       prefs.showTip = false
     })
   }
 
   useEffect(() => {
-    if (!handle) return
-
     const updateConnectionStatus = (readyStates: ReadyState[]) => {
       const connected = readyStates.some(
         s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
@@ -410,7 +407,7 @@ function ChatApp() {
           <button
             type="button"
             onClick={sendMessage}
-            disabled={!input.trim() || !handle}
+            disabled={!input.trim()}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full p-3 w-12 h-12 flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95"
           >
             <svg

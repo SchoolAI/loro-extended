@@ -1,33 +1,23 @@
 # @loro-extended/react
 
-React hooks for building real-time collaborative applications with [Loro CRDT](https://github.com/loro-dev/loro) documents. Offers both **simple untyped** and **schema-based typed** APIs.
+React hooks for building real-time collaborative applications with [Loro CRDT](https://github.com/loro-dev/loro) documents.
 
 ## What This Package Does
 
-This package provides React-specific bindings for Loro CRDT documents with two approaches:
+This package provides React-specific bindings for Loro CRDT documents with a handle-first pattern:
 
-- **Simple API**: Direct LoroDoc access without schema dependencies
-- **Typed API**: Schema-based documents with type safety and empty state management
+- **`useHandle`** - Get a stable, typed document handle
+- **`useDoc`** - Subscribe to document changes with optional selectors
+- **`usePresence`** - Subscribe to presence state changes
 
 ### Key Features
 
-- **Document Lifecycle**: Automatic loading, creation, and synchronization of documents
-- **React Integration**: Reactive hooks that re-render when documents change
-- **Flexible APIs**: Choose between simple or typed approaches based on your needs
-- **Type Safety**: Full TypeScript support (optional schema-driven type inference)
-- **Loading States**: Handle sync status separately from data availability
+- **Stable References** - Handles never change, preventing unnecessary re-renders
+- **Fine-Grained Reactivity** - Use selectors to only re-render when specific data changes
+- **Type Safety** - Full TypeScript support with schema-driven type inference
+- **Unified Presence** - Document and presence are managed together through the handle
 
 ## Installation
-
-### For Simple API (no schema dependencies)
-
-```bash
-npm install @loro-extended/react @loro-extended/repo loro-crdt
-# or
-pnpm add @loro-extended/react @loro-extended/repo loro-crdt
-```
-
-### For Typed API (with schema support)
 
 ```bash
 npm install @loro-extended/react @loro-extended/change @loro-extended/repo loro-crdt
@@ -37,498 +27,347 @@ pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crd
 
 ## Quick Start
 
-### Simple API (Untyped)
-
-For direct LoroDoc access without schema dependencies:
-
 ```tsx
-import { useUntypedDocument } from "@loro-extended/react";
+import { Shape, useHandle, useDoc, usePresence, RepoProvider } from "@loro-extended/react"
+import type { RepoParams } from "@loro-extended/repo"
 
-interface TodoDoc {
-  title: string;
-  todos: Array<{ id: string; text: string; completed: boolean }>;
-}
-
-function SimpleTodoApp() {
-  const [doc, changeDoc, handle] = useUntypedDocument("todo-doc");
-
-  // Check if doc is ready before using
-  if (!doc) {
-    return <div>Loading...</div>;
-  }
-
-  const data = doc.toJSON() as TodoDoc;
-
-  return (
-    <div>
-      <h1>{data.title || "My Todo List"}</h1>
-
-      <button
-        onClick={() =>
-          changeDoc((doc) => {
-            const titleText = doc.getText("title");
-            titleText.insert(0, "📝 ");
-          })
-        }
-      >
-        Add Emoji
-      </button>
-
-      {(data.todos || []).map((todo, index) => (
-        <div key={todo.id}>
-          <input
-            type="checkbox"
-            checked={todo.completed}
-            onChange={() =>
-              changeDoc((doc) => {
-                const todosList = doc.getList("todos");
-                const todoMap = todosList.get(index);
-                if (todoMap) {
-                  todoMap.set("completed", !todo.completed);
-                }
-              })
-            }
-          />
-          {todo.text}
-        </div>
-      ))}
-
-      <button
-        onClick={() =>
-          changeDoc((doc) => {
-            const todosList = doc.getList("todos");
-            todosList.push({
-              id: Date.now().toString(),
-              text: "New Todo",
-              completed: false,
-            });
-          })
-        }
-      >
-        Add Todo
-      </button>
-    </div>
-  );
-}
-```
-
-### Typed API (Schema-based)
-
-For schema-aware documents with type safety and empty state management:
-
-```tsx
-import { useDocument, Shape } from "@loro-extended/react";
-
-// Define your document schema (see @loro-extended/change for details)
-const todoSchema = Shape.doc({
+// Define your document schema
+const TodoSchema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
   todos: Shape.list(
-    Shape.plain.object({
+    Shape.map({
       id: Shape.plain.string(),
       text: Shape.plain.string(),
       completed: Shape.plain.boolean(),
     })
   ),
-});
+})
 
-function TypedTodoApp() {
-  const [doc, changeDoc, handle] = useDocument("todo-doc", todoSchema);
+// Define presence schema (optional)
+const PresenceSchema = Shape.plain.object({
+  cursor: Shape.plain.object({
+    x: Shape.plain.number(),
+    y: Shape.plain.number(),
+  }),
+  name: Shape.plain.string().placeholder("Anonymous"),
+})
 
-  // doc is ALWAYS defined - no loading check needed!
+function TodoApp() {
+  // Get a stable handle (never re-renders)
+  const handle = useHandle("todo-doc", TodoSchema, PresenceSchema)
+  
+  // Subscribe to document changes
+  const doc = useDoc(handle)
+  
+  // Subscribe to presence changes
+  const { self, peers } = usePresence(handle)
+
+  const addTodo = (text: string) => {
+    handle.change(d => {
+      d.todos.push({
+        id: Date.now().toString(),
+        text,
+        completed: false,
+      })
+    })
+  }
+
+  const toggleTodo = (index: number) => {
+    handle.change(d => {
+      const todo = d.todos.get(index)
+      if (todo) {
+        todo.completed = !todo.completed
+      }
+    })
+  }
+
   return (
     <div>
       <h1>{doc.title}</h1>
-
-      <button
-        onClick={() =>
-          changeDoc((draft) => {
-            draft.title.insert(0, "📝 ");
-          })
-        }
-      >
-        Add Emoji
-      </button>
+      
+      {/* Show connected users */}
+      <div>
+        Online: {self.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
+      </div>
 
       {doc.todos.map((todo, index) => (
         <div key={todo.id}>
           <input
             type="checkbox"
             checked={todo.completed}
-            onChange={() =>
-              changeDoc((draft) => {
-                // Update the specific todo item
-                const todoItem = draft.todos.get(index);
-                if (todoItem) {
-                  todoItem.completed = !todo.completed;
-                }
-              })
-            }
+            onChange={() => toggleTodo(index)}
           />
           {todo.text}
         </div>
       ))}
 
-      <button
-        onClick={() =>
-          changeDoc((draft) => {
-            draft.todos.push({
-              id: Date.now().toString(),
-              text: "New Todo",
-              completed: false,
-            });
-          })
-        }
-      >
+      <button onClick={() => addTodo("New Todo")}>
         Add Todo
       </button>
     </div>
-  );
+  )
+}
+
+// Wrap your app with RepoProvider
+function App() {
+  const config: RepoParams = {
+    identity: { name: "user-1", type: "user" },
+    adapters: [/* your adapters */],
+  }
+
+  return (
+    <RepoProvider config={config}>
+      <TodoApp />
+    </RepoProvider>
+  )
 }
 ```
 
 ## Core Hooks
 
-### `useUntypedDocument` - Simple API
+### `useHandle(docId, docSchema, presenceSchema?)`
 
-For direct LoroDoc access without schema dependencies.
-
-#### Signature
+Returns a stable `TypedDocHandle` for the given document. The handle is created synchronously and never changes.
 
 ```typescript
-function useUntypedDocument<T = any>(
-  documentId: string
-): [
-  doc: LoroDoc | null,
-  changeDoc: (fn: SimpleChangeFn) => void,
-  handle: DocHandle | null
-];
+// Without presence
+const handle = useHandle(docId, docSchema)
+
+// With presence
+const handle = useHandle(docId, docSchema, presenceSchema)
 ```
 
-#### Parameters
+**Parameters:**
+- `docId: DocId` - The document identifier
+- `docSchema: DocShape` - The document schema
+- `presenceSchema?: ValueShape` - Optional presence schema
 
-- **`documentId`**: Unique identifier for the document
+**Returns:** `TypedDocHandle<D, P>` with:
+- `handle.value` - Current document value (readonly)
+- `handle.change(fn)` - Mutate the document
+- `handle.presence` - Typed presence API
+- `handle.docId` - The document ID
+- `handle.readyStates` - Sync status information
 
-#### Returns
+### `useDoc(handle, selector?)`
 
-1. **`doc: LoroDoc | null`** - The raw LoroDoc instance
-
-   - `null` when not ready (requires loading check)
-   - Direct access to all LoroDoc methods when available
-   - Use `doc.toJSON()` to get plain JavaScript object
-
-2. **`changeDoc: (fn: SimpleChangeFn) => void`** - Function to modify the document
-
-   - Provides direct access to LoroDoc for mutations
-   - Example: `changeDoc(doc => doc.getText("title").insert(0, "Hello"))`
-
-3. **`handle: DocHandle | null`** - The document handle
-   - Provides access to sync state (via `readyStates`) and events
-   - `null` initially, then becomes available
-
-### `useDocument` - Typed API
-
-For schema-aware documents with type safety and empty state management.
-
-#### Signature
+Subscribes to document changes and returns the current value.
 
 ```typescript
-function useDocument<T extends DocShape>(
-  documentId: string,
-  schema: T
-): [
-  doc: InferPlainType<T>,
-  changeDoc: (fn: ChangeFn<T>) => void,
-  handle: DocHandle | null
-];
+// Full document
+const doc = useDoc(handle)
+
+// With selector (fine-grained updates)
+const title = useDoc(handle, d => d.title)
+const todoCount = useDoc(handle, d => d.todos.length)
 ```
 
-#### Parameters
+**Parameters:**
+- `handle: TypedDocHandle<D>` - The document handle
+- `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector
 
-- **`documentId`**: Unique identifier for the document
-- **`schema`**: Document schema (see [`@loro-extended/change`](../change/README.md) for schema documentation)
+**Returns:** The document value or selected value
 
-#### Returns
+### `usePresence(handle)`
 
-1. **`doc: InferPlainType<T>`** - The current document state
-
-   - **Always defined** due to empty state overlay
-   - Shows empty state initially, then overlays CRDT data when available
-   - Automatically re-renders when local or remote changes occur
-
-2. **`changeDoc: (fn: ChangeFn<T>) => void`** - Function to modify the document
-
-   - Uses schema-aware draft operations
-   - All changes are automatically committed and synchronized
-   - See [`@loro-extended/change`](../change/README.md) for operation details
-
-3. **`handle: DocHandle | null`** - The document handle
-   - Provides access to sync state (via `readyStates`)
-   - Emits events for state changes and document updates
-   - `null` initially, then becomes available
-
-### `usePresence` - Typed Presence
-
-For schema-aware presence with type safety. Default values are derived from the schema's placeholder annotations.
+Subscribes to presence changes.
 
 ```typescript
-const { self, peers, setSelf } = usePresence(documentId, presenceSchema);
+const { self, peers } = usePresence(handle)
 
-// self: Infer<PresenceSchema> - always defined with placeholder values
-// peers: Map<string, Infer<PresenceSchema>> - other connected peers
+// Update your presence
+handle.presence.set({ cursor: { x: 100, y: 200 } })
 ```
 
-#### Functional Updaters
+**Returns:** `{ self: Infer<P>, peers: Map<string, Infer<P>> }`
 
-The `setSelf` function supports both direct values and functional updaters, similar to React's `useState`:
+### `useRepo()`
+
+Returns the Repo instance from context.
 
 ```typescript
-// Direct value
-setSelf({ cursor: { x: 10, y: 20 } });
-
-// Functional updater - receives current state, returns partial update
-setSelf((current) => ({
-  cursor: { x: current.cursor.x + 1, y: current.cursor.y },
-}));
+const repo = useRepo()
+const myPeerId = repo.identity.peerId
 ```
 
-This is useful when you need to update presence based on the current state, such as incrementing counters or toggling values.
+## Fine-Grained Reactivity with Selectors
 
-### `useUntypedPresence` - Untyped Presence
-
-For presence without schema validation.
-
-```typescript
-const { self, all, setSelf } = useUntypedPresence(documentId);
-
-// self: any
-// all: Record<string, any>
-```
-
-The `setSelf` function also supports functional updaters:
-
-```typescript
-setSelf((current) => ({ count: (current.count || 0) + 1 }));
-```
-
-## Choosing Between APIs
-
-### Use Simple API When:
-
-- You want minimal dependencies (no schema package required)
-- You prefer direct control over LoroDoc operations
-- You're building a simple application or prototype
-- You want to integrate with existing Loro code
-
-### Use Typed API When:
-
-- You want full type safety and IntelliSense support
-- You prefer declarative schema definitions
-- You want empty state management (no loading checks needed)
-- You're building a complex application with structured data
-
-## Key Benefits
-
-### Simple API Benefits
-
-- **Minimal Dependencies**: Only requires `@loro-extended/react` and `loro-crdt`
-- **Direct Control**: Full access to LoroDoc methods and operations
-- **Flexibility**: No schema constraints, work with any document structure
-- **Performance**: No schema transformation overhead
-
-### Typed API Benefits
-
-- **🚀 No Loading States for Data**: `doc` is **always defined** due to empty state overlay
-- **🔄 Immediate Rendering**: Components render immediately with empty state
-- **🎯 Type Safety**: Full TypeScript support with compile-time validation
-- **🛡️ Schema Validation**: Ensures data consistency across your application
-
-#### Example: No Loading States
+Use selectors to prevent unnecessary re-renders:
 
 ```tsx
-// Simple API - requires loading check
-const [doc, changeDoc] = useUntypedDocument("doc-id");
-if (!doc) return <div>Loading...</div>;
+function TodoCount() {
+  const handle = useHandle("todos", TodoSchema)
+  
+  // Only re-renders when the count changes
+  const count = useDoc(handle, d => d.todos.length)
+  
+  return <span>Total: {count}</span>
+}
 
-// Typed API - always available
-const [doc, changeDoc] = useDocument("doc-id", schema);
-return <h1>{doc.title}</h1>; // Always works!
+function TodoTitle() {
+  const handle = useHandle("todos", TodoSchema)
+  
+  // Only re-renders when the title changes
+  const title = useDoc(handle, d => d.title)
+  
+  return <h1>{title}</h1>
+}
 ```
 
-## Setting Up the Repo Context
+## Presence
 
-Wrap your app with `RepoProvider` to provide document synchronization:
+Presence allows you to share ephemeral state (like cursors, selections, or user status) with other connected users.
 
 ```tsx
-import { RepoProvider } from "@loro-extended/react";
-import { Repo } from "@loro-extended/repo";
+const PresenceSchema = Shape.plain.object({
+  cursor: Shape.plain.object({
+    x: Shape.plain.number(),
+    y: Shape.plain.number(),
+  }),
+  name: Shape.plain.string().placeholder("Anonymous"),
+  isTyping: Shape.plain.boolean(),
+})
 
-// Configure your adapters (see @loro-extended/repo docs)
+function CollaborativeEditor() {
+  const handle = useHandle("doc", DocSchema, PresenceSchema)
+  const { self, peers } = usePresence(handle)
+
+  // Update cursor position
+  const handleMouseMove = (e: MouseEvent) => {
+    handle.presence.set({
+      cursor: { x: e.clientX, y: e.clientY }
+    })
+  }
+
+  // Show other users' cursors
+  return (
+    <div onMouseMove={handleMouseMove}>
+      {Array.from(peers.entries()).map(([peerId, presence]) => (
+        <Cursor
+          key={peerId}
+          x={presence.cursor.x}
+          y={presence.cursor.y}
+          name={presence.name}
+        />
+      ))}
+    </div>
+  )
+}
+```
+
+## Setting Up the Repo
+
+```tsx
+import { RepoProvider } from "@loro-extended/react"
+import { InMemoryStorageAdapter } from "@loro-extended/repo"
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
+
 const config = {
   identity: { name: "user-1", type: "user" },
-  adapters: [networkAdapter, storageAdapter],
-};
+  adapters: [
+    new InMemoryStorageAdapter(),
+    new SseClientNetworkAdapter({
+      postUrl: () => "/sync/post",
+      eventSourceUrl: (peerId) => `/sync/subscribe?peerId=${peerId}`,
+    }),
+  ],
+}
 
 function App() {
   return (
     <RepoProvider config={config}>
-      <YourComponents />
+      <YourApp />
     </RepoProvider>
-  );
+  )
 }
 ```
 
-## React-Specific Patterns
+## Sync Status
 
-### Multiple Documents
+Check the document's sync status using `readyStates`:
 
 ```tsx
-// Simple API
-function MultiDocApp() {
-  const [todos, changeTodos] = useUntypedDocument<TodoDoc>("todos");
-  const [notes, changeNotes] = useUntypedDocument<NoteDoc>("notes");
+function SyncStatus() {
+  const handle = useHandle("doc", DocSchema)
+  
+  const isConnected = handle.readyStates.some(
+    s => s.state === "loaded" && s.channels.some(c => c.kind === "network")
+  )
 
   return (
-    <div>
-      {todos && <TodoList doc={todos.toJSON()} onChange={changeTodos} />}
-      {notes && <NoteEditor doc={notes.toJSON()} onChange={changeNotes} />}
+    <div className={isConnected ? "connected" : "disconnected"}>
+      {isConnected ? "Connected" : "Offline"}
     </div>
-  );
-}
-
-// Typed API
-function MultiDocApp() {
-  const [todos, changeTodos] = useDocument("todos", todoSchema);
-  const [notes, changeNotes] = useDocument("notes", noteSchema);
-
-  return (
-    <div>
-      <TodoList doc={todos} onChange={changeTodos} />
-      <NoteEditor doc={notes} onChange={changeNotes} />
-    </div>
-  );
+  )
 }
 ```
 
-### Conditional Document Loading
+## TypeScript Support
 
-```tsx
-// Simple API
-function ConditionalDoc({ documentId }: { documentId: string | null }) {
-  const [doc, changeDoc] = useUntypedDocument(documentId || "default");
-
-  if (!documentId) {
-    return <div>Select a document</div>;
-  }
-
-  if (!doc) {
-    return <div>Loading...</div>;
-  }
-
-  return <DocumentEditor doc={doc.toJSON()} onChange={changeDoc} />;
-}
-
-// Typed API
-function ConditionalDoc({ documentId }: { documentId: string | null }) {
-  const [doc, changeDoc] = useDocument(documentId || "default", schema);
-
-  if (!documentId) {
-    return <div>Select a document</div>;
-  }
-
-  return <DocumentEditor doc={doc} onChange={changeDoc} />;
-}
-```
-
-### Custom Loading UI
-
-```tsx
-function DocumentWithStatus() {
-  const [doc, changeDoc, handle] = useDocument(id, schema);
-
-  // Check readyStates to determine sync status
-  const isSyncing = handle?.readyStates.some(
-    (s) => s.loading.state === "requesting"
-  );
-
-  return (
-    <div>
-      {isSyncing && <div className="status-bar">Syncing...</div>}
-      <DocumentContent doc={doc} onChange={changeDoc} />
-    </div>
-  );
-}
-```
-
-## Performance
-
-The hook uses React's `useSyncExternalStore` for optimal performance:
-
-- Only re-renders when the document actually changes
-- Efficient subscription management
-- Stable function references to prevent unnecessary re-renders
-
-## Type Safety
-
-Full TypeScript support with automatic type inference:
+Full type inference from your schemas:
 
 ```typescript
-// Types are automatically inferred from your schema
-const [doc, changeDoc] = useDocument(documentId, schema);
-// doc: { title: string; todos: Array<{id: string; text: string; completed: boolean}> }
-// changeDoc: (fn: (draft: DraftType) => void) => void
+const DocSchema = Shape.doc({
+  title: Shape.text(),
+  count: Shape.counter(),
+})
+
+const handle = useHandle("doc", DocSchema)
+const doc = useDoc(handle)
+
+// doc.title is typed as string
+// doc.count is typed as number
+
+handle.change(d => {
+  d.title.insert(0, "Hello") // TypedText methods
+  d.count.increment(1)       // Counter methods
+})
 ```
 
-## Complete Example
+## Migration from Previous API
 
-For a full collaborative React application, see the [Todo SSE Example](../../examples/todo-sse/README.md) which demonstrates:
+If you're upgrading from the previous `useDocument` API:
 
-- Setting up the Repo with network and storage adapters
-- Using `useDocument` for reactive document state
-- Building collaborative UI components
-- Handling offline scenarios
+**Before:**
+```typescript
+const [doc, changeDoc, handle] = useDocument(docId, schema)
+changeDoc(d => { d.title = "new" })
 
-## Advanced Usage
-
-For advanced use cases, you can access the underlying building blocks:
-
-```tsx
-import {
-  useDocHandleState,
-  useRawLoroDoc,
-  useUntypedDocChanger,
-  useTypedDocState,
-  useTypedDocChanger,
-} from "@loro-extended/react";
-
-// Custom hook combining base components
-function useCustomDocument(documentId: string) {
-  const { handle } = useDocHandleState(documentId);
-  const changeDoc = useUntypedDocChanger(handle);
-
-  // Your custom logic here
-
-  return [
-    /* your custom return */
-  ];
-}
+const { peers, self, setSelf } = usePresence(docId, PresenceSchema)
+setSelf({ cursor: { x: 10, y: 20 } })
 ```
+
+**After:**
+```typescript
+const handle = useHandle(docId, schema, PresenceSchema)
+const doc = useDoc(handle)
+const { self, peers } = usePresence(handle)
+
+handle.change(d => { d.title = "new" })
+handle.presence.set({ cursor: { x: 10, y: 20 } })
+```
+
+## Examples
+
+See the example applications for complete implementations:
+
+- [Todo SSE Example](../../examples/todo-sse/) - Basic todo app with SSE sync
+- [Todo WebSocket Example](../../examples/todo-websocket/) - Todo app with WebSocket sync
+- [Chat Example](../../examples/chat/) - Real-time chat with presence
+- [Bumper Cars Example](../../examples/bumper-cars/) - Multiplayer game with presence
+
+## Related Packages
+
+- [`@loro-extended/hooks-core`](../hooks-core/README.md) - Framework-agnostic hook implementations
+- [`@loro-extended/change`](../change/README.md) - Schema definitions and typed operations
+- [`@loro-extended/repo`](../repo/README.md) - Document synchronization and storage
+- Network adapters: `@loro-extended/adapter-sse`, `@loro-extended/adapter-websocket`, `@loro-extended/adapter-webrtc`
+- Storage adapters: `@loro-extended/adapter-indexeddb`, `@loro-extended/adapter-leveldb`, `@loro-extended/adapter-postgres`
 
 ## Requirements
 
 - React 18+
 - TypeScript 5+ (recommended)
-- A Repo instance from `@loro-extended/repo`
-
-### Optional Dependencies
-
-- `@loro-extended/change` - Required only for typed API (`useDocument`)
-
-## Related Packages
-
-- [`@loro-extended/change`](../change/README.md) - Schema-based CRDT operations (optional)
-- [`@loro-extended/repo`](../repo/README.md) - Document synchronization and storage
-- Network adapters: `@loro-extended/adapter-sse`, `@loro-extended/adapter-websocket`, `@loro-extended/adapter-webrtc`, `@loro-extended/adapter-http-polling`
-- Storage adapters: `@loro-extended/adapter-indexeddb`, `@loro-extended/adapter-leveldb`, `@loro-extended/adapter-postgres`
 
 ## License
 

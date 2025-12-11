@@ -1,31 +1,23 @@
-// Re-export schema-related types from @loro-extended/change for convenience
+// Re-export schema-related types from @loro-extended/change
 export type {
+  DeepReadonly,
   DocShape,
-  /** @deprecated Use Mutable instead */
-  Draft,
   Infer,
   Mutable,
 } from "@loro-extended/change"
 export { Shape } from "@loro-extended/change"
-// Common types
-export type {
-  ChangeFn,
-  DocWrapper,
-  SimpleChangeFn,
-} from "@loro-extended/hooks-core"
-// Base hooks for advanced usage
-// Typed hooks - require @loro-extended/change
+
+// Re-export handle types from @loro-extended/repo
+export type { DocId, TypedDocHandle } from "@loro-extended/repo"
+
+// Hooks
 export {
-  useDocChanger,
-  useDocHandleState,
-  useDocument,
+  RepoContext,
+  useDoc,
+  useHandle,
   usePresence,
-  useRawLoroDoc,
-  useTypedDocChanger,
-  useTypedDocState,
-  useUntypedDocChanger,
-  useUntypedDocument,
-  useUntypedPresence,
+  useRepo,
 } from "./hooks-core.js"
 
+// Context provider
 export * from "./repo-context.js"

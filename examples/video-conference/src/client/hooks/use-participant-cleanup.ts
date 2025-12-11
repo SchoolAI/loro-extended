@@ -27,7 +27,7 @@ type Participant = {
  * If we're offline, we don't know if they're really gone.
  */
 export function useParticipantCleanup(
-  participants: Participant[],
+  participants: readonly Participant[],
   userPresence: Record<string, UserPresence>,
   myPeerId: PeerID,
   isOnline: boolean,

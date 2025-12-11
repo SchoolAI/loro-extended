@@ -1,6 +1,6 @@
 import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb"
 import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
-import { RepoProvider, Shape, useDocument } from "@loro-extended/hono"
+import { RepoProvider, Shape, useHandle, useDoc } from "@loro-extended/hono"
 import {
   generatePeerId,
   type PeerID,
@@ -14,8 +14,6 @@ import "./style.css"
 const counterSchema = Shape.doc({
   count: Shape.counter(),
 })
-
-const emptyState = { count: 0 }
 
 // Generate a unique peer ID for this client (must be a numeric string)
 const peerId = generatePeerId()
@@ -50,17 +48,19 @@ function App() {
 }
 
 function SyncedCounter() {
-  const [doc, changeDoc] = useDocument("counter", counterSchema, emptyState)
+  // NEW API: Get handle first, then subscribe to doc
+  const handle = useHandle("counter", counterSchema)
+  const doc = useDoc(handle)
 
   const increment = () => {
-    changeDoc(draft => {
+    handle.change(draft => {
       // Shape.counter() provides a CRDT counter with increment method
       draft.count.increment(1)
     })
   }
 
   const decrement = () => {
-    changeDoc(draft => {
+    handle.change(draft => {
       draft.count.decrement(1)
     })
   }

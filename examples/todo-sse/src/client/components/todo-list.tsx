@@ -3,7 +3,7 @@ import type { Todo } from "../../shared/types"
 import { TodoItem } from "./todo-item"
 
 interface TodoListProps {
-  todos: Todo[]
+  todos: readonly Todo[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
 }

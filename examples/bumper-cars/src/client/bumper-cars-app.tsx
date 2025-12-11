@@ -1,4 +1,4 @@
-import { useDocument, usePresence, useRepo } from "@loro-extended/react"
+import { useDoc, useHandle, usePresence, useRepo } from "@loro-extended/react"
 import type { PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -41,18 +41,22 @@ export default function BumperCarsApp({
       CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
   )
 
-  // Use arena document for persistent scores
-  const [doc, _changeDoc, handle] = useDocument(ARENA_DOC_ID, ArenaSchema)
-
-  // Use typed presence with discriminated union schema
-  // This provides type-safe access to both client and server presence
-  // Placeholder values are automatically derived from schema annotations
-  const { all: allPresence, setSelf: setPresence } = usePresence(
-    ARENA_DOC_ID,
-    GamePresenceSchema,
-  )
+  // NEW API: Get handle with both doc and presence schemas
+  const handle = useHandle(ARENA_DOC_ID, ArenaSchema, GamePresenceSchema)
+  const doc = useDoc(handle)
+  const { self, peers } = usePresence(handle)
 
   // Get server presence (game state) - type-safe filtering
+  // Combine self and peers into allPresence for backward compatibility
+  const allPresence = useMemo(() => {
+    const all: Record<string, typeof self> = {}
+    all[myPeerId] = self
+    for (const [peerId, presence] of peers.entries()) {
+      all[peerId] = presence
+    }
+    return all
+  }, [self, peers, myPeerId])
+
   const serverPresence = useMemo(() => {
     for (const presence of Object.values(allPresence)) {
       if (presence.type === "server") {
@@ -126,8 +130,8 @@ export default function BumperCarsApp({
       input: currentInput,
     }
 
-    setPresence(presence)
-  }, [hasJoined, playerName, playerColor, currentInput, setPresence])
+    handle.presence.set(presence)
+  }, [hasJoined, playerName, playerColor, currentInput, handle])
 
   // Handle join
   const handleJoin = useCallback(
@@ -146,11 +150,11 @@ export default function BumperCarsApp({
         color,
         input: { force: 0, angle: 0 },
       }
-      setPresence(presence)
+      handle.presence.set(presence)
 
       setHasJoined(true)
     },
-    [setPresence],
+    [handle],
   )
 
   // Handle leaving the game (Escape key)
@@ -162,9 +166,9 @@ export default function BumperCarsApp({
       color: playerColor,
       input: { force: 0, angle: 0 },
     }
-    setPresence(presence)
+    handle.presence.set(presence)
     setHasJoined(false)
-  }, [playerColor, setPresence])
+  }, [playerColor, handle])
 
   // Listen for Escape key to leave the game
   useEffect(() => {
@@ -233,7 +237,7 @@ export default function BumperCarsApp({
             initialName={playerName}
             initialColor={playerColor}
             onJoin={handleJoin}
-            canJoin={!!handle}
+            canJoin={true}
           />
         )}
       </div>

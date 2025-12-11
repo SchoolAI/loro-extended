@@ -1,11 +1,19 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
-import { useDocument, useRepo, useUntypedPresence } from "@loro-extended/react"
+import {
+  Shape,
+  useDoc,
+  useHandle,
+  usePresence,
+  useRepo,
+} from "@loro-extended/react"
 import { type DocId, generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   RoomSchema,
   type SignalingPresence,
+  SignalingPresenceSchema,
   type UserPresence,
+  UserPresenceSchema,
 } from "../shared/types"
 import {
   DebugPanel,
@@ -27,6 +35,9 @@ import { useWebRtcMesh } from "./use-webrtc-mesh"
 function generateRoomId(): DocId {
   return `room-${generateUUID()}`
 }
+
+// Empty doc schema for signaling channel (we only use presence)
+const SignalingDocSchema = Shape.doc({})
 
 type VideoConferenceAppProps = {
   displayName: string
@@ -63,34 +74,57 @@ export default function VideoConferenceApp({
     }
   }, [roomId])
 
-  // Use room document for persistent state
-  const [doc, changeDoc, handle] = useDocument(roomId, RoomSchema)
+  // NEW API: Get handle with doc and presence schemas
+  const handle = useHandle(roomId, RoomSchema, UserPresenceSchema)
+  const doc = useDoc(handle)
+  const { self: userSelf, peers: userPeers } = usePresence(handle)
 
-  // ============================================================================
-  // Separated Presence Channels (Phase 3)
-  // ============================================================================
+  // Convert to the old format for backward compatibility with existing code
+  const userPresence: Record<string, UserPresence> = {}
+  userPresence[myPeerId] = userSelf
+  for (const [peerId, presence] of userPeers.entries()) {
+    userPresence[peerId] = presence
+  }
 
-  // User presence - stable metadata (name, audio/video preferences)
-  // Uses the main room ID as the presence channel
-  const { all: rawUserPresence, setSelf: setUserPresence } =
-    useUntypedPresence(roomId)
-  const userPresence = rawUserPresence as Record<string, UserPresence>
+  // biome-ignore lint/correctness/useExhaustiveDependencies: debug logging
   useEffect(() => {
     console.log({ userPresence })
   }, [userPresence])
 
+  // ============================================================================
+  // Signaling Presence Channel (separate from user presence)
+  // ============================================================================
+
   // Signaling presence - high-frequency WebRTC signals
   // Uses a separate channel to avoid mixing with user metadata
   const signalingChannelId = `${roomId}:signaling` as DocId
-  const { all: rawSignalingPresence, setSelf: setSignalingPresence } =
-    useUntypedPresence(signalingChannelId)
-  const signalingPresence = rawSignalingPresence as Record<
-    string,
-    SignalingPresence
-  >
+  const signalingHandle = useHandle(
+    signalingChannelId,
+    SignalingDocSchema,
+    SignalingPresenceSchema,
+  )
+  const { self: signalingSelf, peers: signalingPeers } =
+    usePresence(signalingHandle)
+
+  // Convert to the old format for backward compatibility
+  const signalingPresence: Record<string, SignalingPresence> = {}
+  signalingPresence[myPeerId] = signalingSelf
+  for (const [peerId, presence] of signalingPeers.entries()) {
+    signalingPresence[peerId] = presence
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: debug logging
   useEffect(() => {
     console.log({ signalingPresence })
   }, [signalingPresence])
+
+  // Wrapper for setSignalingPresence to match old API
+  const setSignalingPresence = useCallback(
+    (value: Partial<SignalingPresence>) => {
+      signalingHandle.presence.set(value)
+    },
+    [signalingHandle],
+  )
 
   // Local media (camera/microphone)
   const {
@@ -136,18 +170,18 @@ export default function VideoConferenceApp({
   // Update user presence with media preferences
   // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
   useEffect(() => {
-    setUserPresence({
+    handle.presence.set({
       name: displayName,
       wantsAudio: wantsAudio,
       wantsVideo: wantsVideo,
     })
-  }, [displayName, wantsAudio, wantsVideo, setUserPresence])
+  }, [displayName, wantsAudio, wantsVideo, handle])
 
   // Join room
   const joinRoom = useCallback(() => {
     const alreadyJoined = doc.participants.some(p => p.peerId === myPeerId)
     if (!alreadyJoined) {
-      changeDoc(draft => {
+      handle.change(draft => {
         draft.participants.push({
           peerId: myPeerId,
           name: displayName,
@@ -156,30 +190,30 @@ export default function VideoConferenceApp({
       })
     }
     setHasJoined(true)
-  }, [doc.participants, myPeerId, displayName, changeDoc])
+  }, [doc.participants, myPeerId, displayName, handle])
 
   // Leave room
   const leaveRoom = useCallback(() => {
-    changeDoc(draft => {
+    handle.change(draft => {
       const index = draft.participants.findIndex(p => p.peerId === myPeerId)
       if (index !== -1) {
         draft.participants.delete(index, 1)
       }
     })
     setHasJoined(false)
-  }, [myPeerId, changeDoc])
+  }, [myPeerId, handle])
 
   // Remove a participant from the document (used by cleanup hook)
   const removeParticipant = useCallback(
     (peerId: string) => {
-      changeDoc(draft => {
+      handle.change(draft => {
         const index = draft.participants.findIndex(p => p.peerId === peerId)
         if (index !== -1) {
           draft.participants.delete(index, 1)
         }
       })
     },
-    [changeDoc],
+    [handle],
   )
 
   // Connection status monitoring
@@ -267,7 +301,7 @@ export default function VideoConferenceApp({
               onToggleVideo={toggleVideo}
               onRequestMedia={requestMedia}
               onJoin={joinRoom}
-              canJoin={!!handle && isMediaReady}
+              canJoin={isMediaReady}
               deviceSelection={deviceSelection}
               audioLevel={audioLevel}
             />
