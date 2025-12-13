@@ -58,14 +58,14 @@ export type InferPlaceholderType<T> = T extends Shape<any, any, infer P>
   : never
 
 /**
- * Mutable type for use within change() callbacks.
+ * Mutable type for use within change() callbacks and direct mutations on doc.value.
  * This is the type-safe wrapper around CRDT containers that allows mutation.
  */
 export type Mutable<T extends DocShape<Record<string, ContainerShape>>> =
   InferMutableType<T>
 
 /**
- * @deprecated Use Mutable<T> instead
+ * @deprecated Use Mutable<T> instead. Draft is an alias kept for backwards compatibility.
  */
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
   Mutable<T>
@@ -77,38 +77,3 @@ export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
 export interface HasToJSON<T> {
   toJSON(): T
 }
-
-/**
- * Deep readonly wrapper for plain objects (no index signature).
- * Includes toJSON() method.
- */
-export type DeepReadonlyObject<T extends object> = {
-  readonly [P in keyof T]: DeepReadonly<T[P]>
-} & HasToJSON<T>
-
-/**
- * Deep readonly wrapper for Record types (with string index signature).
- * The toJSON() method is available but NOT part of the index signature,
- * so Object.values() returns clean types.
- */
-export type DeepReadonlyRecord<T> = {
-  readonly [K in keyof T]: DeepReadonly<T[K]>
-} & HasToJSON<Record<string, T[keyof T]>>
-
-/**
- * Deep readonly wrapper that makes all properties readonly recursively
- * and adds a toJSON() method for JSON serialization.
- *
- * For arrays: Returns ReadonlyArray with toJSON()
- * For objects with string index signature (Records): toJSON() is available
- *   but doesn't pollute Object.values() type inference
- * For plain objects: Returns readonly properties with toJSON()
- * For primitives: Returns as-is
- */
-export type DeepReadonly<T> = T extends any[]
-  ? ReadonlyArray<DeepReadonly<T[number]>> & HasToJSON<T>
-  : T extends object
-    ? string extends keyof T
-      ? DeepReadonlyRecord<T>
-      : DeepReadonlyObject<T>
-    : T

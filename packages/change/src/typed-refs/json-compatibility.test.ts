@@ -1,5 +1,6 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
+import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc, TypedDoc } from "../typed-doc.js"
 
@@ -25,7 +26,7 @@ describe("JSON Compatibility", () => {
   it("should support JSON.stringify on the whole doc", () => {
     const doc = createTypedDoc(ChatSchema)
 
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.meta.title = "My Chat"
       root.meta.count.increment(5)
 
@@ -42,7 +43,8 @@ describe("JSON Compatibility", () => {
       root.settings.set("sound", false)
     })
 
-    const json = JSON.stringify(doc.value)
+    // Use doc.toJSON() to get plain JSON, then stringify
+    const json = JSON.stringify(doc.toJSON())
     const parsed = JSON.parse(json)
 
     expect(parsed).toEqual({
@@ -67,17 +69,18 @@ describe("JSON Compatibility", () => {
 
   it("should support Object.keys and Object.entries", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.meta.title = "Test"
     })
 
-    const keys = Object.keys(doc.value)
+    // With the new proxy API, Object.keys works directly on doc
+    const keys = Object.keys(doc)
     expect(keys).toContain("messages")
     expect(keys).toContain("meta")
     expect(keys).toContain("tags")
     expect(keys).toContain("settings")
 
-    const entries = Object.entries(doc.value.meta)
+    const entries = Object.entries(doc.meta)
     const entryMap = new Map(entries)
     expect(entryMap.get("title")).toBe("Test")
     expect(entryMap.get("count")).toBeDefined()
@@ -85,11 +88,11 @@ describe("JSON Compatibility", () => {
 
   it("should support JSON.stringify on nested structures", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 1 })
     })
 
-    const messagesJson = JSON.stringify(doc.value.messages)
+    const messagesJson = JSON.stringify(doc.messages)
     expect(JSON.parse(messagesJson)).toEqual([
       { id: "1", content: "A", timestamp: 1 },
     ])
@@ -97,24 +100,24 @@ describe("JSON Compatibility", () => {
 
   it("should support MovableList", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.tags.push("a")
       root.tags.push("b")
       root.tags.move(0, 1) // move 'a' to index 1
     })
 
     // After move: ["b", "a"]
-    const json = JSON.stringify(doc.value.tags)
+    const json = JSON.stringify(doc.tags)
     expect(JSON.parse(json)).toEqual(["b", "a"])
   })
 
   it("should support Record", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.settings.set("dark_mode", true)
     })
 
-    const json = JSON.stringify(doc.value.settings)
+    const json = JSON.stringify(doc.settings)
     expect(JSON.parse(json)).toEqual({ dark_mode: true })
   })
 
@@ -122,12 +125,13 @@ describe("JSON Compatibility", () => {
     const doc = createTypedDoc(ChatSchema)
     let mutableJson = ""
 
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.meta.title = "Draft"
       mutableJson = JSON.stringify(root)
     })
 
-    const readonlyJson = JSON.stringify(doc.value)
+    // With the new API, use doc.toJSON() for serialization
+    const readonlyJson = JSON.stringify(doc.toJSON())
     expect(readonlyJson).toBe(mutableJson)
   })
 
@@ -135,7 +139,8 @@ describe("JSON Compatibility", () => {
     const doc = createTypedDoc(ChatSchema)
     // No changes made
 
-    const json = JSON.stringify(doc.value)
+    // Use doc.toJSON() to get plain JSON with placeholders
+    const json = JSON.stringify(doc.toJSON())
     const parsed = JSON.parse(json)
 
     expect(parsed.meta.title).toBe("") // Default string placeholder
@@ -145,17 +150,17 @@ describe("JSON Compatibility", () => {
 
   it("should support Array methods on Lists", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 10 })
       root.messages.push({ id: "2", content: "B", timestamp: 20 })
     })
 
-    const mapped = doc.value.messages.map(m => ({ id: m.id, txt: m.content }))
+    const mapped = doc.messages.map(m => ({ id: m.id, txt: m.content }))
     expect(JSON.stringify(mapped)).toBe(
       '[{"id":"1","txt":"A"},{"id":"2","txt":"B"}]',
     )
 
-    const filtered = doc.value.messages.filter(m => m.timestamp > 15)
+    const filtered = doc.messages.filter(m => m.timestamp > 15)
     expect(filtered).toHaveLength(1)
     expect(filtered[0].id).toBe("2")
     // filtered returns MutableItems (TypedRefs), so JSON.stringify should work on them
@@ -166,12 +171,12 @@ describe("JSON Compatibility", () => {
 
   it("should support Object.values", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.settings.set("a", true)
       root.settings.set("b", false)
     })
 
-    const values = Object.values(doc.value.settings)
+    const values = Object.values(doc.settings)
     expect(values).toContain(true)
     expect(values).toContain(false)
     expect(values).toHaveLength(2)
@@ -181,7 +186,7 @@ describe("JSON Compatibility", () => {
     const loroDoc = new LoroDoc()
     const doc = new TypedDoc(ChatSchema, loroDoc)
 
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 1 })
       root.meta.title = "Test"
     })
@@ -191,7 +196,7 @@ describe("JSON Compatibility", () => {
     const getListSpy = vi.spyOn(loroDoc, "getList")
 
     // Access messages and call toJSON
-    const messagesJson = doc.value.messages.toJSON()
+    const messagesJson = doc.messages.toJSON()
 
     expect(messagesJson).toHaveLength(1)
 
@@ -207,7 +212,7 @@ describe("JSON Compatibility", () => {
 
   it("should allow calling toJSON() directly on refs", () => {
     const doc = createTypedDoc(ChatSchema)
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       root.meta.title = "Direct"
       root.meta.count.increment(10)
       root.messages.push({ id: "1", content: "A", timestamp: 1 })
@@ -215,29 +220,29 @@ describe("JSON Compatibility", () => {
     })
 
     // DocRef
-    expect(doc.value.toJSON()).toEqual(
+    expect(doc.toJSON()).toEqual(
       expect.objectContaining({
         meta: expect.objectContaining({ title: "Direct" }),
       }),
     )
 
     // MapRef
-    expect(doc.value.meta.toJSON()).toEqual({
+    expect(doc.meta.toJSON()).toEqual({
       title: "Direct",
       count: 10,
     })
 
     // ListRef
-    expect(doc.value.messages.toJSON()).toEqual([
+    expect(doc.messages.toJSON()).toEqual([
       { id: "1", content: "A", timestamp: 1 },
     ])
 
     // RecordRef
-    expect(doc.value.settings.toJSON()).toEqual({
+    expect(doc.settings.toJSON()).toEqual({
       opt: true,
     })
 
-    doc.change((root: any) => {
+    change(doc, (root: any) => {
       // Inside change, these are mutable refs
       expect(root.meta.toJSON()).toEqual({ title: "Direct", count: 10 })
       expect(root.messages.toJSON()).toEqual([

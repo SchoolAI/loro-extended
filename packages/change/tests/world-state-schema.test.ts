@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "../src/functional-helpers.js"
 import { Shape } from "../src/shape.js"
 import { createTypedDoc } from "../src/typed-doc.js"
 
@@ -133,9 +134,9 @@ describe("WorldStateSchema", () => {
     it("should update playerLocationName from null to string", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.meta.set("playerLocationName", "Starting Village")
-      })
+      }).toJSON()
 
       expect(result.meta.playerLocationName).toBe("Starting Village")
     })
@@ -143,13 +144,13 @@ describe("WorldStateSchema", () => {
     it("should update playerLocationName back to null", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.meta.set("playerLocationName", "Starting Village")
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.meta.set("playerLocationName", null)
-      })
+      }).toJSON()
 
       expect(result.meta.playerLocationName).toBeNull()
     })
@@ -157,9 +158,9 @@ describe("WorldStateSchema", () => {
     it("should update worldMood", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.meta.set("worldMood", "rising-tensions")
-      })
+      }).toJSON()
 
       expect(result.meta.worldMood).toBe("rising-tensions")
     })
@@ -167,9 +168,9 @@ describe("WorldStateSchema", () => {
     it("should update currentAct", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.meta.set("currentAct", "confrontation")
-      })
+      }).toJSON()
 
       expect(result.meta.currentAct).toBe("confrontation")
     })
@@ -177,9 +178,9 @@ describe("WorldStateSchema", () => {
     it("should update flourish", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.meta.set("flourish", "brief")
-      })
+      }).toJSON()
 
       expect(result.meta.flourish).toBe("brief")
     })
@@ -189,7 +190,7 @@ describe("WorldStateSchema", () => {
     it("should add a character", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.characters.push({
           name: "Hero",
           sensoryDescription: "A brave adventurer with a determined look",
@@ -197,7 +198,7 @@ describe("WorldStateSchema", () => {
           isInParty: true,
           locationName: "Starting Village",
         })
-      })
+      }).toJSON()
 
       expect(result.characters).toHaveLength(1)
       expect(result.characters[0].name).toBe("Hero")
@@ -207,7 +208,7 @@ describe("WorldStateSchema", () => {
     it("should add multiple characters", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.characters.push({
           name: "Hero",
           sensoryDescription: "A brave adventurer",
@@ -222,7 +223,7 @@ describe("WorldStateSchema", () => {
           isInParty: false,
           locationName: "Market",
         })
-      })
+      }).toJSON()
 
       expect(result.characters).toHaveLength(2)
       expect(result.characters[0].name).toBe("Hero")
@@ -232,7 +233,7 @@ describe("WorldStateSchema", () => {
     it("should find and modify a character", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.characters.push({
           name: "Hero",
           sensoryDescription: "A brave adventurer",
@@ -242,13 +243,13 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const hero = draft.characters.find(c => c.name === "Hero")
         if (hero) {
           hero.locationName = "Forest"
           hero.isInParty = false
         }
-      })
+      }).toJSON()
 
       expect(result.characters[0].locationName).toBe("Forest")
       expect(result.characters[0].isInParty).toBe(false)
@@ -257,7 +258,7 @@ describe("WorldStateSchema", () => {
     it("should delete a character", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.characters.push({
           name: "Hero",
           sensoryDescription: "A brave adventurer",
@@ -274,14 +275,14 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const villainIndex = draft.characters.findIndex(
           c => c.name === "Villain",
         )
         if (villainIndex !== -1) {
           draft.characters.delete(villainIndex, 1)
         }
-      })
+      }).toJSON()
 
       expect(result.characters).toHaveLength(1)
       expect(result.characters[0].name).toBe("Hero")
@@ -292,14 +293,14 @@ describe("WorldStateSchema", () => {
     it("should add a timeline event with text content", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.timeline.push({
           id: "event-1",
           role: "system",
           content: "Welcome to the adventure!",
           timestamp: Date.now(),
         })
-      })
+      }).toJSON()
 
       expect(result.timeline).toHaveLength(1)
       expect(result.timeline[0].id).toBe("event-1")
@@ -310,7 +311,7 @@ describe("WorldStateSchema", () => {
     it("should add multiple timeline events", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.timeline.push({
           id: "event-1",
           role: "system",
@@ -329,7 +330,7 @@ describe("WorldStateSchema", () => {
           content: "You see a vast forest ahead",
           timestamp: 3000,
         })
-      })
+      }).toJSON()
 
       expect(result.timeline).toHaveLength(3)
       expect(result.timeline[0].role).toBe("system")
@@ -340,7 +341,7 @@ describe("WorldStateSchema", () => {
     it("should modify timeline event content using text operations", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.timeline.push({
           id: "event-1",
           role: "assistant",
@@ -349,12 +350,12 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const event = draft.timeline.get(0)
         if (event) {
           event.content.update("Updated response with more detail")
         }
-      })
+      }).toJSON()
 
       expect(result.timeline[0].content).toBe(
         "Updated response with more detail",
@@ -364,7 +365,7 @@ describe("WorldStateSchema", () => {
     it("should stream content to timeline event using text insert", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.timeline.push({
           id: "event-1",
           role: "assistant",
@@ -374,26 +375,26 @@ describe("WorldStateSchema", () => {
       })
 
       // Simulate streaming by inserting text incrementally
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         const event = draft.timeline.get(0)
         if (event) {
           event.content.insert(0, "Hello")
         }
       })
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         const event = draft.timeline.get(0)
         if (event) {
           event.content.insert(5, " World")
         }
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const event = draft.timeline.get(0)
         if (event) {
           event.content.insert(11, "!")
         }
-      })
+      }).toJSON()
 
       expect(result.timeline[0].content).toBe("Hello World!")
     })
@@ -403,14 +404,14 @@ describe("WorldStateSchema", () => {
     it("should add a location to the map", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Starting Village",
           description: "A peaceful village at the edge of the forest",
           creationContext: "Initial game setup",
           items: [],
         })
-      })
+      }).toJSON()
 
       expect(result.map.locations).toHaveLength(1)
       expect(result.map.locations[0].name).toBe("Starting Village")
@@ -419,7 +420,7 @@ describe("WorldStateSchema", () => {
     it("should add multiple locations", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Village",
           description: "A small village",
@@ -438,7 +439,7 @@ describe("WorldStateSchema", () => {
           creationContext: "Quest destination",
           items: [],
         })
-      })
+      }).toJSON()
 
       expect(result.map.locations).toHaveLength(3)
     })
@@ -446,7 +447,7 @@ describe("WorldStateSchema", () => {
     it("should add connections between locations", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         // Add locations first
         draft.map.locations.push({
           name: "Village",
@@ -463,7 +464,7 @@ describe("WorldStateSchema", () => {
 
         // Add connection as [from, to] tuple
         draft.map.connections.push(["Village", "Forest"])
-      })
+      }).toJSON()
 
       expect(result.map.connections).toHaveLength(1)
       expect(result.map.connections[0]).toEqual(["Village", "Forest"])
@@ -472,7 +473,7 @@ describe("WorldStateSchema", () => {
     it("should add items to a location", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Village",
           description: "A small village",
@@ -487,7 +488,7 @@ describe("WorldStateSchema", () => {
             },
           ],
         })
-      })
+      }).toJSON()
 
       expect(result.map.locations[0].items).toHaveLength(1)
       expect(result.map.locations[0].items[0].name).toBe("Sword")
@@ -496,7 +497,7 @@ describe("WorldStateSchema", () => {
     it("should find and modify a location", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Village",
           description: "A small village",
@@ -505,12 +506,12 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const village = draft.map.locations.find(loc => loc.name === "Village")
         if (village) {
           village.description = "A bustling village with a market"
         }
-      })
+      }).toJSON()
 
       expect(result.map.locations[0].description).toBe(
         "A bustling village with a market",
@@ -522,7 +523,7 @@ describe("WorldStateSchema", () => {
     it("should add an item to inventory", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Health Potion",
@@ -533,7 +534,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Backpack",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory).toHaveLength(1)
       expect(result.inventory[0].item.name).toBe("Health Potion")
@@ -543,7 +544,7 @@ describe("WorldStateSchema", () => {
     it("should handle item with null imageUrl", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Gold Coin",
@@ -554,7 +555,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Pouch",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.imageUrl).toBeNull()
       expect(result.inventory[0].item.quantity.units).toBeNull()
@@ -563,7 +564,7 @@ describe("WorldStateSchema", () => {
     it("should add item state with various status types", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Magic Sword",
@@ -579,7 +580,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Hand",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.state).toHaveLength(4)
       expect(result.inventory[0].item.state[0].status).toBe(true)
@@ -591,7 +592,7 @@ describe("WorldStateSchema", () => {
     it("should find and modify inventory item", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Health Potion",
@@ -604,14 +605,14 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const potion = draft.inventory.find(
           inv => inv.item.name === "Health Potion",
         )
         if (potion) {
           potion.item.quantity.measure = 4 // Used one potion
         }
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.quantity.measure).toBe(4)
     })
@@ -619,7 +620,7 @@ describe("WorldStateSchema", () => {
     it("should remove item from inventory", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Key",
@@ -642,14 +643,14 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const keyIndex = draft.inventory.findIndex(
           inv => inv.item.name === "Key",
         )
         if (keyIndex !== -1) {
           draft.inventory.delete(keyIndex, 1)
         }
-      })
+      }).toJSON()
 
       expect(result.inventory).toHaveLength(1)
       expect(result.inventory[0].item.name).toBe("Map")
@@ -660,7 +661,7 @@ describe("WorldStateSchema", () => {
     it("should handle a complete game state update", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         // Add a location
         draft.map.locations.push({
           name: "Tavern",
@@ -700,7 +701,7 @@ describe("WorldStateSchema", () => {
 
         // Update meta
         draft.meta.set("playerLocationName", "Tavern")
-      })
+      }).toJSON()
 
       expect(result.map.locations).toHaveLength(1)
       expect(result.characters).toHaveLength(1)
@@ -713,7 +714,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       // First change: setup
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Village",
           description: "Starting point",
@@ -724,7 +725,7 @@ describe("WorldStateSchema", () => {
       })
 
       // Second change: add character
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.characters.push({
           name: "Hero",
           sensoryDescription: "The player",
@@ -735,7 +736,7 @@ describe("WorldStateSchema", () => {
       })
 
       // Third change: add timeline
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.timeline.push({
           id: "event-1",
           role: "system",
@@ -745,7 +746,7 @@ describe("WorldStateSchema", () => {
       })
 
       // Verify all state persisted
-      const finalState = typedDoc.value
+      const finalState = typedDoc.toJSON()
       expect(finalState.map.locations).toHaveLength(1)
       expect(finalState.characters).toHaveLength(1)
       expect(finalState.timeline).toHaveLength(1)
@@ -755,7 +756,7 @@ describe("WorldStateSchema", () => {
     it("should handle deeply nested item state modifications", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.map.locations.push({
           name: "Dungeon",
           description: "A dark dungeon",
@@ -775,7 +776,7 @@ describe("WorldStateSchema", () => {
         })
       })
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const dungeon = draft.map.locations.find(loc => loc.name === "Dungeon")
         if (dungeon) {
           const chest = dungeon.items.find(
@@ -789,7 +790,7 @@ describe("WorldStateSchema", () => {
             }
           }
         }
-      })
+      }).toJSON()
 
       expect(result.map.locations[0].items[0].state[0].status).toBe(false)
     })
@@ -799,7 +800,7 @@ describe("WorldStateSchema", () => {
     it("should handle empty strings in text fields", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.characters.push({
           name: "",
           sensoryDescription: "",
@@ -807,7 +808,7 @@ describe("WorldStateSchema", () => {
           isInParty: false,
           locationName: "",
         })
-      })
+      }).toJSON()
 
       expect(result.characters[0].name).toBe("")
     })
@@ -815,7 +816,7 @@ describe("WorldStateSchema", () => {
     it("should handle special characters and unicode", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.characters.push({
           name: "Héro 英雄 🦸",
           sensoryDescription: "A hero with émojis 🌟",
@@ -823,7 +824,7 @@ describe("WorldStateSchema", () => {
           isInParty: true,
           locationName: "村 Village",
         })
-      })
+      }).toJSON()
 
       expect(result.characters[0].name).toBe("Héro 英雄 🦸")
       expect(result.characters[0].sensoryDescription).toBe(
@@ -834,7 +835,7 @@ describe("WorldStateSchema", () => {
     it("should handle large numbers in quantity", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Gold",
@@ -845,7 +846,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Bank",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.quantity.measure).toBe(999999999)
     })
@@ -853,7 +854,7 @@ describe("WorldStateSchema", () => {
     it("should handle negative numbers in quantity", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Debt",
@@ -864,7 +865,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Ledger",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.quantity.measure).toBe(-500)
     })
@@ -872,7 +873,7 @@ describe("WorldStateSchema", () => {
     it("should handle floating point numbers in quantity", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Water",
@@ -883,7 +884,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Canteen",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.quantity.measure).toBe(2.5)
     })
@@ -891,7 +892,7 @@ describe("WorldStateSchema", () => {
     it("should handle status with number 0", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Broken Sword",
@@ -902,7 +903,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Ground",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.state[0].status).toBe(0)
     })
@@ -910,7 +911,7 @@ describe("WorldStateSchema", () => {
     it("should handle status with empty string", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Blank Scroll",
@@ -921,7 +922,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Bag",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.state[0].status).toBe("")
     })
@@ -929,7 +930,7 @@ describe("WorldStateSchema", () => {
     it("should handle status with false boolean", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.inventory.push({
           item: {
             name: "Torch",
@@ -940,7 +941,7 @@ describe("WorldStateSchema", () => {
           },
           heldAt: "Hand",
         })
-      })
+      }).toJSON()
 
       expect(result.inventory[0].item.state[0].status).toBe(false)
     })

@@ -1,9 +1,4 @@
-import type {
-  DeepReadonly,
-  DocShape,
-  Infer,
-  ValueShape,
-} from "@loro-extended/change"
+import type { DocShape, Infer, ValueShape } from "@loro-extended/change"
 import type { DocId, Repo, TypedDocHandle } from "@loro-extended/repo"
 
 export interface FrameworkHooks {
@@ -82,36 +77,34 @@ export function createHooks(framework: FrameworkHooks) {
   }
 
   // ============================================
-  // useDoc - Select document values (reactive)
+  // useDoc - Get document JSON snapshot (reactive)
   // ============================================
 
   // Overload: with selector (fine-grained)
   function useDoc<D extends DocShape, R>(
     handle: TypedDocHandle<D>,
-    selector: (doc: DeepReadonly<Infer<D>>) => R,
+    selector: (doc: Infer<D>) => R,
   ): R
 
-  // Overload: without selector (full doc)
-  function useDoc<D extends DocShape>(
-    handle: TypedDocHandle<D>,
-  ): DeepReadonly<Infer<D>>
+  // Overload: without selector (full doc JSON)
+  function useDoc<D extends DocShape>(handle: TypedDocHandle<D>): Infer<D>
 
   // Implementation
   function useDoc<D extends DocShape, R>(
     handle: TypedDocHandle<D>,
-    selector?: (doc: DeepReadonly<Infer<D>>) => R,
-  ): R | DeepReadonly<Infer<D>> {
+    selector?: (doc: Infer<D>) => R,
+  ): R | Infer<D> {
     // Use a ref to cache the snapshot and track version
     const cacheRef = useRef<{
       version: number
-      value: R | DeepReadonly<Infer<D>>
+      value: R | Infer<D>
     } | null>(null)
 
     const store = useMemo(() => {
       // Compute the current snapshot value
-      const computeValue = () => {
-        const value = handle.value
-        return selector ? selector(value) : value
+      const computeValue = (): R | Infer<D> => {
+        const json = handle.doc.toJSON()
+        return selector ? selector(json) : json
       }
 
       // Initialize cache
@@ -135,13 +128,16 @@ export function createHooks(framework: FrameworkHooks) {
         })
       }
 
-      const getSnapshot = () => {
+      const getSnapshot = (): R | Infer<D> => {
         const currentVersion = handle.untyped.doc.opCount()
         if (!cacheRef.current || cacheRef.current.version !== currentVersion) {
           cacheRef.current = {
             version: currentVersion,
             value: computeValue(),
           }
+        }
+        if (!cacheRef.current) {
+          throw new Error("useDoc: cache not initialized")
         }
         return cacheRef.current.value
       }

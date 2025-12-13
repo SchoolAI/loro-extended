@@ -1,5 +1,6 @@
 import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc, TypedDoc } from "./typed-doc.js"
 
@@ -65,14 +66,10 @@ describe("Record with Map entries - placeholder required bug", () => {
     // Now wrap it with TypedDoc
     const typedDoc = new TypedDoc(AiStateSchema, loroDoc)
 
-    // Log the raw CRDT value
-    console.log("Raw CRDT value:", JSON.stringify(loroDoc.toJSON(), null, 2))
-
     // This should not throw "placeholder required"
     // BUG: Currently throws because the nested MapRef has placeholder: undefined
     expect(() => {
-      const json = typedDoc.value.toJSON()
-      console.log("toJSON result:", JSON.stringify(json, null, 2))
+      typedDoc.toJSON()
     }).not.toThrow()
   })
 
@@ -80,7 +77,7 @@ describe("Record with Map entries - placeholder required bug", () => {
     const typedDoc = createTypedDoc(AiStateSchema)
 
     // Add an entry via the typed API
-    typedDoc.change(draft => {
+    change(typedDoc, draft => {
       draft.tomState.set("peer-123", {
         peerId: "peer-123",
         authorName: "Alice",
@@ -92,8 +89,7 @@ describe("Record with Map entries - placeholder required bug", () => {
 
     // This should work because all values were set
     expect(() => {
-      const json = typedDoc.value.toJSON()
-      console.log("toJSON result (via change):", JSON.stringify(json, null, 2))
+      typedDoc.toJSON()
     }).not.toThrow()
   })
 
@@ -113,16 +109,9 @@ describe("Record with Map entries - placeholder required bug", () => {
 
     const typedDoc = new TypedDoc(AiStateSchema, loroDoc)
 
-    // Log what we have
-    console.log(
-      "Raw CRDT (partial):",
-      JSON.stringify(loroDoc.toJSON(), null, 2),
-    )
-
     // This should not throw - missing fields should use placeholder defaults
     expect(() => {
-      const json = typedDoc.value.toJSON()
-      console.log("toJSON (partial):", JSON.stringify(json, null, 2))
+      typedDoc.toJSON()
     }).not.toThrow()
   })
 })

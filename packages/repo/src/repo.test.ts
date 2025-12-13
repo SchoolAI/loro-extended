@@ -41,7 +41,7 @@ describe("Repo", () => {
     })
 
     it("should create a document with initial value", () => {
-      const handle = repo.getUntyped("test-doc").change(doc => {
+      const handle = repo.getUntyped("test-doc").batch(doc => {
         const root = doc.getMap("root")
         root.set("text", "initial")
       })
@@ -82,7 +82,7 @@ describe("Repo", () => {
       })
 
       // Read using typed API
-      expect(handle.value.root.text.toString()).toBe("hello")
+      expect(handle.doc.root.text.toString()).toBe("hello")
     })
 
     it("should share underlying untyped handle", () => {
@@ -117,7 +117,7 @@ describe("Repo", () => {
 
       const handleA = repoA.getUntyped("test-doc")
 
-      handleA.change(doc => {
+      handleA.batch(doc => {
         const root = doc.getMap("root")
         root.set("text", "hello")
       })

@@ -63,7 +63,7 @@ function TodoApp() {
   const { self, peers } = usePresence(handle)
 
   const addTodo = (text: string) => {
-    handle.change(d => {
+    handle.batch(d => {
       d.todos.push({
         id: Date.now().toString(),
         text,
@@ -73,7 +73,7 @@ function TodoApp() {
   }
 
   const toggleTodo = (index: number) => {
-    handle.change(d => {
+    handle.batch(d => {
       const todo = d.todos.get(index)
       if (todo) {
         todo.completed = !todo.completed
@@ -144,7 +144,7 @@ const handle = useHandle(docId, docSchema, presenceSchema)
 
 **Returns:** `TypedDocHandle<D, P>` with:
 - `handle.value` - Current document value (readonly)
-- `handle.change(fn)` - Mutate the document
+- `handle.batch(fn)` - Mutate the document (batched transaction)
 - `handle.presence` - Typed presence API
 - `handle.docId` - The document ID
 - `handle.readyStates` - Sync status information
@@ -318,7 +318,7 @@ const doc = useDoc(handle)
 // doc.title is typed as string
 // doc.count is typed as number
 
-handle.change(d => {
+handle.batch(d => {
   d.title.insert(0, "Hello") // TypedText methods
   d.count.increment(1)       // Counter methods
 })
@@ -331,7 +331,7 @@ If you're upgrading from the previous `useDocument` API:
 **Before:**
 ```typescript
 const [doc, changeDoc, handle] = useDocument(docId, schema)
-changeDoc(d => { d.title = "new" })
+changeDoc(d => { d.title.update("new") })
 
 const { peers, self, setSelf } = usePresence(docId, PresenceSchema)
 setSelf({ cursor: { x: 10, y: 20 } })
@@ -343,7 +343,7 @@ const handle = useHandle(docId, schema, PresenceSchema)
 const doc = useDoc(handle)
 const { self, peers } = usePresence(handle)
 
-handle.change(d => { d.title = "new" })
+handle.batch(d => { d.title.update("new") })
 handle.presence.set({ cursor: { x: 10, y: 20 } })
 ```
 

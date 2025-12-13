@@ -29,7 +29,7 @@ describe("Repo E2E", () => {
     expect(handle1.doc).toBeDefined()
 
     // Mutate the document
-    handle1.change(doc => {
+    handle1.batch(doc => {
       doc.getMap("doc").set("text", "hello")
     })
     expect(handle1.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
@@ -41,7 +41,7 @@ describe("Repo E2E", () => {
     expect(handle2.doc.getMap("doc").toJSON()).toEqual({ text: "hello" })
 
     // Mutate the document from repo 2
-    handle2.change(doc => {
+    handle2.batch(doc => {
       const root = doc.getMap("doc")
       root.get("text")
       root.set("text", `${root.get("text")} world`)
@@ -82,7 +82,7 @@ describe("Repo E2E", () => {
     await handle2.waitForNetwork()
 
     // A change from a permitted peer should be applied
-    handle2.change(doc => {
+    handle2.batch(doc => {
       doc.getMap("doc").set("text", "hello")
     })
 
@@ -92,7 +92,7 @@ describe("Repo E2E", () => {
 
     // A change from a non-permitted peer should not be applied
     repo1CanWrite = false
-    handle2.change(doc => {
+    handle2.batch(doc => {
       const root = doc.getMap("doc")
       root.set("text", `${root.get("text")} world`)
     })
@@ -201,7 +201,7 @@ describe("Repo E2E", () => {
       })
 
       const handleA = repoA.get(crypto.randomUUID())
-      handleA.change(doc => {
+      handleA.batch(doc => {
         doc.getMap("doc").set("text", "hello")
       })
 
@@ -226,13 +226,13 @@ describe("Repo E2E", () => {
 
       // Create documents and make changes BEFORE repoB connects
       const handle1 = repoA.get("allowed-doc-1")
-      handle1.change(doc => doc.getMap("doc").set("test", "1"))
+      handle1.batch(doc => doc.getMap("doc").set("test", "1"))
 
       const handle2 = repoA.get("denied-doc-1")
-      handle2.change(doc => doc.getMap("doc").set("test", "2"))
+      handle2.batch(doc => doc.getMap("doc").set("test", "2"))
 
       const handle3 = repoA.get("allowed-doc-2")
-      handle3.change(doc => doc.getMap("doc").set("test", "3"))
+      handle3.batch(doc => doc.getMap("doc").set("test", "3"))
 
       // Now create repoB - it should receive announcements based on canReveal
       repoB = new Repo({
@@ -266,7 +266,7 @@ describe("Repo E2E", () => {
       const handle1 = repo1.get(documentId)
 
       // Add some content
-      handle1.change(doc => {
+      handle1.batch(doc => {
         const root = doc.getMap("doc")
         root.set("title", "My Document")
         root.set("content", "This should persist")
@@ -318,7 +318,7 @@ describe("Repo E2E", () => {
       const documentId = "incremental-doc"
       const handle1 = repo1.get(documentId)
 
-      handle1.change(doc => {
+      handle1.batch(doc => {
         const root = doc.getMap("doc")
         root.set("items", ["item1", "item2"])
       })
@@ -343,7 +343,7 @@ describe("Repo E2E", () => {
       expect(root2.get("items")).toEqual(["item1", "item2"])
 
       // Make additional changes
-      handle2.change(doc => {
+      handle2.batch(doc => {
         const root = doc.getMap("doc")
         const items = root.get("items") as string[]
         root.set("items", [...items, "item3"])
@@ -382,7 +382,7 @@ describe("Repo E2E", () => {
       const handle1 = repo1.get(documentId)
 
       // Create a complex nested structure
-      handle1.change(doc => {
+      handle1.batch(doc => {
         const root = doc.getMap("doc")
 
         // Add nested maps
@@ -474,7 +474,7 @@ describe("Repo E2E", () => {
       const documentId = "counter"
       const handle1 = repo1.get(documentId)
 
-      handle1.change(doc => {
+      handle1.batch(doc => {
         const root = doc.getMap("doc")
         root.set("count", 42)
       })
@@ -533,7 +533,7 @@ describe("Repo E2E", () => {
       const documentId = "counter"
       const handle1 = repo1.get(documentId)
 
-      handle1.change(doc => {
+      handle1.batch(doc => {
         const root = doc.getMap("doc")
         root.set("count", 42)
       })

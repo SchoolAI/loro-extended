@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 
-describe("TypedDoc Readonly Mode", () => {
+describe("TypedDoc Mutable Mode", () => {
   const schema = Shape.doc({
     meta: Shape.map({
       count: Shape.plain.number(),
@@ -14,7 +14,7 @@ describe("TypedDoc Readonly Mode", () => {
   it("should read values correctly", () => {
     const doc = createTypedDoc(schema)
 
-    doc.change(d => {
+    doc.$.change(d => {
       d.meta.count = 1
       d.meta.title = "updated"
       d.list.push("item1")
@@ -29,11 +29,11 @@ describe("TypedDoc Readonly Mode", () => {
     const doc = createTypedDoc(schema)
 
     // Get a reference to the live view
-    const liveMeta = doc.value.meta
+    const liveMeta = doc.meta
 
     expect(liveMeta.count).toBe(0)
 
-    doc.change(d => {
+    doc.$.change(d => {
       d.meta.count = 5
     })
 
@@ -41,39 +41,40 @@ describe("TypedDoc Readonly Mode", () => {
     expect(liveMeta.count).toBe(5)
   })
 
-  it("should throw on mutation attempts", () => {
+  it("should allow direct mutations via doc.value (auto-commit)", () => {
     const doc = createTypedDoc(schema)
 
-    const liveMeta = doc.value.meta as any
-    const liveList = doc.value.list as any
+    // Direct mutations on doc.value should work and auto-commit
+    doc.meta.count = 10
+    expect(doc.toJSON().meta.count).toBe(10)
 
-    expect(() => {
-      liveMeta.count = 10
-    }).toThrow() // Proxy might not throw on set, but the underlying setter should
+    doc.list.push("item1")
+    expect(doc.toJSON().list[0]).toBe("item1")
 
-    // We don't strictly prevent adding new properties to the JS object if it's not a Proxy,
-    // but we ensure defined properties are protected.
-    // expect(() => {
-    //   liveMeta.newProp = "fail"
-    // }).toThrow()
+    doc.list.push("item2")
+    expect(doc.toJSON().list).toEqual(["item1", "item2"])
+  })
 
-    expect(() => {
-      delete liveMeta.count
-    }).toThrow()
+  it("should support change() for grouped mutations", () => {
+    const doc = createTypedDoc(schema)
 
-    expect(() => {
-      liveList.push("fail")
-    }).toThrow()
+    doc.$.change(d => {
+      d.meta.count = 1
+      d.meta.title = "batched"
+      d.list.push("a")
+      d.list.push("b")
+    })
 
-    expect(() => {
-      liveList[0] = "fail"
-    }).toThrow()
+    expect(doc.toJSON()).toEqual({
+      meta: { count: 1, title: "batched" },
+      list: ["a", "b"],
+    })
   })
 
   it("should support toJSON for full serialization", () => {
     const doc = createTypedDoc(schema)
 
-    doc.change(d => {
+    doc.$.change(d => {
       d.meta.count = 1
       d.meta.title = "json"
       d.list.push("a")

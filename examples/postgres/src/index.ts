@@ -1,6 +1,6 @@
-import { Pool } from "pg"
-import { Repo } from "@loro-extended/repo"
 import { PostgresStorageAdapter } from "@loro-extended/adapter-postgres/server"
+import { Repo } from "@loro-extended/repo"
+import { Pool } from "pg"
 
 async function main() {
   console.log("🐘 PostgreSQL Storage Adapter Example\n")
@@ -15,14 +15,18 @@ async function main() {
 
   console.log("🔧 Creating repo with storage...")
   const repo = new Repo({
-    peerId: "server-1",
-    storage,
+    identity: {
+      peerId: "server-1" as `${number}`,
+      name: "server",
+      type: "user",
+    },
+    adapters: [storage],
   })
 
   // Create and modify a document
   console.log("\n📝 Creating document...")
-  const handle = repo.create("my-doc")
-  handle.change(doc => {
+  const handle = repo.get("my-doc")
+  handle.batch(doc => {
     doc.getMap("root").set("message", "Hello from PostgreSQL!")
     doc.getMap("root").set("timestamp", Date.now())
   })
@@ -46,12 +50,15 @@ async function main() {
 
   // Make another change
   console.log("\n📝 Making another change...")
-  handle.change(doc => {
+  handle.batch(doc => {
     doc.getMap("root").set("updated", true)
     doc.getMap("root").set("updateTime", Date.now())
   })
 
-  console.log("📄 Updated content:", JSON.stringify(handle.doc.toJSON(), null, 2))
+  console.log(
+    "📄 Updated content:",
+    JSON.stringify(handle.doc.toJSON(), null, 2),
+  )
 
   // Wait for storage to persist
   await new Promise(resolve => setTimeout(resolve, 200))

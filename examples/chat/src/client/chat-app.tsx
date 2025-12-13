@@ -1,4 +1,4 @@
-import { useHandle, useDoc, usePresence, useRepo } from "@loro-extended/react"
+import { useDoc, useHandle, usePresence, useRepo } from "@loro-extended/react"
 import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import { ChatSchema, PresenceSchema, type Message } from "../shared/types"
@@ -92,7 +92,9 @@ function ChatApp() {
   }, [handle, userName])
 
   // Check if the current user has sent any messages in this conversation
-  const hasUserSentMessages = doc.messages.some(
+  // doc.messages is already a plain array (useDoc returns JSON)
+  const messages = doc.messages
+  const hasUserSentMessages = messages.some(
     msg => msg.role === "user" && msg.author === repo.identity.peerId,
   )
 
@@ -120,7 +122,7 @@ function ChatApp() {
   const memberCount = (self.type === "user" ? 1 : 0) + peerCount
 
   // Auto-scroll to bottom when messages change
-  useAutoScroll(messagesEndRef, doc.messages)
+  useAutoScroll(messagesEndRef, messages)
 
   const sendMessage = () => {
     if (!input.trim()) return
@@ -325,7 +327,7 @@ function ChatApp() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
-          {doc.messages.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-60">
               <div className="text-6xl">👋</div>
               <h2 className="text-2xl font-bold text-gray-700">
@@ -338,7 +340,7 @@ function ChatApp() {
               </p>
             </div>
           ) : (
-            doc.messages.map(msg => {
+            messages.map(msg => {
               const isMyMessage = msg.author === myPeerId
               return (
                 <div

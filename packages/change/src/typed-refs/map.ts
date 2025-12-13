@@ -6,6 +6,7 @@ import type {
   MapContainerShape,
   ValueShape,
 } from "../shape.js"
+import type { Infer } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import {
@@ -54,6 +55,8 @@ export class MapRef<
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
       readonly: this.readonly,
+      autoCommit: this._params.autoCommit,
+      getDoc: this._params.getDoc,
     }
   }
 
@@ -130,15 +133,22 @@ export class MapRef<
     }
   }
 
-  toJSON(): any {
+  toJSON(): Infer<MapContainerShape<NestedShapes>> {
     // Fast path: readonly mode
     if (this.readonly) {
       const nativeJson = this.container.toJSON() as Value
       // Overlay placeholders for missing properties
-      return mergeValue(this.shape, nativeJson, this.placeholder as Value)
+      return mergeValue(
+        this.shape,
+        nativeJson,
+        this.placeholder as Value,
+      ) as Infer<MapContainerShape<NestedShapes>>
     }
 
-    return serializeRefToJSON(this as any, Object.keys(this.shape.shapes))
+    return serializeRefToJSON(
+      this as any,
+      Object.keys(this.shape.shapes),
+    ) as Infer<MapContainerShape<NestedShapes>>
   }
 
   // TODO(duane): return correct type here
@@ -149,16 +159,20 @@ export class MapRef<
   set(key: string, value: Value): void {
     this.assertMutable()
     this.container.set(key, value)
+    this.commitIfAuto()
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
     this.assertMutable()
-    return this.container.setContainer(key, container)
+    const result = this.container.setContainer(key, container)
+    this.commitIfAuto()
+    return result
   }
 
   delete(key: string): void {
     this.assertMutable()
     this.container.delete(key)
+    this.commitIfAuto()
   }
 
   has(key: string): boolean {

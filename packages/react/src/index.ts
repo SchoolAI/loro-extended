@@ -1,11 +1,10 @@
 // Re-export schema-related types from @loro-extended/change
 export type {
-  DeepReadonly,
   DocShape,
   Infer,
   Mutable,
 } from "@loro-extended/change"
-export { Shape } from "@loro-extended/change"
+export { change, getLoroDoc, Shape } from "@loro-extended/change"
 
 // Re-export handle types from @loro-extended/repo
 export type { DocId, TypedDocHandle } from "@loro-extended/repo"

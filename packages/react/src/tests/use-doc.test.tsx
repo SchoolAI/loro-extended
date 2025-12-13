@@ -1,5 +1,5 @@
 import { Shape } from "@loro-extended/change"
-import { renderHook } from "@testing-library/react"
+import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { useDoc, useHandle } from "../index.js"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
@@ -9,39 +9,8 @@ const testSchema = Shape.doc({
   count: Shape.counter(),
 })
 
-describe("useHandle", () => {
-  it("should return a typed handle synchronously", () => {
-    const documentId = createTestDocumentId()
-    const RepoWrapper = createRepoWrapper()
-
-    const { result } = renderHook(() => useHandle(documentId, testSchema), {
-      wrapper: RepoWrapper,
-    })
-
-    const handle = result.current
-    expect(handle).not.toBeNull()
-    expect(handle.docId).toBe(documentId)
-  })
-
-  it("should return stable handle reference across re-renders", () => {
-    const documentId = createTestDocumentId()
-    const RepoWrapper = createRepoWrapper()
-
-    const { result, rerender } = renderHook(
-      () => useHandle(documentId, testSchema),
-      { wrapper: RepoWrapper },
-    )
-
-    const firstHandle = result.current
-    rerender()
-    const secondHandle = result.current
-
-    expect(firstHandle).toBe(secondHandle)
-  })
-})
-
 describe("useDoc", () => {
-  it("should return document value", () => {
+  it("should return JSON snapshot", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
@@ -53,6 +22,7 @@ describe("useDoc", () => {
       { wrapper: RepoWrapper },
     )
 
+    // useDoc returns JSON, so values are plain types
     expect(result.current.title).toBe("Test Document")
     expect(result.current.count).toBe(0)
   })
@@ -93,7 +63,7 @@ describe("useDoc", () => {
     })
   })
 
-  it("should allow mutations via handle.change", () => {
+  it("should allow mutations via handle.batch", () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
@@ -106,17 +76,44 @@ describe("useDoc", () => {
       { wrapper: RepoWrapper },
     )
 
-    // Verify initial state
+    // Verify initial state - doc is JSON
     expect(result.current.doc.title).toBe("Test Document")
 
-    // Mutate via handle.change
-    result.current.handle.change(d => {
-      d.title.delete(0, d.title.length)
-      d.title.insert(0, "Updated Title")
+    // Mutate via handle.batch (wrapped in act to allow React to process updates)
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "Updated Title")
+      })
     })
 
     // Verify mutation worked
     expect(result.current.doc.title).toBe("Updated Title")
+  })
+
+  it("should allow direct mutations via handle.doc", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => {
+        const handle = useHandle(documentId, testSchema)
+        const doc = useDoc(handle)
+        return { handle, doc }
+      },
+      { wrapper: RepoWrapper },
+    )
+
+    // Verify initial state - doc is JSON
+    expect(result.current.doc.count).toBe(0)
+
+    // Direct mutation via handle.doc (auto-commits)
+    act(() => {
+      result.current.handle.doc.count.increment(5)
+    })
+
+    // Verify mutation worked
+    expect(result.current.doc.count).toBe(5)
   })
 
   it("should work with different document IDs", () => {

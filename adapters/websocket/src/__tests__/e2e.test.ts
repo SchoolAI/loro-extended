@@ -88,7 +88,7 @@ describe("WebSocket Adapter E2E", () => {
 
     // Client 1 creates doc and makes changes
     const handle1 = clientRepo1.get(docId)
-    handle1.change((doc: any) => {
+    handle1.batch((doc: any) => {
       const text = doc.getText("text")
       text.insert(0, "Hello")
     })

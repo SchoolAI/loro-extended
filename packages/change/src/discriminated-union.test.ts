@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
 import { TypedDoc } from "./typed-doc.js"
@@ -222,7 +223,7 @@ describe("discriminatedUnion", () => {
 
         const doc = new TypedDoc(DocSchema)
 
-        doc.change(draft => {
+        change(doc, draft => {
           // This should work now that MapDraftNode recognizes discriminatedUnion as a value shape
           draft.state.presence = {
             type: "server",

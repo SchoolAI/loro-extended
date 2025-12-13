@@ -4,6 +4,8 @@ export {
   derivePlaceholder,
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
+// Functional helpers (recommended API)
+export { change, getLoroDoc } from "./functional-helpers.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
 export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
@@ -37,13 +39,8 @@ export { Shape } from "./shape.js"
 export { createTypedDoc, TypedDoc } from "./typed-doc.js"
 export { TypedPresence } from "./typed-presence.js"
 export type {
-  DeepReadonly,
-  /** @deprecated Use Mutable instead */
-  Draft,
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
-  /** @deprecated Use InferMutableType instead */
-  InferDraftType,
   InferMutableType,
   InferPlaceholderType,
   Mutable,

@@ -59,20 +59,34 @@ export class RecordRef<
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
       readonly: this.readonly,
+      autoCommit: this._params.autoCommit,
+      getDoc: this._params.getDoc,
     }
   }
 
-  getOrCreateRef(key: string): any {
-    // For readonly mode with container shapes, check if the key exists first
+  /**
+   * Gets an existing ref for a key, or returns undefined if the key doesn't exist.
+   * Used for reading operations where we want optional chaining to work.
+   */
+  getRef(key: string): any {
+    // For container shapes, check if the key exists first
     // This allows optional chaining (?.) to work correctly for non-existent keys
-    // Similar to how ListRefBase.getMutableItem() handles non-existent indices
-    if (this.readonly && isContainerShape(this.shape.shape)) {
+    if (isContainerShape(this.shape.shape)) {
       const existing = this.container.get(key)
       if (existing === undefined) {
         return undefined
       }
     }
 
+    return this.getOrCreateRef(key)
+  }
+
+  /**
+   * Gets or creates a ref for a key.
+   * Always creates the container if it doesn't exist.
+   * This is the method used for write operations.
+   */
+  getOrCreateRef(key: string): any {
     let ref = this.refCache.get(key)
     if (!ref) {
       const shape = this.shape.shape
@@ -116,7 +130,7 @@ export class RecordRef<
   }
 
   get(key: string): InferMutableType<NestedShape> {
-    return this.getOrCreateRef(key)
+    return this.getRef(key)
   }
 
   set(key: string, value: any): void {
@@ -124,10 +138,13 @@ export class RecordRef<
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
       this.refCache.set(key, value)
+      this.commitIfAuto()
     } else {
       // For container shapes, try to assign the plain value
+      // Use getOrCreateRef to ensure the container is created
       const ref = this.getOrCreateRef(key)
       if (assignPlainValueToTypedRef(ref, value)) {
+        this.commitIfAuto()
         return
       }
       throw new Error(
@@ -138,13 +155,16 @@ export class RecordRef<
 
   setContainer<C extends Container>(key: string, container: C): C {
     this.assertMutable()
-    return this.container.setContainer(key, container)
+    const result = this.container.setContainer(key, container)
+    this.commitIfAuto()
+    return result
   }
 
   delete(key: string): void {
     this.assertMutable()
     this.container.delete(key)
     this.refCache.delete(key)
+    this.commitIfAuto()
   }
 
   has(key: string): boolean {
@@ -163,12 +183,12 @@ export class RecordRef<
     return this.container.size
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, Infer<NestedShape>> {
     // Fast path: readonly mode
     if (this.readonly) {
       const nativeJson = this.container.toJSON() as Record<string, any>
       // For records, we need to overlay placeholders for each entry's nested shape
-      const result: Record<string, any> = {}
+      const result: Record<string, Infer<NestedShape>> = {}
       for (const key of Object.keys(nativeJson)) {
         // For records, the placeholder is always {}, so we need to derive
         // the placeholder for the nested shape on the fly
@@ -178,11 +198,14 @@ export class RecordRef<
           this.shape.shape,
           nativeJson[key],
           nestedPlaceholderValue as Value,
-        )
+        ) as Infer<NestedShape>
       }
       return result
     }
 
-    return serializeRefToJSON(this, this.keys())
+    return serializeRefToJSON(this, this.keys()) as Record<
+      string,
+      Infer<NestedShape>
+    >
   }
 }

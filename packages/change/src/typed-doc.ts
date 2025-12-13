@@ -11,27 +11,90 @@ import {
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
 import { DocRef } from "./typed-refs/doc.js"
-import type {
-  DeepReadonly,
-  Draft,
-  Infer,
-  InferPlaceholderType,
-} from "./types.js"
+import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { validatePlaceholder } from "./validation.js"
 
-// Core TypedDoc abstraction around LoroDoc
-export class TypedDoc<Shape extends DocShape> {
+/**
+ * Meta-operations namespace for TypedDoc.
+ * Access via doc.$ to perform batch operations, serialization, etc.
+ */
+export class TypedDocMeta<Shape extends DocShape> {
+  constructor(private internal: TypedDocInternal<Shape>) {}
+
+  /**
+   * The primary method of mutating typed documents.
+   * Batches multiple mutations into a single transaction.
+   * All changes commit together at the end.
+   *
+   * Use this for:
+   * - Find-and-mutate operations (required due to JS limitations)
+   * - Performance (fewer commits)
+   * - Atomic undo (all changes = one undo step)
+   *
+   * Returns the doc for chaining.
+   */
+  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
+    this.internal.change(fn)
+    return this.internal.proxy as TypedDoc<Shape>
+  }
+
+  /**
+   * Returns the full plain JavaScript object representation of the document.
+   * This is an expensive O(N) operation that serializes the entire document.
+   */
+  toJSON(): Infer<Shape> {
+    return this.internal.toJSON()
+  }
+
+  /**
+   * Apply JSON Patch operations to the document
+   *
+   * @param patch - Array of JSON Patch operations (RFC 6902)
+   * @param pathPrefix - Optional path prefix for scoped operations
+   * @returns Updated document value
+   */
+  applyPatch(
+    patch: JsonPatch,
+    pathPrefix?: (string | number)[],
+  ): TypedDoc<Shape> {
+    this.internal.applyPatch(patch, pathPrefix)
+    return this.internal.proxy as TypedDoc<Shape>
+  }
+
+  /**
+   * Access the underlying LoroDoc for advanced operations.
+   */
+  get loroDoc(): LoroDoc {
+    return this.internal.loroDoc
+  }
+
+  /**
+   * Access the document schema shape.
+   */
+  get docShape(): Shape {
+    return this.internal.docShape
+  }
+
+  /**
+   * Get raw CRDT value without placeholder overlay.
+   */
+  get rawValue(): any {
+    return this.internal.rawValue
+  }
+}
+
+/**
+ * Internal TypedDoc implementation (not directly exposed to users).
+ * Users interact with the proxied version that provides direct schema access.
+ */
+class TypedDocInternal<Shape extends DocShape> {
   private shape: Shape
   private placeholder: InferPlaceholderType<Shape>
   private doc: LoroDoc
+  private _valueRef: DocRef<Shape> | null = null
+  // Reference to the proxy for returning from change()
+  proxy: TypedDoc<Shape> | null = null
 
-  /**
-   * Creates a new TypedDoc with the given schema.
-   * Placeholder state is automatically derived from the schema's placeholder values.
-   *
-   * @param shape - The document schema (with optional .placeholder() values)
-   * @param doc - Optional existing LoroDoc to wrap
-   */
   constructor(shape: Shape, doc: LoroDoc = new LoroDoc()) {
     this.shape = shape
     this.placeholder = derivePlaceholder(shape)
@@ -40,24 +103,18 @@ export class TypedDoc<Shape extends DocShape> {
     validatePlaceholder(this.placeholder, this.shape)
   }
 
-  /**
-   * Returns a read-only, live view of the document.
-   * Accessing properties on this object will read directly from the underlying CRDT.
-   * This is efficient (O(1) per access) and always up-to-date.
-   */
-  get value(): DeepReadonly<Infer<Shape>> {
-    return new DocRef({
-      shape: this.shape,
-      placeholder: this.placeholder as any,
-      doc: this.doc,
-      readonly: true,
-    }) as unknown as DeepReadonly<Infer<Shape>>
+  get value(): Mutable<Shape> {
+    if (!this._valueRef) {
+      this._valueRef = new DocRef({
+        shape: this.shape,
+        placeholder: this.placeholder as any,
+        doc: this.doc,
+        autoCommit: true,
+      })
+    }
+    return this._valueRef as unknown as Mutable<Shape>
   }
 
-  /**
-   * Returns the full plain JavaScript object representation of the document.
-   * This is an expensive O(N) operation that serializes the entire document.
-   */
   toJSON(): Infer<Shape> {
     const crdtValue = this.doc.toJSON()
     return overlayPlaceholder(
@@ -67,39 +124,25 @@ export class TypedDoc<Shape extends DocShape> {
     ) as Infer<Shape>
   }
 
-  change(fn: (draft: Draft<Shape>) => void): Infer<Shape> {
-    // Reuse existing DocRef system with placeholder integration
+  change(fn: (draft: Mutable<Shape>) => void): void {
     const draft = new DocRef({
       shape: this.shape,
       placeholder: this.placeholder as any,
       doc: this.doc,
+      autoCommit: false,
     })
-    fn(draft as unknown as Draft<Shape>)
+    fn(draft as unknown as Mutable<Shape>)
     draft.absorbPlainValues()
     this.doc.commit()
-    return this.toJSON()
+
+    // Invalidate cached value ref since doc changed
+    this._valueRef = null
   }
 
-  /**
-   * Apply JSON Patch operations to the document
-   *
-   * @param patch - Array of JSON Patch operations (RFC 6902)
-   * @param pathPrefix - Optional path prefix for scoped operations
-   * @returns Updated document value
-   *
-   * @example
-   * ```typescript
-   * const result = typedDoc.applyPatch([
-   *   { op: 'add', path: '/users/0/name', value: 'Alice' },
-   *   { op: 'replace', path: '/settings/theme', value: 'dark' }
-   * ])
-   * ```
-   */
-  applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): Infer<Shape> {
-    return this.change(draft => {
+  applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void {
+    this.change(draft => {
       const applicator = new JsonPatchApplicator(draft)
 
-      // Apply path prefix if provided
       const prefixedPatch = pathPrefix
         ? patch.map((op: JsonPatchOperation) => ({
             ...op,
@@ -111,26 +154,175 @@ export class TypedDoc<Shape extends DocShape> {
     })
   }
 
-  // Expose underlying doc for advanced use cases
   get loroDoc(): LoroDoc {
     return this.doc
   }
 
-  // Expose shape for internal use
   get docShape(): Shape {
     return this.shape
   }
 
-  // Get raw CRDT value without overlay
   get rawValue(): any {
     return this.doc.toJSON()
   }
 }
 
-// Factory function for TypedLoroDoc
+/**
+ * The proxied TypedDoc type that provides direct schema access.
+ * Schema properties are accessed directly on the doc object.
+ * Meta-operations are available via the $ namespace.
+ *
+ * @example
+ * ```typescript
+ * const doc = createTypedDoc(schema);
+ *
+ * // Direct schema access
+ * doc.count.increment(5);
+ * doc.title.insert(0, "Hello");
+ *
+ * // Serialize to JSON (works on doc and all refs)
+ * const snapshot = doc.toJSON();
+ * const users = doc.users.toJSON();
+ *
+ * // Meta-operations via $ (escape hatch)
+ * doc.$.change(draft => { ... });
+ * doc.$.loroDoc;
+ * ```
+ */
+export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
+  /**
+   * Meta-operations namespace.
+   * Use for change(), loroDoc, etc.
+   */
+  $: TypedDocMeta<Shape>
+
+  /**
+   * Returns the full plain JavaScript object representation of the document.
+   * This is an O(N) operation that serializes the entire document.
+   *
+   * @example
+   * ```typescript
+   * const snapshot = doc.toJSON();
+   * console.log(snapshot.count); // number
+   * ```
+   */
+  toJSON(): Infer<Shape>
+}
+
+/**
+ * Creates a new TypedDoc with the given schema.
+ * Returns a proxied document where schema properties are accessed directly.
+ *
+ * @param shape - The document schema (with optional .placeholder() values)
+ * @param existingDoc - Optional existing LoroDoc to wrap
+ * @returns A proxied TypedDoc with direct schema access and $ namespace
+ *
+ * @example
+ * ```typescript
+ * const schema = Shape.doc({
+ *   title: Shape.text(),
+ *   count: Shape.counter(),
+ * });
+ *
+ * const doc = createTypedDoc(schema);
+ *
+ * // Direct mutations (auto-commit)
+ * doc.count.increment(5);
+ * doc.title.insert(0, "Hello");
+ *
+ * // Batched mutations are committed together via `change`
+ * doc.$.change(draft => {
+ *   draft.count.increment(10);
+ *   draft.title.update("World");
+ * });
+ *
+ * // Get plain JSON
+ * const snapshot = doc.toJSON();
+ * ```
+ */
 export function createTypedDoc<Shape extends DocShape>(
   shape: Shape,
   existingDoc?: LoroDoc,
 ): TypedDoc<Shape> {
-  return new TypedDoc<Shape>(shape, existingDoc || new LoroDoc())
+  const internal = new TypedDocInternal(shape, existingDoc || new LoroDoc())
+  const meta = new TypedDocMeta(internal)
+
+  // Create a proxy that delegates schema properties to the DocRef
+  // and provides $ namespace for meta-operations
+  const proxy = new Proxy(internal.value as object, {
+    get(target, prop, receiver) {
+      // $ namespace for meta-operations
+      if (prop === "$") {
+        return meta
+      }
+
+      // toJSON() should always read fresh from the CRDT
+      if (prop === "toJSON") {
+        return () => internal.toJSON()
+      }
+
+      // Delegate to the DocRef (which is the target)
+      return Reflect.get(target, prop, receiver)
+    },
+
+    set(target, prop, value, receiver) {
+      // Don't allow setting $ namespace
+      if (prop === "$") {
+        return false
+      }
+
+      // Delegate to the DocRef
+      return Reflect.set(target, prop, value, receiver)
+    },
+
+    // Support 'in' operator
+    has(target, prop) {
+      if (prop === "$") return true
+      return Reflect.has(target, prop)
+    },
+
+    // Support Object.keys() - don't include $ in enumeration
+    ownKeys(target) {
+      return Reflect.ownKeys(target)
+    },
+
+    getOwnPropertyDescriptor(target, prop) {
+      if (prop === "$") {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: meta,
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(target, prop)
+    },
+  }) as TypedDoc<Shape>
+
+  // Store reference to proxy for returning from change()
+  internal.proxy = proxy
+
+  return proxy
+}
+
+// For backwards compatibility, provide a constructor-like function
+// that can be called with `new`
+function TypedDocConstructor<Shape extends DocShape>(
+  this: TypedDoc<Shape> | undefined,
+  shape: Shape,
+  existingDoc?: LoroDoc,
+): TypedDoc<Shape> {
+  return createTypedDoc(shape, existingDoc)
+}
+
+// Type assertion to make it work as both a constructor and a function
+/**
+ * @deprecated Use createTypedDoc() instead for cleaner API.
+ * This is kept for backwards compatibility with `new TypedDoc(schema)`.
+ */
+export const TypedDoc = TypedDocConstructor as unknown as {
+  new <Shape extends DocShape>(
+    shape: Shape,
+    existingDoc?: LoroDoc,
+  ): TypedDoc<Shape>
+  <Shape extends DocShape>(shape: Shape, existingDoc?: LoroDoc): TypedDoc<Shape>
 }

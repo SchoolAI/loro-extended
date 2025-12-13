@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "../functional-helpers.js"
 import { Shape, TypedDoc } from "../index.js"
 
 describe("Record Types", () => {
@@ -10,7 +11,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.scores.getOrCreateRef("alice").increment(10)
         draft.scores.getOrCreateRef("bob").increment(5)
       })
@@ -20,7 +21,7 @@ describe("Record Types", () => {
         bob: 5,
       })
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.scores.getOrCreateRef("alice").increment(5)
         draft.scores.delete("bob")
       })
@@ -37,7 +38,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.notes.getOrCreateRef("todo").insert(0, "Buy milk")
         draft.notes.getOrCreateRef("reminders").insert(0, "Call mom")
       })
@@ -55,7 +56,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         const groupA = draft.groups.getOrCreateRef("groupA")
         groupA.push("alice")
         groupA.push("bob")
@@ -81,7 +82,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.wrapper.config.theme = "dark"
         draft.wrapper.config.lang = "en"
       })
@@ -91,7 +92,7 @@ describe("Record Types", () => {
         lang: "en",
       })
 
-      doc.change(draft => {
+      change(doc, draft => {
         delete draft.wrapper.config.theme
         draft.wrapper.config.lang = "fr"
       })
@@ -110,7 +111,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.wrapper.stats.visits = 100
         draft.wrapper.stats.clicks = 50
       })
@@ -132,7 +133,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.wrapper.settings.ui = {
           darkMode: true,
           sidebar: false,
@@ -169,7 +170,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         const alice = draft.users.getOrCreateRef("u1")
         alice.name = "Alice"
         alice.age = 30
@@ -199,7 +200,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.participants["student-1"] = {
           id: "student-1",
           role: "student",
@@ -229,7 +230,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.data["item-1"] = {
           info: {
             name: "Item 1",
@@ -251,13 +252,13 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.histories.user1 = ["a", "b"]
       })
 
       expect(doc.toJSON().histories.user1).toEqual(["a", "b"])
 
-      doc.change(draft => {
+      change(doc, draft => {
         // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
         draft.histories["user1"] = ["c"]
       })
@@ -273,7 +274,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.notes.set("note-1", "Hello World")
         draft.notes["note-2"] = "Another note"
       })
@@ -291,7 +292,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.scores.set("alice", 100)
         draft.scores.bob = 50
       })
@@ -315,7 +316,7 @@ describe("Record Types", () => {
 
       const doc = new TypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.users.set("user-123", {
           userId: "user-123",
           displayName: "Test User",
@@ -346,17 +347,17 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       // First, set a value for a specific peer
-      doc.change(d => {
+      change(doc, d => {
         d.preferences.peer1 = { showTip: true }
       })
 
       // This should work - accessing an existing key
-      expect(doc.value.preferences.peer1?.showTip).toBe(true)
+      expect(doc.preferences.peer1?.showTip).toBe(true)
 
       // Accessing a non-existent key should NOT throw "placeholder required"
       // It should return undefined so optional chaining works correctly
       expect(() => {
-        const result = doc.value.preferences.nonexistent?.showTip
+        const result = doc.preferences.nonexistent?.showTip
         return result
       }).not.toThrow()
     })
@@ -373,7 +374,7 @@ describe("Record Types", () => {
       const doc = new TypedDoc(schema)
 
       // Access a key that doesn't exist - should return undefined
-      const prefs = doc.value.preferences.nonexistent
+      const prefs = doc.preferences.nonexistent
       expect(prefs).toBeUndefined()
     })
 
@@ -393,7 +394,7 @@ describe("Record Types", () => {
       // This is the exact code pattern from the user's app:
       // doc.preferences[myPeerId]?.showTip !== false
       expect(() => {
-        const showTip = doc.value.preferences[myPeerId]?.showTip
+        const showTip = doc.preferences[myPeerId]?.showTip
         const result = showTip !== false
         return result
       }).not.toThrow()

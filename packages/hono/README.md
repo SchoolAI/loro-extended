@@ -48,13 +48,13 @@ function Counter() {
   const doc = useDoc(handle)
 
   const increment = () => {
-    handle.change(d => {
+    handle.batch(d => {
       d.count.increment(1)
     })
   }
 
   const decrement = () => {
-    handle.change(d => {
+    handle.batch(d => {
       d.count.decrement(1)
     })
   }
@@ -106,7 +106,7 @@ const handle = useHandle(docId, docSchema, presenceSchema)
 
 **Returns:** `TypedDocHandle<D, P>` with:
 - `handle.value` - Current document value (readonly)
-- `handle.change(fn)` - Mutate the document
+- `handle.batch(fn)` - Mutate the document (batched transaction)
 - `handle.presence` - Typed presence API
 - `handle.docId` - The document ID
 - `handle.readyStates` - Sync status information
@@ -230,7 +230,7 @@ changeDoc(d => { d.count.increment(1) })
 ```typescript
 const handle = useHandle(docId, schema)
 const doc = useDoc(handle)
-handle.change(d => { d.count.increment(1) })
+handle.batch(d => { d.count.increment(1) })
 ```
 
 ## Differences from @loro-extended/react

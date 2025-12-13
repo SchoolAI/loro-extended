@@ -11,11 +11,11 @@ A schema-driven, type-safe wrapper for [Loro CRDT](https://github.com/loro-dev/l
 Working with Loro directly involves somewhat verbose container operations and complex type management. The `change` package provides:
 
 - **Schema-First Design**: Define your document structure with type-safe schemas
-- **Natural Syntax**: Write `draft.title.insert(0, "Hello")` instead of verbose CRDT operations
+- **Natural Syntax**: Write `doc.title.insert(0, "Hello")` instead of verbose CRDT operations
 - **Empty State Overlay**: Seamlessly blend default values with CRDT state
 - **Full Type Safety**: Complete TypeScript support with compile-time validation
-- **Transactional Changes**: All mutations within a `change()` block are atomic
-- **Loro Compatible**: Works seamlessly with existing Loro code (`typedDoc.loroDoc` is a familiar `LoroDoc`)
+- **Transactional Changes**: All mutations within a `$.batch()` block are atomic
+- **Loro Compatible**: Works seamlessly with existing Loro code (`doc.$.loroDoc` is a familiar `LoroDoc`)
 
 ## Installation
 
@@ -28,35 +28,45 @@ pnpm add @loro-extended/change loro-crdt
 ## Quick Start
 
 ```typescript
-import { TypedDoc, Shape } from "@loro-extended/change";
+import { createTypedDoc, Shape, batch, toJSON } from "@loro-extended/change";
 
 // Define your document schema
 const schema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
-  todos: Shape.list(
-    Shape.plain.object({
-      id: Shape.plain.string(),
-      text: Shape.plain.string(),
-      completed: Shape.plain.boolean(),
-    })
-  ),
+  count: Shape.counter(),
+  users: Shape.record(Shape.plain.object({
+    name: Shape.plain.string(),
+  })),
 });
 
 // Create a typed document
-const doc = new TypedDoc(schema);
+const doc = createTypedDoc(schema);
 
-// Make changes with natural syntax
-const result = doc.change((draft) => {
-  draft.title.insert(0, "📝 Todo");
-  draft.todos.push({
-    id: "1",
-    text: "Learn Loro",
-    completed: false,
-  });
+// Direct mutations - commit immediately (auto-commit mode)
+doc.title.insert(0, "📝 Todo");
+doc.count.increment(5);
+doc.users.set("alice", { name: "Alice" });
+
+// Check existence
+if (doc.users.has("alice")) {
+  console.log("Alice exists!");
+}
+if ("alice" in doc.users) {
+  console.log("Also works with 'in' operator!");
+}
+
+// Batched mutations - commit together (optional, for performance)
+// Using functional helper (recommended)
+batch(doc, draft => {
+  draft.title.insert(0, "Batch: ");
+  draft.count.increment(10);
+  draft.users.set("bob", { name: "Bob" });
 });
+// All changes commit as one transaction
 
-console.log(result);
-// { title: "📝 Todo", todos: [{ id: "1", text: "Learn Loro", completed: false }] }
+// Get JSON snapshot using functional helper
+console.log(doc.toJSON());
+// { title: "Batch: 📝 Todo", count: 15, users: { alice: { name: "Alice" }, bob: { name: "Bob" } } }
 ```
 
 Note that this is even more useful in combination with `@loro-extended/react` (if your app uses React) and `@loro-extended/repo` for syncing between client/server or among peers.
@@ -122,29 +132,40 @@ const blogSchemaWithDefaults = Shape.doc({
   ),
 });
 
-const doc = new TypedDoc(blogSchemaWithDefaults);
+const doc = createTypedDoc(blogSchemaWithDefaults);
 
 // Initially returns empty state
-console.log(doc.value);
+console.log(doc.toJSON());
 // { title: "Untitled Document", viewCount: 0, ... }
 
 // After changes, CRDT values take priority over empty state
-doc.change((draft) => {
+batch(doc, (draft) => {
   draft.title.insert(0, "My Blog Post");
   draft.viewCount.increment(10);
 });
 
-console.log(doc.value);
+console.log(doc.toJSON());
 // { title: "My Blog Post",  viewCount: 10,  tags: [], ... }
 //   ↑ CRDT value            ↑ CRDT value    ↑ empty state preserved
 ```
 
-### The `change()` Function
+### Direct Mutations vs Batched Mutations
 
-All mutations happen within transactional `change()` blocks:
+With the Grand Unified API, schema properties are accessed directly on the doc. Mutations commit immediately by default:
 
 ```typescript
-const result = doc.change((draft) => {
+// Direct mutations - each commits immediately
+doc.title.insert(0, "📝");
+doc.viewCount.increment(1);
+doc.tags.push("typescript");
+```
+
+For batched operations (better performance, atomic undo), use `batch()`:
+
+```typescript
+import { batch, toJSON } from "@loro-extended/change";
+
+batch(doc, (draft) => {
   // Text operations
   draft.title.insert(0, "📝");
   draft.title.delete(5, 3);
@@ -171,9 +192,22 @@ const result = doc.change((draft) => {
   draft.sections.move(0, 1); // Reorder sections
 });
 
-// All changes are committed atomically
-console.log(result); // Updated document state
+// All changes are committed atomically as one transaction
+// batch() returns the doc for chaining
+console.log(doc.toJSON()); // Updated document state
 ```
+
+### When to Use `batch()` vs Direct Mutations
+
+| Use Case | Approach |
+|----------|----------|
+| Single mutation | Direct: `doc.count.increment(1)` |
+| Multiple related mutations | Batched: `batch(doc, d => { ... })` |
+| Atomic undo/redo | Batched: `batch(doc, d => { ... })` |
+| Performance-critical bulk updates | Batched: `batch(doc, d => { ... })` |
+| Simple reads + writes | Direct: `doc.users.set(...)` |
+
+> **Note:** The `$.change()` and `$.batch()` methods are available as an escape hatch, but the functional `batch()` helper is recommended for cleaner code.
 
 ## Advanced Usage
 
@@ -278,9 +312,9 @@ const emptyState = {
   },
 };
 
-const doc = new TypedDoc(complexSchema, emptyState);
+const doc = createTypedDoc(complexSchema);
 
-doc.change((draft) => {
+batch(doc, (draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
   draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
@@ -301,7 +335,7 @@ const schema = Shape.doc({
   }),
 });
 
-doc.change((draft) => {
+batch(doc, (draft) => {
   // Set individual values
   draft.settings.theme = "dark";
   draft.settings.collapsed = true;
@@ -329,7 +363,7 @@ const collaborativeSchema = Shape.doc({
   ),
 });
 
-doc.change((draft) => {
+batch(doc, (draft) => {
   // Push creates and configures nested containers automatically
   draft.articles.push({
     title: "Collaborative Article",
@@ -352,22 +386,79 @@ doc.change((draft) => {
 
 ### Core Functions
 
-#### `new TypedDoc<T>(schema, existingDoc?)`
+#### `createTypedDoc<T>(schema, existingDoc?)`
 
-Creates a new typed Loro document.
+Creates a new typed Loro document. This is the recommended way to create documents.
 
 ```typescript
-const doc = new TypedDoc(schema);
-const docFromExisting = new TypedDoc(schema, existingLoroDoc);
+import { createTypedDoc, Shape } from "@loro-extended/change";
+
+const doc = createTypedDoc(schema);
+const docFromExisting = createTypedDoc(schema, existingLoroDoc);
 ```
 
-#### `doc.change(mutator)`
+#### `new TypedDoc<T>(schema, existingDoc?)` *(deprecated)*
 
-Applies transactional changes to a document.
+Constructor-style API. Use `createTypedDoc()` instead for cleaner code.
 
 ```typescript
-const result = doc.change((draft) => {
-  // Make changes to draft
+// Deprecated - use createTypedDoc() instead
+const doc = new TypedDoc(schema);
+```
+
+### Functional Helpers (Recommended)
+
+These functional helpers provide a cleaner API and are the recommended way to work with TypedDoc:
+
+#### `batch(doc, mutator)`
+
+Batches multiple mutations into a single transaction. Returns the doc for chaining.
+
+```typescript
+import { batch } from "@loro-extended/change";
+
+batch(doc, (draft) => {
+  draft.title.insert(0, "Hello");
+  draft.count.increment(5);
+});
+
+// Chainable - batch returns the doc
+batch(doc, d => d.count.increment(1)).count.increment(2);
+```
+
+#### `toJSON(doc)`
+
+Returns the full plain JavaScript object representation of the document.
+
+```typescript
+import { toJSON } from "@loro-extended/change";
+
+const snapshot = toJSON(doc);
+// { title: "Hello", count: 5, ... }
+```
+
+#### `getLoroDoc(doc)`
+
+Access the underlying LoroDoc for advanced operations.
+
+```typescript
+import { getLoroDoc } from "@loro-extended/change";
+
+const loroDoc = getLoroDoc(doc);
+loroDoc.subscribe((event) => console.log("Changed:", event));
+```
+
+### $ Namespace (Escape Hatch)
+
+The `$` namespace provides access to meta-operations. While functional helpers are recommended, the `$` namespace is available for advanced use cases:
+
+#### `doc.$.batch(mutator)`
+
+Same as `batch(doc, mutator)`.
+
+```typescript
+doc.$.batch((draft) => {
+  // Make changes to draft - all commit together
 });
 ```
 
@@ -408,39 +499,54 @@ const schema = Shape.doc({
 - `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
 - `Shape.plain.discriminatedUnion(key, variants)` - Tagged union types with a discriminant key
 
-### TypedDoc Methods
+### TypedDoc API
 
-#### `.value`
+With the proxy-based API, schema properties are accessed directly on the doc object, and meta-operations are accessed via the `$` namespace.
 
-Returns the current document state with empty state overlay.
+#### Direct Schema Access
+
+Access schema properties directly on the doc. Mutations commit immediately (auto-commit mode).
 
 ```typescript
-const currentState = doc.value;
+// Read values
+const title = doc.title.toString();
+const count = doc.count.value;
+
+// Mutate directly - commits immediately
+doc.title.insert(0, "Hello");
+doc.count.increment(5);
+doc.users.set("alice", { name: "Alice" });
+
+// Check existence
+doc.users.has("alice"); // true
+"alice" in doc.users;   // true
 ```
 
-This overlays "empty state" defaults with CRDT values, returning a JSON object with full type information (from your schema).
+For batched mutations, use `$.batch()` instead.
 
-#### `.rawValue`
+#### `doc.$.toJSON()`
+
+Same as `doc.toJSON`. Returns the full plain JavaScript object representation.
+
+```typescript
+const snapshot = doc.$.toJSON();
+```
+
+#### `doc.$.rawValue`
 
 Returns raw CRDT state without empty state overlay.
 
 ```typescript
-const crdtState = doc.rawValue;
+const crdtState = doc.$.rawValue;
 ```
 
-#### `.loroDoc`
+#### `doc.$.loroDoc`
 
-Access the underlying LoroDoc for advanced operations.
+Same as `getLoroDoc(doc)`. Access the underlying LoroDoc.
 
 ```typescript
-const loroDoc = doc.loroDoc;
-
-const foods = loroDoc.getMap("foods");
-const drinks = loroDoc.getOrCreateContainer("drinks", new LoroMap());
-// etc.
+const loroDoc = doc.$.loroDoc;
 ```
-
-You may need this when interfacing with other libraries, such as `loro-dev/loro-prosemirror`.
 
 ## CRDT Container Operations
 
@@ -505,7 +611,7 @@ draft.todos.forEach((todo, index) => {
 **Important**: Methods like `find()` and `filter()` return **mutable draft objects** that you can modify directly:
 
 ```typescript
-doc.change((draft) => {
+batch(doc, (draft) => {
   // Find and mutate pattern - very common!
   const todo = draft.todos.find((t) => t.id === "123");
   if (todo) {
@@ -521,7 +627,7 @@ doc.change((draft) => {
 });
 ```
 
-This dual interface ensures predicates work with current data (including previous mutations in the same `change()` block) while returned objects remain mutable.
+This dual interface ensures predicates work with current data (including previous mutations in the same `batch()` block) while returned objects remain mutable.
 
 ### Movable List Operations
 
@@ -553,16 +659,16 @@ You can easily get a plain JavaScript object snapshot of any part of the documen
 
 ```typescript
 // Get full document snapshot
-const snapshot = doc.toJSON();
+const snapshot = doc.$.toJSON();
 
 // Get snapshot of a specific list
-const todos = doc.value.todos.toJSON(); // returns plain array of todos
+const todos = doc.todos.toJSON(); // returns plain array of todos
 
 // Works with nested structures
-const metadata = doc.value.metadata.toJSON(); // returns plain object
+const metadata = doc.metadata.toJSON(); // returns plain object
 
 // Serialize as JSON
-const serializedMetadata = JSON.stringify(doc.value.metadata); // returns string
+const serializedMetadata = JSON.stringify(doc.metadata); // returns string
 ```
 
 **Note:** `JSON.stringify()` is recommended for serialization as it handles all data types correctly. `.toJSON()` is available on all `TypedRef` objects and proxied placeholders for convenience when you need a direct object snapshot.
@@ -595,8 +701,8 @@ const todoSchema = Shape.doc({
 // TypeScript will ensure the schema produces the correct type
 const doc = new TypedDoc(todoSchema);
 
-// The result will be properly typed as TodoDoc
-const result: TodoDoc = doc.change((draft) => {
+// Mutations are type-safe
+batch(doc, (draft) => {
   draft.title.insert(0, "Hello"); // ✅ Valid - TypeScript knows this is LoroText
   draft.todos.push({
     // ✅ Valid - TypeScript knows the expected shape
@@ -608,6 +714,9 @@ const result: TodoDoc = doc.change((draft) => {
   // draft.title.insert(0, 123);         // ❌ TypeScript error
   // draft.todos.push({ invalid: true }); // ❌ TypeScript error
 });
+
+// The result is properly typed as TodoDoc
+const result: TodoDoc = doc.toJSON();
 
 // You can also use type assertion to ensure schema compatibility
 type SchemaType = InferPlainType<typeof todoSchema>;
@@ -622,13 +731,14 @@ const _typeCheck: TodoDoc = {} as SchemaType; // ✅ Will error if types don't m
 
 ```typescript
 import { LoroDoc } from "loro-crdt";
+import { createTypedDoc, getLoroDoc } from "@loro-extended/change";
 
 // Wrap existing LoroDoc
 const existingDoc = new LoroDoc();
-const typedDoc = new TypedDoc(schema, existingDoc);
+const typedDoc = createTypedDoc(schema, existingDoc);
 
 // Access underlying LoroDoc
-const loroDoc = typedDoc.loroDoc;
+const loroDoc = getLoroDoc(typedDoc);
 
 // Use with existing Loro APIs
 loroDoc.subscribe((event) => {
@@ -696,7 +806,7 @@ This is typically provided by `UntypedDocHandle.presence` in `@loro-extended/rep
 
 ## Performance Considerations
 
-- All changes within a `change()` block are batched into a single transaction
+- All changes within a `batch()` call are batched into a single transaction
 - Empty state overlay is computed on-demand, not stored
 - Container creation is lazy - containers are only created when accessed
 - Type validation occurs at development time, not runtime

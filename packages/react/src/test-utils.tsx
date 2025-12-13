@@ -19,7 +19,7 @@ export function createMockDocHandle(
       subscribe: vi.fn().mockReturnValue(() => {}),
       commit: vi.fn(),
     } as any,
-    change: vi.fn().mockReturnThis(),
+    batch: vi.fn().mockReturnThis(),
     readyStates: [],
     onReadyStateChange: vi.fn().mockReturnValue(() => {}),
     presence: {

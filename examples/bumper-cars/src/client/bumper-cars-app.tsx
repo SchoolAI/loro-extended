@@ -8,7 +8,6 @@ import {
   type CarColor,
   type ClientPresence,
   GamePresenceSchema,
-  type PlayerScore,
   type ServerPresence,
 } from "../shared/types"
 import { ArenaCanvas } from "./components/arena-canvas"
@@ -186,9 +185,8 @@ export default function BumperCarsApp({
 
   // Get scores sorted by bumps
   const sortedScores = useMemo(() => {
-    // Type assertion needed because record of maps doesn't infer nested types well
-    const scores = doc.scores as Record<string, PlayerScore>
-    return Object.entries(scores)
+    // doc.scores is already a plain object (useDoc returns JSON)
+    return Object.entries(doc.scores)
       .map(([peerId, score]) => ({
         peerId: peerId as PeerID,
         name: score.name,

@@ -156,11 +156,11 @@ export class UntypedDocHandle {
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   /**
-   * The primary method for an application to mutate the document.
+   * A way to batch mutations togehter into a single LoroDoc commit.
    * The document is always available for mutations.
    * @param mutator A function that receives the document to modify.
    */
-  public change(mutator: LoroDocMutator<DocContent>): UntypedDocHandle {
+  public batch(mutator: LoroDocMutator<DocContent>): UntypedDocHandle {
     this.logger.trace("change")
 
     mutator(this.doc)

@@ -1,5 +1,6 @@
 import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc, TypedDoc } from "./typed-doc.js"
 
@@ -12,11 +13,11 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.title.insert(0, "Hello")
         draft.title.insert(5, " World")
         draft.title.delete(0, 5) // Delete "Hello"
-      })
+      }).toJSON()
 
       expect(result.title).toBe(" World")
     })
@@ -28,10 +29,10 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.content.insert(0, "Initial content")
         draft.content.update("Replaced content")
-      })
+      }).toJSON()
 
       expect(result.content).toBe("Replaced content")
     })
@@ -43,11 +44,11 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.richText.insert(0, "Bold text")
         draft.richText.mark({ start: 0, end: 4 }, "bold", true)
         draft.richText.unmark({ start: 0, end: 2 }, "bold")
-      })
+      }).toJSON()
 
       expect(result.richText).toBe("Bold text")
     })
@@ -59,7 +60,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.deltaText.insert(0, "Hello World")
         const delta = draft.deltaText.toDelta()
         expect(delta).toBeDefined()
@@ -68,7 +69,8 @@ describe("CRDT Operations", () => {
         draft.deltaText.applyDelta([{ insert: "New " }])
       })
 
-      const result = typedDoc.value
+      // Use toJSON() to get plain values for comparison
+      const result = typedDoc.toJSON()
       expect(result.deltaText).toContain("New")
     })
 
@@ -79,7 +81,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.measuredText.insert(0, "Hello")
         expect(draft.measuredText.length).toBe(5)
 
@@ -97,11 +99,11 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.count.increment(5)
         draft.count.decrement(2)
         draft.count.increment(10)
-      })
+      }).toJSON()
 
       expect(result.count).toBe(13) // 5 - 2 + 10 = 13
     })
@@ -113,7 +115,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.counter.increment(7)
         expect(draft.counter.value).toBe(7)
 
@@ -129,10 +131,10 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.negativeCounter.increment(-5) // Negative increment
         draft.negativeCounter.decrement(-3) // Negative decrement (adds 3)
-      })
+      }).toJSON()
 
       expect(result.negativeCounter).toBe(-2) // -5 + 3 = -2
     })
@@ -146,12 +148,12 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.items.push("first")
         draft.items.insert(0, "zero")
         draft.items.push("second")
         draft.items.delete(1, 1) // Delete "first"
-      })
+      }).toJSON()
 
       expect(result.items).toEqual(["zero", "second"])
     })
@@ -163,11 +165,11 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.numbers.push(1)
         draft.numbers.push(2)
         draft.numbers.insert(1, 1.5)
-      })
+      }).toJSON()
 
       expect(result.numbers).toEqual([1, 1.5, 2])
     })
@@ -179,11 +181,11 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.flags.push(true)
         draft.flags.push(false)
         draft.flags.insert(1, true)
-      })
+      }).toJSON()
 
       expect(result.flags).toEqual([true, true, false])
     })
@@ -195,7 +197,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.testList.push("a")
         draft.testList.push("b")
 
@@ -213,13 +215,13 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         // Note: pushContainer and insertContainer expect actual container instances
         // For testing purposes, we'll just verify the list exists
         expect(draft.containerList.length).toBe(0)
       })
 
-      const result = typedDoc.value
+      const result = typedDoc.toJSON()
       expect(result.containerList).toHaveLength(0) // No containers were actually added
     })
 
@@ -231,18 +233,18 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add initial items
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.items.push("first")
         draft.items.push("second")
         draft.items.push("third")
       })
 
       // Test move operation: move first item to the end
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         const valueToMove = draft.items.get(0)
         draft.items.delete(0, 1)
         draft.items.insert(2, valueToMove)
-      })
+      }).toJSON()
 
       expect(result.items).toEqual(["second", "third", "first"])
     })
@@ -261,13 +263,13 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.tasks.push({ id: "1", title: "Task 1" })
         draft.tasks.push({ id: "2", title: "Task 2" })
         draft.tasks.push({ id: "3", title: "Task 3" })
         draft.tasks.move(0, 2) // Move first task to position 2
         draft.tasks.delete(1, 1) // Delete middle task
-      })
+      }).toJSON()
 
       expect(result.tasks).toHaveLength(2)
       expect(result.tasks[0]).toEqual({ id: "2", title: "Task 2" })
@@ -281,10 +283,10 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.editableList.push("original")
         draft.editableList.set(0, "modified")
-      })
+      }).toJSON()
 
       expect(result.editableList).toEqual(["modified"])
     })
@@ -296,7 +298,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.movableItems.push(10)
         draft.movableItems.push(20)
 
@@ -319,12 +321,12 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.metadata.set("title", "Test Title")
         draft.metadata.set("count", 42)
         draft.metadata.set("enabled", true)
         draft.metadata.delete("count")
-      })
+      }).toJSON()
 
       expect(result.metadata.title).toBe("Test Title")
       expect(result.metadata.count).toBe(1) // Should fall back to empty state
@@ -341,10 +343,10 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.config.set("tags", ["tag1", "tag2", "tag3"])
         draft.config.set("numbers", [1, 2, 3])
-      })
+      }).toJSON()
 
       expect(result.config.tags).toEqual(["tag1", "tag2", "tag3"])
       expect(result.config.numbers).toEqual([1, 2, 3])
@@ -360,7 +362,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.testMap.set("key1", "value1")
         draft.testMap.set("key2", 123)
 
@@ -384,13 +386,13 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         // Note: setContainer expects actual container instances
         // For testing purposes, we'll just verify the map exists
         expect(draft.containerMap).toBeDefined()
       })
 
-      const rawValue = typedDoc.rawValue
+      const rawValue = typedDoc.$.rawValue
       // Since no container was actually set, containerMap might be undefined
       expect(rawValue.containerMap).toBeUndefined()
     })
@@ -404,7 +406,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         const root = draft.tree.createNode()
         expect(root).toBeDefined()
 
@@ -421,7 +423,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         const parent1 = draft.hierarchy.createNode()
         const parent2 = draft.hierarchy.createNode()
 
@@ -439,7 +441,7 @@ describe("CRDT Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         const node = draft.searchableTree.createNode()
 
         // Note: getNodeByID might not be available in all versions
@@ -468,12 +470,12 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "Nested Article")
         draft.article.metadata.views.increment(10)
         draft.article.metadata.author.set("name", "John Doe")
         draft.article.metadata.author.set("email", "john@example.com")
-      })
+      }).toJSON()
 
       expect(result.article.title).toBe("Nested Article")
       expect(result.article.metadata.views).toBe(10)
@@ -493,12 +495,12 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.mixed.set("plainString", "Hello")
         draft.mixed.set("plainArray", [1, 2, 3])
         draft.mixed.loroText.insert(0, "Loro Text")
         draft.mixed.loroCounter.increment(5)
-      })
+      }).toJSON()
 
       expect(result.mixed.plainString).toBe("Hello")
       expect(result.mixed.plainArray).toEqual([1, 2, 3])
@@ -524,7 +526,7 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.articles.push({
           title: "First Article",
           tags: ["tech", "programming"],
@@ -542,7 +544,7 @@ describe("Nested Operations", () => {
             published: false,
           },
         })
-      })
+      }).toJSON()
 
       expect(result.articles).toHaveLength(2)
       expect(result.articles[0].title).toBe("First Article")
@@ -565,25 +567,25 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result1 = typedDoc.change(draft => {
+      const result1 = change(typedDoc, draft => {
         // natural object access & assignment for Value nodes
         draft.articles.metadata.views.page = 1
-      })
+      }).toJSON()
 
       expect(result1).toEqual({
         articles: { metadata: { views: { page: 1 } } },
       })
 
-      const result2 = typedDoc.change(draft => {
+      const result2 = change(typedDoc, draft => {
         // natural object access & assignment for Value nodes
         draft.articles.metadata = { views: { page: 2 } }
-      })
+      }).toJSON()
 
       expect(result2).toEqual({
         articles: { metadata: { views: { page: 2 } } },
       })
 
-      expect(typedDoc.rawValue).toEqual({
+      expect(typedDoc.$.rawValue).toEqual({
         articles: { metadata: { views: { page: 2 } } },
       })
     })
@@ -595,10 +597,10 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.matrix.push([1, 2, 3])
         draft.matrix.push([4, 5, 6])
-      })
+      }).toJSON()
 
       const correctResult = {
         matrix: [
@@ -608,7 +610,7 @@ describe("Nested Operations", () => {
       }
 
       expect(result).toEqual(correctResult)
-      expect(typedDoc.rawValue).toEqual(correctResult)
+      expect(typedDoc.$.rawValue).toEqual(correctResult)
     })
   })
 
@@ -623,11 +625,11 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.categories.tech.push("JavaScript")
         draft.categories.tech.push("TypeScript")
         draft.categories.design.push("UI/UX")
-      })
+      }).toJSON()
 
       expect(result.categories.tech).toEqual(["JavaScript", "TypeScript"])
       expect(result.categories.design).toEqual(["UI/UX"])
@@ -662,10 +664,10 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.title.insert(0, "Hello World")
         draft.count.increment(5)
-      })
+      }).toJSON()
 
       expect(result.title).toBe("Hello World")
       expect(result.count).toBe(5)
@@ -699,11 +701,11 @@ describe("TypedLoroDoc", () => {
 
       expect(typedDoc.toJSON()).toEqual(expectedPlaceholder)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "New Title")
         draft.article.metadata.views.increment(10)
         draft.article.metadata.set("author", "John Doe")
-      })
+      }).toJSON()
 
       expect(result.article.title).toBe("New Title")
       expect(result.article.metadata.views).toBe(10)
@@ -726,10 +728,10 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.profile.set("name", "John Doe")
         draft.profile.set("email", "john@example.com")
-      })
+      }).toJSON()
 
       expect(result.profile.name).toBe("John Doe")
       expect(result.profile.email).toBe("john@example.com")
@@ -748,17 +750,18 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.title.insert(0, "Hello")
       })
 
       // Raw value should only contain what was actually set in CRDT
-      const rawValue = typedDoc.rawValue
+      const rawValue = typedDoc.$.rawValue
       expect(rawValue.title).toBe("Hello")
       expect(rawValue.metadata).toBeUndefined()
 
       // Overlaid value should include empty state defaults
-      const overlaidValue = typedDoc.value
+      // Use toJSON() to get plain values for comparison
+      const overlaidValue = typedDoc.toJSON()
       expect(overlaidValue.title).toBe("Hello")
       expect(overlaidValue.metadata.optional).toBe("default-optional")
     })
@@ -802,7 +805,7 @@ describe("TypedLoroDoc", () => {
 
       // This should not throw "placeholder required"
       expect(() => {
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           // Accessing the property triggers getOrCreateNode
           const current = draft.interjection.currentPrediction
           expect(current).toBeNull()
@@ -827,22 +830,22 @@ describe("TypedLoroDoc", () => {
       const typedDoc = createTypedDoc(schema)
 
       // First change
-      let result = typedDoc.change(draft => {
+      let result = change(typedDoc, draft => {
         draft.title.insert(0, "Hello")
         draft.count.increment(5)
         draft.items.push("first")
-      })
+      }).toJSON()
 
       expect(result.title).toBe("Hello")
       expect(result.count).toBe(5)
       expect(result.items).toEqual(["first"])
 
       // Second change - should build on previous state
-      result = typedDoc.change(draft => {
+      result = change(typedDoc, draft => {
         draft.title.insert(5, " World")
         draft.count.increment(3)
         draft.items.push("second")
-      })
+      }).toJSON()
 
       expect(result.title).toBe("Hello World")
       expect(result.count).toBe(8) // 5 + 3
@@ -863,12 +866,12 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.articles.push({
           title: "Hello World",
           tags: ["hello", "world"],
         })
-      })
+      }).toJSON()
 
       expect(result.articles).toHaveLength(1)
       expect(result.articles[0].title).toBe("Hello World")
@@ -888,13 +891,13 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.tasks.push({
           title: "Main Task",
           completed: false,
           subtasks: ["subtask1", "subtask2"],
         })
-      })
+      }).toJSON()
 
       expect(result.tasks).toHaveLength(1)
       expect(result.tasks[0].title).toBe("Main Task")
@@ -917,7 +920,7 @@ describe("TypedLoroDoc", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.posts.push({
           title: "Complex Post",
           metadata: {
@@ -925,7 +928,7 @@ describe("TypedLoroDoc", () => {
             tags: ["complex", "nested"],
           },
         })
-      })
+      }).toJSON()
 
       expect(result.posts).toHaveLength(1)
       expect(result.posts[0].title).toBe("Complex Post")
@@ -949,23 +952,24 @@ describe("Edge Cases and Error Handling", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Multiple changes
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.title.insert(0, "First Title")
         draft.metadata.set("author", "John Doe")
       })
 
-      let result = typedDoc.value
+      // Use toJSON() to get plain values for comparison
+      let result = typedDoc.toJSON()
       expect(result.title).toBe("First Title")
       expect(result.metadata.author).toBe("John Doe")
       expect(result.metadata.publishedAt).toBe("2025-01-01")
 
       // More changes
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.title.update("Updated Title")
         draft.metadata.set("publishedAt", "2025-12-01")
       })
 
-      result = typedDoc.value
+      result = typedDoc.toJSON()
       expect(result.title).toBe("Updated Title")
       expect(result.metadata.author).toBe("John Doe") // Preserved from previous change
       expect(result.metadata.publishedAt).toBe("2025-12-01")
@@ -984,12 +988,12 @@ describe("Edge Cases and Error Handling", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add a todo item with minimal data
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.todos.push({
           text: "Test Todo",
           completed: false,
         })
-      })
+      }).toJSON()
 
       expect(result.todos).toHaveLength(1)
       expect(result.todos[0].text).toBe("Test Todo")
@@ -1006,13 +1010,13 @@ describe("Edge Cases and Error Handling", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         // Add many items
         for (let i = 0; i < 100; i++) {
           draft.items.push(`item-${i}`)
           draft.counter.increment(1)
         }
-      })
+      }).toJSON()
 
       expect(result.items).toHaveLength(100)
       expect(result.counter).toBe(100)
@@ -1031,11 +1035,11 @@ describe("Edge Cases and Error Handling", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.text.insert(0, "")
         draft.count.increment(0)
         draft.items.push("")
-      })
+      }).toJSON()
 
       expect(result.text).toBe("")
       expect(result.count).toBe(0)
@@ -1050,11 +1054,11 @@ describe("Edge Cases and Error Handling", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      const result = typedDoc.change(draft => {
+      const result = change(typedDoc, draft => {
         draft.unicode.insert(0, "Hello 世界 🌍")
         draft.emoji.push("🚀")
         draft.emoji.push("⭐")
-      })
+      }).toJSON()
 
       expect(result.unicode).toBe("Hello 世界 🌍")
       expect(result.emoji).toEqual(["🚀", "⭐"])
@@ -1070,7 +1074,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.items.push("apple")
           draft.items.push("banana")
           draft.items.push("cherry")
@@ -1091,7 +1095,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.numbers.push(10)
           draft.numbers.push(20)
           draft.numbers.push(30)
@@ -1112,7 +1116,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.words.push("hello")
           draft.words.push("world")
 
@@ -1139,7 +1143,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.numbers.push(1)
           draft.numbers.push(2)
           draft.numbers.push(3)
@@ -1162,7 +1166,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.items.push("a")
           draft.items.push("b")
           draft.items.push("c")
@@ -1188,7 +1192,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.numbers.push(1)
           draft.numbers.push(3)
           draft.numbers.push(5)
@@ -1214,7 +1218,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.numbers.push(2)
           draft.numbers.push(4)
           draft.numbers.push(6)
@@ -1246,7 +1250,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.todos.push({ id: "1", text: "Buy milk", completed: false })
           draft.todos.push({ id: "2", text: "Walk dog", completed: true })
           draft.todos.push({ id: "3", text: "Write code", completed: false })
@@ -1295,7 +1299,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.articles.push({
             title: "First Article",
             published: true,
@@ -1337,7 +1341,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.tasks.push({ id: "1", priority: 1 })
           draft.tasks.push({ id: "2", priority: 3 })
           draft.tasks.push({ id: "3", priority: 2 })
@@ -1381,7 +1385,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           // Test all methods on empty list
           expect(draft.items.find(_item => true)).toBeUndefined()
           expect(draft.items.findIndex(_item => true)).toBe(-1)
@@ -1405,7 +1409,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.items.push(42)
 
           // Test all methods on single item list
@@ -1434,7 +1438,7 @@ describe("Edge Cases and Error Handling", () => {
 
         const typedDoc = createTypedDoc(schema)
 
-        typedDoc.change(draft => {
+        change(typedDoc, draft => {
           draft.items.push("a")
           draft.items.push("b")
           draft.items.push("c")
@@ -1491,14 +1495,14 @@ describe("Edge Cases and Error Handling", () => {
           const typedDoc = createTypedDoc(schema)
 
           // Add initial todos
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.todos.push({ id: "1", text: "Buy milk", completed: false })
             draft.todos.push({ id: "2", text: "Walk dog", completed: false })
             draft.todos.push({ id: "3", text: "Write code", completed: true })
           })
 
           // Test the key developer expectation: find + mutate
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             // Find a todo and toggle its completion status
             const todo = draft.todos.find(t => t.id === "2")
             if (todo) {
@@ -1510,7 +1514,7 @@ describe("Edge Cases and Error Handling", () => {
             if (codeTodo) {
               codeTodo.text = "Write better code"
             }
-          })
+          }).toJSON()
 
           // Verify the mutations persisted to the document state
           expect(result.todos[0]).toEqual({
@@ -1529,8 +1533,8 @@ describe("Edge Cases and Error Handling", () => {
             completed: true,
           }) // Text should be changed
 
-          // Also verify via typedDoc.value
-          const finalState = typedDoc.value
+          // Also verify via typedDoc.toJSON()
+          const finalState = typedDoc.toJSON()
           expect(finalState.todos[1].completed).toBe(true)
           expect(finalState.todos[2].text).toBe("Write better code")
         })
@@ -1552,7 +1556,7 @@ describe("Edge Cases and Error Handling", () => {
           const typedDoc = createTypedDoc(schema)
 
           // Add initial articles
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.articles.push({
               title: "First Article",
               viewCount: 0,
@@ -1566,7 +1570,7 @@ describe("Edge Cases and Error Handling", () => {
           })
 
           // Test mutation of nested containers found via array methods
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             // Find article by author and modify its nested properties
             const aliceArticle = draft.articles.find(
               article => article.metadata.author === "Alice",
@@ -1590,7 +1594,7 @@ describe("Edge Cases and Error Handling", () => {
               publishedArticle.title.update("Updated Second Article")
               publishedArticle.viewCount.increment(3)
             }
-          })
+          }).toJSON()
 
           // Verify all mutations persisted correctly
           expect(result.articles[0].title).toBe("📝 First Article")
@@ -1599,8 +1603,8 @@ describe("Edge Cases and Error Handling", () => {
           expect(result.articles[1].title).toBe("Updated Second Article")
           expect(result.articles[1].viewCount).toBe(8) // 5 + 3
 
-          // Verify via typedDoc.value as well
-          const finalState = typedDoc.value
+          // Verify via typedDoc.toJSON() as well (use toJSON for plain values)
+          const finalState = typedDoc.toJSON()
           expect(finalState.articles[0].title).toBe("📝 First Article")
           expect(finalState.articles[0].viewCount).toBe(10)
           expect(finalState.articles[1].viewCount).toBe(8)
@@ -1621,7 +1625,7 @@ describe("Edge Cases and Error Handling", () => {
           const typedDoc = createTypedDoc(schema)
 
           // Add initial users
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.users.push({
               id: "1",
               name: "Alice",
@@ -1637,7 +1641,7 @@ describe("Edge Cases and Error Handling", () => {
             })
           })
 
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             // Pattern 1: Find and toggle boolean
             const inactiveUser = draft.users.find(user => !user.active)
             if (inactiveUser) {
@@ -1662,7 +1666,7 @@ describe("Edge Cases and Error Handling", () => {
             if (firstUser) {
               firstUser.name = `👑 ${firstUser.name}`
             }
-          })
+          }).toJSON()
 
           // Verify all patterns worked
           expect(result.users[0].name).toBe("👑 Alice")
@@ -1673,7 +1677,7 @@ describe("Edge Cases and Error Handling", () => {
           expect(result.users[2].score).toBe(180) // 120 + 50 VIP + 10 bonus
 
           // Verify persistence
-          const finalState = typedDoc.value
+          const finalState = typedDoc.toJSON()
           expect(finalState.users.every(user => user.active)).toBe(true)
           expect(finalState.users[2].name).toContain("VIP")
         })
@@ -1690,7 +1694,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             // Add some items
             draft.items.push({ id: "1", value: 10 })
             draft.items.push({ id: "2", value: 20 })
@@ -1717,7 +1721,7 @@ describe("Edge Cases and Error Handling", () => {
                 item.value += 5
               }
             }
-          })
+          }).toJSON()
 
           // Verify mutations worked correctly
           expect(result.items).toHaveLength(2)
@@ -1737,7 +1741,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push("a")
             draft.items.push("b")
             draft.items.push("c")
@@ -1757,7 +1761,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push("a")
             draft.items.push("b")
             draft.items.push("c")
@@ -1785,7 +1789,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push("a")
             draft.items.push("b")
             draft.items.push("c")
@@ -1804,7 +1808,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push("a")
             draft.items.push("b")
             draft.items.push("c")
@@ -1822,7 +1826,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push("a")
             draft.items.push("b")
             draft.items.push("c")
@@ -1848,7 +1852,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             // slice() on empty list returns []
             expect(draft.items.slice()).toEqual([])
             expect(draft.items.slice(0, 10)).toEqual([])
@@ -1868,7 +1872,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.items.push({ id: "1", value: 10 })
             draft.items.push({ id: "2", value: 20 })
             draft.items.push({ id: "3", value: 30 })
@@ -1876,12 +1880,12 @@ describe("Edge Cases and Error Handling", () => {
           })
 
           // Modify items from slice and verify changes persist
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             const middleItems = draft.items.slice(1, 3)
             // Mutate the sliced items
             middleItems[0].value = 200
             middleItems[1].value = 300
-          })
+          }).toJSON()
 
           // Verify mutations persisted to the original list
           expect(result.items[0].value).toBe(10) // unchanged
@@ -1897,7 +1901,7 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.tasks.push("task1")
             draft.tasks.push("task2")
             draft.tasks.push("task3")
@@ -1924,19 +1928,19 @@ describe("Edge Cases and Error Handling", () => {
 
           const typedDoc = createTypedDoc(schema)
 
-          typedDoc.change(draft => {
+          change(typedDoc, draft => {
             draft.articles.push({ title: "Article 1", views: 10 })
             draft.articles.push({ title: "Article 2", views: 20 })
             draft.articles.push({ title: "Article 3", views: 30 })
           })
 
-          const result = typedDoc.change(draft => {
+          const result = change(typedDoc, draft => {
             const sliced = draft.articles.slice(0, 2)
             // Mutate nested containers in sliced items
             sliced[0].title.update("Updated Article 1")
             sliced[0].views.increment(5)
             sliced[1].views.increment(10)
-          })
+          }).toJSON()
 
           // Verify mutations persisted
           expect(result.articles[0].title).toBe("Updated Article 1")
@@ -1996,7 +2000,8 @@ describe("Edge Cases and Error Handling", () => {
 
       // This should not throw "placeholder required"
       expect(() => {
-        const json = typedDoc.value.toJSON()
+        // Use typedDoc.toJSON() to get plain values
+        const json = typedDoc.toJSON()
         // Verify the result has placeholder defaults for missing fields
         expect(json.students["peer-123"].peerId).toBe("peer-123")
         expect(json.students["peer-123"].authorName).toBe("Alice")

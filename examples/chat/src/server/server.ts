@@ -3,9 +3,9 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/server"
-import { type Infer, TypedDoc } from "@loro-extended/change"
+import { type Infer, TypedDoc, TypedPresence } from "@loro-extended/change"
 import {
-  type DocHandle,
+  type UntypedDocHandle,
   type DocId,
   generateUUID,
   Repo,
@@ -36,7 +36,7 @@ async function streamLLMResponse(
   try {
     // Convert chat history in document to LLM message context
     const messages: Array<{ role: "user" | "assistant"; content: string }> =
-      typedDoc.value.messages.flatMap(msg =>
+      typedDoc.messages.toArray().flatMap((msg: any) =>
         msg.id === messageId
           ? []
           : [
@@ -55,8 +55,8 @@ async function streamLLMResponse(
     })
 
     for await (const chunk of textStream) {
-      typedDoc.change(draft => {
-        const message = draft.messages.find(m => m.id === messageId)
+      typedDoc.$.change((draft: any) => {
+        const message = draft.messages.find((m: any) => m.id === messageId)
         if (!message) {
           logger.warn`Unable to find target messageId ${messageId} in doc`
           return
@@ -78,7 +78,7 @@ function appendAssistantMessage(
 ) {
   const id = generateUUID()
 
-  typedDoc.change(draft => {
+  typedDoc.$.change((draft: any) => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -99,13 +99,13 @@ function processDocumentUpdate(
   typedDoc: TypedDoc<typeof ChatSchema>,
 ) {
   try {
-    const messages = typedDoc.value.messages
-    logger.debug`Processing doc ${docId}. Message count: ${messages.length}`
+    const messagesRef = typedDoc.messages
+    logger.debug`Processing doc ${docId}. Message count: ${messagesRef.length}`
 
-    if (messages.length === 0) return
+    if (messagesRef.length === 0) return
 
-    const lastMsg = messages[messages.length - 1]
-    logger.debug`Doc ${docId} updated. Last message: ${lastMsg.role} - ${lastMsg.content.substring(0, 20)}...`
+    const lastMsg = messagesRef.get(messagesRef.length - 1)
+    logger.debug`Doc ${docId} updated. Last message: ${lastMsg.role} - ${lastMsg.content.toString().substring(0, 20)}...`
 
     // Only process user messages
     if (lastMsg.role !== "user") return
@@ -114,7 +114,7 @@ function processDocumentUpdate(
     if (!lastMsg.needsAiReply) return
 
     // Check this off as taken care of
-    typedDoc.change(draft => {
+    typedDoc.$.change((draft: any) => {
       const lastMsg = draft.messages.get(draft.messages.length - 1)
       lastMsg.needsAiReply = false
     })
@@ -145,7 +145,7 @@ function processDocumentUpdate(
   }
 }
 
-function getChatDoc(handle: DocHandle) {
+function getChatDoc(handle: UntypedDocHandle) {
   const typedDoc = new TypedDoc(ChatSchema, handle.doc)
 
   return typedDoc
@@ -169,8 +169,8 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     processDocumentUpdate(docId, typedDoc)
   })
 
-  const typedPresence = handle.presence(PresenceSchema)
-  const unsubscribePresence = typedPresence.subscribe(({ all }) => {
+  const typedPresence = new TypedPresence(PresenceSchema, handle.presence)
+  const unsubscribePresence = typedPresence.subscribe(({ all }: any) => {
     presences.set(docId, all)
   })
 
@@ -189,7 +189,7 @@ const storageAdapter = new LevelDBStorageAdapter("loro-chat-app.db")
 
 // Create the Repo
 const repo = new Repo({
-  identity: { name: "chat-app-server", type: "service" },
+  identity: { name: "example-chat-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
   rules: {
     canReveal(context) {

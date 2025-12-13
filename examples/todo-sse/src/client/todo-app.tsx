@@ -1,4 +1,4 @@
-import { Shape, useHandle, useDoc } from "@loro-extended/react"
+import { Shape, useDoc, useHandle } from "@loro-extended/react"
 import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { TodoSchema } from "../shared/types"
@@ -19,9 +19,10 @@ function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
-  // NEW API: Get handle first, then subscribe to doc
+  // Get handle for mutations, doc for reading (JSON snapshot)
   const handle = useHandle(docId, schema)
   const doc = useDoc(handle)
+  const { doc: mutate } = handle
   const connectionState = useConnectionState()
 
   useEffect(() => {
@@ -30,18 +31,16 @@ function TodoApp() {
   }, [doc, handle])
 
   const addTodo = (text: string) => {
-    handle.change(d => {
-      d.todos.push({
-        id: generateUUID(),
-        text,
-        completed: false,
-      })
+    mutate.todos.push({
+      id: generateUUID(),
+      text,
+      completed: false,
     })
   }
 
   const toggleTodo = (id: string) => {
     handle.change(d => {
-      const todo = d.todos.find(t => t.id === id)
+      const todo = d.todos.find((t: { id: string }) => t.id === id)
       if (todo) {
         todo.completed = !todo.completed
       }
@@ -50,7 +49,7 @@ function TodoApp() {
 
   const deleteTodo = (id: string) => {
     handle.change(d => {
-      const index = d.todos.findIndex(t => t.id === id)
+      const index = d.todos.findIndex((t: { id: string }) => t.id === id)
       if (index > -1) {
         d.todos.delete(index, 1)
       }

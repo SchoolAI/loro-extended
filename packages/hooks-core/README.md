@@ -171,7 +171,7 @@ function MyComponent({ docId }) {
   
   // Mutate document
   const addItem = (text) => {
-    handle.change(d => {
+    handle.batch(d => {
       d.items.push(text)
     })
   }

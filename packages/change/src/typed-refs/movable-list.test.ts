@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "../functional-helpers.js"
 import { createTypedDoc, Shape } from "../index.js"
 
 describe("MovableListRef", () => {
@@ -14,7 +15,7 @@ describe("MovableListRef", () => {
 
       const doc = createTypedDoc(schema)
 
-      doc.change(draft => {
+      change(doc, draft => {
         draft.users.push({ name: "Alice" })
 
         // Update via index

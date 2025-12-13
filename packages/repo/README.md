@@ -47,7 +47,7 @@ const TodoSchema = Shape.doc({
 });
 
 const typedHandle = repo.get("my-doc", TodoSchema);
-typedHandle.doc.change(draft => {
+typedHandle.batch(draft => {
   draft.title.insert(0, "My Todos");
   draft.todos.push({ id: "1", text: "Learn Loro", done: false });
 });
@@ -67,7 +67,7 @@ The `Repo` class is the central orchestrator for the Loro state synchronization 
 
 The `TypedDocHandle` wraps an `UntypedDocHandle` and provides strongly-typed access to documents and presence. Use `repo.get(docId, docShape, presenceShape?)` to get a typed handle.
 
-- **Type-Safe Mutations**: Use `handle.doc.change(draft => { ... })` with full TypeScript support
+- **Type-Safe Mutations**: Use `handle.batch(draft => { ... })` with full TypeScript support
 - **Typed Presence**: Access `handle.presence` for type-safe ephemeral state
 - **Schema-Driven**: Define your document structure once, get type safety everywhere
 
@@ -151,13 +151,13 @@ const doc = typedHandle.doc; // TypedDoc instance
 console.log(typedHandle.value); // { title: "", count: 0 }
 
 // Make type-safe changes
-typedHandle.change(draft => {
+typedHandle.batch(draft => {
   draft.title.insert(0, "Hello World");
   draft.count.increment(1);
 });
 
 // Or use the doc directly
-typedHandle.doc.change(draft => {
+typedHandle.doc.$.batch(draft => {
   draft.title.insert(0, "Hello");
 });
 ```
@@ -437,7 +437,7 @@ const todoHandle = repo.get("main-todos", TodoSchema);
 await todoHandle.waitForStorage();
 
 // Add a new todo with type-safe mutations
-todoHandle.change((draft) => {
+todoHandle.batch((draft) => {
   draft.todos.push({
     id: crypto.randomUUID(),
     text: "Learn about Loro",

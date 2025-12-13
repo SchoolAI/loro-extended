@@ -144,7 +144,9 @@ export default function VideoConferenceApp({
   } = useLocalMedia(true, true)
 
   // Get participant peer IDs from the document
-  const participantPeerIds = doc.participants.map(p => p.peerId as PeerID)
+  // doc.participants is already a plain array (useDoc returns JSON)
+  const participants = doc.participants
+  const participantPeerIds = participants.map(p => p.peerId as PeerID)
 
   // WebRTC mesh for video connections - only needs signaling presence
   // Also connects Loro sync via data channels
@@ -179,7 +181,7 @@ export default function VideoConferenceApp({
 
   // Join room
   const joinRoom = useCallback(() => {
-    const alreadyJoined = doc.participants.some(p => p.peerId === myPeerId)
+    const alreadyJoined = participants.some(p => p.peerId === myPeerId)
     if (!alreadyJoined) {
       handle.change(draft => {
         draft.participants.push({
@@ -190,7 +192,7 @@ export default function VideoConferenceApp({
       })
     }
     setHasJoined(true)
-  }, [doc.participants, myPeerId, displayName, handle])
+  }, [participants, myPeerId, displayName, handle])
 
   // Leave room
   const leaveRoom = useCallback(() => {
@@ -226,7 +228,7 @@ export default function VideoConferenceApp({
 
   // Automatic cleanup of stale participants
   useParticipantCleanup(
-    doc.participants,
+    participants,
     userPresence,
     myPeerId,
     isOnline,
@@ -272,7 +274,7 @@ export default function VideoConferenceApp({
   }, [])
 
   // Get other participants (excluding self)
-  const otherParticipants = doc.participants.filter(p => p.peerId !== myPeerId)
+  const otherParticipants = participants.filter(p => p.peerId !== myPeerId)
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
@@ -281,7 +283,7 @@ export default function VideoConferenceApp({
 
       <Header
         roomId={roomId}
-        participantCount={doc.participants.length}
+        participantCount={participants.length}
         isCopied={isCopied}
         onCopyLink={copyLink}
         onNewRoom={startNewRoom}

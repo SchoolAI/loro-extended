@@ -19,9 +19,10 @@ function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
-  // NEW API: Get handle first, then subscribe to doc
+  // Get handle for mutations, doc for reading (JSON snapshot)
   const handle = useHandle(docId, schema)
   const doc = useDoc(handle)
+  const { doc: mutate } = handle
   const connectionState = useConnectionState()
 
   useEffect(() => {
@@ -30,12 +31,10 @@ function TodoApp() {
   }, [doc, handle])
 
   const addTodo = (text: string) => {
-    handle.change(d => {
-      d.todos.push({
-        id: generateUUID(),
-        text,
-        completed: false,
-      })
+    mutate.todos.push({
+      id: generateUUID(),
+      text,
+      completed: false,
     })
   }
 

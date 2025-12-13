@@ -60,7 +60,7 @@ describe("BridgeAdapter Integration Tests", () => {
     const docId = "test-doc-1"
     const handle1 = repo1.get(docId)
 
-    handle1.change(doc => {
+    handle1.batch(doc => {
       const root = doc.getMap("root")
       root.set("message", "Hello from repo1")
       root.set("count", 42)
@@ -103,14 +103,14 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Repo1 creates and modifies document
     const handle1 = repo1.get(docId)
-    handle1.change(doc => {
+    handle1.batch(doc => {
       doc.getMap("root").set("from", "repo1")
     })
 
     // Repo2 gets the document and adds to it
     const handle2 = repo2.get(docId)
 
-    handle2.change(doc => {
+    handle2.batch(doc => {
       doc.getMap("root").set("also-from", "repo2")
     })
 
@@ -157,17 +157,17 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle2 = repo2.get(docId)
 
     // Initialize with some shared state
-    handle1.change(doc => {
+    handle1.batch(doc => {
       doc.getMap("root").set("initialized", true)
     })
 
     // Make concurrent modifications (without waiting for sync)
-    handle1.change(doc => {
+    handle1.batch(doc => {
       const list = doc.getList("items")
       list.push("item-from-repo1")
     })
 
-    handle2.change(doc => {
+    handle2.batch(doc => {
       const list = doc.getList("items")
       list.push("item-from-repo2")
     })
@@ -214,9 +214,9 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle1B = repo1.get("doc-b")
     const handle1C = repo1.get("doc-c")
 
-    handle1A.change(doc => doc.getMap("root").set("id", "a"))
-    handle1B.change(doc => doc.getMap("root").set("id", "b"))
-    handle1C.change(doc => doc.getMap("root").set("id", "c"))
+    handle1A.batch(doc => doc.getMap("root").set("id", "a"))
+    handle1B.batch(doc => doc.getMap("root").set("id", "b"))
+    handle1C.batch(doc => doc.getMap("root").set("id", "c"))
 
     // Access the same documents in repo2
     const handle2A = repo2.get("doc-a")
@@ -333,7 +333,7 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Repo1 creates the document
     const handle1 = repo1.get(docId)
-    handle1.change(doc => {
+    handle1.batch(doc => {
       doc.getMap("root").set("creator", "repo1")
     })
 
@@ -347,7 +347,7 @@ describe("BridgeAdapter Integration Tests", () => {
     expect(handle3.doc.getMap("root").get("creator")).toBe("repo1")
 
     // Repo2 makes a change
-    handle2.change(doc => {
+    handle2.batch(doc => {
       doc.getMap("root").set("modified-by", "repo2")
     })
 

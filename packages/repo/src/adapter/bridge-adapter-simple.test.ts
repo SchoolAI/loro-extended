@@ -32,7 +32,7 @@ describe("BridgeAdapter Simple Test", () => {
     // Create a document in repo1
     const docId = "test-doc"
     const handle1 = repo1.get(docId)
-    handle1.change(doc => {
+    handle1.batch(doc => {
       doc.getMap("root").set("test", "value")
     })
 

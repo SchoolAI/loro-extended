@@ -28,7 +28,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // Create doc on repoA
     const docId = crypto.randomUUID()
     const handleA = repoA.get(docId)
-    handleA.change(doc => doc.getMap("doc").set("text", "secret"))
+    handleA.batch(doc => doc.getMap("doc").set("text", "secret"))
 
     // Manually inject peer state into repoA to simulate that repoB ALREADY has the doc
     // We do this BEFORE creating repoB to avoid race conditions

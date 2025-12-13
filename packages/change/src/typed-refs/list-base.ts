@@ -99,6 +99,8 @@ export abstract class ListRefBase<
         return containerItem
       },
       readonly: this.readonly,
+      autoCommit: this._params.autoCommit,
+      getDoc: this._params.getDoc,
     }
   }
 
@@ -303,6 +305,7 @@ export abstract class ListRefBase<
     // Update cache indices before performing the insert operation
     this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
+    this.commitIfAuto()
   }
 
   delete(index: number, len: number): void {
@@ -310,21 +313,27 @@ export abstract class ListRefBase<
     // Update cache indices before performing the delete operation
     this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
+    this.commitIfAuto()
   }
 
   push(item: Item): void {
     this.assertMutable()
     this.pushWithConversion(item)
+    this.commitIfAuto()
   }
 
   pushContainer(container: Container): Container {
     this.assertMutable()
-    return this.container.pushContainer(container)
+    const result = this.container.pushContainer(container)
+    this.commitIfAuto()
+    return result
   }
 
   insertContainer(index: number, container: Container): Container {
     this.assertMutable()
-    return this.container.insertContainer(index, container)
+    const result = this.container.insertContainer(index, container)
+    this.commitIfAuto()
+    return result
   }
 
   get(index: number): MutableItem {
@@ -340,28 +349,23 @@ export abstract class ListRefBase<
   }
 
   toJSON(): Item[] {
-    // Fast path: readonly mode with no pending mutations
-    if (this.readonly) {
-      const nativeJson = this.container.toJSON() as any[]
+    const nativeJson = this.container.toJSON() as any[]
 
-      // If the nested shape is a container shape (map, record, etc.) or an object value shape,
-      // we need to overlay placeholders for each item
-      if (
-        isContainerShape(this.shape.shape) ||
-        (isValueShape(this.shape.shape) &&
-          this.shape.shape.valueType === "object")
-      ) {
-        const itemPlaceholder = deriveShapePlaceholder(this.shape.shape)
-        return nativeJson.map(item =>
-          mergeValue(this.shape.shape, item, itemPlaceholder as any),
-        ) as Item[]
-      }
-
-      // For primitive value shapes, no overlay needed
-      return nativeJson ?? []
+    // If the nested shape is a container shape (map, record, etc.) or an object value shape,
+    // we need to overlay placeholders for each item
+    if (
+      isContainerShape(this.shape.shape) ||
+      (isValueShape(this.shape.shape) &&
+        this.shape.shape.valueType === "object")
+    ) {
+      const itemPlaceholder = deriveShapePlaceholder(this.shape.shape)
+      return nativeJson.map(item =>
+        mergeValue(this.shape.shape, item, itemPlaceholder as any),
+      ) as Item[]
     }
 
-    return this.toArray()
+    // For primitive value shapes, no overlay needed
+    return nativeJson ?? []
   }
 
   [Symbol.iterator](): IterableIterator<MutableItem> {

@@ -1,5 +1,6 @@
 import { LoroDoc, LoroList, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc, TypedDoc } from "./typed-doc.js"
@@ -24,7 +25,7 @@ describe("Overlay and Placeholder Handling", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Set only the name, 'role' should default to 'guest'
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.user.profile.set("name", "Alice")
       })
 
@@ -176,7 +177,7 @@ describe("Overlay and Placeholder Handling", () => {
       const typedDoc = new TypedDoc(schema, loroDoc)
 
       // Access the list ref directly and call toJSON()
-      const listJson = typedDoc.value.items.toJSON()
+      const listJson = typedDoc.items.toJSON()
 
       expect(listJson[0].name).toBe("Widget")
       expect(listJson[0].count).toBe(0)

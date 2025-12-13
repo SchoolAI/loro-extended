@@ -1,10 +1,4 @@
-import type {
-  DeepReadonly,
-  DocShape,
-  Infer,
-  Mutable,
-  ValueShape,
-} from "@loro-extended/change"
+import type { DocShape, Mutable, ValueShape } from "@loro-extended/change"
 import { TypedDoc, TypedPresence } from "@loro-extended/change"
 import type { ReadyState } from "./types.js"
 import type { ReadinessCheck, UntypedDocHandle } from "./untyped-doc-handle.js"
@@ -50,7 +44,7 @@ export class TypedDocHandle<
 
   /**
    * The strongly-typed document.
-   * Use `.value` for read access, `.change()` for mutations.
+   * Access schema properties directly on doc, use doc.$ for meta operations.
    */
   get doc(): TypedDoc<D> {
     return this._doc
@@ -64,17 +58,10 @@ export class TypedDocHandle<
   }
 
   /**
-   * Convenience method: Get the current document value.
+   * Convenience method: change a set of mutations in a single commit
    */
-  get value(): DeepReadonly<Infer<D>> {
-    return this._doc.value
-  }
-
-  /**
-   * Convenience method: Mutate the document.
-   */
-  change(fn: (draft: Mutable<D>) => void): Infer<D> {
-    return this._doc.change(fn)
+  change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {
+    return this._doc.$.change(fn)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

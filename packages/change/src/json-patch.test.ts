@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import type { JsonPatch } from "./json-patch.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -20,7 +21,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/metadata/count", value: 42 },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.metadata.title).toBe("Hello World")
       expect(result.metadata.count).toBe(42)
@@ -37,14 +38,14 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // First set some values
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.config.set("theme", "dark")
         draft.config.set("debug", false)
       })
 
       const patch: JsonPatch = [{ op: "remove", path: "/config/debug" }]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.config.theme).toBe("dark")
       expect(result.config.debug).toBe(true) // Should fall back to empty state
@@ -61,7 +62,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Set initial values
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.settings.set("language", "fr")
         draft.settings.set("volume", 75)
       })
@@ -71,7 +72,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/settings/volume", value: 100 },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.settings.language).toBe("es")
       expect(result.settings.volume).toBe(100)
@@ -92,7 +93,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/items/1", value: "middle" }, // Insert in middle
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.items).toEqual(["first", "middle", "second"])
     })
@@ -105,7 +106,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add initial items
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.tasks.push("task1")
         draft.tasks.push("task2")
         draft.tasks.push("task3")
@@ -115,7 +116,7 @@ describe("JSON Patch Integration", () => {
         { op: "remove", path: "/tasks/1" }, // Remove "task2"
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.tasks).toEqual(["task1", "task3"])
     })
@@ -128,7 +129,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add initial items
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.numbers.push(1)
         draft.numbers.push(2)
         draft.numbers.push(3)
@@ -138,7 +139,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/numbers/1", value: 20 },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.numbers).toEqual([1, 20, 3])
     })
@@ -157,10 +158,13 @@ describe("JSON Patch Integration", () => {
       // since it's a CRDT container. This test verifies the path navigation works
       // but the actual text manipulation should be done through text methods
 
-      // This should work for setting up the structure
-      const result = typedDoc.value
-      expect(result.title).toBe("")
-      expect(result.content).toBe("")
+      // doc.value returns TextRef objects with methods
+      expect(typedDoc.title.toString()).toBe("")
+      expect(typedDoc.content.toString()).toBe("")
+
+      // toJSON returns plain strings
+      expect(typedDoc.toJSON().title).toBe("")
+      expect(typedDoc.toJSON().content).toBe("")
     })
 
     it("should work with counter containers", () => {
@@ -175,9 +179,13 @@ describe("JSON Patch Integration", () => {
       // The path navigation should work, but actual counter operations
       // should use increment/decrement methods
 
-      const result = typedDoc.value
-      expect(result.views).toBe(0)
-      expect(result.likes).toBe(0)
+      // doc.value returns CounterRef objects with methods
+      expect(typedDoc.views.value).toBe(0)
+      expect(typedDoc.likes.value).toBe(0)
+
+      // toJSON returns plain numbers
+      expect(typedDoc.toJSON().views).toBe(0)
+      expect(typedDoc.toJSON().likes).toBe(0)
     })
   })
 
@@ -207,7 +215,7 @@ describe("JSON Patch Integration", () => {
         },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.user.profile.name).toBe("Alice")
       expect(result.user.profile.settings.theme).toBe("dark")
@@ -245,7 +253,7 @@ describe("JSON Patch Integration", () => {
         },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.todos).toHaveLength(2)
       expect(result.todos[0]).toEqual({
@@ -270,7 +278,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add initial items
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.items.push("first")
         draft.items.push("second")
         draft.items.push("third")
@@ -280,7 +288,7 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/0", path: "/items/2" }, // Move "first" to end
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.items).toEqual(["second", "third", "first"])
     })
@@ -293,7 +301,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Test move from 0 to 3 (move first item to end of 4-item list)
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.items.push("A")
         draft.items.push("B")
         draft.items.push("C")
@@ -304,11 +312,11 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/0", path: "/items/3" },
       ]
 
-      const result1 = typedDoc.applyPatch(patch1)
+      const result1 = typedDoc.$.applyPatch(patch1).toJSON()
       expect(result1.items).toEqual(["B", "C", "D", "A"])
 
       // Reset for next test
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.items.delete(0, draft.items.length)
         draft.items.push("A")
         draft.items.push("B")
@@ -321,7 +329,7 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/1", path: "/items/3" },
       ]
 
-      const result2 = typedDoc.applyPatch(patch2)
+      const result2 = typedDoc.$.applyPatch(patch2).toJSON()
       expect(result2.items).toEqual(["A", "C", "D", "B"])
     })
 
@@ -334,7 +342,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Add initial items
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.source.push("item1")
         draft.source.push("item2")
       })
@@ -344,7 +352,7 @@ describe("JSON Patch Integration", () => {
         { op: "copy", from: "/source/1", path: "/target/1" },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.source).toEqual(["item1", "item2"])
       expect(result.target).toEqual(["item1", "item2"])
@@ -361,7 +369,7 @@ describe("JSON Patch Integration", () => {
 
       const typedDoc = createTypedDoc(schema)
 
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.config.set("version", "2.0.0")
       })
 
@@ -370,7 +378,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/config/version", value: "2.1.0" },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.config.version).toBe("2.1.0")
     })
@@ -389,7 +397,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        typedDoc.applyPatch(patch)
+        typedDoc.$.applyPatch(patch)
       }).toThrow("JSON Patch test failed at path: /config/version")
     })
   })
@@ -417,7 +425,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/email", value: "alice@example.com" },
       ]
 
-      const result = typedDoc.applyPatch(patch, ["users", "alice"])
+      const result = typedDoc.$.applyPatch(patch, ["users", "alice"]).toJSON()
 
       expect(result.users.alice.name).toBe("Alice Smith")
       expect(result.users.alice.email).toBe("alice@example.com")
@@ -440,7 +448,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/data/items/1", value: "second" },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.data.items).toEqual(["first", "second"])
     })
@@ -459,7 +467,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: ["data", "items", 1], value: "second" },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.data.items).toEqual(["first", "second"])
     })
@@ -480,7 +488,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        typedDoc.applyPatch(patch)
+        typedDoc.$.applyPatch(patch)
       }).toThrow("Cannot navigate to path segment: nonexistent")
     })
 
@@ -496,7 +504,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        typedDoc.applyPatch(patch)
+        typedDoc.$.applyPatch(patch)
       }).toThrow("Index out of bound")
     })
   })
@@ -514,7 +522,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       // Use regular change operations
-      typedDoc.change(draft => {
+      change(typedDoc, draft => {
         draft.counter.increment(5)
         draft.text.insert(0, "Hello")
       })
@@ -525,7 +533,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/data/items/1", value: "item2" },
       ]
 
-      const result = typedDoc.applyPatch(patch)
+      const result = typedDoc.$.applyPatch(patch).toJSON()
 
       expect(result.counter).toBe(5)
       expect(result.text).toBe("Hello")
@@ -547,14 +555,14 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/settings/theme", value: "dark" },
       ]
 
-      typedDoc.applyPatch(patch1)
+      typedDoc.$.applyPatch(patch1)
 
       // Second patch
       const patch2: JsonPatch = [
         { op: "replace", path: "/settings/language", value: "fr" },
       ]
 
-      const result = typedDoc.applyPatch(patch2)
+      const result = typedDoc.$.applyPatch(patch2).toJSON()
 
       expect(result.settings.theme).toBe("dark") // Should persist from first patch
       expect(result.settings.language).toBe("fr")

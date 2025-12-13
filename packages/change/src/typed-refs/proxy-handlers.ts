@@ -5,7 +5,8 @@ import type { RecordRef } from "./record.js"
 export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
   get: (target, prop) => {
     if (typeof prop === "string" && !(prop in target)) {
-      return target.get(prop)
+      // Use getRef for reading - returns undefined for non-existent keys
+      return target.getRef(prop)
     }
     return Reflect.get(target, prop)
   },
@@ -22,6 +23,18 @@ export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
       return true
     }
     return Reflect.deleteProperty(target, prop)
+  },
+  // Support `in` operator for checking key existence
+  has: (target, prop) => {
+    if (typeof prop === "string") {
+      // Check if it's a method/property on the class first
+      if (prop in target) {
+        return true
+      }
+      // Otherwise check the underlying container
+      return target.has(prop)
+    }
+    return Reflect.has(target, prop)
   },
   ownKeys: target => {
     return target.keys()

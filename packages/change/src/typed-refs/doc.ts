@@ -20,21 +20,25 @@ const containerGetter = {
 
 // Doc Ref class -- the actual object passed to the change `mutation` function
 export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
-  private doc: LoroDoc
+  private _doc: LoroDoc
   private propertyCache = new Map<string, TypedRef<ContainerShape>>()
   private requiredPlaceholder!: Infer<Shape>
 
   constructor(
-    _params: Omit<TypedRefParams<Shape>, "getContainer"> & { doc: LoroDoc },
+    _params: Omit<TypedRefParams<Shape>, "getContainer" | "getDoc"> & {
+      doc: LoroDoc
+      autoCommit?: boolean
+    },
   ) {
     super({
       ..._params,
       getContainer: () => {
         throw new Error("can't get container on DocRef")
       },
+      getDoc: () => this._doc,
     })
     if (!_params.placeholder) throw new Error("placeholder required")
-    this.doc = _params.doc
+    this._doc = _params.doc
     this.requiredPlaceholder = _params.placeholder
     this.createLazyProperties()
   }
@@ -43,13 +47,15 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     key: string,
     shape: S,
   ): TypedRefParams<ContainerShape> {
-    const getter = this.doc[containerGetter[shape._type]].bind(this.doc)
+    const getter = this._doc[containerGetter[shape._type]].bind(this._doc)
 
     return {
       shape,
       placeholder: this.requiredPlaceholder[key],
       getContainer: () => getter(key),
       readonly: this.readonly,
+      autoCommit: this._params.autoCommit,
+      getDoc: () => this._doc,
     }
   }
 
@@ -62,7 +68,7 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
       (shape._type === "counter" || shape._type === "text")
     ) {
       // Check if the container exists in the doc without creating it
-      const shallow = this.doc.getShallowValue()
+      const shallow = this._doc.getShallowValue()
       if (!shallow[key]) {
         return this.requiredPlaceholder[key] as any
       }

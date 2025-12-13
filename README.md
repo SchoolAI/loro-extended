@@ -143,6 +143,8 @@ By treating agents as "peers" in a CRDT network, you decouple **Execution** (the
 Raw CRDTs can feel like "schemaless JSON soup." We bring structure back. Define a `Shape`, and get full TypeScript inference for every mutation.
 
 ```typescript
+import { createTypedDoc, Shape, batch } from "@loro-extended/change";
+
 // Define your schema once
 const schema = Shape.doc({
   todos: Shape.list(
@@ -153,8 +155,10 @@ const schema = Shape.doc({
   ),
 });
 
+const doc = createTypedDoc(schema);
+
 // Get full intellisense and type checking
-doc.change((draft) => {
+batch(doc, (draft) => {
   draft.todos.push({ text: "Buy milk", done: false }); // ✅ Type-safe
   draft.todos.push({ text: 123 }); // ❌ Error: Type 'number' is not assignable to 'string'
 });

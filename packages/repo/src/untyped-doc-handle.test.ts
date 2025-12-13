@@ -35,7 +35,7 @@ describe("UntypedDocHandle Integration Tests", () => {
       synchronizer,
     })
 
-    handle.change(doc => {
+    handle.batch(doc => {
       const root = doc.getMap("doc")
       root.set("text", "hello world")
     })
@@ -50,7 +50,7 @@ describe("UntypedDocHandle Integration Tests", () => {
       synchronizer,
     })
 
-    handle.change(doc => {
+    handle.batch(doc => {
       const stored = doc.getText("stored")
       stored.insert(0, "some-value")
     })
