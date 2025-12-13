@@ -12,6 +12,7 @@
     "format": "pnpm -r format",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:all": "pnpm -r test && pnpm -r test:all",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

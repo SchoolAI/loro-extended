@@ -13,7 +13,7 @@
     "format": "biome format --write .",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
-    "test": "pnpm test:e2e",
+    "test:all": "pnpm test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit"
