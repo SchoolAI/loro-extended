@@ -14,9 +14,9 @@ import type {
   ContainerShape,
   CounterContainerShape,
   ListContainerShape,
-  MapContainerShape,
   MovableListContainerShape,
   RecordContainerShape,
+  StructContainerShape,
   TextContainerShape,
   TreeContainerShape,
   ValueShape,
@@ -146,13 +146,18 @@ export function isMovableListShape(
 }
 
 /**
- * Type guard to check if a schema is for MapDraftNode
+ * Type guard to check if a schema is for StructDraftNode
  */
-export function isMapShape(
+export function isStructShape(
   schema: ContainerOrValueShape,
-): schema is MapContainerShape {
-  return schema && typeof schema === "object" && schema._type === "map"
+): schema is StructContainerShape {
+  return schema && typeof schema === "object" && schema._type === "struct"
 }
+
+/**
+ * @deprecated Use isStructShape instead. isMapShape is an alias for backward compatibility.
+ */
+export const isMapShape = isStructShape
 
 /**
  * Type guard to check if a schema is for RecordDraftNode
@@ -193,7 +198,7 @@ export function isValueShape(
       "null",
       "undefined",
       "uint8array",
-      "object",
+      "struct",
       "record",
       "array",
       "union",

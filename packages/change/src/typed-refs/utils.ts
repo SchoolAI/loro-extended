@@ -11,16 +11,15 @@ import type {
   ContainerShape,
   CounterContainerShape,
   ListContainerShape,
-  MapContainerShape,
   MovableListContainerShape,
   RecordContainerShape,
+  StructContainerShape,
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import { CounterRef } from "./counter.js"
 import { ListRef } from "./list.js"
-import { MapRef } from "./map.js"
 import { MovableListRef } from "./movable-list.js"
 import {
   listProxyHandler,
@@ -28,6 +27,7 @@ import {
   recordProxyHandler,
 } from "./proxy-handlers.js"
 import { RecordRef } from "./record.js"
+import { StructRef } from "./struct.js"
 import { TextRef } from "./text.js"
 import { TreeRef } from "./tree.js"
 
@@ -38,9 +38,9 @@ import { TreeRef } from "./tree.js"
 export const containerConstructor = {
   counter: LoroCounter,
   list: LoroList,
-  map: LoroMap,
   movableList: LoroMovableList,
   record: LoroMap, // Records use LoroMap as their underlying container
+  struct: LoroMap, // Structs use LoroMap as their underlying container
   text: LoroText,
   tree: LoroTree,
 } as const
@@ -124,8 +124,8 @@ export function createContainerTypedRef(
         new ListRef(params as TypedRefParams<ListContainerShape>),
         listProxyHandler,
       )
-    case "map":
-      return new MapRef(params as TypedRefParams<MapContainerShape>)
+    case "struct":
+      return new StructRef(params as TypedRefParams<StructContainerShape>)
     case "movableList":
       return new Proxy(
         new MovableListRef(params as TypedRefParams<MovableListContainerShape>),
@@ -153,7 +153,7 @@ export function assignPlainValueToTypedRef(
 ): boolean {
   const shapeType = (ref as any).shape._type
 
-  if (shapeType === "map" || shapeType === "record") {
+  if (shapeType === "struct" || shapeType === "record") {
     for (const k in value) {
       ;(ref as any)[k] = value[k]
     }

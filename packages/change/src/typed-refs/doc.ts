@@ -11,9 +11,9 @@ import {
 const containerGetter = {
   counter: "getCounter",
   list: "getList",
-  map: "getMap",
   movableList: "getMovableList",
   record: "getMap",
+  struct: "getMap", // Structs use LoroMap as their underlying container
   text: "getText",
   tree: "getTree",
 } as const

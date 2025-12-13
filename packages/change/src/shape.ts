@@ -11,9 +11,9 @@ import type {
 
 import type { CounterRef } from "./typed-refs/counter.js"
 import type { ListRef } from "./typed-refs/list.js"
-import type { MapRef } from "./typed-refs/map.js"
 import type { MovableListRef } from "./typed-refs/movable-list.js"
 import type { RecordRef } from "./typed-refs/record.js"
+import type { StructRef } from "./typed-refs/struct.js"
 import type { TextRef } from "./typed-refs/text.js"
 
 export interface Shape<Plain, Mutable, Placeholder = Plain> {
@@ -77,20 +77,35 @@ export interface MovableListContainerShape<
   readonly shape: NestedShape
 }
 
-export interface MapContainerShape<
+/**
+ * @deprecated Use StructContainerShape instead. MapContainerShape is an alias for backward compatibility.
+ */
+export type MapContainerShape<
+  NestedShapes extends Record<string, ContainerOrValueShape> = Record<
+    string,
+    ContainerOrValueShape
+  >,
+> = StructContainerShape<NestedShapes>
+
+/**
+ * Container shape for objects with fixed keys (structs).
+ * This is the preferred way to define fixed-key objects.
+ * Uses LoroMap as the underlying container.
+ */
+export interface StructContainerShape<
   NestedShapes extends Record<string, ContainerOrValueShape> = Record<
     string,
     ContainerOrValueShape
   >,
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
-    MapRef<NestedShapes> & {
+    StructRef<NestedShapes> & {
       [K in keyof NestedShapes]: NestedShapes[K]["_mutable"]
     },
     { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
-  readonly _type: "map"
-  // Each map property has its own shape, hence 'shapes'
+  readonly _type: "struct"
+  // Each struct property has its own shape, hence 'shapes'
   readonly shapes: NestedShapes
 }
 
@@ -108,9 +123,9 @@ export interface RecordContainerShape<
 export type ContainerShape =
   | CounterContainerShape
   | ListContainerShape
-  | MapContainerShape
   | MovableListContainerShape
   | RecordContainerShape
+  | StructContainerShape
   | TextContainerShape
   | TreeContainerShape
 
@@ -146,7 +161,19 @@ export interface Uint8ArrayValueShape
   readonly valueType: "uint8array"
 }
 
-export interface ObjectValueShape<
+/**
+ * @deprecated Use StructValueShape instead. ObjectValueShape is an alias for backward compatibility.
+ */
+export type ObjectValueShape<
+  T extends Record<string, ValueShape> = Record<string, ValueShape>,
+> = StructValueShape<T>
+
+/**
+ * Value shape for objects with fixed keys (structs).
+ * This is the preferred way to define fixed-key plain value objects.
+ * Identical structure to ObjectValueShape but with valueType: "struct".
+ */
+export interface StructValueShape<
   T extends Record<string, ValueShape> = Record<string, ValueShape>,
 > extends Shape<
     { [K in keyof T]: T[K]["_plain"] },
@@ -154,7 +181,7 @@ export interface ObjectValueShape<
     { [K in keyof T]: T[K]["_placeholder"] }
   > {
   readonly _type: "value"
-  readonly valueType: "object"
+  readonly valueType: "struct"
   readonly shape: T
 }
 
@@ -204,7 +231,7 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
  */
 export interface DiscriminatedUnionValueShape<
   K extends string = string,
-  T extends Record<string, ObjectValueShape> = Record<string, ObjectValueShape>,
+  T extends Record<string, StructValueShape> = Record<string, StructValueShape>,
   Plain = T[keyof T]["_plain"],
   Mutable = T[keyof T]["_mutable"],
   Placeholder = T[keyof T]["_placeholder"],
@@ -223,7 +250,7 @@ export type ValueShape =
   | NullValueShape
   | UndefinedValueShape
   | Uint8ArrayValueShape
-  | ObjectValueShape
+  | StructValueShape
   | RecordValueShape
   | ArrayValueShape
   | UnionValueShape
@@ -271,10 +298,37 @@ export const Shape = {
     _placeholder: [] as never[],
   }),
 
+  /**
+   * Creates a struct container shape for objects with fixed keys.
+   * This is the preferred way to define fixed-key objects.
+   *
+   * @example
+   * ```typescript
+   * const UserSchema = Shape.doc({
+   *   user: Shape.struct({
+   *     name: Shape.text(),
+   *     age: Shape.counter(),
+   *   }),
+   * })
+   * ```
+   */
+  struct: <T extends Record<string, ContainerOrValueShape>>(
+    shape: T,
+  ): StructContainerShape<T> => ({
+    _type: "struct" as const,
+    shapes: shape,
+    _plain: {} as any,
+    _mutable: {} as any,
+    _placeholder: {} as any,
+  }),
+
+  /**
+   * @deprecated Use `Shape.struct` instead. `Shape.map` will be removed in a future version.
+   */
   map: <T extends Record<string, ContainerOrValueShape>>(
     shape: T,
-  ): MapContainerShape<T> => ({
-    _type: "map" as const,
+  ): StructContainerShape<T> => ({
+    _type: "struct" as const,
     shapes: shape,
     _plain: {} as any,
     _mutable: {} as any,
@@ -315,7 +369,9 @@ export const Shape = {
     })
   },
 
-  tree: <T extends MapContainerShape>(shape: T): TreeContainerShape => ({
+  tree: <T extends MapContainerShape | StructContainerShape>(
+    shape: T,
+  ): TreeContainerShape => ({
     _type: "tree" as const,
     shape,
     _plain: {} as any,
@@ -400,11 +456,37 @@ export const Shape = {
       _placeholder: new Uint8Array(),
     }),
 
+    /**
+     * Creates a struct value shape for plain objects with fixed keys.
+     * This is the preferred way to define fixed-key plain value objects.
+     *
+     * @example
+     * ```typescript
+     * const PointSchema = Shape.plain.struct({
+     *   x: Shape.plain.number(),
+     *   y: Shape.plain.number(),
+     * })
+     * ```
+     */
+    struct: <T extends Record<string, ValueShape>>(
+      shape: T,
+    ): StructValueShape<T> => ({
+      _type: "value" as const,
+      valueType: "struct" as const,
+      shape,
+      _plain: {} as any,
+      _mutable: {} as any,
+      _placeholder: {} as any,
+    }),
+
+    /**
+     * @deprecated Use `Shape.plain.struct` instead. `Shape.plain.object` will be removed in a future version.
+     */
     object: <T extends Record<string, ValueShape>>(
       shape: T,
-    ): ObjectValueShape<T> => ({
+    ): StructValueShape<T> => ({
       _type: "value" as const,
-      valueType: "object" as const,
+      valueType: "struct" as const,
       shape,
       _plain: {} as any,
       _mutable: {} as any,
@@ -477,7 +559,7 @@ export const Shape = {
      */
     discriminatedUnion: <
       K extends string,
-      T extends Record<string, ObjectValueShape>,
+      T extends Record<string, StructValueShape>,
     >(
       discriminantKey: K,
       variants: T,
@@ -512,7 +594,7 @@ export type ShapeToContainer<T extends DocShape | ContainerShape> =
         ? LoroList
         : T extends MovableListContainerShape
           ? LoroMovableList
-          : T extends MapContainerShape | RecordContainerShape
+          : T extends StructContainerShape | RecordContainerShape
             ? LoroMap
             : T extends TreeContainerShape
               ? LoroTree

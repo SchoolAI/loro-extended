@@ -21,11 +21,15 @@ export type {
   // Schema node types
   DocShape,
   ListContainerShape,
+  /** @deprecated Use StructContainerShape instead */
   MapContainerShape,
   MovableListContainerShape,
+  /** @deprecated Use StructValueShape instead */
   ObjectValueShape,
   RecordContainerShape,
   RecordValueShape,
+  StructContainerShape,
+  StructValueShape,
   TextContainerShape,
   TreeContainerShape,
   UnionValueShape,

@@ -11,11 +11,11 @@ import type {
   ArrayValueShape,
   ContainerOrValueShape,
   ListContainerShape,
-  MapContainerShape,
   MovableListContainerShape,
-  ObjectValueShape,
   RecordContainerShape,
   RecordValueShape,
+  StructContainerShape,
+  StructValueShape,
 } from "./shape.js"
 import {
   isContainer,
@@ -97,11 +97,11 @@ function convertMovableListInput(
 }
 
 /**
- * Converts object input to LoroMap container
+ * Converts object input to LoroMap container (Struct)
  */
-function convertMapInput(
+function convertStructInput(
   value: { [key: string]: Value },
-  shape: MapContainerShape | ObjectValueShape,
+  shape: StructContainerShape | StructValueShape,
 ): LoroMap | { [key: string]: Value } {
   if (!isContainerShape(shape)) {
     return value
@@ -186,12 +186,12 @@ export function convertInputToRef<Shape extends ContainerOrValueShape>(
 
       return convertMovableListInput(value, shape)
     }
-    case "map": {
+    case "struct": {
       if (!isObjectValue(value)) {
         throw new Error("object expected")
       }
 
-      return convertMapInput(value, shape)
+      return convertStructInput(value, shape)
     }
     case "record": {
       if (!isObjectValue(value)) {

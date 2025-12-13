@@ -4,12 +4,12 @@ import type {
   DiscriminatedUnionValueShape,
   DocShape,
   ListContainerShape,
-  MapContainerShape,
   MovableListContainerShape,
-  ObjectValueShape,
   RecordContainerShape,
   RecordValueShape,
   StringValueShape,
+  StructContainerShape,
+  StructValueShape,
   UnionValueShape,
   ValueShape,
 } from "./shape.js"
@@ -60,17 +60,17 @@ export function validateValue(
     )
   }
 
-  if (schema._type === "map") {
+  if (schema._type === "struct") {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       throw new Error(
         `Expected object at path ${currentPath}, got ${typeof value}`,
       )
     }
-    const mapSchema = schema as MapContainerShape
+    const structSchema = schema as StructContainerShape
     const result: Record<string, unknown> = {}
 
-    // Validate each property in the map shape
-    for (const [key, nestedSchema] of Object.entries(mapSchema.shapes)) {
+    // Validate each property in the struct shape
+    for (const [key, nestedSchema] of Object.entries(structSchema.shapes)) {
       const nestedPath = `${currentPath}.${key}`
       const nestedValue = (value as Record<string, unknown>)[key]
       result[key] = validateValue(nestedValue, nestedSchema, nestedPath)
@@ -165,17 +165,17 @@ export function validateValue(
         }
         return value
 
-      case "object": {
+      case "struct": {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
           throw new Error(
             `Expected object at path ${currentPath}, got ${typeof value}`,
           )
         }
-        const objectSchema = valueSchema as ObjectValueShape
+        const structSchema = valueSchema as StructValueShape
         const result: Record<string, unknown> = {}
 
-        // Validate each property in the object shape
-        for (const [key, nestedSchema] of Object.entries(objectSchema.shape)) {
+        // Validate each property in the struct shape
+        for (const [key, nestedSchema] of Object.entries(structSchema.shape)) {
           const nestedPath = `${currentPath}.${key}`
           const nestedValue = (value as Record<string, unknown>)[key]
           result[key] = validateValue(nestedValue, nestedSchema, nestedPath)

@@ -42,7 +42,7 @@ export function deriveShapePlaceholder(shape: ContainerOrValueShape): unknown {
       return {}
 
     // Structured container - recurse into nested shapes
-    case "map": {
+    case "struct": {
       const result: Record<string, unknown> = {}
       for (const [key, nestedShape] of Object.entries(shape.shapes)) {
         result[key] = deriveShapePlaceholder(nestedShape)
@@ -74,8 +74,8 @@ function deriveValueShapePlaceholder(shape: ValueShape): unknown {
     case "uint8array":
       return shape._placeholder
 
-    // Structured value - recurse into nested shapes (like map)
-    case "object": {
+    // Structured value - recurse into nested shapes (like struct)
+    case "struct": {
       const result: Record<string, unknown> = {}
       for (const [key, nestedShape] of Object.entries(shape.shape)) {
         result[key] = deriveValueShapePlaceholder(nestedShape)

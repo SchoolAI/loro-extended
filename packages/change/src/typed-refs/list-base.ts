@@ -356,7 +356,7 @@ export abstract class ListRefBase<
     if (
       isContainerShape(this.shape.shape) ||
       (isValueShape(this.shape.shape) &&
-        this.shape.shape.valueType === "object")
+        this.shape.shape.valueType === "struct")
     ) {
       const itemPlaceholder = deriveShapePlaceholder(this.shape.shape)
       return nativeJson.map(item =>

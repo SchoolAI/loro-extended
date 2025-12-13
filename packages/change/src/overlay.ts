@@ -73,23 +73,23 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
         mergeValue(itemShape, item, itemPlaceholder as Value),
       )
     }
-    case "map": {
+    case "struct": {
       if (!isObjectValue(crdtValue) && crdtValue !== undefined) {
-        throw new Error("map crdt must be object")
+        throw new Error("struct crdt must be object")
       }
 
-      const crdtMapValue = crdtValue ?? {}
+      const crdtStructValue = crdtValue ?? {}
 
       if (!isObjectValue(placeholderValue) && placeholderValue !== undefined) {
-        throw new Error("map placeholder must be object")
+        throw new Error("struct placeholder must be object")
       }
 
-      const placeholderMapValue = placeholderValue ?? {}
+      const placeholderStructValue = placeholderValue ?? {}
 
-      const result = { ...placeholderMapValue }
+      const result = { ...placeholderStructValue }
       for (const [key, nestedShape] of Object.entries(shape.shapes)) {
-        const nestedCrdtValue = crdtMapValue[key]
-        const nestedPlaceholderValue = placeholderMapValue[key]
+        const nestedCrdtValue = crdtStructValue[key]
+        const nestedPlaceholderValue = placeholderStructValue[key]
 
         result[key as keyof typeof result] = mergeValue(
           nestedShape,
@@ -128,7 +128,7 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
       return result
     }
     default:
-      if (shape._type === "value" && shape.valueType === "object") {
+      if (shape._type === "value" && shape.valueType === "struct") {
         const crdtObj = (crdtValue as any) ?? {}
         const placeholderObj = (placeholderValue as any) ?? {}
         const result = { ...placeholderObj }

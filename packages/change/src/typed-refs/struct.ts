@@ -3,7 +3,7 @@ import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
-  MapContainerShape,
+  StructContainerShape,
   ValueShape,
 } from "../shape.js"
 import type { Infer } from "../types.js"
@@ -18,19 +18,22 @@ import {
   unwrapReadonlyPrimitive,
 } from "./utils.js"
 
-// Map typed ref
-export class MapRef<
+/**
+ * Typed ref for struct containers (objects with fixed keys).
+ * Uses LoroMap as the underlying container.
+ */
+export class StructRef<
   NestedShapes extends Record<string, ContainerOrValueShape>,
 > extends TypedRef<any> {
   private propertyCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
-  constructor(params: TypedRefParams<MapContainerShape<NestedShapes>>) {
+  constructor(params: TypedRefParams<StructContainerShape<NestedShapes>>) {
     super(params)
     this.createLazyProperties()
   }
 
-  protected get shape(): MapContainerShape<NestedShapes> {
-    return super.shape as MapContainerShape<NestedShapes>
+  protected get shape(): StructContainerShape<NestedShapes> {
+    return super.shape as StructContainerShape<NestedShapes>
   }
 
   protected get container(): LoroMap {
@@ -133,7 +136,7 @@ export class MapRef<
     }
   }
 
-  toJSON(): Infer<MapContainerShape<NestedShapes>> {
+  toJSON(): Infer<StructContainerShape<NestedShapes>> {
     // Fast path: readonly mode
     if (this.readonly) {
       const nativeJson = this.container.toJSON() as Value
@@ -142,13 +145,13 @@ export class MapRef<
         this.shape,
         nativeJson,
         this.placeholder as Value,
-      ) as Infer<MapContainerShape<NestedShapes>>
+      ) as Infer<StructContainerShape<NestedShapes>>
     }
 
     return serializeRefToJSON(
       this as any,
       Object.keys(this.shape.shapes),
-    ) as Infer<MapContainerShape<NestedShapes>>
+    ) as Infer<StructContainerShape<NestedShapes>>
   }
 
   // TODO(duane): return correct type here
