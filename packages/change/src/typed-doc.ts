@@ -303,26 +303,3 @@ export function createTypedDoc<Shape extends DocShape>(
 
   return proxy
 }
-
-// For backwards compatibility, provide a constructor-like function
-// that can be called with `new`
-function TypedDocConstructor<Shape extends DocShape>(
-  this: TypedDoc<Shape> | undefined,
-  shape: Shape,
-  existingDoc?: LoroDoc,
-): TypedDoc<Shape> {
-  return createTypedDoc(shape, existingDoc)
-}
-
-// Type assertion to make it work as both a constructor and a function
-/**
- * @deprecated Use createTypedDoc() instead for cleaner API.
- * This is kept for backwards compatibility with `new TypedDoc(schema)`.
- */
-export const TypedDoc = TypedDocConstructor as unknown as {
-  new <Shape extends DocShape>(
-    shape: Shape,
-    existingDoc?: LoroDoc,
-  ): TypedDoc<Shape>
-  <Shape extends DocShape>(shape: Shape, existingDoc?: LoroDoc): TypedDoc<Shape>
-}

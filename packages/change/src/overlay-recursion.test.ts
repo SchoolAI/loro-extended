@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
 import { mergeValue } from "./overlay.js"
 import { Shape } from "./shape.js"
-import { createTypedDoc, TypedDoc } from "./typed-doc.js"
+import { createTypedDoc } from "./typed-doc.js"
 
 /**
  * Regression tests for overlay/mergeValue functionality.
@@ -52,7 +52,7 @@ describe("Overlay and Placeholder Handling", () => {
       userMap.set("name", "Alice")
       // Note: 'role' is NOT set - should default to "guest"
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.users[0].name).toBe("Alice")
@@ -91,7 +91,7 @@ describe("Overlay and Placeholder Handling", () => {
       empMap.set("name", "Bob")
       // Note: 'level' and 'status' are NOT set
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.departments[0].name).toBe("Engineering")
@@ -121,7 +121,7 @@ describe("Overlay and Placeholder Handling", () => {
       )
       // Actually we need to create a text container properly
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       // The counter should default to 100 if not set
@@ -147,7 +147,7 @@ describe("Overlay and Placeholder Handling", () => {
       taskMap.set("title", "Important Task")
       // Note: 'priority' and 'completed' are NOT set
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.tasks[0].title).toBe("Important Task")
@@ -174,7 +174,7 @@ describe("Overlay and Placeholder Handling", () => {
       itemMap.set("name", "Widget")
       // Note: 'count' is NOT set
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
 
       // Access the list ref directly and call toJSON()
       const listJson = typedDoc.items.toJSON()
@@ -213,7 +213,7 @@ describe("Overlay and Placeholder Handling", () => {
       numbersList.insert(1, 2)
       numbersList.insert(2, 3)
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.numbers).toEqual([1, 2, 3])
@@ -239,7 +239,7 @@ describe("Overlay and Placeholder Handling", () => {
       userMap.set("name", "Charlie")
       // Note: 'salary' is NOT set
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.usersByDept.engineering[0].name).toBe("Charlie")
@@ -294,7 +294,7 @@ describe("Overlay and Placeholder Handling", () => {
       const dataMap = loroDoc.getMap("data")
       dataMap.set("value", null)
 
-      const typedDoc = new TypedDoc(schema, loroDoc)
+      const typedDoc = createTypedDoc(schema, loroDoc)
       const json = typedDoc.toJSON()
 
       expect(json.data.value).toBeNull()

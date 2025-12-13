@@ -1,5 +1,9 @@
 import type { DocShape, Mutable, ValueShape } from "@loro-extended/change"
-import { TypedDoc, TypedPresence } from "@loro-extended/change"
+import {
+  createTypedDoc,
+  type TypedDoc,
+  TypedPresence,
+} from "@loro-extended/change"
 import type { ReadyState } from "./types.js"
 import type { ReadinessCheck, UntypedDocHandle } from "./untyped-doc-handle.js"
 
@@ -38,7 +42,7 @@ export class TypedDocHandle<
   ) {
     this.docId = untyped.docId
     this.peerId = untyped.peerId
-    this._doc = new TypedDoc(docShape, untyped.doc)
+    this._doc = createTypedDoc(docShape, untyped.doc)
     this._presence = new TypedPresence(presenceShape, untyped.presence)
   }
 

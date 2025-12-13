@@ -40,7 +40,8 @@ export type {
 } from "./shape.js"
 // Schema and type exports
 export { Shape } from "./shape.js"
-export { createTypedDoc, TypedDoc } from "./typed-doc.js"
+export type { TypedDoc } from "./typed-doc.js"
+export { createTypedDoc } from "./typed-doc.js"
 export { TypedPresence } from "./typed-presence.js"
 export type {
   // Type inference - Infer<T> is the recommended unified helper

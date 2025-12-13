@@ -2,7 +2,7 @@ import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
-import { createTypedDoc, TypedDoc } from "../typed-doc.js"
+import { createTypedDoc } from "../typed-doc.js"
 
 const MessageSchema = Shape.map({
   id: Shape.plain.string(),
@@ -184,7 +184,7 @@ describe("JSON Compatibility", () => {
 
   it("should be efficient (not access unrelated parts)", () => {
     const loroDoc = new LoroDoc()
-    const doc = new TypedDoc(ChatSchema, loroDoc)
+    const doc = createTypedDoc(ChatSchema, loroDoc)
 
     change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 1 })

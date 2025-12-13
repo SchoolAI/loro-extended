@@ -2,7 +2,7 @@ import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
 import { Shape } from "./shape.js"
-import { createTypedDoc, TypedDoc } from "./typed-doc.js"
+import { createTypedDoc } from "./typed-doc.js"
 
 /**
  * This test file reproduces the "placeholder required" error reported by users
@@ -64,7 +64,7 @@ describe("Record with Map entries - placeholder required bug", () => {
     // Note: authorColor is NOT set - this should fall back to placeholder
 
     // Now wrap it with TypedDoc
-    const typedDoc = new TypedDoc(AiStateSchema, loroDoc)
+    const typedDoc = createTypedDoc(AiStateSchema, loroDoc)
 
     // This should not throw "placeholder required"
     // BUG: Currently throws because the nested MapRef has placeholder: undefined
@@ -107,7 +107,7 @@ describe("Record with Map entries - placeholder required bug", () => {
     // Only set peerId - other fields are missing
     studentMap.set("peerId", "peer-456")
 
-    const typedDoc = new TypedDoc(AiStateSchema, loroDoc)
+    const typedDoc = createTypedDoc(AiStateSchema, loroDoc)
 
     // This should not throw - missing fields should use placeholder defaults
     expect(() => {

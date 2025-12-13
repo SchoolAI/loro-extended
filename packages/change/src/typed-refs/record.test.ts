@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
-import { Shape, TypedDoc } from "../index.js"
+import { createTypedDoc, Shape } from "../index.js"
 
 describe("Record Types", () => {
   describe("Shape.record (Container)", () => {
@@ -9,7 +9,7 @@ describe("Record Types", () => {
         scores: Shape.record(Shape.counter()),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.scores.getOrCreateRef("alice").increment(10)
@@ -36,7 +36,7 @@ describe("Record Types", () => {
         notes: Shape.record(Shape.text()),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.notes.getOrCreateRef("todo").insert(0, "Buy milk")
@@ -54,7 +54,7 @@ describe("Record Types", () => {
         groups: Shape.record(Shape.list(Shape.plain.string())),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         const groupA = draft.groups.getOrCreateRef("groupA")
@@ -80,7 +80,7 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.wrapper.config.theme = "dark"
@@ -109,7 +109,7 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.wrapper.stats.visits = 100
@@ -131,7 +131,7 @@ describe("Record Types", () => {
         }),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.wrapper.settings.ui = {
@@ -168,7 +168,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         const alice = draft.users.getOrCreateRef("u1")
@@ -198,7 +198,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.participants["student-1"] = {
@@ -228,7 +228,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.data["item-1"] = {
@@ -250,7 +250,7 @@ describe("Record Types", () => {
         histories: Shape.record(Shape.list(Shape.plain.string())),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.histories.user1 = ["a", "b"]
@@ -272,7 +272,7 @@ describe("Record Types", () => {
         notes: Shape.record(Shape.text()),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.notes.set("note-1", "Hello World")
@@ -290,7 +290,7 @@ describe("Record Types", () => {
         scores: Shape.record(Shape.counter()),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.scores.set("alice", 100)
@@ -314,7 +314,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       change(doc, draft => {
         draft.users.set("user-123", {
@@ -344,7 +344,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       // First, set a value for a specific peer
       change(doc, d => {
@@ -371,7 +371,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
 
       // Access a key that doesn't exist - should return undefined
       const prefs = doc.preferences.nonexistent
@@ -388,7 +388,7 @@ describe("Record Types", () => {
         ),
       })
 
-      const doc = new TypedDoc(schema)
+      const doc = createTypedDoc(schema)
       const myPeerId = "some-peer-id"
 
       // This is the exact code pattern from the user's app:
