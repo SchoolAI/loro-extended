@@ -8,29 +8,29 @@ describe("Discriminated Union Placeholder Issue", () => {
 
     const SessionPhaseSchema = Shape.plain
       .discriminatedUnion("phase", {
-        "not-started": Shape.plain.object({
+        "not-started": Shape.plain.struct({
           phase: Shape.plain.string("not-started"),
         }),
 
-        lobby: Shape.plain.object({
+        lobby: Shape.plain.struct({
           phase: Shape.plain.string("lobby"),
         }),
-        "lobby-paused": Shape.plain.object({
+        "lobby-paused": Shape.plain.struct({
           phase: Shape.plain.string("lobby-paused"),
           reason: PauseReasonSchema,
         }),
 
-        active: Shape.plain.object({
+        active: Shape.plain.struct({
           phase: Shape.plain.string("active"),
           mode: ActiveModeSchema,
         }),
-        "active-paused": Shape.plain.object({
+        "active-paused": Shape.plain.struct({
           phase: Shape.plain.string("active-paused"),
           mode: ActiveModeSchema,
           reason: PauseReasonSchema,
         }),
 
-        ended: Shape.plain.object({
+        ended: Shape.plain.struct({
           phase: Shape.plain.string("ended"),
         }),
       })

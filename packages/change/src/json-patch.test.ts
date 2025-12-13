@@ -225,7 +225,7 @@ describe("JSON Patch Integration", () => {
     it("should handle lists of objects", () => {
       const schema = Shape.doc({
         todos: Shape.list(
-          Shape.plain.object({
+          Shape.plain.struct({
             id: Shape.plain.string(),
             text: Shape.plain.string(),
             completed: Shape.plain.boolean(),

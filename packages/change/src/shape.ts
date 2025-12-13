@@ -480,7 +480,7 @@ export const Shape = {
     }),
 
     /**
-     * @deprecated Use `Shape.plain.struct` instead. `Shape.plain.object` will be removed in a future version.
+     * @deprecated Use `Shape.plain.struct` instead. `Shape.plain.struct` will be removed in a future version.
      */
     object: <T extends Record<string, ValueShape>>(
       shape: T,
@@ -536,15 +536,15 @@ export const Shape = {
      *
      * @example
      * ```typescript
-     * const ClientPresenceShape = Shape.plain.object({
+     * const ClientPresenceShape = Shape.plain.struct({
      *   type: Shape.plain.string("client"),
      *   name: Shape.plain.string(),
-     *   input: Shape.plain.object({ force: Shape.plain.number(), angle: Shape.plain.number() }),
+     *   input: Shape.plain.struct({ force: Shape.plain.number(), angle: Shape.plain.number() }),
      * })
      *
-     * const ServerPresenceShape = Shape.plain.object({
+     * const ServerPresenceShape = Shape.plain.struct({
      *   type: Shape.plain.string("server"),
-     *   cars: Shape.plain.record(Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() })),
+     *   cars: Shape.plain.record(Shape.plain.struct({ x: Shape.plain.number(), y: Shape.plain.number() })),
      *   tick: Shape.plain.number(),
      * })
      *

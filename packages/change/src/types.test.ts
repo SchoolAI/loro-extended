@@ -24,7 +24,7 @@ describe("Infer type helper", () => {
   })
 
   it("infers ValueShape plain type (object)", () => {
-    const schema = Shape.plain.object({
+    const schema = Shape.plain.struct({
       name: Shape.plain.string(),
       age: Shape.plain.number(),
     })
@@ -39,7 +39,7 @@ describe("Infer type helper", () => {
         Shape.struct({
           id: Shape.plain.string(),
           profile: Shape.record(
-            Shape.plain.object({
+            Shape.plain.struct({
               bio: Shape.plain.string(),
             }),
           ),
@@ -58,18 +58,18 @@ describe("Infer type helper", () => {
 
   it("infers discriminated union plain type", () => {
     const SessionStatusSchema = Shape.plain.discriminatedUnion("status", {
-      not_started: Shape.plain.object({
+      not_started: Shape.plain.struct({
         status: Shape.plain.string("not_started"),
       }),
-      lobby: Shape.plain.object({
+      lobby: Shape.plain.struct({
         status: Shape.plain.string("lobby"),
         lobbyPhase: Shape.plain.string("preparing", "typing"),
       }),
-      active: Shape.plain.object({
+      active: Shape.plain.struct({
         status: Shape.plain.string("active"),
         mode: Shape.plain.string("solo", "group"),
       }),
-      paused: Shape.plain.object({
+      paused: Shape.plain.struct({
         status: Shape.plain.string("paused"),
         previousStatus: Shape.plain.string("lobby", "active"),
         previousMode: Shape.plain.string("solo", "group"),
@@ -79,7 +79,7 @@ describe("Infer type helper", () => {
           "assignment_empty",
         ),
       }),
-      ended: Shape.plain.object({
+      ended: Shape.plain.struct({
         status: Shape.plain.string<"ended">("ended"),
       }),
     })
@@ -104,10 +104,10 @@ describe("Infer type helper", () => {
 
   it("infers discriminated union inside a map container", () => {
     const SessionStatusSchema = Shape.plain.discriminatedUnion("status", {
-      not_started: Shape.plain.object({
+      not_started: Shape.plain.struct({
         status: Shape.plain.string("not_started"),
       }),
-      active: Shape.plain.object({
+      active: Shape.plain.struct({
         status: Shape.plain.string("active"),
         mode: Shape.plain.string("solo", "group"),
       }),
@@ -132,10 +132,10 @@ describe("Infer type helper", () => {
 
   it("infers discriminated union inside a doc", () => {
     const SessionStatusSchema = Shape.plain.discriminatedUnion("status", {
-      not_started: Shape.plain.object({
+      not_started: Shape.plain.struct({
         status: Shape.plain.string("not_started"),
       }),
-      active: Shape.plain.object({
+      active: Shape.plain.struct({
         status: Shape.plain.string("active"),
       }),
     })
@@ -163,11 +163,11 @@ describe("Infer type helper", () => {
     // This test verifies the fix for usePresence type inference
     // The issue was that DiscriminatedUnionValueShape<any, any> in the ValueShape union
     // caused type information to be lost when inferring through generic constraints
-    const ClientPresenceShape = Shape.plain.object({
+    const ClientPresenceShape = Shape.plain.struct({
       type: Shape.plain.string("client"),
       name: Shape.plain.string(),
     })
-    const ServerPresenceShape = Shape.plain.object({
+    const ServerPresenceShape = Shape.plain.struct({
       type: Shape.plain.string("server"),
       tick: Shape.plain.number(),
     })
@@ -191,7 +191,7 @@ describe("Infer type helper", () => {
 
 describe("Mutable type helper", () => {
   it("Object.values returns values from the record", () => {
-    const ParticipantSchema = Shape.plain.object({
+    const ParticipantSchema = Shape.plain.struct({
       id: Shape.plain.string(),
       name: Shape.plain.string(),
     })
@@ -218,7 +218,7 @@ describe("Mutable type helper", () => {
   })
 
   it("toJSON is callable on Records", () => {
-    const ParticipantSchema = Shape.plain.object({
+    const ParticipantSchema = Shape.plain.struct({
       id: Shape.plain.string(),
       name: Shape.plain.string(),
     })

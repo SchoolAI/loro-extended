@@ -24,9 +24,9 @@ import type { ContainerShape, DocShape, Shape } from "./shape.js"
  * type ChatDoc = Infer<typeof ChatSchema>
  * // Result: { messages: { id: string; content: string }[] }
  *
- * const PresenceSchema = Shape.plain.object({
+ * const PresenceSchema = Shape.plain.struct({
  *   name: Shape.plain.string(),
- *   cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() }),
+ *   cursor: Shape.plain.struct({ x: Shape.plain.number(), y: Shape.plain.number() }),
  * })
  *
  * // Extract the presence type

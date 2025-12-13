@@ -104,7 +104,7 @@ describe("derivePlaceholder", () => {
   it("handles nested plain objects", () => {
     const schema = Shape.doc({
       user: Shape.struct({
-        profile: Shape.plain.object({
+        profile: Shape.plain.struct({
           name: Shape.plain.string().placeholder("Anonymous"),
           age: Shape.plain.number().placeholder(0),
         }),
@@ -205,7 +205,7 @@ describe("derivePlaceholder", () => {
         title: Shape.text().placeholder("Untitled Article"),
         metadata: Shape.struct({
           views: Shape.counter().placeholder(0),
-          author: Shape.plain.object({
+          author: Shape.plain.struct({
             name: Shape.plain.string().placeholder("Anonymous"),
             email: Shape.plain.string(),
           }),

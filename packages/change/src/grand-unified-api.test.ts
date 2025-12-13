@@ -15,7 +15,7 @@ describe("Grand Unified API v3", () => {
     title: Shape.text(),
     count: Shape.counter(),
     users: Shape.record(
-      Shape.plain.object({
+      Shape.plain.struct({
         name: Shape.plain.string(),
       }),
     ),

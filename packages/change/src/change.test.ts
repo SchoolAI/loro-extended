@@ -254,7 +254,7 @@ describe("CRDT Operations", () => {
     it("should handle push, insert, delete, and move operations", () => {
       const schema = Shape.doc({
         tasks: Shape.movableList(
-          Shape.plain.object({
+          Shape.plain.struct({
             id: Shape.plain.string(),
             title: Shape.plain.string(),
           }),
@@ -557,8 +557,8 @@ describe("Nested Operations", () => {
     it("should handle nested plain value maps", () => {
       const schema = Shape.doc({
         articles: Shape.struct({
-          metadata: Shape.plain.object({
-            views: Shape.plain.object({
+          metadata: Shape.plain.struct({
+            views: Shape.plain.struct({
               page: Shape.plain.number(),
             }),
           }),
@@ -1240,7 +1240,7 @@ describe("Edge Cases and Error Handling", () => {
       it("should work with lists of plain objects", () => {
         const schema = Shape.doc({
           todos: Shape.list(
-            Shape.plain.object({
+            Shape.plain.struct({
               id: Shape.plain.string(),
               text: Shape.plain.string(),
               completed: Shape.plain.boolean(),
@@ -1332,7 +1332,7 @@ describe("Edge Cases and Error Handling", () => {
       it("should support all array methods on movable lists", () => {
         const schema = Shape.doc({
           tasks: Shape.movableList(
-            Shape.plain.object({
+            Shape.plain.struct({
               id: Shape.plain.string(),
               priority: Shape.plain.number(),
             }),
@@ -1484,7 +1484,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should allow mutation of items found via array methods", () => {
           const schema = Shape.doc({
             todos: Shape.list(
-              Shape.plain.object({
+              Shape.plain.struct({
                 id: Shape.plain.string(),
                 text: Shape.plain.string(),
                 completed: Shape.plain.boolean(),
@@ -1545,7 +1545,7 @@ describe("Edge Cases and Error Handling", () => {
               Shape.struct({
                 title: Shape.text(),
                 viewCount: Shape.counter(),
-                metadata: Shape.plain.object({
+                metadata: Shape.plain.struct({
                   author: Shape.plain.string(),
                   published: Shape.plain.boolean(),
                 }),
@@ -1613,7 +1613,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should support common developer patterns with array methods", () => {
           const schema = Shape.doc({
             users: Shape.list(
-              Shape.plain.object({
+              Shape.plain.struct({
                 id: Shape.plain.string(),
                 name: Shape.plain.string(),
                 active: Shape.plain.boolean(),
@@ -1685,7 +1685,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should handle edge cases in find-and-mutate patterns", () => {
           const schema = Shape.doc({
             items: Shape.list(
-              Shape.plain.object({
+              Shape.plain.struct({
                 id: Shape.plain.string(),
                 value: Shape.plain.number(),
               }),
@@ -1863,7 +1863,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should allow mutations to persist", () => {
           const schema = Shape.doc({
             items: Shape.list(
-              Shape.plain.object({
+              Shape.plain.struct({
                 id: Shape.plain.string(),
                 value: Shape.plain.number(),
               }),

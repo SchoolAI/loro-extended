@@ -398,7 +398,7 @@ describe("Conversion Functions", () => {
     })
 
     it("should return plain object for value shape", () => {
-      const shape = Shape.plain.object({
+      const shape = Shape.plain.struct({
         name: Shape.plain.string(),
         age: Shape.plain.number(),
       })
@@ -446,7 +446,7 @@ describe("Conversion Functions", () => {
 
     it("should handle complex value shapes", () => {
       const arrayShape = Shape.plain.array(Shape.plain.string())
-      const objectShape = Shape.plain.object({
+      const objectShape = Shape.plain.struct({
         name: Shape.plain.string(),
         count: Shape.plain.number(),
       })

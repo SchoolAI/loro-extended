@@ -7,19 +7,19 @@ import { validateValue } from "./validation.js"
 
 describe("discriminatedUnion", () => {
   // Define variant shapes
-  const ClientPresenceShape = Shape.plain.object({
+  const ClientPresenceShape = Shape.plain.struct({
     type: Shape.plain.string("client"),
     name: Shape.plain.string(),
-    input: Shape.plain.object({
+    input: Shape.plain.struct({
       force: Shape.plain.number(),
       angle: Shape.plain.number(),
     }),
   })
 
-  const ServerPresenceShape = Shape.plain.object({
+  const ServerPresenceShape = Shape.plain.struct({
     type: Shape.plain.string("server"),
     cars: Shape.plain.record(
-      Shape.plain.object({
+      Shape.plain.struct({
         x: Shape.plain.number(),
         y: Shape.plain.number(),
       }),
