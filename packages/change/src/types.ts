@@ -14,7 +14,7 @@ import type { ContainerShape, DocShape, Shape } from "./shape.js"
  * @example
  * ```typescript
  * const ChatSchema = Shape.doc({
- *   messages: Shape.list(Shape.map({
+ *   messages: Shape.list(Shape.struct({
  *     id: Shape.plain.string(),
  *     content: Shape.text(),
  *   })),

@@ -36,7 +36,7 @@ describe("Discriminated Union Placeholder Issue", () => {
       })
       .placeholder({ phase: "not-started" })
 
-    const PhaseTransitionSchema = Shape.map({
+    const PhaseTransitionSchema = Shape.struct({
       phase: SessionPhaseSchema,
     })
 

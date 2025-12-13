@@ -216,7 +216,7 @@ describe("discriminatedUnion", () => {
     describe("TypedDoc integration", () => {
       it("should allow setting a discriminated union property in a MapDraftNode", () => {
         const DocSchema = Shape.doc({
-          state: Shape.map({
+          state: Shape.struct({
             presence: GamePresenceSchema.placeholder(EmptyClientPresence),
           }),
         })

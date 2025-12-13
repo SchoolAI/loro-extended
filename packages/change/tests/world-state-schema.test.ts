@@ -5,7 +5,7 @@ import { createTypedDoc } from "../src/typed-doc.js"
 
 // --- Item ---
 const ItemStateSchema = Shape.list(
-  Shape.map({
+  Shape.struct({
     name: Shape.plain.string(),
     status: Shape.plain.union([
       Shape.plain.string(),
@@ -16,11 +16,11 @@ const ItemStateSchema = Shape.list(
   }),
 )
 
-const ItemSchema = Shape.map({
+const ItemSchema = Shape.struct({
   name: Shape.plain.string(),
   description: Shape.plain.string(),
   imageUrl: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
-  quantity: Shape.map({
+  quantity: Shape.struct({
     measure: Shape.plain.number(),
     units: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
   }),
@@ -28,13 +28,13 @@ const ItemSchema = Shape.map({
 })
 
 // --- Inventory ---
-const InventoryItemSchema = Shape.map({
+const InventoryItemSchema = Shape.struct({
   item: ItemSchema,
   heldAt: Shape.plain.string(),
 })
 
 // --- Character ---
-const CharacterSchema = Shape.map({
+const CharacterSchema = Shape.struct({
   name: Shape.plain.string(),
   sensoryDescription: Shape.plain.string(),
   hiddenBackgroundStory: Shape.plain.string(),
@@ -43,7 +43,7 @@ const CharacterSchema = Shape.map({
 })
 
 // --- Map ---
-const MapLocationSchema = Shape.map({
+const MapLocationSchema = Shape.struct({
   name: Shape.plain.string(),
   description: Shape.plain.string(),
   creationContext: Shape.plain.string(),
@@ -53,13 +53,13 @@ const MapLocationSchema = Shape.map({
 // Connections are simple tuples. We use a List container for [string, string].
 const MapConnectionSchema = Shape.list(Shape.plain.string())
 
-const WorldMapSchema = Shape.map({
+const WorldMapSchema = Shape.struct({
   locations: Shape.list(MapLocationSchema),
   connections: Shape.list(MapConnectionSchema),
 })
 
 // --- Timeline ---
-const TimelineEventSchema = Shape.map({
+const TimelineEventSchema = Shape.struct({
   id: Shape.plain.string(),
   role: Shape.plain.string(), // "system" | "assistant" | "user"
   content: Shape.text(), // LoroText for streaming
@@ -67,7 +67,7 @@ const TimelineEventSchema = Shape.map({
 })
 
 // --- Meta (Global State) ---
-const MetaSchema = Shape.map({
+const MetaSchema = Shape.struct({
   playerLocationName: Shape.plain
     .union([Shape.plain.null(), Shape.plain.string()])
     .placeholder(null),

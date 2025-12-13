@@ -75,7 +75,7 @@ describe("Record Types", () => {
   describe("Shape.plain.record (Value)", () => {
     it("should handle record of plain strings", () => {
       const schema = Shape.doc({
-        wrapper: Shape.map({
+        wrapper: Shape.struct({
           config: Shape.plain.record(Shape.plain.string()),
         }),
       })
@@ -104,7 +104,7 @@ describe("Record Types", () => {
 
     it("should handle record of plain numbers", () => {
       const schema = Shape.doc({
-        wrapper: Shape.map({
+        wrapper: Shape.struct({
           stats: Shape.plain.record(Shape.plain.number()),
         }),
       })
@@ -124,7 +124,7 @@ describe("Record Types", () => {
 
     it("should handle nested records", () => {
       const schema = Shape.doc({
-        wrapper: Shape.map({
+        wrapper: Shape.struct({
           settings: Shape.plain.record(
             Shape.plain.record(Shape.plain.boolean()),
           ),
@@ -161,7 +161,7 @@ describe("Record Types", () => {
     it("should handle record of maps", () => {
       const schema = Shape.doc({
         users: Shape.record(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
             age: Shape.plain.number(),
           }),
@@ -189,7 +189,7 @@ describe("Record Types", () => {
     it("should allow setting a plain object for a record with map values", () => {
       const schema = Shape.doc({
         participants: Shape.record(
-          Shape.map({
+          Shape.struct({
             id: Shape.plain.string(),
             role: Shape.plain.string(),
             name: Shape.plain.string(),
@@ -220,8 +220,8 @@ describe("Record Types", () => {
     it("should allow setting a plain object for a record with nested map values", () => {
       const schema = Shape.doc({
         data: Shape.record(
-          Shape.map({
-            info: Shape.map({
+          Shape.struct({
+            info: Shape.struct({
               name: Shape.plain.string(),
             }),
           }),
@@ -306,7 +306,7 @@ describe("Record Types", () => {
     it("should allow setting a plain object with text fields for a record of maps", () => {
       const schema = Shape.doc({
         users: Shape.record(
-          Shape.map({
+          Shape.struct({
             userId: Shape.plain.string(),
             displayName: Shape.text(),
             email: Shape.plain.string(),
@@ -338,7 +338,7 @@ describe("Record Types", () => {
       // preferences: Record<string, { showTip: boolean }>
       const schema = Shape.doc({
         preferences: Shape.record(
-          Shape.map({
+          Shape.struct({
             showTip: Shape.plain.boolean(),
           }),
         ),
@@ -365,7 +365,7 @@ describe("Record Types", () => {
     it("should return undefined for non-existent record keys in readonly mode", () => {
       const schema = Shape.doc({
         preferences: Shape.record(
-          Shape.map({
+          Shape.struct({
             showTip: Shape.plain.boolean(),
           }),
         ),
@@ -382,7 +382,7 @@ describe("Record Types", () => {
       // Exact reproduction of a user's schema and access pattern
       const schema = Shape.doc({
         preferences: Shape.record(
-          Shape.map({
+          Shape.struct({
             showTip: Shape.plain.boolean(),
           }),
         ),

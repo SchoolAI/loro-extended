@@ -14,8 +14,8 @@ describe("Overlay and Placeholder Handling", () => {
   describe("TypedDoc.toJSON() - uses overlayPlaceholder/mergeValue", () => {
     it("should apply placeholders in nested Maps within a Map", () => {
       const schema = Shape.doc({
-        user: Shape.map({
-          profile: Shape.map({
+        user: Shape.struct({
+          profile: Shape.struct({
             name: Shape.plain.string(),
             role: Shape.plain.string().placeholder("guest"), // Default value
           }),
@@ -38,7 +38,7 @@ describe("Overlay and Placeholder Handling", () => {
     it("should apply placeholders to nested map properties inside list items", () => {
       const schema = Shape.doc({
         users: Shape.list(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
             role: Shape.plain.string().placeholder("guest"),
           }),
@@ -62,10 +62,10 @@ describe("Overlay and Placeholder Handling", () => {
     it("should apply placeholders in deeply nested structures: list → map → list → map", () => {
       const schema = Shape.doc({
         departments: Shape.list(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
             employees: Shape.list(
-              Shape.map({
+              Shape.struct({
                 name: Shape.plain.string(),
                 level: Shape.plain.number().placeholder(1),
                 status: Shape.plain.string().placeholder("active"),
@@ -103,7 +103,7 @@ describe("Overlay and Placeholder Handling", () => {
     it("should apply placeholders to counter values inside list items", () => {
       const schema = Shape.doc({
         articles: Shape.list(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
             views: Shape.counter().placeholder(100),
           }),
@@ -132,7 +132,7 @@ describe("Overlay and Placeholder Handling", () => {
     it("should apply placeholders to movableList items", () => {
       const schema = Shape.doc({
         tasks: Shape.movableList(
-          Shape.map({
+          Shape.struct({
             title: Shape.plain.string(),
             priority: Shape.plain.number().placeholder(5),
             completed: Shape.plain.boolean().placeholder(false),
@@ -160,7 +160,7 @@ describe("Overlay and Placeholder Handling", () => {
     it("should apply placeholders when calling toJSON() on a list ref directly", () => {
       const schema = Shape.doc({
         items: Shape.list(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
             count: Shape.plain.number().placeholder(0),
           }),
@@ -188,7 +188,7 @@ describe("Overlay and Placeholder Handling", () => {
     it("should handle empty lists correctly", () => {
       const schema = Shape.doc({
         items: Shape.list(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
             value: Shape.plain.number().placeholder(42),
           }),
@@ -224,7 +224,7 @@ describe("Overlay and Placeholder Handling", () => {
       const schema = Shape.doc({
         usersByDept: Shape.record(
           Shape.list(
-            Shape.map({
+            Shape.struct({
               name: Shape.plain.string(),
               salary: Shape.plain.number().placeholder(50000),
             }),
@@ -285,7 +285,7 @@ describe("Overlay and Placeholder Handling", () => {
 
     it("should preserve null in nested map properties", () => {
       const schema = Shape.doc({
-        data: Shape.map({
+        data: Shape.struct({
           value: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
         }),
       })

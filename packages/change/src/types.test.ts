@@ -36,7 +36,7 @@ describe("Infer type helper", () => {
   it("infers nested shapes", () => {
     const schema = Shape.doc({
       users: Shape.list(
-        Shape.map({
+        Shape.struct({
           id: Shape.plain.string(),
           profile: Shape.record(
             Shape.plain.object({
@@ -113,7 +113,7 @@ describe("Infer type helper", () => {
       }),
     })
 
-    const SessionMetadataSchema = Shape.map({
+    const SessionMetadataSchema = Shape.struct({
       sessionStartedAt: Shape.plain.number(),
       sessionStatus: SessionStatusSchema,
     })
@@ -141,7 +141,7 @@ describe("Infer type helper", () => {
     })
 
     const DocSchema = Shape.doc({
-      metadata: Shape.map({
+      metadata: Shape.struct({
         sessionStartedAt: Shape.plain.number(),
         sessionStatus: SessionStatusSchema,
       }),
@@ -248,7 +248,7 @@ describe("Mutable type helper", () => {
   })
 
   it("toJSON is callable on Maps", () => {
-    const MetaSchema = Shape.map({
+    const MetaSchema = Shape.struct({
       title: Shape.plain.string(),
       count: Shape.plain.number(),
     })

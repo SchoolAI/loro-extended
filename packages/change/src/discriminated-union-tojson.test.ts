@@ -15,16 +15,16 @@ import { createTypedDoc } from "./typed-doc.js"
  */
 describe("Record with Map entries - placeholder required bug", () => {
   // Reproduce the user's schema structure
-  const StudentTomStateSchema = Shape.map({
+  const StudentTomStateSchema = Shape.struct({
     peerId: Shape.plain.string(),
     authorName: Shape.plain.string(),
     authorColor: Shape.plain.string(),
     intentionHistory: Shape.list(
-      Shape.map({
+      Shape.struct({
         observedAt: Shape.plain.number(),
         messageTimestamp: Shape.plain.number(),
         predictions: Shape.list(
-          Shape.map({
+          Shape.struct({
             horizon: Shape.plain.string("now", "soon", "future"),
             value: Shape.plain.string(),
           }),
@@ -32,11 +32,11 @@ describe("Record with Map entries - placeholder required bug", () => {
       }),
     ),
     emotionHistory: Shape.list(
-      Shape.map({
+      Shape.struct({
         observedAt: Shape.plain.number(),
         messageTimestamp: Shape.plain.number(),
         predictions: Shape.list(
-          Shape.map({
+          Shape.struct({
             horizon: Shape.plain.string("now", "soon", "future"),
             value: Shape.plain.string(),
           }),

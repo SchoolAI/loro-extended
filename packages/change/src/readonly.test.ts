@@ -4,7 +4,7 @@ import { createTypedDoc } from "./typed-doc.js"
 
 describe("TypedDoc Mutable Mode", () => {
   const schema = Shape.doc({
-    meta: Shape.map({
+    meta: Shape.struct({
       count: Shape.plain.number(),
       title: Shape.plain.string(),
     }),

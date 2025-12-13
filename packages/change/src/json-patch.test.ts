@@ -8,7 +8,7 @@ describe("JSON Patch Integration", () => {
   describe("Basic Operations", () => {
     it("should handle add operations on map properties", () => {
       const schema = Shape.doc({
-        metadata: Shape.map({
+        metadata: Shape.struct({
           title: Shape.plain.string(),
           count: Shape.plain.number(),
         }),
@@ -29,7 +29,7 @@ describe("JSON Patch Integration", () => {
 
     it("should handle remove operations on map properties", () => {
       const schema = Shape.doc({
-        config: Shape.map({
+        config: Shape.struct({
           theme: Shape.plain.string().placeholder("light"),
           debug: Shape.plain.boolean().placeholder(true),
         }),
@@ -53,7 +53,7 @@ describe("JSON Patch Integration", () => {
 
     it("should handle replace operations on map properties", () => {
       const schema = Shape.doc({
-        settings: Shape.map({
+        settings: Shape.struct({
           language: Shape.plain.string().placeholder("en"),
           volume: Shape.plain.number().placeholder(50),
         }),
@@ -192,10 +192,10 @@ describe("JSON Patch Integration", () => {
   describe("Complex Nested Operations", () => {
     it("should handle deeply nested map structures", () => {
       const schema = Shape.doc({
-        user: Shape.map({
-          profile: Shape.map({
+        user: Shape.struct({
+          profile: Shape.struct({
             name: Shape.plain.string(),
-            settings: Shape.map({
+            settings: Shape.struct({
               theme: Shape.plain.string().placeholder("light"),
               notifications: Shape.plain.boolean().placeholder(true),
             }),
@@ -362,7 +362,7 @@ describe("JSON Patch Integration", () => {
   describe("Test Operations", () => {
     it("should handle test operations that pass", () => {
       const schema = Shape.doc({
-        config: Shape.map({
+        config: Shape.struct({
           version: Shape.plain.string().placeholder("1.0.0"),
         }),
       })
@@ -385,7 +385,7 @@ describe("JSON Patch Integration", () => {
 
     it("should throw on test operations that fail", () => {
       const schema = Shape.doc({
-        config: Shape.map({
+        config: Shape.struct({
           version: Shape.plain.string().placeholder("1.0.0"),
         }),
       })
@@ -405,12 +405,12 @@ describe("JSON Patch Integration", () => {
   describe("Path Prefix Support", () => {
     it("should support path prefixes for scoped operations", () => {
       const schema = Shape.doc({
-        users: Shape.map({
-          alice: Shape.map({
+        users: Shape.struct({
+          alice: Shape.struct({
             name: Shape.plain.string(),
             email: Shape.plain.string(),
           }),
-          bob: Shape.map({
+          bob: Shape.struct({
             name: Shape.plain.string(),
             email: Shape.plain.string(),
           }),
@@ -436,7 +436,7 @@ describe("JSON Patch Integration", () => {
   describe("Path Formats", () => {
     it("should handle JSON Pointer format paths", () => {
       const schema = Shape.doc({
-        data: Shape.map({
+        data: Shape.struct({
           items: Shape.list(Shape.plain.string()),
         }),
       })
@@ -455,7 +455,7 @@ describe("JSON Patch Integration", () => {
 
     it("should handle array format paths", () => {
       const schema = Shape.doc({
-        data: Shape.map({
+        data: Shape.struct({
           items: Shape.list(Shape.plain.string()),
         }),
       })
@@ -476,7 +476,7 @@ describe("JSON Patch Integration", () => {
   describe("Error Handling", () => {
     it("should throw on invalid paths", () => {
       const schema = Shape.doc({
-        data: Shape.map({
+        data: Shape.struct({
           value: Shape.plain.string(),
         }),
       })
@@ -514,7 +514,7 @@ describe("JSON Patch Integration", () => {
       const schema = Shape.doc({
         counter: Shape.counter(),
         text: Shape.text(),
-        data: Shape.map({
+        data: Shape.struct({
           items: Shape.list(Shape.plain.string()),
         }),
       })
@@ -542,7 +542,7 @@ describe("JSON Patch Integration", () => {
 
     it("should maintain state across multiple patch applications", () => {
       const schema = Shape.doc({
-        settings: Shape.map({
+        settings: Shape.struct({
           theme: Shape.plain.string().placeholder("light"),
           language: Shape.plain.string().placeholder("en"),
         }),

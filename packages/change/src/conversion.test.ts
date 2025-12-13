@@ -298,7 +298,7 @@ describe("Conversion Functions", () => {
 
   describe("convertInputToNode - Map Conversion", () => {
     it("should convert object to LoroMap with value properties", () => {
-      const shape = Shape.map({
+      const shape = Shape.struct({
         name: Shape.plain.string(),
         age: Shape.plain.number(),
         active: Shape.plain.boolean(),
@@ -322,7 +322,7 @@ describe("Conversion Functions", () => {
     })
 
     it("should convert object to LoroMap with container properties", () => {
-      const shape = Shape.map({
+      const shape = Shape.struct({
         title: Shape.text(),
         count: Shape.counter(),
       })
@@ -343,7 +343,7 @@ describe("Conversion Functions", () => {
     })
 
     it("should handle empty object", () => {
-      const shape = Shape.map({})
+      const shape = Shape.struct({})
       const result = convertInputToRef({}, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
@@ -352,7 +352,7 @@ describe("Conversion Functions", () => {
     })
 
     it("should handle object with extra properties not in schema", () => {
-      const shape = Shape.map({
+      const shape = Shape.struct({
         name: Shape.plain.string(),
       })
 
@@ -371,10 +371,10 @@ describe("Conversion Functions", () => {
     })
 
     it("should handle nested map structures", () => {
-      const shape = Shape.map({
-        user: Shape.map({
+      const shape = Shape.struct({
+        user: Shape.struct({
           name: Shape.plain.string(),
-          profile: Shape.map({
+          profile: Shape.struct({
             bio: Shape.text(),
           }),
         }),
@@ -412,7 +412,7 @@ describe("Conversion Functions", () => {
     })
 
     it("should throw error for non-object input", () => {
-      const shape = Shape.map({
+      const shape = Shape.struct({
         name: Shape.plain.string(),
       })
 
@@ -470,7 +470,7 @@ describe("Conversion Functions", () => {
 
   describe("convertInputToNode - Error Cases", () => {
     it("should throw error for tree type (unimplemented)", () => {
-      const shape = Shape.tree(Shape.map({}))
+      const shape = Shape.tree(Shape.struct({}))
 
       expect(() => convertInputToRef({}, shape)).toThrow(
         "tree type unimplemented",
@@ -489,9 +489,9 @@ describe("Conversion Functions", () => {
   describe("convertInputToNode - Complex Nested Structures", () => {
     it("should handle deeply nested container structures", () => {
       const shape = Shape.list(
-        Shape.map({
+        Shape.struct({
           title: Shape.text(),
-          metadata: Shape.map({
+          metadata: Shape.struct({
             views: Shape.counter(),
             tags: Shape.list(Shape.plain.string()),
           }),
@@ -523,12 +523,12 @@ describe("Conversion Functions", () => {
     })
 
     it("should handle mixed container and value types", () => {
-      const shape = Shape.map({
+      const shape = Shape.struct({
         plainString: Shape.plain.string(),
         plainArray: Shape.plain.array(Shape.plain.number()),
         loroText: Shape.text(),
         loroList: Shape.list(Shape.plain.string()),
-        nestedMap: Shape.map({
+        nestedMap: Shape.struct({
           counter: Shape.counter(),
           plainBool: Shape.plain.boolean(),
         }),
@@ -573,7 +573,7 @@ describe("Conversion Functions", () => {
 
     it("should handle movable lists with complex items", () => {
       const shape = Shape.movableList(
-        Shape.map({
+        Shape.struct({
           id: Shape.plain.string(),
           title: Shape.text(),
           completed: Shape.plain.boolean(),
@@ -604,7 +604,7 @@ describe("Conversion Functions", () => {
 
     it("should handle empty containers", () => {
       const emptyListShape = Shape.list(Shape.plain.string())
-      const emptyMapShape = Shape.map({})
+      const emptyMapShape = Shape.struct({})
       const emptyMovableListShape = Shape.movableList(Shape.plain.number())
 
       const emptyList = convertInputToRef([], emptyListShape)
@@ -662,7 +662,7 @@ describe("Conversion Functions", () => {
         input[`prop${i}`] = `value${i}`
       }
 
-      const shape = Shape.map(shapes)
+      const shape = Shape.struct(shapes)
       const result = convertInputToRef(input, shape)
 
       expect(isLoroMap(result as any)).toBe(true)
@@ -708,7 +708,7 @@ describe("Conversion Functions", () => {
 
     it("should handle recursive structures without infinite loops", () => {
       // Test that the conversion doesn't get stuck in infinite recursion
-      const shape = Shape.map({
+      const shape = Shape.struct({
         name: Shape.plain.string(),
         children: Shape.list(Shape.plain.string()), // Not recursive, but nested
       })

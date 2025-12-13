@@ -4,7 +4,7 @@ import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 
-const MessageSchema = Shape.map({
+const MessageSchema = Shape.struct({
   id: Shape.plain.string(),
   content: Shape.text(),
   timestamp: Shape.plain.number(),
@@ -12,14 +12,14 @@ const MessageSchema = Shape.map({
 
 const ChatSchema = Shape.doc({
   messages: Shape.list(MessageSchema),
-  meta: Shape.map({
+  meta: Shape.struct({
     title: Shape.plain.string(),
     count: Shape.counter(),
   }),
   tags: Shape.movableList(Shape.plain.string()),
   settings: Shape.record(Shape.plain.boolean()),
   // Tree support might be limited in current implementation
-  // tree: Shape.tree(Shape.map({ val: Shape.plain.number() }))
+  // tree: Shape.tree(Shape.struct({ val: Shape.plain.number() }))
 })
 
 describe("JSON Compatibility", () => {

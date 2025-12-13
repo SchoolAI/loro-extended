@@ -312,7 +312,7 @@ describe("CRDT Operations", () => {
   describe("Map Operations", () => {
     it("should handle set, get, and delete operations", () => {
       const schema = Shape.doc({
-        metadata: Shape.map({
+        metadata: Shape.struct({
           title: Shape.plain.string(),
           count: Shape.plain.number().placeholder(1),
           enabled: Shape.plain.boolean(),
@@ -335,7 +335,7 @@ describe("CRDT Operations", () => {
 
     it("should handle array values in maps", () => {
       const schema = Shape.doc({
-        config: Shape.map({
+        config: Shape.struct({
           tags: Shape.plain.array(Shape.plain.string()),
           numbers: Shape.plain.array(Shape.plain.number()),
         }),
@@ -354,7 +354,7 @@ describe("CRDT Operations", () => {
 
     it("should provide map utility methods", () => {
       const schema = Shape.doc({
-        testMap: Shape.map({
+        testMap: Shape.struct({
           key1: Shape.plain.string(),
           key2: Shape.plain.number(),
         }),
@@ -379,7 +379,7 @@ describe("CRDT Operations", () => {
 
     it("should handle container insertion in maps", () => {
       const schema = Shape.doc({
-        containerMap: Shape.map({
+        containerMap: Shape.struct({
           textField: Shape.text(),
         }),
       })
@@ -401,7 +401,7 @@ describe("CRDT Operations", () => {
   describe("Tree Operations", () => {
     it("should handle basic tree operations", () => {
       const schema = Shape.doc({
-        tree: Shape.tree(Shape.map({ name: Shape.text() })),
+        tree: Shape.tree(Shape.struct({ name: Shape.text() })),
       })
 
       const typedDoc = createTypedDoc(schema)
@@ -418,7 +418,7 @@ describe("CRDT Operations", () => {
 
     it("should handle tree node movement and deletion", () => {
       const schema = Shape.doc({
-        hierarchy: Shape.tree(Shape.map({ name: Shape.text() })),
+        hierarchy: Shape.tree(Shape.struct({ name: Shape.text() })),
       })
 
       const typedDoc = createTypedDoc(schema)
@@ -436,7 +436,7 @@ describe("CRDT Operations", () => {
 
     it("should handle tree node lookup by ID", () => {
       const schema = Shape.doc({
-        searchableTree: Shape.tree(Shape.map({ name: Shape.text() })),
+        searchableTree: Shape.tree(Shape.struct({ name: Shape.text() })),
       })
 
       const typedDoc = createTypedDoc(schema)
@@ -456,11 +456,11 @@ describe("Nested Operations", () => {
   describe("Nested Maps", () => {
     it("should handle deeply nested map structures", () => {
       const schema = Shape.doc({
-        article: Shape.map({
+        article: Shape.struct({
           title: Shape.text(),
-          metadata: Shape.map({
+          metadata: Shape.struct({
             views: Shape.counter(),
-            author: Shape.map({
+            author: Shape.struct({
               name: Shape.plain.string(),
               email: Shape.plain.string(),
             }),
@@ -485,7 +485,7 @@ describe("Nested Operations", () => {
 
     it("should handle maps with mixed Zod and Loro schemas", () => {
       const schema = Shape.doc({
-        mixed: Shape.map({
+        mixed: Shape.struct({
           plainString: Shape.plain.string(),
           plainArray: Shape.plain.array(Shape.plain.number()),
           loroText: Shape.text(),
@@ -513,10 +513,10 @@ describe("Nested Operations", () => {
     it("should handle lists of maps with nested structures", () => {
       const schema = Shape.doc({
         articles: Shape.list(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
             tags: Shape.list(Shape.plain.string()),
-            metadata: Shape.map({
+            metadata: Shape.struct({
               views: Shape.counter(),
               published: Shape.plain.boolean(),
             }),
@@ -556,7 +556,7 @@ describe("Nested Operations", () => {
 
     it("should handle nested plain value maps", () => {
       const schema = Shape.doc({
-        articles: Shape.map({
+        articles: Shape.struct({
           metadata: Shape.plain.object({
             views: Shape.plain.object({
               page: Shape.plain.number(),
@@ -617,7 +617,7 @@ describe("Nested Operations", () => {
   describe("Maps with List Values", () => {
     it("should handle maps containing lists", () => {
       const schema = Shape.doc({
-        categories: Shape.map({
+        categories: Shape.struct({
           tech: Shape.list(Shape.plain.string()),
           design: Shape.list(Shape.plain.string()),
         }),
@@ -676,9 +676,9 @@ describe("TypedLoroDoc", () => {
 
     it("should handle nested empty state structures", () => {
       const schema = Shape.doc({
-        article: Shape.map({
+        article: Shape.struct({
           title: Shape.text().placeholder("Default Title"),
-          metadata: Shape.map({
+          metadata: Shape.struct({
             views: Shape.counter(),
             tags: Shape.plain.array(Shape.plain.string()),
             author: Shape.plain.string().placeholder("Anonymous"),
@@ -715,7 +715,7 @@ describe("TypedLoroDoc", () => {
 
     it("should handle empty state with optional fields", () => {
       const schema = Shape.doc({
-        profile: Shape.map({
+        profile: Shape.struct({
           name: Shape.plain.string().placeholder("Anonymous"),
           email: Shape.plain
             .union([Shape.plain.null(), Shape.plain.string()])
@@ -743,7 +743,7 @@ describe("TypedLoroDoc", () => {
     it("should distinguish between raw CRDT and overlaid values", () => {
       const schema = Shape.doc({
         title: Shape.text(),
-        metadata: Shape.map({
+        metadata: Shape.struct({
           optional: Shape.plain.string().placeholder("default-optional"),
         }),
       })
@@ -794,7 +794,7 @@ describe("TypedLoroDoc", () => {
 
     it("should handle null values in placeholder correctly", () => {
       const schema = Shape.doc({
-        interjection: Shape.map({
+        interjection: Shape.struct({
           currentPrediction: Shape.plain
             .union([Shape.plain.null(), Shape.plain.string()])
             .placeholder(null),
@@ -857,7 +857,7 @@ describe("TypedLoroDoc", () => {
     it("should convert plain objects to map containers in lists", () => {
       const schema = Shape.doc({
         articles: Shape.list(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
             tags: Shape.list(Shape.plain.string()),
           }),
@@ -881,7 +881,7 @@ describe("TypedLoroDoc", () => {
     it("should handle nested conversion in movable lists", () => {
       const schema = Shape.doc({
         tasks: Shape.movableList(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
             completed: Shape.plain.boolean(),
             subtasks: Shape.list(Shape.plain.string()),
@@ -908,9 +908,9 @@ describe("TypedLoroDoc", () => {
     it("should handle deeply nested conversion", () => {
       const schema = Shape.doc({
         posts: Shape.list(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
-            metadata: Shape.map({
+            metadata: Shape.struct({
               views: Shape.counter(),
               tags: Shape.plain.array(Shape.plain.string()),
             }),
@@ -943,7 +943,7 @@ describe("Edge Cases and Error Handling", () => {
     it("should maintain type safety with complex schemas", () => {
       const schema = Shape.doc({
         title: Shape.text(),
-        metadata: Shape.map({
+        metadata: Shape.struct({
           author: Shape.plain.string().placeholder("Anonymous"),
           publishedAt: Shape.plain.string().placeholder("2025-01-01"),
         }),
@@ -978,7 +978,7 @@ describe("Edge Cases and Error Handling", () => {
     it("should handle empty containers gracefully", () => {
       const schema = Shape.doc({
         todos: Shape.list(
-          Shape.map({
+          Shape.struct({
             text: Shape.text(),
             completed: Shape.plain.boolean(),
           }),
@@ -1290,7 +1290,7 @@ describe("Edge Cases and Error Handling", () => {
       it("should work with lists of maps (nested containers)", () => {
         const schema = Shape.doc({
           articles: Shape.list(
-            Shape.map({
+            Shape.struct({
               title: Shape.text(),
               published: Shape.plain.boolean(),
             }),
@@ -1542,7 +1542,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should allow mutation of nested container items found via array methods", () => {
           const schema = Shape.doc({
             articles: Shape.list(
-              Shape.map({
+              Shape.struct({
                 title: Shape.text(),
                 viewCount: Shape.counter(),
                 metadata: Shape.plain.object({
@@ -1919,7 +1919,7 @@ describe("Edge Cases and Error Handling", () => {
         it("should work with nested container items", () => {
           const schema = Shape.doc({
             articles: Shape.list(
-              Shape.map({
+              Shape.struct({
                 title: Shape.text(),
                 views: Shape.counter(),
               }),
@@ -1967,12 +1967,12 @@ describe("Edge Cases and Error Handling", () => {
      */
     it("should call toJSON() without error when Record has entries with partial CRDT data", () => {
       // Schema with a Record containing Maps (similar to user's tomState schema)
-      const StudentStateSchema = Shape.map({
+      const StudentStateSchema = Shape.struct({
         peerId: Shape.plain.string(),
         authorName: Shape.plain.string(),
         authorColor: Shape.plain.string(),
         history: Shape.list(
-          Shape.map({
+          Shape.struct({
             timestamp: Shape.plain.number(),
             value: Shape.plain.string(),
           }),

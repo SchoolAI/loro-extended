@@ -231,9 +231,9 @@ describe("Grand Unified API v3", () => {
   describe("nested container mutations", () => {
     it("should auto-commit nested map mutations", () => {
       const nestedSchema = Shape.doc({
-        article: Shape.map({
+        article: Shape.struct({
           title: Shape.text(),
-          metadata: Shape.map({
+          metadata: Shape.struct({
             views: Shape.counter(),
             author: Shape.plain.string(),
           }),
@@ -256,7 +256,7 @@ describe("Grand Unified API v3", () => {
     it("should auto-commit list of maps mutations", () => {
       const listMapSchema = Shape.doc({
         articles: Shape.list(
-          Shape.map({
+          Shape.struct({
             title: Shape.text(),
             views: Shape.counter(),
           }),

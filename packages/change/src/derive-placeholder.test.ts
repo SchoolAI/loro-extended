@@ -29,7 +29,7 @@ describe("derivePlaceholder", () => {
 
   it("composes nested map placeholders", () => {
     const schema = Shape.doc({
-      settings: Shape.map({
+      settings: Shape.struct({
         theme: Shape.plain.string().placeholder("dark"),
         fontSize: Shape.plain.number().placeholder(14),
       }),
@@ -65,7 +65,7 @@ describe("derivePlaceholder", () => {
 
   it("handles plain value shapes with defaults", () => {
     const schema = Shape.doc({
-      config: Shape.map({
+      config: Shape.struct({
         name: Shape.plain.string(),
         count: Shape.plain.number(),
         enabled: Shape.plain.boolean(),
@@ -85,7 +85,7 @@ describe("derivePlaceholder", () => {
 
   it("handles plain value shapes with custom placeholders", () => {
     const schema = Shape.doc({
-      config: Shape.map({
+      config: Shape.struct({
         name: Shape.plain.string().placeholder("default-name"),
         count: Shape.plain.number().placeholder(42),
         enabled: Shape.plain.boolean().placeholder(true),
@@ -103,7 +103,7 @@ describe("derivePlaceholder", () => {
 
   it("handles nested plain objects", () => {
     const schema = Shape.doc({
-      user: Shape.map({
+      user: Shape.struct({
         profile: Shape.plain.object({
           name: Shape.plain.string().placeholder("Anonymous"),
           age: Shape.plain.number().placeholder(0),
@@ -123,7 +123,7 @@ describe("derivePlaceholder", () => {
 
   it("handles plain arrays as empty", () => {
     const schema = Shape.doc({
-      tags: Shape.map({
+      tags: Shape.struct({
         items: Shape.plain.array(Shape.plain.string()),
       }),
     })
@@ -137,7 +137,7 @@ describe("derivePlaceholder", () => {
 
   it("handles plain records as empty", () => {
     const schema = Shape.doc({
-      metadata: Shape.map({
+      metadata: Shape.struct({
         values: Shape.plain.record(Shape.plain.number()),
       }),
     })
@@ -151,7 +151,7 @@ describe("derivePlaceholder", () => {
 
   it("handles union types by deriving from first variant", () => {
     const schema = Shape.doc({
-      value: Shape.map({
+      value: Shape.struct({
         data: Shape.plain.union([Shape.plain.string(), Shape.plain.null()]),
       }),
     })
@@ -165,7 +165,7 @@ describe("derivePlaceholder", () => {
 
   it("handles union types with explicit placeholder", () => {
     const schema = Shape.doc({
-      value: Shape.map({
+      value: Shape.struct({
         data: Shape.plain
           .union([Shape.plain.string(), Shape.plain.null()])
           .placeholder(null),
@@ -191,7 +191,7 @@ describe("derivePlaceholder", () => {
 
   it("handles tree containers as empty arrays", () => {
     const schema = Shape.doc({
-      hierarchy: Shape.tree(Shape.map({ name: Shape.text() })),
+      hierarchy: Shape.tree(Shape.struct({ name: Shape.text() })),
     })
 
     expect(derivePlaceholder(schema)).toEqual({
@@ -201,9 +201,9 @@ describe("derivePlaceholder", () => {
 
   it("handles complex nested structures", () => {
     const schema = Shape.doc({
-      article: Shape.map({
+      article: Shape.struct({
         title: Shape.text().placeholder("Untitled Article"),
-        metadata: Shape.map({
+        metadata: Shape.struct({
           views: Shape.counter().placeholder(0),
           author: Shape.plain.object({
             name: Shape.plain.string().placeholder("Anonymous"),
@@ -231,7 +231,7 @@ describe("derivePlaceholder", () => {
 
   it("handles string literal options", () => {
     const schema = Shape.doc({
-      status: Shape.map({
+      status: Shape.struct({
         value: Shape.plain.string("active", "inactive", "pending"),
       }),
     })

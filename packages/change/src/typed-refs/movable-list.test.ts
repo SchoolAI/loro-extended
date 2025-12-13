@@ -7,7 +7,7 @@ describe("MovableListRef", () => {
     it("should allow setting a plain object for a list item via index", () => {
       const schema = Shape.doc({
         users: Shape.movableList(
-          Shape.map({
+          Shape.struct({
             name: Shape.plain.string(),
           }),
         ),
