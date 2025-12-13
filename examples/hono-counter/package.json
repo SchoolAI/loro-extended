@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:all": "vite build --mode client && vite build"
+    "build:all": "vite build --mode client && vite build",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^1.12.2",

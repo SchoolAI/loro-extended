@@ -7,7 +7,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "db:up": "docker-compose up -d",
-    "db:down": "docker-compose down"
+    "db:down": "docker-compose down",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@loro-extended/adapter-postgres": "workspace:^",

@@ -16,7 +16,7 @@
     "test:all": "pnpm test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",
