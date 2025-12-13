@@ -125,16 +125,11 @@ export class RecordRef<
       this.container.set(key, value)
       this.refCache.set(key, value)
     } else {
-      // For containers, we can't set them directly usually.
-      // But if the user passes a plain object that matches the shape, maybe we should convert it?
-      if (value && typeof value === "object") {
-        const ref = this.getOrCreateRef(key)
-
-        if (assignPlainValueToTypedRef(ref, value)) {
-          return
-        }
+      // For container shapes, try to assign the plain value
+      const ref = this.getOrCreateRef(key)
+      if (assignPlainValueToTypedRef(ref, value)) {
+        return
       }
-
       throw new Error(
         "Cannot set container directly, modify the typed ref instead",
       )

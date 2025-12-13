@@ -265,6 +265,70 @@ describe("Record Types", () => {
       // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
       expect(doc.toJSON().histories["user1"]).toEqual(["c"])
     })
+
+    it("should allow setting a plain string for a record of text", () => {
+      const schema = Shape.doc({
+        notes: Shape.record(Shape.text()),
+      })
+
+      const doc = new TypedDoc(schema)
+
+      doc.change(draft => {
+        draft.notes.set("note-1", "Hello World")
+        draft.notes["note-2"] = "Another note"
+      })
+
+      expect(doc.toJSON().notes).toEqual({
+        "note-1": "Hello World",
+        "note-2": "Another note",
+      })
+    })
+
+    it("should allow setting a plain number for a record of counter", () => {
+      const schema = Shape.doc({
+        scores: Shape.record(Shape.counter()),
+      })
+
+      const doc = new TypedDoc(schema)
+
+      doc.change(draft => {
+        draft.scores.set("alice", 100)
+        draft.scores.bob = 50
+      })
+
+      expect(doc.toJSON().scores).toEqual({
+        alice: 100,
+        bob: 50,
+      })
+    })
+
+    it("should allow setting a plain object with text fields for a record of maps", () => {
+      const schema = Shape.doc({
+        users: Shape.record(
+          Shape.map({
+            userId: Shape.plain.string(),
+            displayName: Shape.text(),
+            email: Shape.plain.string(),
+          }),
+        ),
+      })
+
+      const doc = new TypedDoc(schema)
+
+      doc.change(draft => {
+        draft.users.set("user-123", {
+          userId: "user-123",
+          displayName: "Test User",
+          email: "test@example.com",
+        })
+      })
+
+      expect(doc.toJSON().users["user-123"]).toEqual({
+        userId: "user-123",
+        displayName: "Test User",
+        email: "test@example.com",
+      })
+    })
   })
 
   describe("Readonly access to non-existent keys", () => {

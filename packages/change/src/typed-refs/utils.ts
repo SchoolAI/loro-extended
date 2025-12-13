@@ -173,5 +173,27 @@ export function assignPlainValueToTypedRef(
     }
   }
 
+  if (shapeType === "text") {
+    if (typeof value === "string") {
+      ;(ref as any).update(value)
+      return true
+    }
+    return false
+  }
+
+  if (shapeType === "counter") {
+    if (typeof value === "number") {
+      const currentValue = (ref as any).value
+      const diff = value - currentValue
+      if (diff > 0) {
+        ;(ref as any).increment(diff)
+      } else if (diff < 0) {
+        ;(ref as any).decrement(-diff)
+      }
+      return true
+    }
+    return false
+  }
+
   return false
 }

@@ -115,12 +115,10 @@ export class MapRef<
             this.container.set(key, value)
             this.propertyCache.set(key, value)
           } else {
-            if (value && typeof value === "object") {
-              const ref = this.getOrCreateRef(key, shape)
-
-              if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
-                return
-              }
+            // For container shapes, try to assign the plain value
+            const ref = this.getOrCreateRef(key, shape)
+            if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
+              return
             }
             throw new Error(
               "Cannot set container directly, modify the typed ref instead",
