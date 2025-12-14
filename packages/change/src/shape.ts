@@ -28,6 +28,14 @@ export type WithPlaceholder<S extends Shape<any, any, any>> = S & {
   placeholder(value: S["_placeholder"]): S
 }
 
+/**
+ * Type for value shapes that support the .nullable() method.
+ * Returns a union of null and the original shape with null as the default placeholder.
+ */
+export type WithNullable<S extends ValueShape> = {
+  nullable(): WithPlaceholder<UnionValueShape<[NullValueShape, S]>>
+}
+
 export interface DocShape<
   NestedShapes extends Record<string, ContainerShape> = Record<
     string,
@@ -259,6 +267,41 @@ export type ValueShape =
 export type ContainerOrValueShape = ContainerShape | ValueShape
 
 /**
+ * Creates a nullable version of a value shape.
+ * @internal
+ */
+function makeNullable<S extends ValueShape>(
+  shape: S,
+): WithPlaceholder<UnionValueShape<[NullValueShape, S]>> {
+  const nullShape: NullValueShape = {
+    _type: "value" as const,
+    valueType: "null" as const,
+    _plain: null,
+    _mutable: null,
+    _placeholder: null,
+  }
+
+  const base: UnionValueShape<[NullValueShape, S]> = {
+    _type: "value" as const,
+    valueType: "union" as const,
+    shapes: [nullShape, shape] as [NullValueShape, S],
+    _plain: null as any,
+    _mutable: null as any,
+    _placeholder: null as any, // Default placeholder is null
+  }
+
+  return Object.assign(base, {
+    placeholder(
+      value: S["_placeholder"] | null,
+    ): UnionValueShape<[NullValueShape, S]> {
+      return { ...base, _placeholder: value } as UnionValueShape<
+        [NullValueShape, S]
+      >
+    },
+  })
+}
+
+/**
  * The LoroShape factory object
  *
  * If a container has a `shape` type variable, it refers to the shape it contains--
@@ -386,7 +429,8 @@ export const Shape = {
   plain: {
     string: <T extends string = string>(
       ...options: T[]
-    ): WithPlaceholder<StringValueShape<T>> => {
+    ): WithPlaceholder<StringValueShape<T>> &
+      WithNullable<StringValueShape<T>> => {
       const base: StringValueShape<T> = {
         _type: "value" as const,
         valueType: "string" as const,
@@ -399,10 +443,16 @@ export const Shape = {
         placeholder(value: T): StringValueShape<T> {
           return { ...base, _placeholder: value }
         },
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, StringValueShape<T>]>
+        > {
+          return makeNullable(base)
+        },
       })
     },
 
-    number: (): WithPlaceholder<NumberValueShape> => {
+    number: (): WithPlaceholder<NumberValueShape> &
+      WithNullable<NumberValueShape> => {
       const base: NumberValueShape = {
         _type: "value" as const,
         valueType: "number" as const,
@@ -414,10 +464,16 @@ export const Shape = {
         placeholder(value: number): NumberValueShape {
           return { ...base, _placeholder: value }
         },
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, NumberValueShape]>
+        > {
+          return makeNullable(base)
+        },
       })
     },
 
-    boolean: (): WithPlaceholder<BooleanValueShape> => {
+    boolean: (): WithPlaceholder<BooleanValueShape> &
+      WithNullable<BooleanValueShape> => {
       const base: BooleanValueShape = {
         _type: "value" as const,
         valueType: "boolean" as const,
@@ -428,6 +484,11 @@ export const Shape = {
       return Object.assign(base, {
         placeholder(value: boolean): BooleanValueShape {
           return { ...base, _placeholder: value }
+        },
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, BooleanValueShape]>
+        > {
+          return makeNullable(base)
         },
       })
     },
@@ -470,46 +531,86 @@ export const Shape = {
      */
     struct: <T extends Record<string, ValueShape>>(
       shape: T,
-    ): StructValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "struct" as const,
-      shape,
-      _plain: {} as any,
-      _mutable: {} as any,
-      _placeholder: {} as any,
-    }),
+    ): StructValueShape<T> & WithNullable<StructValueShape<T>> => {
+      const base: StructValueShape<T> = {
+        _type: "value" as const,
+        valueType: "struct" as const,
+        shape,
+        _plain: {} as any,
+        _mutable: {} as any,
+        _placeholder: {} as any,
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, StructValueShape<T>]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
 
     /**
      * @deprecated Use `Shape.plain.struct` instead. `Shape.plain.struct` will be removed in a future version.
      */
     object: <T extends Record<string, ValueShape>>(
       shape: T,
-    ): StructValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "struct" as const,
-      shape,
-      _plain: {} as any,
-      _mutable: {} as any,
-      _placeholder: {} as any,
-    }),
+    ): StructValueShape<T> & WithNullable<StructValueShape<T>> => {
+      const base: StructValueShape<T> = {
+        _type: "value" as const,
+        valueType: "struct" as const,
+        shape,
+        _plain: {} as any,
+        _mutable: {} as any,
+        _placeholder: {} as any,
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, StructValueShape<T>]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
 
-    record: <T extends ValueShape>(shape: T): RecordValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "record" as const,
-      shape,
-      _plain: {} as any,
-      _mutable: {} as any,
-      _placeholder: {} as Record<string, never>,
-    }),
+    record: <T extends ValueShape>(
+      shape: T,
+    ): RecordValueShape<T> & WithNullable<RecordValueShape<T>> => {
+      const base: RecordValueShape<T> = {
+        _type: "value" as const,
+        valueType: "record" as const,
+        shape,
+        _plain: {} as any,
+        _mutable: {} as any,
+        _placeholder: {} as Record<string, never>,
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, RecordValueShape<T>]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
 
-    array: <T extends ValueShape>(shape: T): ArrayValueShape<T> => ({
-      _type: "value" as const,
-      valueType: "array" as const,
-      shape,
-      _plain: [] as any,
-      _mutable: [] as any,
-      _placeholder: [] as never[],
-    }),
+    array: <T extends ValueShape>(
+      shape: T,
+    ): ArrayValueShape<T> & WithNullable<ArrayValueShape<T>> => {
+      const base: ArrayValueShape<T> = {
+        _type: "value" as const,
+        valueType: "array" as const,
+        shape,
+        _plain: [] as any,
+        _mutable: [] as any,
+        _placeholder: [] as never[],
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, ArrayValueShape<T>]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
 
     // Special value type that helps make things like `string | null` representable
     // TODO(duane): should this be a more general type for containers too?

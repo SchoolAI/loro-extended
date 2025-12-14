@@ -737,6 +737,257 @@ describe("TypedLoroDoc", () => {
       expect(result.profile.email).toBe("john@example.com")
       expect(result.profile.age).toBeNull()
     })
+
+    describe("Nullable Builder", () => {
+      describe("Basic nullable types", () => {
+        it("should handle nullable string with null placeholder", () => {
+          const schema = Shape.doc({
+            profile: Shape.struct({
+              email: Shape.plain.string().nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          // Should start with null placeholder
+          expect(typedDoc.toJSON().profile.email).toBeNull()
+
+          // Should accept string value
+          const result = change(typedDoc, draft => {
+            draft.profile.set("email", "test@example.com")
+          }).toJSON()
+
+          expect(result.profile.email).toBe("test@example.com")
+
+          // Should accept null value
+          const result2 = change(typedDoc, draft => {
+            draft.profile.set("email", null)
+          }).toJSON()
+
+          expect(result2.profile.email).toBeNull()
+        })
+
+        it("should handle nullable number with null placeholder", () => {
+          const schema = Shape.doc({
+            stats: Shape.struct({
+              age: Shape.plain.number().nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().stats.age).toBeNull()
+
+          const result = change(typedDoc, draft => {
+            draft.stats.set("age", 25)
+          }).toJSON()
+
+          expect(result.stats.age).toBe(25)
+        })
+
+        it("should handle nullable boolean with null placeholder", () => {
+          const schema = Shape.doc({
+            settings: Shape.struct({
+              enabled: Shape.plain.boolean().nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().settings.enabled).toBeNull()
+
+          const result = change(typedDoc, draft => {
+            draft.settings.set("enabled", true)
+          }).toJSON()
+
+          expect(result.settings.enabled).toBe(true)
+        })
+
+        it("should handle nullable record with null placeholder", () => {
+          const schema = Shape.doc({
+            data: Shape.struct({
+              candidates: Shape.plain.record(Shape.plain.string()).nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().data.candidates).toBeNull()
+
+          const result = change(typedDoc, draft => {
+            draft.data.set("candidates", { a: "Alice", b: "Bob" })
+          }).toJSON()
+
+          expect(result.data.candidates).toEqual({ a: "Alice", b: "Bob" })
+
+          // Should accept null value
+          const result2 = change(typedDoc, draft => {
+            draft.data.set("candidates", null)
+          }).toJSON()
+
+          expect(result2.data.candidates).toBeNull()
+        })
+
+        it("should handle nullable array with null placeholder", () => {
+          const schema = Shape.doc({
+            data: Shape.struct({
+              tags: Shape.plain.array(Shape.plain.string()).nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().data.tags).toBeNull()
+
+          const result = change(typedDoc, draft => {
+            draft.data.set("tags", ["a", "b", "c"])
+          }).toJSON()
+
+          expect(result.data.tags).toEqual(["a", "b", "c"])
+
+          // Should accept null value
+          const result2 = change(typedDoc, draft => {
+            draft.data.set("tags", null)
+          }).toJSON()
+
+          expect(result2.data.tags).toBeNull()
+        })
+
+        it("should handle nullable struct with null placeholder", () => {
+          const schema = Shape.doc({
+            data: Shape.struct({
+              point: Shape.plain
+                .struct({
+                  x: Shape.plain.number(),
+                  y: Shape.plain.number(),
+                })
+                .nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().data.point).toBeNull()
+
+          const result = change(typedDoc, draft => {
+            draft.data.set("point", { x: 10, y: 20 })
+          }).toJSON()
+
+          expect(result.data.point).toEqual({ x: 10, y: 20 })
+
+          // Should accept null value
+          const result2 = change(typedDoc, draft => {
+            draft.data.set("point", null)
+          }).toJSON()
+
+          expect(result2.data.point).toBeNull()
+        })
+      })
+
+      describe("Nullable with custom placeholder", () => {
+        it("should allow custom placeholder after nullable()", () => {
+          const schema = Shape.doc({
+            profile: Shape.struct({
+              name: Shape.plain.string().nullable().placeholder("Anonymous"),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          // Should use custom placeholder, not null
+          expect(typedDoc.toJSON().profile.name).toBe("Anonymous")
+
+          // Should still accept null
+          const result = change(typedDoc, draft => {
+            draft.profile.set("name", null)
+          }).toJSON()
+
+          expect(result.profile.name).toBeNull()
+        })
+
+        it("should allow number placeholder after nullable()", () => {
+          const schema = Shape.doc({
+            stats: Shape.struct({
+              score: Shape.plain.number().nullable().placeholder(0),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          expect(typedDoc.toJSON().stats.score).toBe(0)
+        })
+      })
+
+      describe("Type inference", () => {
+        it("should infer correct types for nullable fields", () => {
+          const schema = Shape.doc({
+            data: Shape.struct({
+              nullableString: Shape.plain.string().nullable(),
+              nullableNumber: Shape.plain.number().nullable(),
+              nullableBoolean: Shape.plain.boolean().nullable(),
+            }),
+          })
+
+          const typedDoc = createTypedDoc(schema)
+
+          // TypeScript should allow these assignments
+          change(typedDoc, draft => {
+            draft.data.set("nullableString", "hello")
+            draft.data.set("nullableString", null)
+            draft.data.set("nullableNumber", 42)
+            draft.data.set("nullableNumber", null)
+            draft.data.set("nullableBoolean", true)
+            draft.data.set("nullableBoolean", null)
+          })
+
+          // Verify the types work correctly
+          const json = typedDoc.toJSON()
+          const str: string | null = json.data.nullableString
+          const num: number | null = json.data.nullableNumber
+          const bool: boolean | null = json.data.nullableBoolean
+
+          expect(str).toBeNull()
+          expect(num).toBeNull()
+          expect(bool).toBeNull()
+        })
+      })
+
+      describe("Equivalence to union pattern", () => {
+        it("should behave identically to manual union pattern", () => {
+          // Using nullable()
+          const schema1 = Shape.doc({
+            profile: Shape.struct({
+              email: Shape.plain.string().nullable(),
+            }),
+          })
+
+          // Using manual union
+          const schema2 = Shape.doc({
+            profile: Shape.struct({
+              email: Shape.plain
+                .union([Shape.plain.null(), Shape.plain.string()])
+                .placeholder(null),
+            }),
+          })
+
+          const doc1 = createTypedDoc(schema1)
+          const doc2 = createTypedDoc(schema2)
+
+          // Both should have same initial state
+          expect(doc1.toJSON()).toEqual(doc2.toJSON())
+
+          // Both should accept same operations
+          change(doc1, draft => {
+            draft.profile.set("email", "test@example.com")
+          })
+          change(doc2, draft => {
+            draft.profile.set("email", "test@example.com")
+          })
+
+          expect(doc1.toJSON()).toEqual(doc2.toJSON())
+        })
+      })
+    })
   })
 
   describe("Raw vs Overlaid Values", () => {

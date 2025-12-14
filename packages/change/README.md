@@ -497,6 +497,46 @@ const schema = Shape.doc({
 - `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
 - `Shape.plain.discriminatedUnion(key, variants)` - Tagged union types with a discriminant key
 
+#### Nullable Values
+
+Use `.nullable()` on value types to create nullable fields with `null` as the default placeholder:
+
+```typescript
+const schema = Shape.doc({
+  profile: Shape.struct({
+    name: Shape.plain.string().placeholder("Anonymous"),
+    email: Shape.plain.string().nullable(),        // string | null, defaults to null
+    age: Shape.plain.number().nullable(),          // number | null, defaults to null
+    verified: Shape.plain.boolean().nullable(),    // boolean | null, defaults to null
+    tags: Shape.plain.array(Shape.plain.string()).nullable(),  // string[] | null
+    metadata: Shape.plain.record(Shape.plain.string()).nullable(), // Record<string, string> | null
+    location: Shape.plain.struct({                 // { lat: number, lng: number } | null
+      lat: Shape.plain.number(),
+      lng: Shape.plain.number(),
+    }).nullable(),
+  }),
+});
+```
+
+You can chain `.placeholder()` after `.nullable()` to customize the default value:
+
+```typescript
+const schema = Shape.doc({
+  settings: Shape.struct({
+    // Nullable string with custom default
+    nickname: Shape.plain.string().nullable().placeholder("Guest"),
+  }),
+});
+```
+
+This is syntactic sugar for the more verbose union pattern:
+
+```typescript
+// These are equivalent:
+email: Shape.plain.string().nullable()
+email: Shape.plain.union([Shape.plain.null(), Shape.plain.string()]).placeholder(null)
+```
+
 ### TypedDoc API
 
 With the proxy-based API, schema properties are accessed directly on the doc object, and meta-operations are accessed via the `$` namespace.

@@ -35,6 +35,8 @@ export type {
   UnionValueShape,
   // Value shapes
   ValueShape,
+  // WithNullable type for shapes that support .nullable()
+  WithNullable,
   // WithPlaceholder type for shapes that support .placeholder()
   WithPlaceholder,
 } from "./shape.js"
