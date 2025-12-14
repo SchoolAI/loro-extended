@@ -28,13 +28,13 @@ pnpm add @loro-extended/change loro-crdt
 ## Quick Start
 
 ```typescript
-import { createTypedDoc, Shape, batch, toJSON } from "@loro-extended/change";
+import { createTypedDoc, Shape, change } from "@loro-extended/change";
 
 // Define your document schema
 const schema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
   count: Shape.counter(),
-  users: Shape.record(Shape.plain.object({
+  users: Shape.record(Shape.plain.struct({
     name: Shape.plain.string(),
   })),
 });
@@ -57,8 +57,8 @@ if ("alice" in doc.users) {
 
 // Batched mutations - commit together (optional, for performance)
 // Using functional helper (recommended)
-batch(doc, draft => {
-  draft.title.insert(0, "Batch: ");
+change(doc, draft => {
+  draft.title.insert(0, "Change: ");
   draft.count.increment(10);
   draft.users.set("bob", { name: "Bob" });
 });
@@ -66,7 +66,7 @@ batch(doc, draft => {
 
 // Get JSON snapshot using functional helper
 console.log(doc.toJSON());
-// { title: "Batch: 📝 Todo", count: 15, users: { alice: { name: "Alice" }, bob: { name: "Bob" } } }
+// { title: "Change: 📝 Todo", count: 15, users: { alice: { name: "Alice" }, bob: { name: "Bob" } } }
 ```
 
 Note that this is even more useful in combination with `@loro-extended/react` (if your app uses React) and `@loro-extended/repo` for syncing between client/server or among peers.
@@ -88,8 +88,8 @@ const blogSchema = Shape.doc({
   // Lists for ordered data
   tags: Shape.list(Shape.plain.string()), // List of strings
 
-  // Maps for structured data
-  metadata: Shape.map({
+  // Structs for structured data with fixed keys
+  metadata: Shape.struct({
     author: Shape.plain.string(), // Plain values (POJOs)
     publishedAt: Shape.plain.string(), // ISO date string
     featured: Shape.plain.boolean(),
@@ -97,7 +97,7 @@ const blogSchema = Shape.doc({
 
   // Movable lists for reorderable content
   sections: Shape.movableList(
-    Shape.map({
+    Shape.struct({
       heading: Shape.text(), // Collaborative headings
       content: Shape.text(), // Collaborative content
       order: Shape.plain.number(), // Plain metadata
@@ -106,7 +106,7 @@ const blogSchema = Shape.doc({
 });
 ```
 
-**NOTE:** Use `Shape.*` for collaborative containers and `Shape.plain.*` for plain values. Only put plain values inside Loro containers - a Loro container inside a plain JS object or array won't work.
+**NOTE:** Use `Shape.*` for collaborative containers and `Shape.plain.*` for plain values. Only put plain values inside Loro containers - a Loro container inside a plain JS struct or array won't work.
 
 ### Empty State Overlay
 
@@ -118,13 +118,13 @@ const blogSchemaWithDefaults = Shape.doc({
   title: Shape.text().placeholder("Untitled Document"),
   viewCount: Shape.counter(), // defaults to 0
   tags: Shape.list(Shape.plain.string()), // defaults to []
-  metadata: Shape.map({
+  metadata: Shape.struct({
     author: Shape.plain.string().placeholder("Anonymous"),
     publishedAt: Shape.plain.string(), // defaults to ""
     featured: Shape.plain.boolean(), // defaults to false
   }),
   sections: Shape.movableList(
-    Shape.map({
+    Shape.struct({
       heading: Shape.text(),
       content: Shape.text(),
       order: Shape.plain.number(),
@@ -139,7 +139,7 @@ console.log(doc.toJSON());
 // { title: "Untitled Document", viewCount: 0, ... }
 
 // After changes, CRDT values take priority over empty state
-batch(doc, (draft) => {
+change(doc, (draft) => {
   draft.title.insert(0, "My Blog Post");
   draft.viewCount.increment(10);
 });
@@ -160,12 +160,12 @@ doc.viewCount.increment(1);
 doc.tags.push("typescript");
 ```
 
-For batched operations (better performance, atomic undo), use `batch()`:
+For batched operations (better performance, atomic undo), use `change()`:
 
 ```typescript
-import { batch, toJSON } from "@loro-extended/change";
+import { change } from "@loro-extended/change";
 
-batch(doc, (draft) => {
+change(doc, (draft) => {
   // Text operations
   draft.title.insert(0, "📝");
   draft.title.delete(5, 3);
@@ -179,7 +179,7 @@ batch(doc, (draft) => {
   draft.tags.insert(0, "loro");
   draft.tags.delete(1, 1);
 
-  // Map operations (POJO values)
+  // Struct operations (POJO values)
   draft.metadata.set("author", "John Doe");
   draft.metadata.delete("featured");
 
@@ -193,21 +193,21 @@ batch(doc, (draft) => {
 });
 
 // All changes are committed atomically as one transaction
-// batch() returns the doc for chaining
+// change() returns the doc for chaining
 console.log(doc.toJSON()); // Updated document state
 ```
 
-### When to Use `batch()` vs Direct Mutations
+### When to Use `change()` vs Direct Mutations
 
 | Use Case | Approach |
 |----------|----------|
 | Single mutation | Direct: `doc.count.increment(1)` |
-| Multiple related mutations | Batched: `batch(doc, d => { ... })` |
-| Atomic undo/redo | Batched: `batch(doc, d => { ... })` |
-| Performance-critical bulk updates | Batched: `batch(doc, d => { ... })` |
+| Multiple related mutations | Batched: `change(doc, d => { ... })` |
+| Atomic undo/redo | Batched: `change(doc, d => { ... })` |
+| Performance-critical bulk updates | Batched: `change(doc, d => { ... })` |
 | Simple reads + writes | Direct: `doc.users.set(...)` |
 
-> **Note:** The `$.change()` and `$.batch()` methods are available as an escape hatch, but the functional `batch()` helper is recommended for cleaner code.
+> **Note:** The `$.change()` method is available as an escape hatch, but the functional `change()` helper is recommended for cleaner code.
 
 ## Advanced Usage
 
@@ -219,19 +219,19 @@ For type-safe tagged unions (like different message types or presence states), u
 import { Shape, mergeValue } from "@loro-extended/change";
 
 // Define variant shapes - each must have the discriminant key
-const ClientPresenceShape = Shape.plain.object({
+const ClientPresenceShape = Shape.plain.struct({
   type: Shape.plain.string("client"), // Literal type for discrimination
   name: Shape.plain.string(),
-  input: Shape.plain.object({
+  input: Shape.plain.struct({
     force: Shape.plain.number(),
     angle: Shape.plain.number(),
   }),
 });
 
-const ServerPresenceShape = Shape.plain.object({
+const ServerPresenceShape = Shape.plain.struct({
   type: Shape.plain.string("server"), // Literal type for discrimination
   cars: Shape.plain.record(
-    Shape.plain.object({
+    Shape.plain.struct({
       x: Shape.plain.number(),
       y: Shape.plain.number(),
     })
@@ -287,11 +287,11 @@ Handle complex nested documents with ease:
 
 ```typescript
 const complexSchema = Shape.doc({
-  article: Shape.map({
+  article: Shape.struct({
     title: Shape.text(),
-    metadata: Shape.map({
+    metadata: Shape.struct({
       views: Shape.counter(),
-      author: Shape.map({
+      author: Shape.struct({
         name: Shape.plain.string(),
         email: Shape.plain.string(),
       }),
@@ -314,7 +314,7 @@ const emptyState = {
 
 const doc = createTypedDoc(complexSchema);
 
-batch(doc, (draft) => {
+change(doc, (draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
   draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
@@ -322,20 +322,20 @@ batch(doc, (draft) => {
 });
 ```
 
-### Map Operations
+### Struct Operations
 
-For map containers, use the standard map methods:
+For struct containers (fixed-key objects), use direct property access:
 
 ```typescript
 const schema = Shape.doc({
-  settings: Shape.map({
+  settings: Shape.struct({
     theme: Shape.plain.string(),
     collapsed: Shape.plain.boolean(),
     width: Shape.plain.number(),
   }),
 });
 
-batch(doc, (draft) => {
+change(doc, (draft) => {
   // Set individual values
   draft.settings.theme = "dark";
   draft.settings.collapsed = true;
@@ -350,11 +350,11 @@ Create lists containing CRDT containers for collaborative nested structures:
 ```typescript
 const collaborativeSchema = Shape.doc({
   articles: Shape.list(
-    Shape.map({
+    Shape.struct({
       title: Shape.text(), // Collaborative title
       content: Shape.text(), // Collaborative content
       tags: Shape.list(Shape.plain.string()), // Collaborative tag list
-      metadata: Shape.plain.object({
+      metadata: Shape.plain.struct({
         // Static metadata
         authorId: Shape.plain.string(),
         publishedAt: Shape.plain.string(),
@@ -363,7 +363,7 @@ const collaborativeSchema = Shape.doc({
   ),
 });
 
-batch(doc, (draft) => {
+change(doc, (draft) => {
   // Push creates and configures nested containers automatically
   draft.articles.push({
     title: "Collaborative Article",
@@ -410,30 +410,28 @@ const doc = new TypedDoc(schema);
 
 These functional helpers provide a cleaner API and are the recommended way to work with TypedDoc:
 
-#### `batch(doc, mutator)`
+#### `change(doc, mutator)`
 
 Batches multiple mutations into a single transaction. Returns the doc for chaining.
 
 ```typescript
-import { batch } from "@loro-extended/change";
+import { change } from "@loro-extended/change";
 
-batch(doc, (draft) => {
+change(doc, (draft) => {
   draft.title.insert(0, "Hello");
   draft.count.increment(5);
 });
 
-// Chainable - batch returns the doc
-batch(doc, d => d.count.increment(1)).count.increment(2);
+// Chainable - change returns the doc
+change(doc, d => d.count.increment(1)).count.increment(2);
 ```
 
-#### `toJSON(doc)`
+#### `doc.toJSON()`
 
 Returns the full plain JavaScript object representation of the document.
 
 ```typescript
-import { toJSON } from "@loro-extended/change";
-
-const snapshot = toJSON(doc);
+const snapshot = doc.toJSON();
 // { title: "Hello", count: 5, ... }
 ```
 
@@ -452,12 +450,12 @@ loroDoc.subscribe((event) => console.log("Changed:", event));
 
 The `$` namespace provides access to meta-operations. While functional helpers are recommended, the `$` namespace is available for advanced use cases:
 
-#### `doc.$.batch(mutator)`
+#### `doc.$.change(mutator)`
 
-Same as `batch(doc, mutator)`.
+Same as `change(doc, mutator)`.
 
 ```typescript
-doc.$.batch((draft) => {
+doc.$.change((draft) => {
   // Make changes to draft - all commit together
 });
 ```
@@ -481,7 +479,7 @@ const schema = Shape.doc({
 - `Shape.counter()` - Collaborative increment/decrement counters
 - `Shape.list(itemSchema)` - Collaborative ordered lists
 - `Shape.movableList(itemSchema)` - Collaborative reorderable lists
-- `Shape.map(shape)` - Collaborative key-value maps with fixed keys
+- `Shape.struct(shape)` - Collaborative structs with fixed keys (uses LoroMap internally)
 - `Shape.record(valueSchema)` - Collaborative key-value maps with dynamic string keys
 - `Shape.tree(shape)` - Collaborative hierarchical tree structures (Note: incomplete implementation)
 
@@ -493,7 +491,7 @@ const schema = Shape.doc({
 - `Shape.plain.null()` - Null values
 - `Shape.plain.undefined()` - Undefined values
 - `Shape.plain.uint8Array()` - Binary data values
-- `Shape.plain.object(shape)` - Object values with fixed keys
+- `Shape.plain.struct(shape)` - Struct values with fixed keys
 - `Shape.plain.record(valueShape)` - Object values with dynamic string keys
 - `Shape.plain.array(itemShape)` - Array values
 - `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
@@ -522,7 +520,7 @@ doc.users.has("alice"); // true
 "alice" in doc.users;   // true
 ```
 
-For batched mutations, use `$.batch()` instead.
+For batched mutations, use `$.change()` instead.
 
 #### `doc.$.toJSON()`
 
@@ -611,7 +609,7 @@ draft.todos.forEach((todo, index) => {
 **Important**: Methods like `find()` and `filter()` return **mutable draft objects** that you can modify directly:
 
 ```typescript
-batch(doc, (draft) => {
+change(doc, (draft) => {
   // Find and mutate pattern - very common!
   const todo = draft.todos.find((t) => t.id === "123");
   if (todo) {
@@ -627,7 +625,7 @@ batch(doc, (draft) => {
 });
 ```
 
-This dual interface ensures predicates work with current data (including previous mutations in the same `batch()` block) while returned objects remain mutable.
+This dual interface ensures predicates work with current data (including previous mutations in the same `change()` block) while returned objects remain mutable.
 
 ### Movable List Operations
 
@@ -690,7 +688,7 @@ interface TodoDoc {
 const todoSchema = Shape.doc({
   title: Shape.text(),
   todos: Shape.list(
-    Shape.plain.object({
+    Shape.plain.struct({
       id: Shape.plain.string(),
       text: Shape.plain.string(),
       done: Shape.plain.boolean(),
@@ -699,10 +697,10 @@ const todoSchema = Shape.doc({
 });
 
 // TypeScript will ensure the schema produces the correct type
-const doc = new TypedDoc(todoSchema);
+const doc = createTypedDoc(todoSchema);
 
 // Mutations are type-safe
-batch(doc, (draft) => {
+change(doc, (draft) => {
   draft.title.insert(0, "Hello"); // ✅ Valid - TypeScript knows this is LoroText
   draft.todos.push({
     // ✅ Valid - TypeScript knows the expected shape
@@ -754,8 +752,8 @@ The `TypedPresence` class provides type-safe access to ephemeral presence data w
 import { TypedPresence, Shape } from "@loro-extended/change";
 
 // Define a presence schema with placeholders
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
@@ -806,7 +804,7 @@ This is typically provided by `UntypedDocHandle.presence` in `@loro-extended/rep
 
 ## Performance Considerations
 
-- All changes within a `batch()` call are batched into a single transaction
+- All changes within a `change()` call are batched into a single transaction
 - Empty state overlay is computed on-demand, not stored
 - Container creation is lazy - containers are only created when accessed
 - Type validation occurs at development time, not runtime

@@ -4,7 +4,7 @@
 
 ## What is Loro?
 
-Loro is a library of CRDTs (Conflict-free Replicated Data Types) that enables real-time collaboration and local-first applications. It allows multiple users to concurrently modify a shared JSON-like data structure, merging changes automatically without conflicts. Data is stored locally and can be synced with peers when a network connection is available.
+Loro is a library of CRDTs (Convergent Replicated Data Types) that enables real-time collaboration and local-first applications. It allows multiple users to concurrently modify a shared JSON-like data structure, merging changes automatically without conflicts. Data is stored locally and can be synced with peers when a network connection is available.
 
 ## Installation
 
@@ -39,7 +39,7 @@ import { Shape } from "@loro-extended/change";
 
 const TodoSchema = Shape.doc({
   title: Shape.text(),
-  todos: Shape.list(Shape.plain.object({
+  todos: Shape.list(Shape.plain.struct({
     id: Shape.plain.string(),
     text: Shape.plain.string(),
     done: Shape.plain.boolean(),
@@ -47,7 +47,7 @@ const TodoSchema = Shape.doc({
 });
 
 const typedHandle = repo.get("my-doc", TodoSchema);
-typedHandle.batch(draft => {
+typedHandle.change(draft => {
   draft.title.insert(0, "My Todos");
   draft.todos.push({ id: "1", text: "Learn Loro", done: false });
 });
@@ -118,8 +118,8 @@ const DocSchema = Shape.doc({
   count: Shape.counter(),
 });
 
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() }),
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({ x: Shape.plain.number(), y: Shape.plain.number() }),
   name: Shape.plain.string().placeholder("Anonymous"),
 });
 
@@ -246,7 +246,7 @@ For type safety with untyped handles, create a `TypedPresence` manually:
 ```typescript
 import { TypedPresence, Shape } from "@loro-extended/change";
 
-const PresenceSchema = Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
   name: Shape.plain.string().placeholder("Anonymous"),
 });
 
@@ -423,7 +423,7 @@ const repo = new Repo({
 
 // Define the schema
 const TodoSchema = Shape.doc({
-  todos: Shape.list(Shape.plain.object({
+  todos: Shape.list(Shape.plain.struct({
     id: Shape.plain.string(),
     text: Shape.plain.string(),
     completed: Shape.plain.boolean(),
@@ -437,7 +437,7 @@ const todoHandle = repo.get("main-todos", TodoSchema);
 await todoHandle.waitForStorage();
 
 // Add a new todo with type-safe mutations
-todoHandle.batch((draft) => {
+todoHandle.change((draft) => {
   draft.todos.push({
     id: crypto.randomUUID(),
     text: "Learn about Loro",
