@@ -1,5 +1,20 @@
 # example-chat
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [0f4ce81]
+- Updated dependencies [5d8cfdb]
+- Updated dependencies [db55b58]
+- Updated dependencies [73997a6]
+- Updated dependencies [dafd365]
+  - @loro-extended/change@1.0.0
+  - @loro-extended/repo@1.0.0
+  - @loro-extended/react@1.0.0
+  - @loro-extended/adapter-leveldb@1.0.0
+  - @loro-extended/adapter-sse@1.0.0
+
 ## 0.2.3
 
 ### Patch Changes

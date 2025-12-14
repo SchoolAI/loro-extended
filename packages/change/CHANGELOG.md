@@ -1,5 +1,154 @@
 # @loro-extended/change
 
+## 1.0.0
+
+### Minor Changes
+
+- 5d8cfdb: # Grand Unified API v3: Proxy-based TypedDoc with $ namespace
+
+  This release transforms the `@loro-extended/change` API to provide a cleaner, more intuitive interface for working with typed Loro documents.
+
+  ## Breaking Changes
+
+  ### New Proxy-based API
+
+  TypedDoc is now a Proxy that allows direct access to schema properties:
+
+  ```typescript
+  // Before (old API)
+  doc.value.title.insert(0, "Hello")
+  doc.value.count.increment(5)
+  doc.batch(draft => { ... })
+  doc.loroDoc
+
+  // After (new API)
+  doc.title.insert(0, "Hello")
+  doc.count.increment(5)
+  batch(doc, draft => { ... })
+  getLoroDoc(doc)
+  ```
+
+  ### Meta-operations via `$` namespace
+
+  All internal meta-operations can be accessed via the `$` property:
+
+  - `doc.$.batch(fn)` - Batch multiple mutations into a single transaction
+  - `doc.$.change(fn)` - Deprecated alias for `batch()`
+  - `doc.$.rawValue` - Get raw CRDT state without placeholders
+  - `doc.$.loroDoc` - Access underlying LoroDoc
+
+  ### Direct Schema Access
+
+  Schema properties are accessed directly on the doc object:
+
+  ```typescript
+  // Direct mutations - commit immediately
+  doc.title.insert(0, "Hello");
+  doc.count.increment(5);
+  doc.users.set("alice", { name: "Alice" });
+
+  // Check existence
+  doc.users.has("alice"); // true
+  "alice" in doc.users; // true (via Proxy has trap)
+  ```
+
+  ## Migration Guide
+
+  1. Replace `doc.value.` with `doc.`:
+
+     - `doc.value.title` → `doc.title`
+     - `doc.value.count` → `doc.count`
+
+  2. Replace `doc.` meta-operations with `batch()` and `getLoroDoc()` (preferred), or if needed, you can reach into internal properties:
+     - `doc.batch()` → `doc.$.batch()`
+     - `doc.change()` → `doc.$.change()` (deprecated, use `$.batch()`)
+     - `doc.rawValue` → `doc.$.rawValue`
+     - `doc.loroDoc` → `doc.$.loroDoc`
+
+  ## Other Changes
+
+  - Updated `TypedDocHandle` to use new API internally
+  - Updated `useDoc` hook types to use `Infer<D>` instead of `DeepReadonly<Infer<D>>`
+
+- 73997a6: # Shape API: Adopt "struct" terminology for fixed-key objects
+
+  This release improves the consistency and Developer Experience (DX) of the `Shape` schema builder by adopting the term "struct" for objects with fixed keys.
+
+  ## New API
+
+  ### Container Shapes
+
+  - **`Shape.struct({ ... })`** - Creates a struct container shape for objects with fixed keys (uses LoroMap internally)
+  - **`Shape.map({ ... })`** - **Deprecated**, use `Shape.struct()` instead
+
+  ### Value Shapes
+
+  - **`Shape.plain.struct({ ... })`** - Creates a struct value shape for plain objects with fixed keys
+  - **`Shape.plain.object({ ... })`** - **Deprecated**, use `Shape.plain.struct()` instead
+
+  ## Why "struct"?
+
+  The term "map" was confusing because it implies dynamic keys (like JavaScript's `Map` or a dictionary). The term "object" is too generic. "Struct" clearly communicates that this is for objects with a fixed, known set of keys - similar to structs in C, Go, Rust, etc.
+
+  The term "record" is retained for objects with dynamic keys (like `Record<string, T>` in TypeScript).
+
+  ## Migration Guide
+
+  ### Before
+
+  ```typescript
+  const schema = Shape.doc({
+    user: Shape.map({
+      name: Shape.text(),
+      age: Shape.counter(),
+      metadata: Shape.plain.object({
+        createdAt: Shape.plain.string(),
+        updatedAt: Shape.plain.string(),
+      }),
+    }),
+  });
+  ```
+
+  ### After
+
+  ```typescript
+  const schema = Shape.doc({
+    user: Shape.struct({
+      name: Shape.text(),
+      age: Shape.counter(),
+      metadata: Shape.plain.struct({
+        createdAt: Shape.plain.string(),
+        updatedAt: Shape.plain.string(),
+      }),
+    }),
+  });
+  ```
+
+  ## Backward Compatibility
+
+  - **No breaking changes** - Existing code using `Shape.map` and `Shape.plain.object` continues to work
+  - IDE will show deprecation warnings for old methods
+  - `MapContainerShape` is now a type alias for `StructContainerShape`
+  - `ObjectValueShape` is now a type alias for `StructValueShape`
+
+  ## Type Exports
+
+  New types are exported:
+
+  - `StructContainerShape` - The container shape type for structs
+  - `StructValueShape` - The value shape type for plain structs
+
+  Deprecated types (still exported for backward compatibility):
+
+  - `MapContainerShape` - Use `StructContainerShape` instead
+  - `ObjectValueShape` - Use `StructValueShape` instead
+
+### Patch Changes
+
+- 0f4ce81: Fix: Allow `record.set()` and indexed assignment to work with `Shape.text()` and `Shape.counter()` fields
+
+  Previously, calling `record.set(key, value)` or using indexed assignment (`record[key] = value`) would throw "Cannot set container directly, modify the typed ref instead" when the record contained `Shape.text()` or `Shape.counter()` fields. This affected both direct records of text/counter (`Shape.record(Shape.text())`) and records of maps containing text/counter fields.
+
 ## 0.9.1
 
 ### Patch Changes

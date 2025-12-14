@@ -1,7 +1,7 @@
 {
   "name": "example-video-conference",
   "private": true,
-  "version": "1.2.3",
+  "version": "1.2.4",
   "type": "module",
   "scripts": {
     "build:all": "pnpm build:client && pnpm build:server",

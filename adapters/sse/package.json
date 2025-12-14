@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-sse",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "description": "SSE (Server-Sent Events) network adapter for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",
