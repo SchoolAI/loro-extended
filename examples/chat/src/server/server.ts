@@ -3,12 +3,17 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/server"
-import { type Infer, TypedDoc, TypedPresence } from "@loro-extended/change"
 import {
-  type UntypedDocHandle,
+  createTypedDoc,
+  type Infer,
+  type TypedDoc,
+  TypedPresence,
+} from "@loro-extended/change"
+import {
   type DocId,
   generateUUID,
   Repo,
+  type UntypedDocHandle,
 } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
@@ -145,8 +150,8 @@ function processDocumentUpdate(
   }
 }
 
-function getChatDoc(handle: UntypedDocHandle) {
-  const typedDoc = new TypedDoc(ChatSchema, handle.doc)
+function getChatDoc(handle: UntypedDocHandle): TypedDoc<typeof ChatSchema> {
+  const typedDoc = createTypedDoc(ChatSchema, handle.doc)
 
   return typedDoc
 }

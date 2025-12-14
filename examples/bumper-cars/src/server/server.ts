@@ -41,21 +41,15 @@ app.use((req, _res, next) => {
 startupLog("Express app created")
 
 // Create adapters
-startupLog("Creating WsServerNetworkAdapter...")
 const wsAdapter = new WsServerNetworkAdapter()
-startupLog("WsServerNetworkAdapter created")
 
-startupLog("Creating LevelDBStorageAdapter...")
 const storageAdapter = new LevelDBStorageAdapter("loro-bumper-cars.db")
-startupLog("LevelDBStorageAdapter created")
 
 // Create Repo
-startupLog("Creating Repo...")
 const repo = new Repo({
   identity: { name: "bumper-cars-server", type: "service" },
   adapters: [wsAdapter, storageAdapter],
 })
-startupLog(`Repo created with peerId: ${repo.identity.peerId}`)
 
 logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
@@ -67,23 +61,16 @@ const arenaHandle = repo.get(ARENA_DOC_ID, ArenaSchema, GamePresenceSchema)
 const gameLoop = new GameLoop(arenaHandle)
 
 // Start game loop
-startupLog("Starting game loop...")
 gameLoop.start()
-startupLog("Game loop started")
 
 // Create HTTP + WebSocket server
-startupLog("Creating HTTP server...")
 const server = createServer(app)
-startupLog("HTTP server created")
 
-startupLog("Creating WebSocketServer...")
 const wss = new WebSocketServer({ server, path: "/ws" })
-startupLog("WebSocketServer created")
 
 // Log when WebSocket upgrade requests arrive (before connection is established)
 server.on("upgrade", (request: IncomingMessage, _socket, _head) => {
   const url = request.url || "unknown"
-  startupLog(`WebSocket upgrade request received for: ${url}`)
   logger.info`WebSocket upgrade request received for: ${url}`
 })
 

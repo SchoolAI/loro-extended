@@ -255,12 +255,9 @@ export class GameLoop {
     // TypedDocHandle provides direct type-safe document mutations
     this.handle.change(draft => {
       if (!draft.scores.has(peerId)) {
-        // For records with container values, we need to access the nested container
-        // via get() which creates it, then modify its properties
-        const score = draft.scores.get(peerId)
-        score.name = name
-        score.color = color
-        // Counter starts at 0 by default, no need to set
+        // Use set() to create the entry with initial values
+        // Counter starts at 0 by default
+        draft.scores.set(peerId, { name, color })
       }
     })
   }
