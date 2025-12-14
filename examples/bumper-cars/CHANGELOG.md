@@ -1,5 +1,11 @@
 # example-bumper-cars
 
+## 0.1.7
+
+### Patch Changes
+
+- 66f0c77: Fixed errors related to 1.0 changes to `repo` and `change` packages
+
 ## 0.1.6
 
 ### Patch Changes

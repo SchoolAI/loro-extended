@@ -1,5 +1,11 @@
 # example-chat
 
+## 0.2.5
+
+### Patch Changes
+
+- 66f0c77: Fixed errors related to 1.0 changes to `repo` and `change` packages
+
 ## 0.2.4
 
 ### Patch Changes
