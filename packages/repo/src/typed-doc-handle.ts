@@ -4,6 +4,7 @@ import {
   type TypedDoc,
   TypedPresence,
 } from "@loro-extended/change"
+import type { Listener } from "loro-crdt"
 import type { ReadyState } from "./types.js"
 import type { ReadinessCheck, UntypedDocHandle } from "./untyped-doc-handle.js"
 
@@ -66,6 +67,24 @@ export class TypedDocHandle<
    */
   change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {
     return this._doc.$.change(fn)
+  }
+
+  /**
+   * Convenience method: subscribe to all changes on the document.
+   *
+   * The listener receives a `LoroEventBatch` from loro-crdt containing:
+   * - `by`: The origin of the change ("local", "import", or "checkout")
+   * - `origin`: Optional string identifying the change source
+   * - `currentTarget`: The container ID of the event receiver (undefined for root doc)
+   * - `events`: Array of `LoroEvent` objects with container diffs
+   * - `from`: The frontiers before the change
+   * - `to`: The frontiers after the change
+   *
+   * @param listener - Callback invoked on each document change
+   * @returns Unsubscribe function
+   */
+  subscribe(listener: Listener): () => void {
+    return this._doc.$.loroDoc.subscribe(listener)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
