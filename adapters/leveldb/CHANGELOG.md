@@ -1,5 +1,12 @@
 # @loro-extended/adapter-leveldb
 
+## 1.1.0
+
+### Patch Changes
+
+- Updated dependencies [4896d83]
+  - @loro-extended/repo@1.1.0
+
 ## 1.0.1
 
 ### Patch Changes
