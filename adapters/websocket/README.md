@@ -1,6 +1,6 @@
 # @loro-extended/adapter-websocket
 
-WebSocket network adapter implementing the [Loro Syncing Protocol](https://loro.dev/docs/protocol) for `@loro-extended/repo`.
+WebSocket network adapter implementing the [Loro Syncing Protocol](https://loro.dev/blog/loro-protocol) for `@loro-extended/repo`.
 
 ## Features
 
@@ -129,7 +129,7 @@ export default app;
 
 ## Protocol
 
-This adapter implements the [Loro Syncing Protocol](https://loro.dev/docs/protocol), which uses binary messages over WebSocket for efficient real-time synchronization.
+This adapter implements the [Loro Syncing Protocol](https://loro.dev/blog/loro-protocol) which uses binary messages over WebSocket for efficient real-time synchronization.
 
 ### Message Types
 
