@@ -1,6 +1,6 @@
 import { getLogger, type Logger } from "@logtape/logtape"
 import type { ObjectValue, PresenceInterface } from "@loro-extended/change"
-import type { LoroDoc, Value } from "loro-crdt"
+import type {LoroDoc, PeerID, Value} from "loro-crdt"
 import type { Synchronizer } from "./synchronizer.js"
 import type { DocContent, DocId, LoroDocMutator, ReadyState } from "./types.js"
 
@@ -81,10 +81,10 @@ export class UntypedDocHandle {
       get peers() {
         // Return all peers EXCEPT self as a Map
         const allStates = synchronizer.getAllEphemeralStates(docId)
-        const result = new Map<string, ObjectValue>()
+        const result = new Map<PeerID, ObjectValue>()
         for (const [peerId, value] of Object.entries(allStates)) {
           if (peerId !== myPeerId) {
-            result.set(peerId, value)
+            result.set(peerId as PeerID, value)
           }
         }
         return result

@@ -1,4 +1,4 @@
-import type { Value } from "loro-crdt"
+import type {PeerID, Value} from "loro-crdt"
 
 /**
  * A record of string keys to Loro values, used for presence data.
@@ -29,7 +29,7 @@ export interface PresenceInterface {
    * Other peers' presence states, keyed by peer ID.
    * Does NOT include self. Use this for iterating over remote peers.
    */
-  readonly peers: Map<string, ObjectValue>
+  readonly peers: Map<PeerID, ObjectValue>
 
   /**
    * All peers' presence states, keyed by peer ID (includes self).
