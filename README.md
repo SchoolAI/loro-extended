@@ -2,7 +2,7 @@
 
 **A toolkit for building local-first applications and multi-agent systems with [Loro](https://github.com/loro-dev/loro).**
 
-`@loro-extended` adds a pleasant layer of abstraction--schemas, network synchronization, persistence, and reactivity--to a raw CRDT engine called Loro. It's built to make it easy to focus on distributed application logic, instead of the usual shuttling of state between peers, clients, agents, etc. in a distributed system.
+`@loro-extended` adds a pleasant layer of abstraction--schemas, network synchronization, persistence, and reactivity--to a raw CRDT engine called Loro. It's built to make it easy to focus on distributed application logic, instead of the usual focus on shuttling of state between peers, clients, agents, etc. in a distributed system.
 
 ---
 
