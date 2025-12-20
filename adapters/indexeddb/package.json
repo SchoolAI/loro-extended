@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "lint": "biome check --write .",
+    "check": "biome check --write .",
     "test": "vitest"
   },
   "dependencies": {

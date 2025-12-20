@@ -18,8 +18,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "format": "biome format --write .",
-    "lint": "biome check --write .",
+    "check": "biome check --write .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -9,8 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:all": "pnpm -r build && pnpm -r build:all",
-    "format": "pnpm -r format",
-    "lint": "pnpm -r lint",
+    "check": "pnpm -r check",
     "test": "pnpm -r test",
     "test:all": "pnpm -r test && pnpm -r test:all",
     "typecheck": "pnpm -r typecheck"
