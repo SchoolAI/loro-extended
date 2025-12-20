@@ -15,6 +15,14 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
+    external: ["@loro-extended/repo"],
+  },
+  {
+    entry: ["src/express.ts"],
+    outDir: "dist",
+    dts: true,
+    sourcemap: true,
+    format: "esm",
     external: ["@loro-extended/repo", "express"],
   },
 ])

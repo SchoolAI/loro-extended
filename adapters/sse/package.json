@@ -18,12 +18,15 @@
       "import": "./dist/server.js",
       "types": "./dist/server.d.ts"
     },
+    "./express": {
+      "import": "./dist/express.js",
+      "types": "./dist/express.d.ts"
+    },
     "./src/*": "./src/*"
   },
   "scripts": {
     "build": "tsup",
-    "format": "biome format --write .",
-    "lint": "biome check --write .",
+    "check": "biome check --write .",
     "test": "vitest"
   },
   "dependencies": {
