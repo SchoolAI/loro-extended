@@ -130,11 +130,15 @@ export class TypedDocHandle<
       const jsonpath = listenerOrJsonpath
       const loroDoc = this._doc.$.loroDoc
 
+      if (!jsonpathListener) {
+        throw new Error("JSONPath subscription requires a listener callback")
+      }
+
       // Wrap the user's callback to provide value and getPath helper
       const wrappedCallback = () => {
         const value = loroDoc.JSONPath(jsonpath)
         const getPath = (path: string) => loroDoc.JSONPath(path)
-        jsonpathListener!(value, getPath)
+        jsonpathListener(value, getPath)
       }
 
       // JSONPath subscription with wrapped callback
