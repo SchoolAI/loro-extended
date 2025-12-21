@@ -114,9 +114,12 @@ describe("TypedDocHandle.subscribe", () => {
       const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
 
       const calls: Array<{ value: string; prev: string | undefined }> = []
-      const unsubscribe = handle.subscribe(p => p.config.theme, (value, prev) => {
-        calls.push({ value, prev })
-      })
+      const unsubscribe = handle.subscribe(
+        p => p.config.theme,
+        (value, prev) => {
+          calls.push({ value, prev })
+        },
+      )
 
       // First change
       handle.change(draft => {
@@ -142,13 +145,20 @@ describe("TypedDocHandle.subscribe", () => {
       const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
 
       let receivedTitles: string[] = []
-      const unsubscribe = handle.subscribe(p => p.books.$each.title, (titles) => {
-        receivedTitles = titles
-      })
+      const unsubscribe = handle.subscribe(
+        p => p.books.$each.title,
+        titles => {
+          receivedTitles = titles
+        },
+      )
 
       // Add a book
       handle.change(draft => {
-        draft.books.push({ title: "New Book", price: 15, description: "A new book" })
+        draft.books.push({
+          title: "New Book",
+          price: 15,
+          description: "A new book",
+        })
       })
 
       // Should receive the title
@@ -156,7 +166,11 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Add another book
       handle.change(draft => {
-        draft.books.push({ title: "Another Book", price: 25, description: "Another one" })
+        draft.books.push({
+          title: "Another Book",
+          price: 25,
+          description: "Another one",
+        })
       })
 
       // Should receive both titles
@@ -172,14 +186,25 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Set up initial data
       handle.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, description: "First" })
-        draft.books.push({ title: "Second Book", price: 20, description: "Second" })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          description: "First",
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          description: "Second",
+        })
       })
 
       let receivedTitle: string | undefined
-      const unsubscribe = handle.subscribe(p => p.books.$at(0).title, (title) => {
-        receivedTitle = title
-      })
+      const unsubscribe = handle.subscribe(
+        p => p.books.$at(0).title,
+        title => {
+          receivedTitle = title
+        },
+      )
 
       // Modify the first book's title using the LoroText API
       handle.change(draft => {
@@ -199,20 +224,38 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Set up initial data
       handle.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, description: "First" })
-        draft.books.push({ title: "Second Book", price: 20, description: "Second" })
-        draft.books.push({ title: "Third Book", price: 30, description: "Third" })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          description: "First",
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          description: "Second",
+        })
+        draft.books.push({
+          title: "Third Book",
+          price: 30,
+          description: "Third",
+        })
       })
 
       let firstTitle: string | undefined
       let lastTitle: string | undefined
 
-      const unsubFirst = handle.subscribe(p => p.books.$first.title, (title) => {
-        firstTitle = title
-      })
-      const unsubLast = handle.subscribe(p => p.books.$last.title, (title) => {
-        lastTitle = title
-      })
+      const unsubFirst = handle.subscribe(
+        p => p.books.$first.title,
+        title => {
+          firstTitle = title
+        },
+      )
+      const unsubLast = handle.subscribe(
+        p => p.books.$last.title,
+        title => {
+          lastTitle = title
+        },
+      )
 
       // Modify the first book
       handle.change(draft => {
@@ -248,9 +291,12 @@ describe("TypedDocHandle.subscribe", () => {
       })
 
       let aliceName: string | undefined
-      const unsubscribe = handle.subscribe(p => p.users.$key("alice").name, (name) => {
-        aliceName = name
-      })
+      const unsubscribe = handle.subscribe(
+        p => p.users.$key("alice").name,
+        name => {
+          aliceName = name
+        },
+      )
 
       // Modify Alice's name
       handle.change(draft => {
@@ -274,9 +320,12 @@ describe("TypedDocHandle.subscribe", () => {
       })
 
       let allNames: string[] = []
-      const unsubscribe = handle.subscribe(p => p.users.$each.name, (names) => {
-        allNames = names
-      })
+      const unsubscribe = handle.subscribe(
+        p => p.users.$each.name,
+        names => {
+          allNames = names
+        },
+      )
 
       // Add a new user
       handle.change(draft => {
@@ -441,7 +490,11 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Add another book
       handle.change(draft => {
-        draft.books.push({ title: "Another Book", price: 25, description: "Another" })
+        draft.books.push({
+          title: "Another Book",
+          price: 25,
+          description: "Another",
+        })
       })
 
       // Should receive both prices
@@ -460,7 +513,11 @@ describe("TypedDocHandle.subscribe", () => {
       // Set up initial data
       handle.change(draft => {
         draft.books.push({ title: "Book 1", price: 10, description: "Cheap" })
-        draft.books.push({ title: "Book 2", price: 50, description: "Expensive" })
+        draft.books.push({
+          title: "Book 2",
+          price: 50,
+          description: "Expensive",
+        })
       })
 
       // Query prices (plain values) instead of titles (LoroText containers)
@@ -538,9 +595,21 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Set up initial data with multiple books
       handle.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, description: "First" })
-        draft.books.push({ title: "Second Book", price: 20, description: "Second" })
-        draft.books.push({ title: "Third Book", price: 30, description: "Third" })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          description: "First",
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          description: "Second",
+        })
+        draft.books.push({
+          title: "Third Book",
+          price: 30,
+          description: "Third",
+        })
       })
 
       // Test negative index in JSONPath
@@ -565,8 +634,16 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Set up initial data
       handle.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, description: "First" })
-        draft.books.push({ title: "Second Book", price: 20, description: "Second" })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          description: "First",
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          description: "Second",
+        })
       })
 
       let lastPrice: unknown[] = []
@@ -583,7 +660,11 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Add a third book - now it becomes the last
       handle.change(draft => {
-        draft.books.push({ title: "Third Book", price: 30, description: "Third" })
+        draft.books.push({
+          title: "Third Book",
+          price: 30,
+          description: "Third",
+        })
       })
 
       expect(lastPrice).toEqual([30])

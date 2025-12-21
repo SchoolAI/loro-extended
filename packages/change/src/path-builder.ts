@@ -5,8 +5,8 @@
 // Runtime implementation of the path builder that creates PathSelector objects
 // with proper segments for JSONPath compilation.
 
-import type { ContainerOrValueShape, DocShape } from "./shape.js"
 import type { PathBuilder, PathSegment, PathSelector } from "./path-selector.js"
+import type { ContainerOrValueShape, DocShape } from "./shape.js"
 
 function createPathSelector<T>(segments: PathSegment[]): PathSelector<T> {
   return {
@@ -121,9 +121,7 @@ export function createPathBuilder<D extends DocShape>(
   for (const key in docShape.shapes) {
     Object.defineProperty(builder, key, {
       get() {
-        return createPathNode(docShape.shapes[key], [
-          { type: "property", key },
-        ])
+        return createPathNode(docShape.shapes[key], [{ type: "property", key }])
       },
       enumerable: true,
     })

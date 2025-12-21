@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { Shape } from "./shape.js"
 import { createPathBuilder } from "./path-builder.js"
 import { compileToJsonPath, hasWildcard } from "./path-compiler.js"
 import { evaluatePathOnValue } from "./path-evaluator.js"
+import { Shape } from "./shape.js"
 
 describe("Path Selector DSL", () => {
   const docShape = Shape.doc({
@@ -66,7 +66,7 @@ describe("Path Selector DSL", () => {
 
     it("should create path segments for $first and $last", () => {
       const builder = createPathBuilder(docShape)
-      
+
       const firstSelector = builder.books.$first.title
       expect(firstSelector.__segments).toEqual([
         { type: "property", key: "books" },
@@ -160,9 +160,7 @@ describe("Path Selector DSL", () => {
     })
 
     it("should use bracket notation for special characters", () => {
-      const segments = [
-        { type: "property" as const, key: "my-key" },
-      ]
+      const segments = [{ type: "property" as const, key: "my-key" }]
       expect(compileToJsonPath(segments)).toBe('$["my-key"]')
     })
   })
@@ -290,9 +288,7 @@ describe("Path Selector DSL", () => {
     })
 
     it("should return undefined for missing property", () => {
-      const segments = [
-        { type: "property" as const, key: "nonexistent" },
-      ]
+      const segments = [{ type: "property" as const, key: "nonexistent" }]
       expect(evaluatePathOnValue(testData, segments)).toBeUndefined()
     })
 

@@ -9,8 +9,8 @@
 // 3. Deep equality comparison to filter false positives
 
 import type { PathSegment, PathSelector } from "./path-selector.js"
-import type { TypedDoc } from "./typed-doc.js"
 import type { DocShape } from "./shape.js"
+import type { TypedDoc } from "./typed-doc.js"
 
 /**
  * Evaluate a path selector against a TypedDoc to get the current value.

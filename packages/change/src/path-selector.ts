@@ -44,8 +44,10 @@ export interface PathSelector<T> {
 // ============================================================================
 
 // List path node - InArray tracks if we're inside a wildcard
-interface ListPathNode<Item extends ContainerOrValueShape, InArray extends boolean>
-  extends PathSelector<WrapType<Infer<Item>[], InArray>> {
+interface ListPathNode<
+  Item extends ContainerOrValueShape,
+  InArray extends boolean,
+> extends PathSelector<WrapType<Infer<Item>[], InArray>> {
   /** Select all items (wildcard) - sets InArray to true for children */
   readonly $each: PathNode<Item, true>
   /** Select item at specific index (supports negative indices: -1 = last, -2 = second-to-last, etc.) */
@@ -60,13 +62,17 @@ interface ListPathNode<Item extends ContainerOrValueShape, InArray extends boole
 type StructPathNode<
   Shapes extends Record<string, ContainerOrValueShape>,
   InArray extends boolean,
-> = PathSelector<WrapType<{ [K in keyof Shapes]: Infer<Shapes[K]> }, InArray>> & {
+> = PathSelector<
+  WrapType<{ [K in keyof Shapes]: Infer<Shapes[K]> }, InArray>
+> & {
   readonly [K in keyof Shapes]: PathNode<Shapes[K], InArray>
 }
 
 // Record path node (dynamic keys) - propagates InArray to children
-interface RecordPathNode<Item extends ContainerOrValueShape, InArray extends boolean>
-  extends PathSelector<WrapType<Record<string, Infer<Item>>, InArray>> {
+interface RecordPathNode<
+  Item extends ContainerOrValueShape,
+  InArray extends boolean,
+> extends PathSelector<WrapType<Record<string, Infer<Item>>, InArray>> {
   /** Select all values (wildcard) - sets InArray to true for children */
   readonly $each: PathNode<Item, true>
   /** Select value at specific key */
@@ -74,13 +80,19 @@ interface RecordPathNode<Item extends ContainerOrValueShape, InArray extends boo
 }
 
 // Text path node (terminal)
-type TextPathNode<InArray extends boolean> = PathSelector<WrapType<string, InArray>>
+type TextPathNode<InArray extends boolean> = PathSelector<
+  WrapType<string, InArray>
+>
 
 // Counter path node (terminal)
-type CounterPathNode<InArray extends boolean> = PathSelector<WrapType<number, InArray>>
+type CounterPathNode<InArray extends boolean> = PathSelector<
+  WrapType<number, InArray>
+>
 
 // Terminal node for primitive values
-type TerminalPathNode<T, InArray extends boolean> = PathSelector<WrapType<T, InArray>>
+type TerminalPathNode<T, InArray extends boolean> = PathSelector<
+  WrapType<T, InArray>
+>
 
 // ============================================================================
 // PathNode Type Mapping
