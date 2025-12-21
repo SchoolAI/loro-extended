@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
+import type { Mutable } from "../types.js"
 
 const MessageSchema = Shape.struct({
   id: Shape.plain.string(),
@@ -255,6 +256,32 @@ describe("JSON Compatibility", () => {
       // TextRef (inside message)
       // root.messages[0] is a MapRef. content is TextRef.
       expect(root.messages[0].content.toJSON()).toBe("A")
+    })
+  })
+
+  it("should expose toJSON() in Mutable type signature", () => {
+    const doc = createTypedDoc(ChatSchema)
+
+    // This test verifies that TypeScript sees toJSON() on Mutable types
+    // If this compiles, the type fix is working correctly
+    change(doc, (root: Mutable<typeof ChatSchema>) => {
+      root.meta.title = "Type Test"
+      root.messages.push({ id: "1", content: "Hello", timestamp: 123 })
+
+      // These should all compile without errors - toJSON() is visible on the type
+      const metaJson: { title: string; count: number } = root.meta.toJSON()
+      const messagesJson: Array<{
+        id: string
+        content: string
+        timestamp: number
+      }> = root.messages.toJSON()
+      const countJson: number = root.meta.count.toJSON()
+
+      expect(metaJson).toEqual({ title: "Type Test", count: 0 })
+      expect(messagesJson).toEqual([
+        { id: "1", content: "Hello", timestamp: 123 },
+      ])
+      expect(countJson).toBe(0)
     })
   })
 })

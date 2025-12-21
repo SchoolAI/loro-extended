@@ -19,6 +19,12 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
 
   abstract absorbPlainValues(): void
 
+  /**
+   * Serializes the ref to a plain JSON-compatible value.
+   * Returns the plain type inferred from the shape.
+   */
+  abstract toJSON(): Infer<Shape>
+
   protected get shape(): Shape {
     return this._params.shape
   }
