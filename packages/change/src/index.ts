@@ -7,6 +7,16 @@ export {
 // Functional helpers (recommended API)
 export { change, getLoroDoc } from "./functional-helpers.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
+// Path selector DSL exports
+export { createPathBuilder } from "./path-builder.js"
+export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
+export { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
+export type {
+  PathBuilder,
+  PathNode,
+  PathSegment,
+  PathSelector,
+} from "./path-selector.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
 export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
 export type {

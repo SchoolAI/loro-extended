@@ -1,12 +1,19 @@
 import type { DocShape, Mutable, ValueShape } from "@loro-extended/change"
 import {
+  compileToJsonPath,
+  createPathBuilder,
   createTypedDoc,
+  evaluatePath,
+  hasWildcard,
+  type PathBuilder,
+  type PathSelector,
   type TypedDoc,
   TypedPresence,
 } from "@loro-extended/change"
 import type { Listener } from "loro-crdt"
 import type { ReadyState } from "./types.js"
 import type { ReadinessCheck, UntypedDocHandle } from "./untyped-doc-handle.js"
+import { equal } from "./utils/equal.js"
 
 /**
  * A strongly-typed handle to a Loro document with typed presence.
@@ -36,6 +43,8 @@ export class TypedDocHandle<
   private readonly _doc: TypedDoc<D>
   private readonly _presence: TypedPresence<P>
 
+  private readonly _docShape: D
+
   constructor(
     public readonly untyped: UntypedDocHandle,
     docShape: D,
@@ -45,6 +54,7 @@ export class TypedDocHandle<
     this.peerId = untyped.peerId
     this._doc = createTypedDoc(docShape, untyped.doc)
     this._presence = new TypedPresence(presenceShape, untyped.presence)
+    this._docShape = docShape
   }
 
   /**
@@ -86,16 +96,43 @@ export class TypedDocHandle<
   subscribe(listener: Listener): () => void
 
   /**
-   * Subscribe to changes that may affect a JSONPath query.
+   * Subscribe to changes at a specific path using the type-safe DSL.
    *
-   * This is more efficient than subscribing to all changes when you only
-   * care about specific paths. The callback may fire false positives
-   * (extra notifications) but never false negatives (missed changes).
+   * The callback receives:
+   * - `value`: The current value at the path (properly typed)
+   * - `prev`: The previous value (undefined on first call)
+   *
+   * This uses two-stage filtering:
+   * 1. WASM-side: subscribeJsonpath for efficient path matching
+   * 2. JS-side: Deep equality check to filter false positives
+   *
+   * @param selector - Path selector function using the DSL
+   * @param listener - Callback receiving the typed value and previous value
+   * @returns Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * handle.subscribe(
+   *   p => p.books.$each.title,
+   *   (titles, prev) => {
+   *     console.log("Titles changed from", prev, "to", titles)
+   *   }
+   * )
+   * ```
+   */
+  subscribe<T>(
+    selector: (path: PathBuilder<D>) => PathSelector<T>,
+    listener: (value: T, prev: T | undefined) => void,
+  ): () => void
+
+  /**
+   * Subscribe to changes that may affect a JSONPath query (escape hatch).
+   *
+   * Use this for complex queries not expressible in the DSL (filters, etc.).
+   * Note: No type safety - callback receives unknown[].
    *
    * @param jsonpath - JSONPath expression (e.g., "$.users[*].name")
-   * @param listener - Callback receiving:
-   *   - `value`: The result of evaluating the subscribed JSONPath query
-   *   - `getPath`: Helper function to query other JSONPath expressions
+   * @param listener - Callback receiving the query result
    * @returns Unsubscribe function
    *
    * @example
@@ -103,49 +140,103 @@ export class TypedDocHandle<
    * // Subscribe to changes affecting books with price > 10
    * const unsubscribe = handle.subscribe(
    *   "$.books[?@.price>10].title",
-   *   (titles, getPath) => {
-   *     // titles is already the result of the subscribed path
+   *   (titles) => {
    *     console.log("Expensive book titles:", titles);
-   *
-   *     // getPath makes it easy to query related paths
-   *     const allBooks = getPath("$.books");
    *   }
    * );
    * ```
    */
-  subscribe(
-    jsonpath: string,
-    listener: (value: unknown[], getPath: (path: string) => unknown[]) => void,
-  ): () => void
+  subscribe(jsonpath: string, listener: (value: unknown[]) => void): () => void
 
   // Implementation of subscribe overloads
   subscribe(
-    listenerOrJsonpath: Listener | string,
-    jsonpathListener?: (
-      value: unknown[],
-      getPath: (path: string) => unknown[],
-    ) => void,
+    listenerOrSelectorOrJsonpath:
+      | Listener
+      | ((path: PathBuilder<D>) => PathSelector<unknown>)
+      | string,
+    pathListener?:
+      | ((value: unknown, prev: unknown | undefined) => void)
+      | ((value: unknown[]) => void),
   ): () => void {
-    if (typeof listenerOrJsonpath === "string") {
-      const jsonpath = listenerOrJsonpath
+    // Case 1: Regular subscription (all changes)
+    // A regular Listener takes 1 argument and has no second argument
+    // A path selector function also takes 1 argument but MUST have a second argument (the listener)
+    if (typeof listenerOrSelectorOrJsonpath === "function" && !pathListener) {
+      return this._doc.$.loroDoc.subscribe(
+        listenerOrSelectorOrJsonpath as Listener,
+      )
+    }
+
+    // Case 2: Raw JSONPath string (escape hatch)
+    if (typeof listenerOrSelectorOrJsonpath === "string") {
+      const jsonpath = listenerOrSelectorOrJsonpath
       const loroDoc = this._doc.$.loroDoc
 
-      if (!jsonpathListener) {
+      if (!pathListener) {
         throw new Error("JSONPath subscription requires a listener callback")
       }
 
-      // Wrap the user's callback to provide value and getPath helper
       const wrappedCallback = () => {
         const value = loroDoc.JSONPath(jsonpath)
-        const getPath = (path: string) => loroDoc.JSONPath(path)
-        jsonpathListener(value, getPath)
+        ;(pathListener as (value: unknown[]) => void)(value)
       }
 
-      // JSONPath subscription with wrapped callback
       return loroDoc.subscribeJsonpath(jsonpath, wrappedCallback)
     }
-    // Regular subscription
-    return this._doc.$.loroDoc.subscribe(listenerOrJsonpath)
+
+    // Case 3: Type-safe path selector DSL
+    const selectorFn = listenerOrSelectorOrJsonpath as (
+      path: PathBuilder<D>,
+    ) => PathSelector<unknown>
+    const listener = pathListener as (
+      value: unknown,
+      prev: unknown | undefined,
+    ) => void
+
+    if (!listener) {
+      throw new Error("Path selector subscription requires a listener callback")
+    }
+
+    const pathBuilder = createPathBuilder(this._docShape)
+    const selector = selectorFn(pathBuilder)
+    const jsonpath = compileToJsonPath(selector.__segments)
+    const needsDeepEqual = hasWildcard(selector.__segments)
+
+    // Establish initial previousValue baseline synchronously
+    // This is critical for detecting if the first signaled event is a genuine change
+    let previousValue: unknown = evaluatePath(this._doc, selector)
+
+    const wrappedCallback = () => {
+      const newValue = evaluatePath(this._doc, selector)
+
+      // For paths with wildcards, we need deep equality to filter false positives
+      // For exact paths, subscribeJsonpath is already precise
+      if (needsDeepEqual && equal(newValue, previousValue)) {
+        return // False positive, skip callback
+      }
+
+      const prev = previousValue
+      previousValue = newValue
+      listener(newValue, prev)
+    }
+
+    return this._doc.$.loroDoc.subscribeJsonpath(jsonpath, wrappedCallback)
+  }
+
+  /**
+   * Execute a JSONPath query against the document.
+   *
+   * This is a general-purpose method for querying the document with full
+   * JSONPath expressiveness. Use this for ad-hoc queries or within callbacks.
+   *
+   * @example
+   * ```typescript
+   * const expensiveBooks = handle.jsonPath("$.books[?@.price>10]")
+   * const allTitles = handle.jsonPath("$..title")
+   * ```
+   */
+  jsonPath(path: string): unknown[] {
+    return this._doc.$.loroDoc.JSONPath(path)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

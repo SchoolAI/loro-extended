@@ -34,9 +34,11 @@ import { createTypedDoc, Shape, change } from "@loro-extended/change";
 const schema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
   count: Shape.counter(),
-  users: Shape.record(Shape.plain.struct({
-    name: Shape.plain.string(),
-  })),
+  users: Shape.record(
+    Shape.plain.struct({
+      name: Shape.plain.string(),
+    })
+  ),
 });
 
 // Create a typed document
@@ -57,7 +59,7 @@ if ("alice" in doc.users) {
 
 // Batched mutations - commit together (optional, for performance)
 // Using functional helper (recommended)
-change(doc, draft => {
+change(doc, (draft) => {
   draft.title.insert(0, "Change: ");
   draft.count.increment(10);
   draft.users.set("bob", { name: "Bob" });
@@ -199,13 +201,13 @@ console.log(doc.toJSON()); // Updated document state
 
 ### When to Use `change()` vs Direct Mutations
 
-| Use Case | Approach |
-|----------|----------|
-| Single mutation | Direct: `doc.count.increment(1)` |
-| Multiple related mutations | Batched: `change(doc, d => { ... })` |
-| Atomic undo/redo | Batched: `change(doc, d => { ... })` |
+| Use Case                          | Approach                             |
+| --------------------------------- | ------------------------------------ |
+| Single mutation                   | Direct: `doc.count.increment(1)`     |
+| Multiple related mutations        | Batched: `change(doc, d => { ... })` |
+| Atomic undo/redo                  | Batched: `change(doc, d => { ... })` |
 | Performance-critical bulk updates | Batched: `change(doc, d => { ... })` |
-| Simple reads + writes | Direct: `doc.users.set(...)` |
+| Simple reads + writes             | Direct: `doc.users.set(...)`         |
 
 > **Note:** The `$.change()` method is available as an escape hatch, but the functional `change()` helper is recommended for cleaner code.
 
@@ -276,6 +278,7 @@ function handlePresence(presence: typeof result) {
 ```
 
 **Key features:**
+
 - The discriminant key (e.g., `"type"`) determines which variant shape to use
 - Missing fields are filled from the empty state of the matching variant
 - Works seamlessly with `@loro-extended/react`'s `usePresence` hook
@@ -382,6 +385,31 @@ change(doc, (draft) => {
 });
 ```
 
+## Path Selector DSL
+
+The `@loro-extended/change` package exports a type-safe path selector DSL for building (a subset of) JSONPath expressions with full TypeScript type inference. This is primarily used by `TypedDocHandle.subscribe()` in `@loro-extended/repo` for efficient, type-safe subscriptions:
+
+```typescript
+// In @loro-extended/repo, use with TypedDocHandle.subscribe():
+handle.subscribe(
+  (p) => p.books.$each.title, // Type-safe path selector
+  (titles, prev) => {
+    // titles: string[], prev: string[] | undefined
+    console.log("Titles changed:", titles);
+  }
+);
+
+// DSL constructs:
+// p.config.theme        - Property access
+// p.books.$each         - All items in list/record
+// p.books.$at(0)        - Item at index (supports negative: -1 = last)
+// p.books.$first        - First item (alias for $at(0))
+// p.books.$last         - Last item (alias for $at(-1))
+// p.users.$key("alice") - Record value by key
+```
+
+See `@loro-extended/repo` documentation for full details on `TypedDocHandle.subscribe()`.
+
 ## API Reference
 
 ### Core Functions
@@ -397,7 +425,7 @@ const doc = createTypedDoc(schema);
 const docFromExisting = createTypedDoc(schema, existingLoroDoc);
 ```
 
-#### `new TypedDoc<T>(schema, existingDoc?)` *(deprecated)*
+#### `new TypedDoc<T>(schema, existingDoc?)` _(deprecated)_
 
 Constructor-style API. Use `createTypedDoc()` instead for cleaner code.
 
@@ -423,7 +451,7 @@ change(doc, (draft) => {
 });
 
 // Chainable - change returns the doc
-change(doc, d => d.count.increment(1)).count.increment(2);
+change(doc, (d) => d.count.increment(1)).count.increment(2);
 ```
 
 #### `doc.toJSON()`
@@ -505,15 +533,18 @@ Use `.nullable()` on value types to create nullable fields with `null` as the de
 const schema = Shape.doc({
   profile: Shape.struct({
     name: Shape.plain.string().placeholder("Anonymous"),
-    email: Shape.plain.string().nullable(),        // string | null, defaults to null
-    age: Shape.plain.number().nullable(),          // number | null, defaults to null
-    verified: Shape.plain.boolean().nullable(),    // boolean | null, defaults to null
-    tags: Shape.plain.array(Shape.plain.string()).nullable(),  // string[] | null
+    email: Shape.plain.string().nullable(), // string | null, defaults to null
+    age: Shape.plain.number().nullable(), // number | null, defaults to null
+    verified: Shape.plain.boolean().nullable(), // boolean | null, defaults to null
+    tags: Shape.plain.array(Shape.plain.string()).nullable(), // string[] | null
     metadata: Shape.plain.record(Shape.plain.string()).nullable(), // Record<string, string> | null
-    location: Shape.plain.struct({                 // { lat: number, lng: number } | null
-      lat: Shape.plain.number(),
-      lng: Shape.plain.number(),
-    }).nullable(),
+    location: Shape.plain
+      .struct({
+        // { lat: number, lng: number } | null
+        lat: Shape.plain.number(),
+        lng: Shape.plain.number(),
+      })
+      .nullable(),
   }),
 });
 ```
@@ -533,8 +564,10 @@ This is syntactic sugar for the more verbose union pattern:
 
 ```typescript
 // These are equivalent:
-email: Shape.plain.string().nullable()
-email: Shape.plain.union([Shape.plain.null(), Shape.plain.string()]).placeholder(null)
+email: Shape.plain.string().nullable();
+email: Shape.plain
+  .union([Shape.plain.null(), Shape.plain.string()])
+  .placeholder(null);
 ```
 
 ### TypedDoc API
@@ -557,7 +590,7 @@ doc.users.set("alice", { name: "Alice" });
 
 // Check existence
 doc.users.has("alice"); // true
-"alice" in doc.users;   // true
+"alice" in doc.users; // true
 ```
 
 For batched mutations, use `$.change()` instead.
