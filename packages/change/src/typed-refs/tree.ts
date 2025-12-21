@@ -1,10 +1,16 @@
 import type { TreeContainerShape } from "../shape.js"
+import type { Infer } from "../types.js"
 import { TypedRef } from "./base.js"
 
 // Tree typed ref
 export class TreeRef<T extends TreeContainerShape> extends TypedRef<T> {
   absorbPlainValues() {
     // TODO(duane): implement for trees
+  }
+
+  toJSON(): Infer<T> {
+    // TODO(duane): implement proper tree serialization
+    return this.container.toJSON() as Infer<T>
   }
 
   createNode(parent?: any, index?: number): any {

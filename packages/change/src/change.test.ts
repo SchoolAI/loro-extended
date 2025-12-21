@@ -242,8 +242,10 @@ describe("CRDT Operations", () => {
       // Test move operation: move first item to the end
       const result = change(typedDoc, draft => {
         const valueToMove = draft.items.get(0)
-        draft.items.delete(0, 1)
-        draft.items.insert(2, valueToMove)
+        if (valueToMove !== undefined) {
+          draft.items.delete(0, 1)
+          draft.items.insert(2, valueToMove)
+        }
       }).toJSON()
 
       expect(result.items).toEqual(["second", "third", "first"])

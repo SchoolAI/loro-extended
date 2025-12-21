@@ -19,7 +19,7 @@ describe("MovableListRef", () => {
         draft.users.push({ name: "Alice" })
 
         // Update via index
-        draft.users[0] = { name: "Bob" }
+        ;(draft.users as any)[0] = { name: "Bob" }
       })
 
       expect(doc.toJSON().users[0]).toEqual({ name: "Bob" })

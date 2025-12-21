@@ -22,7 +22,7 @@ import {
 export class RecordRef<
   NestedShape extends ContainerOrValueShape,
 > extends TypedRef<any> {
-  [key: string]: Infer<NestedShape> | any
+  [key: string]: InferMutableType<NestedShape> | undefined | any
   private refCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
   protected get shape(): RecordContainerShape<NestedShape> {
@@ -129,7 +129,7 @@ export class RecordRef<
     return ref as any
   }
 
-  get(key: string): InferMutableType<NestedShape> {
+  get(key: string): InferMutableType<NestedShape> | undefined {
     return this.getRef(key)
   }
 

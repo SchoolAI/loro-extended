@@ -336,7 +336,7 @@ export abstract class ListRefBase<
     return result
   }
 
-  get(index: number): MutableItem {
+  get(index: number): MutableItem | undefined {
     return this.getMutableItem(index)
   }
 

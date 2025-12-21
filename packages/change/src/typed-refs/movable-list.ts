@@ -1,6 +1,6 @@
 import type { Container, LoroMovableList } from "loro-crdt"
 import type { ContainerOrValueShape } from "../shape.js"
-import type { Infer } from "../types.js"
+import type { InferMutableType } from "../types.js"
 import { ListRefBase } from "./list-base.js"
 
 // Movable list typed ref
@@ -8,7 +8,7 @@ export class MovableListRef<
   NestedShape extends ContainerOrValueShape,
   Item = NestedShape["_plain"],
 > extends ListRefBase<NestedShape> {
-  [index: number]: Infer<NestedShape>
+  [index: number]: InferMutableType<NestedShape> | undefined
 
   protected get container(): LoroMovableList {
     return super.container as LoroMovableList
