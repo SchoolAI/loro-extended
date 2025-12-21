@@ -156,8 +156,8 @@ importers:
         specifier: workspace:^
         version: link:../../packages/repo
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
     devDependencies:
       '@logtape/logtape':
         specifier: ^1.1.1
@@ -767,8 +767,8 @@ importers:
   packages/change:
     dependencies:
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
     devDependencies:
       tsup:
         specifier: ^8.5.0
@@ -795,8 +795,8 @@ importers:
         specifier: '>=4'
         version: 4.10.7
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
     devDependencies:
       tsup:
         specifier: ^8.5.0
@@ -815,8 +815,8 @@ importers:
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
     devDependencies:
       tsup:
         specifier: ^8.5.0
@@ -838,8 +838,8 @@ importers:
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
       react:
         specifier: '>=18'
         version: 19.1.1
@@ -882,8 +882,8 @@ importers:
         specifier: ^1.0.1
         version: 1.2.0
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
       mutative:
         specifier: ^1.2.0
         version: 1.2.0
@@ -928,8 +928,8 @@ importers:
         specifier: ^6.0.0
         version: 6.2.0(ink@6.5.1(@types/react@19.1.8)(react@19.1.1))(react@19.1.1)
       loro-crdt:
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: ^1.10.3
+        version: 1.10.3
       meow:
         specifier: ^14.0.0
         version: 14.0.0
@@ -3026,8 +3026,8 @@ packages:
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
 
-  loro-crdt@1.10.2:
-    resolution: {integrity: sha512-qERS9ReVQ9eT4tQsChXPvMUtLV4W8OWHJyUBW0dSksY6HGwk3AkyczkzlgBjRjVZRbU4aig6TOJqWo97xbtF2Q==}
+  loro-crdt@1.10.3:
+    resolution: {integrity: sha512-vzWkVw7mWrKTilPjrgAhhzjAyOn3/DaUPJxdK9lunpEI1Y+uQMDBt/pEtRiovKFtGXo4tUVfULnFc7H/ufGwkQ==}
 
   loupe@3.2.0:
     resolution: {integrity: sha512-2NCfZcT5VGVNX9mSZIxLRkEAegDGBpuQZBy13desuHeVORmBDyAET4TkJr4SjqQy3A8JDofMN6LpkK8Xcm/dlw==}
@@ -6120,7 +6120,7 @@ snapshots:
 
   lodash@4.17.21: {}
 
-  loro-crdt@1.10.2: {}
+  loro-crdt@1.10.3: {}
 
   loupe@3.2.0: {}
 

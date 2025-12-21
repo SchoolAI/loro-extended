@@ -70,7 +70,7 @@ export class TypedDocHandle<
   }
 
   /**
-   * Convenience method: subscribe to all changes on the document.
+   * Subscribe to all changes on the document.
    *
    * The listener receives a `LoroEventBatch` from loro-crdt containing:
    * - `by`: The origin of the change ("local", "import", or "checkout")
@@ -83,8 +83,65 @@ export class TypedDocHandle<
    * @param listener - Callback invoked on each document change
    * @returns Unsubscribe function
    */
-  subscribe(listener: Listener): () => void {
-    return this._doc.$.loroDoc.subscribe(listener)
+  subscribe(listener: Listener): () => void
+
+  /**
+   * Subscribe to changes that may affect a JSONPath query.
+   *
+   * This is more efficient than subscribing to all changes when you only
+   * care about specific paths. The callback may fire false positives
+   * (extra notifications) but never false negatives (missed changes).
+   *
+   * @param jsonpath - JSONPath expression (e.g., "$.users[*].name")
+   * @param listener - Callback receiving:
+   *   - `value`: The result of evaluating the subscribed JSONPath query
+   *   - `getPath`: Helper function to query other JSONPath expressions
+   * @returns Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * // Subscribe to changes affecting books with price > 10
+   * const unsubscribe = handle.subscribe(
+   *   "$.books[?@.price>10].title",
+   *   (titles, getPath) => {
+   *     // titles is already the result of the subscribed path
+   *     console.log("Expensive book titles:", titles);
+   *
+   *     // getPath makes it easy to query related paths
+   *     const allBooks = getPath("$.books");
+   *   }
+   * );
+   * ```
+   */
+  subscribe(
+    jsonpath: string,
+    listener: (value: unknown[], getPath: (path: string) => unknown[]) => void,
+  ): () => void
+
+  // Implementation of subscribe overloads
+  subscribe(
+    listenerOrJsonpath: Listener | string,
+    jsonpathListener?: (
+      value: unknown[],
+      getPath: (path: string) => unknown[],
+    ) => void,
+  ): () => void {
+    if (typeof listenerOrJsonpath === "string") {
+      const jsonpath = listenerOrJsonpath
+      const loroDoc = this._doc.$.loroDoc
+
+      // Wrap the user's callback to provide value and getPath helper
+      const wrappedCallback = () => {
+        const value = loroDoc.JSONPath(jsonpath)
+        const getPath = (path: string) => loroDoc.JSONPath(path)
+        jsonpathListener!(value, getPath)
+      }
+
+      // JSONPath subscription with wrapped callback
+      return loroDoc.subscribeJsonpath(jsonpath, wrappedCallback)
+    }
+    // Regular subscription
+    return this._doc.$.loroDoc.subscribe(listenerOrJsonpath)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsup",
     "check": "biome check --write .",
-    "test": "vitest",
+    "test": "NO_COLOR=true vitest",
     "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
@@ -34,7 +34,7 @@
     "uuid": "^9.0.1"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.10.2"
+    "loro-crdt": "^1.10.3"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
