@@ -1,5 +1,4 @@
-import { Shape } from "@loro-extended/change"
-import type { PeerID } from "@loro-extended/repo"
+import { type Infer, type InferMutableType, Shape } from "@loro-extended/change"
 
 export const MessageSchema = Shape.map({
   id: Shape.plain.string(),
@@ -20,22 +19,20 @@ export const ChatSchema = Shape.doc({
   preferences: Shape.record(PreferenceSchema),
 })
 
-export type Message = {
-  id: string
-  role: "user" | "assistant"
-  author: PeerID
-  authorName: string
-  content: string
-  timestamp: number
-  needsAiReply: false
-}
+// Derive types from schemas for type safety
+export type Message = Infer<typeof MessageSchema>
+export type MutableMessage = InferMutableType<typeof MessageSchema>
+export type ChatDoc = Infer<typeof ChatSchema>
+export type MutableChatDoc = InferMutableType<typeof ChatSchema>
 
 export const PresenceSchema = Shape.plain.object({
   type: Shape.plain.string("user", "ai"),
   name: Shape.plain.string(),
 })
 
-export const EmptyPresence = {
-  type: "user" as const,
+export type Presence = Infer<typeof PresenceSchema>
+
+export const EmptyPresence: Presence = {
+  type: "user",
   name: "Anonymous",
 }

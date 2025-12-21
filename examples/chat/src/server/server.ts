@@ -2,23 +2,22 @@ import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server"
 import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
-} from "@loro-extended/adapter-sse/server"
-import {
-  createTypedDoc,
-  type Infer,
-  type TypedDoc,
-  TypedPresence,
-} from "@loro-extended/change"
+} from "@loro-extended/adapter-sse/express"
 import {
   type DocId,
   generateUUID,
   Repo,
-  type UntypedDocHandle,
+  TypedDocHandle,
 } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
-import { ChatSchema, PresenceSchema } from "../shared/types.js"
+import {
+  ChatSchema,
+  type MutableMessage,
+  type Presence,
+  PresenceSchema,
+} from "../shared/types.js"
 import { logger, model } from "./config.js"
 import { requestLogger } from "./request-logger.js"
 
@@ -31,28 +30,34 @@ app.use(requestLogger())
 
 // Track active subscriptions to avoid double-subscribing
 const subscriptions = new Map<DocId, () => void>()
-const presences = new Map<DocId, Record<string, Infer<typeof PresenceSchema>>>()
+const presences = new Map<DocId, Record<string, Presence>>()
 
-// Stream LLM response into a message
+/**
+ * Stream LLM response directly into a mutable message reference.
+ * This is the efficient "targetMessage" pattern - no repeated lookups needed.
+ */
 async function streamLLMResponse(
-  typedDoc: TypedDoc<typeof ChatSchema>,
-  messageId: string,
+  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
+  targetMessage: MutableMessage,
 ): Promise<void> {
   try {
     // Convert chat history in document to LLM message context
     const messages: Array<{ role: "user" | "assistant"; content: string }> =
-      typedDoc.messages.toArray().flatMap((msg: any) =>
-        msg.id === messageId
+      handle.doc.messages.toArray().flatMap(msg =>
+        msg.id === targetMessage.id
           ? []
           : [
               {
-                role: msg.role === "assistant" ? "assistant" : "user",
-                content: msg.content,
+                role:
+                  msg.role === "assistant"
+                    ? ("assistant" as const)
+                    : ("user" as const),
+                content: msg.content.toString(),
               },
             ],
       )
 
-    logger.info`Streaming response for message ${messageId} with ${messages.length} messages of context`
+    logger.info`Streaming response for message ${targetMessage.id} with ${messages.length} messages of context`
 
     const { textStream } = streamText({
       model,
@@ -60,30 +65,29 @@ async function streamLLMResponse(
     })
 
     for await (const chunk of textStream) {
-      typedDoc.$.change((draft: any) => {
-        const message = draft.messages.find((m: any) => m.id === messageId)
-        if (!message) {
-          logger.warn`Unable to find target messageId ${messageId} in doc`
-          return
-        }
-
-        message.content.insert(message.content.length, chunk)
+      // Stream directly into the mutable reference - no find() needed!
+      handle.change(() => {
+        targetMessage.content.insert(targetMessage.content.length, chunk)
       })
     }
 
-    logger.info`Completed streaming response for message ${messageId}`
+    logger.info`Completed streaming response for message ${targetMessage.id}`
   } catch (error) {
     logger.error`Error streaming LLM response: ${error}`
   }
 }
 
+/**
+ * Append an assistant message and return a mutable reference to it.
+ * The returned reference can be used for efficient streaming.
+ */
 function appendAssistantMessage(
-  typedDoc: TypedDoc<typeof ChatSchema>,
+  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
   content: string,
-) {
+): MutableMessage {
   const id = generateUUID()
 
-  typedDoc.$.change((draft: any) => {
+  handle.change(draft => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -95,16 +99,19 @@ function appendAssistantMessage(
     })
   })
 
-  return id
+  // Return mutable reference to the newly added message
+  return handle.doc.messages.get(handle.doc.messages.length - 1)
 }
 
-// Process document updates to trigger AI
+/**
+ * Process document updates to trigger AI responses.
+ */
 function processDocumentUpdate(
   docId: DocId,
-  typedDoc: TypedDoc<typeof ChatSchema>,
+  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
 ) {
   try {
-    const messagesRef = typedDoc.messages
+    const messagesRef = handle.doc.messages
     logger.debug`Processing doc ${docId}. Message count: ${messagesRef.length}`
 
     if (messagesRef.length === 0) return
@@ -119,8 +126,7 @@ function processDocumentUpdate(
     if (!lastMsg.needsAiReply) return
 
     // Check this off as taken care of
-    typedDoc.$.change((draft: any) => {
-      const lastMsg = draft.messages.get(draft.messages.length - 1)
+    handle.change(() => {
       lastMsg.needsAiReply = false
     })
 
@@ -135,28 +141,25 @@ function processDocumentUpdate(
         userCount >= 2 &&
         !lastMsg.content.toString().toLowerCase().includes("@ai")
       ) {
-        // Don't respond as an assistent
+        // Don't respond as an assistant
         return
       }
     }
 
-    // Start with an empty message
-    const assistantMsgId = appendAssistantMessage(typedDoc, "")
+    // Append an empty assistant message and get a mutable reference
+    const targetMessage = appendAssistantMessage(handle, "")
 
-    // Stream LLM response into it
-    streamLLMResponse(typedDoc, assistantMsgId)
+    // Stream LLM response directly into the target message
+    streamLLMResponse(handle, targetMessage)
   } catch (error) {
     logger.error`Error in document processing: ${error}`
   }
 }
 
-function getChatDoc(handle: UntypedDocHandle): TypedDoc<typeof ChatSchema> {
-  const typedDoc = createTypedDoc(ChatSchema, handle.doc)
-
-  return typedDoc
-}
-
-// Subscribe to a document to react to changes
+/**
+ * Subscribe to a document to react to changes.
+ * Uses TypedDocHandle for type-safe document and presence access.
+ */
 function subscribeToDocument(repo: Repo, docId: DocId) {
   if (subscriptions.has(docId)) {
     logger.warn("Already subscribed to {docId}", { docId })
@@ -165,17 +168,19 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
 
   logger.info("Subscribing to document {docId}", { docId })
 
-  const handle = repo.get(docId)
+  const untypedHandle = repo.get(docId)
+  const handle = new TypedDocHandle(untypedHandle, ChatSchema, PresenceSchema)
 
-  const typedDoc = getChatDoc(handle)
+  // Subscribe to messages changes using path-based subscription
+  const unsubscribeDoc = handle.subscribe(
+    p => p.messages,
+    () => {
+      processDocumentUpdate(docId, handle)
+    },
+  )
 
-  // Subscribe to future changes
-  const unsubscribeDoc = handle.doc.subscribe(() => {
-    processDocumentUpdate(docId, typedDoc)
-  })
-
-  const typedPresence = new TypedPresence(PresenceSchema, handle.presence)
-  const unsubscribePresence = typedPresence.subscribe(({ all }: any) => {
+  // Subscribe to presence changes
+  const unsubscribePresence = handle.presence.subscribe(({ all }) => {
     presences.set(docId, all)
   })
 
@@ -185,7 +190,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
   })
 
   // Check current state immediately (in case we missed the initial sync event)
-  processDocumentUpdate(docId, typedDoc)
+  processDocumentUpdate(docId, handle)
 }
 
 // Create the adapter instances

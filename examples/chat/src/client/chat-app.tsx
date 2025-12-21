@@ -364,7 +364,7 @@ function ChatApp() {
                   >
                     <div className="flex items-baseline gap-2 mb-1 px-1">
                       <span className="text-xs font-medium text-gray-500">
-                        {getAuthorName(msg as Message, myPeerId)}
+                        {getAuthorName(msg, myPeerId)}
                       </span>
                       <span className="text-[10px] text-gray-400">
                         {new Date(msg.timestamp).toLocaleTimeString([], {
