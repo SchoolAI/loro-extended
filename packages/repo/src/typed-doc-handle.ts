@@ -4,7 +4,7 @@ import {
   type TypedDoc,
   TypedPresence,
 } from "@loro-extended/change"
-import type { Listener } from "loro-crdt"
+import type {Listener, PeerID} from "loro-crdt"
 import type { ReadyState } from "./types.js"
 import type { ReadinessCheck, UntypedDocHandle } from "./untyped-doc-handle.js"
 
@@ -31,7 +31,7 @@ export class TypedDocHandle<
   /**
    * The peer ID of the local peer.
    */
-  public readonly peerId: string
+  public readonly peerId: PeerID
 
   private readonly _doc: TypedDoc<D>
   private readonly _presence: TypedPresence<P>

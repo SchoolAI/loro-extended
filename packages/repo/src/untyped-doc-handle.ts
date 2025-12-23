@@ -147,7 +147,7 @@ export class UntypedDocHandle {
   /**
    * Get the peer ID of the local peer.
    */
-  get peerId(): string {
+  get peerId(): PeerID {
     return this.synchronizer.identity.peerId
   }
 
