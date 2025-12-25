@@ -1,0 +1,372 @@
+@import "tailwindcss";
+
+/* Base styles */
+body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Open Sans",
+    "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   ProseMirror Core Styles
+   ============================================ */
+
+.ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+
+.ProseMirror pre {
+  white-space: pre-wrap;
+}
+
+.ProseMirror li {
+  position: relative;
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection *::-moz-selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection {
+  caret-color: transparent;
+}
+
+.ProseMirror-selectednode {
+  outline: 2px solid #8cf;
+}
+
+/* Make sure li selections wrap around markers */
+li.ProseMirror-selectednode {
+  outline: none;
+}
+
+li.ProseMirror-selectednode:after {
+  content: "";
+  position: absolute;
+  left: -32px;
+  right: -2px;
+  top: -2px;
+  bottom: -2px;
+  border: 2px solid #8cf;
+  pointer-events: none;
+}
+
+/* Protect against generic img rules */
+img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+/* ============================================
+   ProseMirror Menu Styles
+   ============================================ */
+
+.ProseMirror-menubar-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.ProseMirror-menubar {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border-bottom: 1px solid #ddd;
+  background: #f8f9fa;
+  min-height: 36px;
+  align-items: center;
+}
+
+.ProseMirror-menubar-spacer {
+  flex-grow: 1;
+}
+
+.ProseMirror-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.ProseMirror-menu-dropdown,
+.ProseMirror-menu-dropdown-menu {
+  font-size: 90%;
+}
+
+.ProseMirror-menu-dropdown {
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.ProseMirror-menu-dropdown:hover {
+  background: #e9ecef;
+}
+
+.ProseMirror-menu-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.ProseMirror-menu-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 120px;
+  z-index: 15;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ProseMirror-menu-dropdown-item {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.ProseMirror-menu-dropdown-item:hover {
+  background: #f0f0f0;
+}
+
+.ProseMirror-menuitem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.ProseMirror-menuitem:hover {
+  background: #e9ecef;
+}
+
+.ProseMirror-menuitem-active {
+  background: #dee2e6;
+}
+
+.ProseMirror-menuseparator {
+  width: 1px;
+  height: 20px;
+  background: #ddd;
+  margin: 0 4px;
+}
+
+.ProseMirror-icon {
+  display: inline-block;
+  line-height: 0.8;
+  vertical-align: -2px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.ProseMirror-icon svg {
+  fill: currentColor;
+  height: 1em;
+}
+
+.ProseMirror-icon span {
+  vertical-align: text-top;
+}
+
+/* ============================================
+   ProseMirror Gapcursor
+   ============================================ */
+
+.ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+}
+
+.ProseMirror-gapcursor:after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid black;
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+/* ============================================
+   ProseMirror Example Setup Styles
+   ============================================ */
+
+.ProseMirror {
+  padding: 4px 8px 4px 14px;
+  line-height: 1.5;
+}
+
+.ProseMirror p {
+  margin: 0 0 0.5em 0;
+}
+
+.ProseMirror blockquote {
+  padding-left: 1em;
+  border-left: 3px solid #eee;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.ProseMirror pre {
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+.ProseMirror code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 0.9em;
+  background: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 24px;
+  margin: 0 0 0.5em 0;
+}
+
+.ProseMirror li {
+  margin: 0.25em 0;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  margin: 1em 0 0.5em 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.ProseMirror h1 {
+  font-size: 1.75em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25em;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 1em 0;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ============================================
+   Loro Cursor Styles
+   ============================================ */
+
+.ProseMirror-loro-cursor {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ProseMirror-loro-cursor > div {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px 4px 4px 0;
+  white-space: nowrap;
+  color: white;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Selection highlight for remote users */
+.loro-selection {
+  background-color: rgba(100, 150, 255, 0.3);
+}
+
+/* Focus styles */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Keyboard shortcut styling */
+kbd {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* ============================================
+   Editor Container Styles
+   ============================================ */
+
+.editor-container {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.editor {
+  min-height: 400px;
+  padding: 16px;
+}
+
+.editor .ProseMirror {
+  min-height: 350px;
+}

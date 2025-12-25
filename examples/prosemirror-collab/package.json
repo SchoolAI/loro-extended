@@ -1,0 +1,53 @@
+{
+  "name": "example-prosemirror-collab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --ignore ./data src/server/server.ts",
+    "dev:client": "vite",
+    "build": "tsc -b && vite build",
+    "check": "biome check --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/middie": "^9.0.0",
+    "@fastify/static": "^8.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "@logtape/logtape": "^1.1.1",
+    "@loro-extended/adapter-indexeddb": "workspace:^",
+    "@loro-extended/adapter-leveldb": "workspace:^",
+    "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/react": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "classic-level": "^1.2.0",
+    "fastify": "^5.0.0",
+    "loro-crdt": "^1.10.2",
+    "loro-prosemirror": "^0.4.1",
+    "prosemirror-example-setup": "^1.2.2",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-menu": "^1.2.5",
+    "prosemirror-model": "^1.22.0",
+    "prosemirror-schema-basic": "^1.2.3",
+    "prosemirror-schema-list": "^1.4.1",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.34.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^8.2.2",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}
