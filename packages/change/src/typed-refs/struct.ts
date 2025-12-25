@@ -14,6 +14,7 @@ import {
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
+  hasContainerConstructor,
   serializeRefToJSON,
   unwrapReadonlyPrimitive,
 } from "./utils.js"
@@ -49,6 +50,14 @@ export class StructRef<
     shape: S,
   ): TypedRefParams<ContainerShape> {
     const placeholder = (this.placeholder as any)?.[key]
+
+    // AnyContainerShape is an escape hatch - it doesn't have a constructor
+    if (!hasContainerConstructor(shape._type)) {
+      throw new Error(
+        `Cannot create typed ref for shape type "${shape._type}". ` +
+          `Use Shape.any() only at the document root level.`,
+      )
+    }
 
     const LoroContainer = containerConstructor[shape._type]
 

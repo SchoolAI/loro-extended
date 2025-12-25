@@ -34,6 +34,9 @@ import { TreeRef } from "./tree.js"
 /**
  * Mapping from container shape types to their Loro constructor classes.
  * Used when creating new containers via getOrCreateContainer().
+ *
+ * Note: "any" is not included because AnyContainerShape is an escape hatch
+ * that doesn't create typed refs - it returns raw Loro containers.
  */
 export const containerConstructor = {
   counter: LoroCounter,
@@ -44,6 +47,16 @@ export const containerConstructor = {
   text: LoroText,
   tree: LoroTree,
 } as const
+
+/**
+ * Type guard to check if a container shape type has a constructor.
+ * Returns false for "any" which is an escape hatch.
+ */
+export function hasContainerConstructor(
+  type: string,
+): type is keyof typeof containerConstructor {
+  return type in containerConstructor
+}
 
 /**
  * Unwraps a TypedRef to its primitive value for readonly access.

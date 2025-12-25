@@ -29,6 +29,11 @@ export function validateValue(
 
   const currentPath = path || "root"
 
+  // Handle AnyContainerShape - no validation, accept anything
+  if (schema._type === "any") {
+    return value
+  }
+
   // Handle ContainerShape types
   if (schema._type === "text") {
     if (typeof value !== "string") {
@@ -110,6 +115,10 @@ export function validateValue(
     const valueSchema = schema as ValueShape
 
     switch (valueSchema.valueType) {
+      // AnyValueShape - no validation, accept anything
+      case "any":
+        return value
+
       case "string": {
         if (typeof value !== "string") {
           throw new Error(

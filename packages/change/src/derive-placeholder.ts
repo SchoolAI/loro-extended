@@ -27,6 +27,10 @@ export function derivePlaceholder<T extends DocShape>(
  */
 export function deriveShapePlaceholder(shape: ContainerOrValueShape): unknown {
   switch (shape._type) {
+    // Any container - no placeholder (undefined)
+    case "any":
+      return undefined
+
     // Leaf containers - use _placeholder directly
     case "text":
       return shape._placeholder
@@ -60,6 +64,10 @@ export function deriveShapePlaceholder(shape: ContainerOrValueShape): unknown {
 
 function deriveValueShapePlaceholder(shape: ValueShape): unknown {
   switch (shape.valueType) {
+    // Any value - no placeholder (undefined)
+    case "any":
+      return undefined
+
     // Leaf values - use _placeholder directly
     case "string":
       return shape._placeholder

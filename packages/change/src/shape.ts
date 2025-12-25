@@ -7,6 +7,7 @@ import type {
   LoroMovableList,
   LoroText,
   LoroTree,
+  Value,
 } from "loro-crdt"
 
 import type { CounterRef } from "./typed-refs/counter.js"
@@ -128,7 +129,24 @@ export interface RecordContainerShape<
   readonly shape: NestedShape
 }
 
+/**
+ * Container escape hatch - represents "any LoroContainer".
+ * Use this when integrating with external libraries that manage their own document structure.
+ *
+ * @example
+ * ```typescript
+ * // loro-prosemirror manages its own structure
+ * const ProseMirrorDocShape = Shape.doc({
+ *   doc: Shape.any(), // opt out of typing for this container
+ * })
+ * ```
+ */
+export interface AnyContainerShape extends Shape<unknown, unknown, undefined> {
+  readonly _type: "any"
+}
+
 export type ContainerShape =
+  | AnyContainerShape
   | CounterContainerShape
   | ListContainerShape
   | MovableListContainerShape
@@ -250,8 +268,25 @@ export interface DiscriminatedUnionValueShape<
   readonly variants: T
 }
 
+/**
+ * Value escape hatch - represents "any Loro Value".
+ * Use this when you need to accept any valid Loro value type.
+ *
+ * @example
+ * ```typescript
+ * const FlexiblePresenceShape = Shape.plain.struct({
+ *   cursor: Shape.plain.any(), // accept any value type
+ * })
+ * ```
+ */
+export interface AnyValueShape extends Shape<Value, Value, undefined> {
+  readonly _type: "value"
+  readonly valueType: "any"
+}
+
 // Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
 export type ValueShape =
+  | AnyValueShape
   | StringValueShape
   | NumberValueShape
   | BooleanValueShape
@@ -315,6 +350,28 @@ export const Shape = {
     _plain: {} as any,
     _mutable: {} as any,
     _placeholder: {} as any,
+  }),
+
+  /**
+   * Creates an "any" container shape - an escape hatch for untyped containers.
+   * Use this when integrating with external libraries that manage their own document structure.
+   *
+   * @example
+   * ```typescript
+   * // loro-prosemirror manages its own structure
+   * const ProseMirrorDocShape = Shape.doc({
+   *   doc: Shape.any(), // opt out of typing for this container
+   * })
+   *
+   * const handle = repo.get(docId, ProseMirrorDocShape, CursorPresenceShape)
+   * // handle.doc.doc is typed as `unknown` - you're on your own
+   * ```
+   */
+  any: (): AnyContainerShape => ({
+    _type: "any" as const,
+    _plain: undefined as unknown,
+    _mutable: undefined as unknown,
+    _placeholder: undefined,
   }),
 
   // CRDTs are represented by Loro Containers--they converge on state using Loro's
@@ -509,12 +566,70 @@ export const Shape = {
       _placeholder: undefined,
     }),
 
-    uint8Array: (): Uint8ArrayValueShape => ({
+    uint8Array: (): Uint8ArrayValueShape &
+      WithNullable<Uint8ArrayValueShape> => {
+      const base: Uint8ArrayValueShape = {
+        _type: "value" as const,
+        valueType: "uint8array" as const,
+        _plain: new Uint8Array(),
+        _mutable: new Uint8Array(),
+        _placeholder: new Uint8Array(),
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, Uint8ArrayValueShape]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
+
+    /**
+     * Alias for `uint8Array()` - creates a shape for binary data.
+     * Use this for better discoverability when working with binary data like cursor positions.
+     *
+     * @example
+     * ```typescript
+     * const CursorPresenceShape = Shape.plain.struct({
+     *   anchor: Shape.plain.bytes().nullable(),
+     *   focus: Shape.plain.bytes().nullable(),
+     * })
+     * ```
+     */
+    bytes: (): Uint8ArrayValueShape & WithNullable<Uint8ArrayValueShape> => {
+      const base: Uint8ArrayValueShape = {
+        _type: "value" as const,
+        valueType: "uint8array" as const,
+        _plain: new Uint8Array(),
+        _mutable: new Uint8Array(),
+        _placeholder: new Uint8Array(),
+      }
+      return Object.assign(base, {
+        nullable(): WithPlaceholder<
+          UnionValueShape<[NullValueShape, Uint8ArrayValueShape]>
+        > {
+          return makeNullable(base)
+        },
+      })
+    },
+
+    /**
+     * Creates an "any" value shape - an escape hatch for untyped values.
+     * Use this when you need to accept any valid Loro value type.
+     *
+     * @example
+     * ```typescript
+     * const FlexiblePresenceShape = Shape.plain.struct({
+     *   metadata: Shape.plain.any(), // accept any value type
+     * })
+     * ```
+     */
+    any: (): AnyValueShape => ({
       _type: "value" as const,
-      valueType: "uint8array" as const,
-      _plain: new Uint8Array(),
-      _mutable: new Uint8Array(),
-      _placeholder: new Uint8Array(),
+      valueType: "any" as const,
+      _plain: undefined as unknown as Value,
+      _mutable: undefined as unknown as Value,
+      _placeholder: undefined,
     }),
 
     /**

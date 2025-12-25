@@ -284,6 +284,67 @@ function handlePresence(presence: typeof result) {
 - Works seamlessly with `@loro-extended/react`'s `usePresence` hook
 - Full TypeScript support for discriminated union types
 
+### Untyped Integration with External Libraries
+
+When integrating with external libraries that manage their own document structure (like `loro-prosemirror`), you may want typed presence but untyped document content. Use `Shape.any()` as an escape hatch:
+
+```typescript
+import { Shape } from "@loro-extended/change";
+
+// Fully typed presence with binary cursor data
+const CursorPresenceSchema = Shape.plain.struct({
+  anchor: Shape.plain.bytes().nullable(), // Uint8Array | null
+  focus: Shape.plain.bytes().nullable(),
+  user: Shape.plain
+    .struct({
+      name: Shape.plain.string(),
+      color: Shape.plain.string(),
+    })
+    .nullable(),
+});
+
+// With @loro-extended/repo:
+
+// Option 1: Shape.any() directly - entire document is untyped
+const handle = repo.get(docId, Shape.any(), CursorPresenceSchema);
+handle.doc; // Raw LoroDoc - use Loro API directly
+handle.doc.getMap("anything").set("key", "value");
+handle.presence.set({
+  // Typed presence
+  anchor: cursor.encode(), // Uint8Array directly
+  focus: null,
+  user: { name: "Alice", color: "#ff0000" },
+});
+
+// Option 2: Shape.any() in a container - one container is untyped
+const ProseMirrorDocShape = Shape.doc({
+  doc: Shape.any(), // loro-prosemirror manages this
+  metadata: Shape.struct({
+    // But we can still have typed containers
+    title: Shape.text(),
+  }),
+});
+const handle2 = repo.get(docId, ProseMirrorDocShape, CursorPresenceSchema);
+handle2.doc.toJSON(); // { doc: unknown, metadata: { title: string } }
+```
+
+**Key features:**
+
+- `Shape.any()` creates an `AnyContainerShape` - type inference produces `unknown`
+- `Shape.plain.any()` creates an `AnyValueShape` - type inference produces Loro's `Value` type
+- `Shape.plain.bytes()` is an alias for `Shape.plain.uint8Array()` for better discoverability
+- All support `.nullable()` for optional values
+
+**When to use:**
+
+| Scenario                                    | Shape to Use                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| External library manages entire document    | `repo.get(docId, Shape.any(), presenceSchema)`                     |
+| External library manages one container      | `Shape.doc({ doc: Shape.any(), ... })`                             |
+| Flexible metadata in presence               | `Shape.plain.any()` for dynamic values                             |
+| Binary cursor/selection data                | `Shape.plain.bytes().nullable()` for `Uint8Array` \| `null`        |
+| Full type safety                            | Use specific shapes like `Shape.struct()`, `Shape.text()`          |
+
 ### Nested Structures
 
 Handle complex nested documents with ease:
@@ -510,6 +571,7 @@ const schema = Shape.doc({
 - `Shape.struct(shape)` - Collaborative structs with fixed keys (uses LoroMap internally)
 - `Shape.record(valueSchema)` - Collaborative key-value maps with dynamic string keys
 - `Shape.tree(shape)` - Collaborative hierarchical tree structures (Note: incomplete implementation)
+- `Shape.any()` - Escape hatch for untyped containers (see [Untyped Integration](#untyped-integration-with-external-libraries))
 
 #### Value Types
 
@@ -519,11 +581,13 @@ const schema = Shape.doc({
 - `Shape.plain.null()` - Null values
 - `Shape.plain.undefined()` - Undefined values
 - `Shape.plain.uint8Array()` - Binary data values
+- `Shape.plain.bytes()` - Alias for `uint8Array()` for better discoverability
 - `Shape.plain.struct(shape)` - Struct values with fixed keys
 - `Shape.plain.record(valueShape)` - Object values with dynamic string keys
 - `Shape.plain.array(itemShape)` - Array values
 - `Shape.plain.union(shapes)` - Union of value types (e.g., `string | null`)
 - `Shape.plain.discriminatedUnion(key, variants)` - Tagged union types with a discriminant key
+- `Shape.plain.any()` - Escape hatch for untyped values (see [Untyped Integration](#untyped-integration-with-external-libraries))
 
 #### Nullable Values
 

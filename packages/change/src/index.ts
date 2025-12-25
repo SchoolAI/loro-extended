@@ -20,6 +20,9 @@ export type {
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
 export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
 export type {
+  // Escape hatch shapes for untyped integration
+  AnyContainerShape,
+  AnyValueShape,
   ArrayValueShape,
   ContainerOrValueShape,
   ContainerShape,

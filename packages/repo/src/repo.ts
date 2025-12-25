@@ -1,11 +1,16 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type { DocShape, ValueShape } from "@loro-extended/change"
+import type {
+  AnyContainerShape,
+  DocShape,
+  ValueShape,
+} from "@loro-extended/change"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { createRules, type Rules } from "./rules.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
 import { TypedDocHandle } from "./typed-doc-handle.js"
 import type { DocId, PeerIdentityDetails } from "./types.js"
 import { UntypedDocHandle } from "./untyped-doc-handle.js"
+import { UntypedWithPresenceHandle } from "./untyped-with-presence-handle.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
 import { validatePeerId } from "./utils/validate-peer-id.js"
 
@@ -104,6 +109,32 @@ export class Repo {
   ): TypedDocHandle<D, ValueShape>
 
   /**
+   * Gets (or creates) an untyped document handle with typed presence.
+   *
+   * Use this when integrating with external libraries (like loro-prosemirror)
+   * that manage their own document structure, but you still want typed presence.
+   *
+   * @param docId The document ID
+   * @param docShape Shape.any() - indicates the document is untyped
+   * @param presenceShape The shape of the presence data
+   * @returns An UntypedWithPresenceHandle with raw LoroDoc and typed presence
+   *
+   * @example
+   * ```typescript
+   * const handle = repo.get('my-doc', Shape.any(), CursorPresenceSchema)
+   * // Document is raw LoroDoc
+   * handle.doc.getMap('doc').set('key', 'value')
+   * // Presence is typed
+   * handle.presence.set({ cursor: { x: 100, y: 200 } })
+   * ```
+   */
+  get<P extends ValueShape>(
+    docId: DocId,
+    docShape: AnyContainerShape,
+    presenceShape: P,
+  ): UntypedWithPresenceHandle<P>
+
+  /**
    * Gets (or creates) an untyped document handle.
    *
    * This overload maintains backward compatibility with existing code that
@@ -125,9 +156,9 @@ export class Repo {
   // Implementation
   get<D extends DocShape, P extends ValueShape>(
     docId: DocId,
-    docShape?: D,
+    docShape?: D | AnyContainerShape,
     presenceShape?: P,
-  ): TypedDocHandle<D, P> | UntypedDocHandle {
+  ): TypedDocHandle<D, P> | UntypedDocHandle | UntypedWithPresenceHandle<P> {
     const untypedHandle = this.getUntyped(docId)
 
     // If no docShape provided, return untyped handle (backward compatible)
@@ -135,10 +166,16 @@ export class Repo {
       return untypedHandle
     }
 
+    // If docShape is AnyContainerShape (Shape.any()), return UntypedWithPresenceHandle
+    if ("_type" in docShape && docShape._type === "any") {
+      const pShape = presenceShape ?? ({} as unknown as P)
+      return new UntypedWithPresenceHandle(untypedHandle, pShape)
+    }
+
     // Default to empty object shape if presence shape not provided
     const pShape = presenceShape ?? ({} as unknown as P)
 
-    return new TypedDocHandle(untypedHandle, docShape, pShape)
+    return new TypedDocHandle(untypedHandle, docShape as D, pShape)
   }
 
   //

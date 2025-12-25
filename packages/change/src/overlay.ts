@@ -50,6 +50,16 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
   crdtValue: Value,
   placeholderValue: Value,
 ): Value {
+  // For "any" shapes, just return the CRDT value as-is (no placeholder merging)
+  if (shape._type === "any") {
+    return crdtValue
+  }
+
+  // For "any" value shapes, just return the CRDT value as-is
+  if (shape._type === "value" && (shape as any).valueType === "any") {
+    return crdtValue
+  }
+
   if (crdtValue === undefined && placeholderValue === undefined) {
     throw new Error("either crdt or placeholder value must be defined")
   }
