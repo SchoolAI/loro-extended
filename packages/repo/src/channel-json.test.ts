@@ -431,10 +431,13 @@ describe("Channel JSON Serialization", () => {
             {
               docId: "doc-1",
               requesterDocVersion: doc.version(),
-              ephemeral: {
-                peerId: "123456789",
-                data: ephemeralData,
-              },
+              ephemeral: [
+                {
+                  peerId: "123456789",
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
             },
           ],
           bidirectional: false,
@@ -445,8 +448,9 @@ describe("Channel JSON Serialization", () => {
         if (json.type === "channel/sync-request") {
           expect(json.docs).toHaveLength(1)
           expect(json.docs[0].ephemeral).toBeDefined()
-          expect(json.docs[0].ephemeral?.peerId).toBe("123456789")
-          expect(typeof json.docs[0].ephemeral?.data).toBe("string")
+          expect(json.docs[0].ephemeral?.[0].peerId).toBe("123456789")
+          expect(typeof json.docs[0].ephemeral?.[0].data).toBe("string")
+          expect(json.docs[0].ephemeral?.[0].namespace).toBe("presence")
         }
       })
 
@@ -470,6 +474,7 @@ describe("Channel JSON Serialization", () => {
             {
               peerId: "123456789",
               data: ephemeralData,
+              namespace: "presence",
             },
           ],
         }
@@ -481,6 +486,7 @@ describe("Channel JSON Serialization", () => {
           expect(json.ephemeral).toHaveLength(1)
           expect(json.ephemeral?.[0].peerId).toBe("123456789")
           expect(typeof json.ephemeral?.[0].data).toBe("string")
+          expect(json.ephemeral?.[0].namespace).toBe("presence")
         }
       })
 
@@ -497,10 +503,13 @@ describe("Channel JSON Serialization", () => {
             {
               docId: "doc-1",
               requesterDocVersion: doc.version(),
-              ephemeral: {
-                peerId: "123456789",
-                data: ephemeralData,
-              },
+              ephemeral: [
+                {
+                  peerId: "123456789",
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
             },
           ],
           bidirectional: false,
@@ -513,11 +522,12 @@ describe("Channel JSON Serialization", () => {
         if (restored.type === "channel/sync-request") {
           expect(restored.docs).toHaveLength(1)
           expect(restored.docs[0].ephemeral).toBeDefined()
-          if (restored.docs[0].ephemeral) {
-            expect(restored.docs[0].ephemeral.peerId).toBe("123456789")
-            expect(Array.from(restored.docs[0].ephemeral.data)).toEqual(
+          if (restored.docs[0].ephemeral?.[0]) {
+            expect(restored.docs[0].ephemeral[0].peerId).toBe("123456789")
+            expect(Array.from(restored.docs[0].ephemeral[0].data)).toEqual(
               Array.from(ephemeralData),
             )
+            expect(restored.docs[0].ephemeral[0].namespace).toBe("presence")
           }
         }
       })
@@ -542,6 +552,7 @@ describe("Channel JSON Serialization", () => {
             {
               peerId: "123456789",
               data: ephemeralData,
+              namespace: "presence",
             },
           ],
         }
@@ -558,6 +569,7 @@ describe("Channel JSON Serialization", () => {
             expect(Array.from(restored.ephemeral[0].data)).toEqual(
               Array.from(ephemeralData),
             )
+            expect(restored.ephemeral[0].namespace).toBe("presence")
           }
           // Also verify the snapshot still works
           if (restored.transmission.type === "snapshot") {

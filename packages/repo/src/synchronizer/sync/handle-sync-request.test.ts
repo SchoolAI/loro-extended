@@ -248,7 +248,7 @@ describe("handle-sync-request", () => {
     const docState = createDocState({ docId })
     initialModel.documents.set(docId, docState)
 
-    // Create ephemeral data (new format: EphemeralPeerData)
+    // Create ephemeral data (new format: EphemeralStoreData[])
     const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
 
     const message: SynchronizerMessage = {
@@ -261,10 +261,13 @@ describe("handle-sync-request", () => {
             {
               docId,
               requesterDocVersion: createVersionVector(),
-              ephemeral: {
-                peerId,
-                data: ephemeralData,
-              },
+              ephemeral: [
+                {
+                  peerId,
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
             },
           ],
           bidirectional: false,
@@ -335,7 +338,7 @@ describe("handle-sync-request", () => {
     const docState = createDocState({ docId })
     initialModel.documents.set(docId, docState)
 
-    // Create ephemeral data (new format: EphemeralPeerData)
+    // Create ephemeral data (new format: EphemeralStoreData[])
     const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
 
     const message: SynchronizerMessage = {
@@ -348,10 +351,13 @@ describe("handle-sync-request", () => {
             {
               docId,
               requesterDocVersion: createVersionVector(),
-              ephemeral: {
-                peerId: peerId1,
-                data: ephemeralData,
-              },
+              ephemeral: [
+                {
+                  peerId: peerId1,
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
             },
           ],
           bidirectional: false,

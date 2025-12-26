@@ -7,12 +7,13 @@ export type {
 export { change, getLoroDoc, Shape } from "@loro-extended/change"
 
 // Re-export handle types
-export type { DocId, TypedDocHandle } from "@loro-extended/repo"
+export type { DocId, Handle } from "@loro-extended/repo"
 
 // Hooks
 export {
   RepoContext,
   useDoc,
+  useEphemeral,
   useHandle,
   usePresence,
   useRepo,

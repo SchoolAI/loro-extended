@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 
+import { Shape } from "@loro-extended/change"
 import { describe, expect, it, vi } from "vitest"
 import { Adapter, type AnyAdapter } from "../adapter/adapter.js"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
@@ -13,6 +14,11 @@ import { Repo } from "../repo.js"
 import { createRules } from "../rules.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
+
+// Schema for test documents
+const DocSchema = Shape.doc({
+  title: Shape.text(),
+})
 
 // Mock adapter for testing
 class MockAdapter extends Adapter<{ name: string }> {
@@ -145,7 +151,7 @@ describe("Synchronizer - Permissions Integration", () => {
 
     // Repo1 creates a handle (but doesn't change it yet)
     // This sends a sync-request to Repo2
-    repo1.get("test-doc-1")
+    repo1.get("test-doc-1", DocSchema)
 
     // Wait for sync to happen
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -175,7 +181,7 @@ describe("Synchronizer - Permissions Integration", () => {
     })
 
     // Repo1 creates a handle
-    repo1.get("test-doc-2")
+    repo1.get("test-doc-2", DocSchema)
 
     // Wait for sync to happen
     await new Promise(resolve => setTimeout(resolve, 100))

@@ -1,7 +1,17 @@
-import { useDoc, useHandle, usePresence, useRepo } from "@loro-extended/react"
+import {
+  useDoc,
+  useEphemeral,
+  useHandle,
+  useRepo,
+} from "@loro-extended/react"
 import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
-import { ChatSchema, PresenceSchema, type Message } from "../shared/types"
+import {
+  ChatEphemeralDeclarations,
+  ChatSchema,
+  type Message,
+  type Presence,
+} from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
 import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
@@ -81,14 +91,14 @@ function ChatApp() {
     }
   }, [docId])
 
-  // NEW API: Get handle with both doc and presence schemas
-  const handle = useHandle(docId, ChatSchema, PresenceSchema)
+  // NEW API: Get handle with both doc and ephemeral schemas
+  const handle = useHandle(docId, ChatSchema, ChatEphemeralDeclarations)
   const doc = useDoc(handle)
-  const { self, peers } = usePresence(handle)
+  const { self, peers } = useEphemeral(handle.presence)
 
   // Set self presence with name
   useEffect(() => {
-    handle.presence.set({ type: "user", name: userName })
+    handle.presence.setSelf({ type: "user", name: userName })
   }, [handle, userName])
 
   // Check if the current user has sent any messages in this conversation
@@ -110,16 +120,16 @@ function ChatApp() {
       // Update to new name
       localStorage.setItem(NAME_STORAGE_KEY, newName)
       setUserName(newName)
-      handle.presence.set({ type: "user", name: newName })
+      handle.presence.setSelf({ type: "user", name: newName })
     }
     setIsEditingName(false)
   }
 
   // Count members: self + all peers with type "user"
   const peerCount = Array.from(peers.values()).filter(
-    p => p.type === "user",
+    (p: Presence) => p.type === "user",
   ).length
-  const memberCount = (self.type === "user" ? 1 : 0) + peerCount
+  const memberCount = (self?.type === "user" ? 1 : 0) + peerCount
 
   // Auto-scroll to bottom when messages change
   useAutoScroll(messagesEndRef, messages)
@@ -180,7 +190,9 @@ function ChatApp() {
   const dismissTip = () => {
     handle.change(d => {
       const prefs = d.preferences.get(myPeerId)
-      prefs.showTip = false
+      if (prefs) {
+        prefs.showTip = false
+      }
     })
   }
 

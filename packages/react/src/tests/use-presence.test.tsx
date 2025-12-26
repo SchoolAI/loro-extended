@@ -20,7 +20,7 @@ const PresenceSchema = Shape.plain.object({
 })
 
 // Expected placeholder values derived from schema
-const expectedPlaceholder = {
+const _expectedPlaceholder = {
   cursor: { x: 0, y: 0 },
   name: "Anonymous",
   status: "offline",
@@ -33,7 +33,9 @@ describe("usePresence", () => {
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, PresenceSchema)
+        const handle = useHandle(documentId, DocSchema, {
+          presence: PresenceSchema,
+        })
         return usePresence(handle)
       },
       {
@@ -41,18 +43,21 @@ describe("usePresence", () => {
       },
     )
 
-    expect(result.current.self).toEqual(expectedPlaceholder)
+    // New API: self is undefined until set
+    expect(result.current.self).toBeUndefined()
     expect(result.current.peers).toBeInstanceOf(Map)
     expect(result.current.peers.size).toBe(0)
   })
 
-  it("should update self state via handle.presence.set", async () => {
+  it("should update self state via handle.presence.setSelf", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, PresenceSchema)
+        const handle = useHandle(documentId, DocSchema, {
+          presence: PresenceSchema,
+        })
         const presence = usePresence(handle)
         return { handle, presence }
       },
@@ -62,23 +67,28 @@ describe("usePresence", () => {
     )
 
     act(() => {
-      result.current.handle.presence.set({ cursor: { x: 10, y: 20 } })
+      result.current.handle.presence.setSelf({
+        cursor: { x: 10, y: 20 },
+        name: "Anonymous",
+        status: "offline",
+      })
     })
 
     await waitFor(() => {
-      expect(result.current.presence.self.cursor).toEqual({ x: 10, y: 20 })
-      // Other fields should remain default
-      expect(result.current.presence.self.name).toBe("Anonymous")
+      expect(result.current.presence.self?.cursor).toEqual({ x: 10, y: 20 })
+      expect(result.current.presence.self?.name).toBe("Anonymous")
     })
   })
 
-  it("should handle partial updates", async () => {
+  it("should handle full updates", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, PresenceSchema)
+        const handle = useHandle(documentId, DocSchema, {
+          presence: PresenceSchema,
+        })
         const presence = usePresence(handle)
         return { handle, presence }
       },
@@ -88,20 +98,28 @@ describe("usePresence", () => {
     )
 
     act(() => {
-      result.current.handle.presence.set({ name: "Alice" })
+      result.current.handle.presence.setSelf({
+        cursor: { x: 0, y: 0 },
+        name: "Alice",
+        status: "offline",
+      })
     })
 
     await waitFor(() => {
-      expect(result.current.presence.self.name).toBe("Alice")
+      expect(result.current.presence.self?.name).toBe("Alice")
     })
 
     act(() => {
-      result.current.handle.presence.set({ status: "online" })
+      result.current.handle.presence.setSelf({
+        cursor: { x: 0, y: 0 },
+        name: "Alice",
+        status: "online",
+      })
     })
 
     await waitFor(() => {
-      expect(result.current.presence.self.name).toBe("Alice")
-      expect(result.current.presence.self.status).toBe("online")
+      expect(result.current.presence.self?.name).toBe("Alice")
+      expect(result.current.presence.self?.status).toBe("online")
     })
   })
 
@@ -125,7 +143,9 @@ describe("usePresence", () => {
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, UnionSchema)
+        const handle = useHandle(documentId, DocSchema, {
+          presence: UnionSchema,
+        })
         return usePresence(handle)
       },
       {
@@ -133,12 +153,8 @@ describe("usePresence", () => {
       },
     )
 
-    const presence = result.current.self
-    if (presence.type === "client") {
-      expect(presence.name).toBe("test")
-    } else {
-      // This branch should be reachable type-wise
-      expect(presence.tick).toBeUndefined()
-    }
+    // New API: self is undefined until set
+    expect(result.current.self).toBeUndefined()
+    expect(result.current.peers).toBeInstanceOf(Map)
   })
 })

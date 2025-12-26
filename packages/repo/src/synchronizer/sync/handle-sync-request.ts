@@ -149,49 +149,64 @@ export function handleSyncRequest(
     }
 
     // Apply incoming ephemeral data from the requester if provided
-    // ephemeral is now EphemeralPeerData: { peerId, data }
-    if (ephemeral) {
-      logger.debug(
-        "sync-request: applying ephemeral data from {peerId} for {docId}",
-        {
-          peerId: ephemeral.peerId,
-          docId,
-        },
-      )
-      commands.push({
-        type: "cmd/apply-ephemeral",
-        docId,
-        stores: [{ peerId: ephemeral.peerId, data: ephemeral.data }],
-      })
-
-      // Relay requester's ephemeral to other peers (not back to requester)
-      const otherChannelIds = getEstablishedChannelsForDoc(
-        model.channels,
-        model.peers,
-        docId,
-      ).filter(id => id !== fromChannelId)
-
-      if (otherChannelIds.length > 0) {
+    // ephemeral is now EphemeralStoreData[]: { peerId, data, namespace }[]
+    if (ephemeral && ephemeral.length > 0) {
+      for (const store of ephemeral) {
         logger.debug(
-          "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
+          "sync-request: applying ephemeral data from {peerId} for {docId} namespace {namespace}",
           {
-            peerId: ephemeral.peerId,
-            count: otherChannelIds.length,
+            peerId: store.peerId,
             docId,
+            namespace: store.namespace,
           },
         )
         commands.push({
-          type: "cmd/send-message",
-          envelope: {
-            toChannelIds: otherChannelIds,
-            message: {
-              type: "channel/ephemeral",
-              docId,
-              hopsRemaining: 0, // Direct relay only
-              stores: [{ peerId: ephemeral.peerId, data: ephemeral.data }],
+          type: "cmd/apply-ephemeral",
+          docId,
+          stores: [
+            {
+              peerId: store.peerId,
+              data: store.data,
+              namespace: store.namespace,
             },
-          },
+          ],
         })
+
+        // Relay requester's ephemeral to other peers (not back to requester)
+        const otherChannelIds = getEstablishedChannelsForDoc(
+          model.channels,
+          model.peers,
+          docId,
+        ).filter(id => id !== fromChannelId)
+
+        if (otherChannelIds.length > 0) {
+          logger.debug(
+            "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
+            {
+              peerId: store.peerId,
+              count: otherChannelIds.length,
+              docId,
+            },
+          )
+          commands.push({
+            type: "cmd/send-message",
+            envelope: {
+              toChannelIds: otherChannelIds,
+              message: {
+                type: "channel/ephemeral",
+                docId,
+                hopsRemaining: 0, // Direct relay only
+                stores: [
+                  {
+                    peerId: store.peerId,
+                    data: store.data,
+                    namespace: store.namespace,
+                  },
+                ],
+              },
+            },
+          })
+        }
       }
     }
 

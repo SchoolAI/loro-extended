@@ -2,18 +2,18 @@ import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import {
   Shape,
   useDoc,
+  useEphemeral,
   useHandle,
-  usePresence,
   useRepo,
 } from "@loro-extended/react"
 import { type DocId, generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   RoomSchema,
+  SignalingEphemeralDeclarations,
   type SignalingPresence,
-  SignalingPresenceSchema,
+  UserEphemeralDeclarations,
   type UserPresence,
-  UserPresenceSchema,
 } from "../shared/types"
 import {
   DebugPanel,
@@ -74,14 +74,16 @@ export default function VideoConferenceApp({
     }
   }, [roomId])
 
-  // NEW API: Get handle with doc and presence schemas
-  const handle = useHandle(roomId, RoomSchema, UserPresenceSchema)
+  // NEW API: Get handle with doc and ephemeral schemas
+  const handle = useHandle(roomId, RoomSchema, UserEphemeralDeclarations)
   const doc = useDoc(handle)
-  const { self: userSelf, peers: userPeers } = usePresence(handle)
+  const { self: userSelf, peers: userPeers } = useEphemeral(handle.presence)
 
   // Convert to the old format for backward compatibility with existing code
   const userPresence: Record<string, UserPresence> = {}
-  userPresence[myPeerId] = userSelf
+  if (userSelf) {
+    userPresence[myPeerId] = userSelf
+  }
   for (const [peerId, presence] of userPeers.entries()) {
     userPresence[peerId] = presence
   }
@@ -101,14 +103,17 @@ export default function VideoConferenceApp({
   const signalingHandle = useHandle(
     signalingChannelId,
     SignalingDocSchema,
-    SignalingPresenceSchema,
+    SignalingEphemeralDeclarations,
   )
-  const { self: signalingSelf, peers: signalingPeers } =
-    usePresence(signalingHandle)
+  const { self: signalingSelf, peers: signalingPeers } = useEphemeral(
+    signalingHandle.presence,
+  )
 
   // Convert to the old format for backward compatibility
   const signalingPresence: Record<string, SignalingPresence> = {}
-  signalingPresence[myPeerId] = signalingSelf
+  if (signalingSelf) {
+    signalingPresence[myPeerId] = signalingSelf
+  }
   for (const [peerId, presence] of signalingPeers.entries()) {
     signalingPresence[peerId] = presence
   }
@@ -121,7 +126,7 @@ export default function VideoConferenceApp({
   // Wrapper for setSignalingPresence to match old API
   const setSignalingPresence = useCallback(
     (value: Partial<SignalingPresence>) => {
-      signalingHandle.presence.set(value)
+      signalingHandle.presence.setSelf(value as SignalingPresence)
     },
     [signalingHandle],
   )
@@ -172,7 +177,7 @@ export default function VideoConferenceApp({
   // Update user presence with media preferences
   // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
   useEffect(() => {
-    handle.presence.set({
+    handle.presence.setSelf({
       name: displayName,
       wantsAudio: wantsAudio,
       wantsVideo: wantsVideo,

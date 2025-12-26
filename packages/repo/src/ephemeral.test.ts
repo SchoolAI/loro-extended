@@ -1,7 +1,18 @@
+import { Shape } from "@loro-extended/change"
 import { describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
+
+// Simple presence schema for testing
+const PresenceSchema = Shape.plain.struct({
+  status: Shape.plain.string(),
+})
+
+// Document schema
+const DocSchema = Shape.doc({
+  content: Shape.text(),
+})
 
 describe("Ephemeral Store Integration", () => {
   it("should allow setting and getting local ephemeral state", () => {
@@ -9,14 +20,15 @@ describe("Ephemeral Store Integration", () => {
       identity: { name: "repo1", type: "user" },
       adapters: [new InMemoryStorageAdapter()],
     })
-    const handle = repo.get("test-doc")
+    const handle = repo.get("test-doc", DocSchema, {
+      presence: PresenceSchema,
+    })
 
-    // Set local state
-    handle.presence.set({ cursor: { x: 10, y: 20 } })
+    // Set local state using the new API
+    handle.presence.setSelf({ status: "online" })
 
     // Get local state
-    expect(handle.presence.get("cursor")).toEqual({ x: 10, y: 20 })
-    expect(handle.presence.self).toEqual({ cursor: { x: 10, y: 20 } })
+    expect(handle.presence.self).toEqual({ status: "online" })
   })
 
   it("should sync ephemeral state between peers", async () => {
@@ -29,7 +41,7 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1", type: "user" },
+      identity: { name: "repo1", type: "user", peerId: "1" },
     })
 
     const repo2 = new Repo({
@@ -39,12 +51,12 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2", type: "user" },
+      identity: { name: "repo2", type: "user", peerId: "2" },
     })
 
     const docId = "ephemeral-sync-doc"
-    const handle1 = repo1.get(docId)
-    const handle2 = repo2.get(docId)
+    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
 
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -54,7 +66,7 @@ describe("Ephemeral Store Integration", () => {
     handle2.presence.subscribe(onChange)
 
     // Set state on repo1
-    handle1.presence.set({ selection: "start" })
+    handle1.presence.setSelf({ status: "online" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -63,26 +75,30 @@ describe("Ephemeral Store Integration", () => {
     expect(onChange).toHaveBeenCalled()
 
     // Check repo2's view of repo1's state
-    // We need repo1's peerId
-    const peerId1 = repo1.identity.peerId
-    const peerState = handle2.presence.all[peerId1]
-    expect(peerState).toEqual({ selection: "start" })
+    const peerState = handle2.presence.get("1")
+    expect(peerState).toEqual({ status: "online" })
+
+    // Cleanup
+    repo1.synchronizer.stopHeartbeat()
+    repo2.synchronizer.stopHeartbeat()
   })
 
-  it("should support the escape hatch setRaw", async () => {
+  it("should support raw store access via getEphemeral", async () => {
     const repo = new Repo({
       identity: { name: "repo1", type: "user" },
       adapters: [new InMemoryStorageAdapter()],
     })
-    const handle = repo.get("test-doc")
+    const handle = repo.get("test-doc", DocSchema, {
+      presence: PresenceSchema,
+    })
 
-    // setRaw sets a key directly in my store (escape hatch for arbitrary keys)
-    handle.presence.setRaw("global-key", "global-value")
+    // Access raw store via getEphemeral
+    const rawStore = handle.getEphemeral("presence")
+    expect(rawStore).toBeDefined()
 
-    // With per-peer stores, the value is in my store, accessed via all[myPeerId]
-    const myPeerId = repo.identity.peerId
-    const myPresence = handle.presence.all[myPeerId] as Record<string, unknown>
-    expect(myPresence["global-key"]).toBe("global-value")
+    // Can set arbitrary keys on raw store
+    rawStore?.set("custom-key", { custom: "value" })
+    expect(rawStore?.get("custom-key")).toEqual({ custom: "value" })
   })
 
   it("should sync ephemeral state on initial sync", async () => {
@@ -95,12 +111,18 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1", type: "user" },
+      identity: { name: "repo1", type: "user", peerId: "1" },
     })
 
+    // Wait for repo1 to be ready
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     const docId = "initial-sync-doc"
-    const handle1 = repo1.get(docId)
-    handle1.presence.set({ status: "online" })
+    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
+    handle1.presence.setSelf({ status: "online" })
+
+    // Wait for presence to be set
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     // Create repo2 AFTER repo1 has set state
     const repo2 = new Repo({
@@ -110,20 +132,26 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2", type: "user" },
+      identity: { name: "repo2", type: "user", peerId: "2" },
     })
 
-    const handle2 = repo2.get(docId)
+    // Wait for connection
+    await new Promise(resolve => setTimeout(resolve, 100))
 
-    // Wait for sync
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
 
-    const peerId1 = repo1.identity.peerId
-    const peerState = handle2.presence.all[peerId1]
+    // Wait for sync - heartbeat will propagate the presence
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    const peerState = handle2.presence.get("1")
     expect(peerState).toEqual({ status: "online" })
+
+    // Cleanup
+    repo1.synchronizer.stopHeartbeat()
+    repo2.synchronizer.stopHeartbeat()
   })
 
-  it("should remove ephemeral state when peer disconnects", async () => {
+  it("should use TypedEphemeral API correctly", async () => {
     const bridge = new Bridge()
 
     const repo1 = new Repo({
@@ -133,7 +161,7 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo1",
         }),
       ],
-      identity: { name: "repo1", type: "user" },
+      identity: { name: "repo1", type: "user", peerId: "1" },
     })
 
     const repo2 = new Repo({
@@ -143,35 +171,43 @@ describe("Ephemeral Store Integration", () => {
           adapterType: "bridge-adapter-repo2",
         }),
       ],
-      identity: { name: "repo2", type: "user" },
+      identity: { name: "repo2", type: "user", peerId: "2" },
     })
 
-    const docId = "disconnect-sync-doc"
-    const handle1 = repo1.get(docId)
-    const handle2 = repo2.get(docId)
+    const docId = "typed-ephemeral-doc"
+    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
 
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    // Set state on repo1
-    handle1.presence.set({ status: "online" })
+    // Set state on both repos
+    handle1.presence.setSelf({ status: "online" })
+    handle2.presence.setSelf({ status: "away" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    // Verify repo2 has repo1's state
-    const peerId1 = repo1.identity.peerId
-    expect(handle2.presence.all[peerId1]).toEqual({ status: "online" })
+    // Test self accessor
+    expect(handle1.presence.self).toEqual({ status: "online" })
+    expect(handle2.presence.self).toEqual({ status: "away" })
 
-    // Disconnect repo1
-    // We can simulate this by stopping the adapter
-    repo1.synchronizer.adapters.adapters[0]._stop()
+    // Test peers accessor (excludes self)
+    const peers1 = handle1.presence.peers
+    expect(peers1.get("2")).toEqual({ status: "away" })
+    expect(peers1.has("1")).toBe(false) // Self not in peers
 
-    // Wait for disconnect processing
-    await new Promise(resolve => setTimeout(resolve, 100))
+    const peers2 = handle2.presence.peers
+    expect(peers2.get("1")).toEqual({ status: "online" })
+    expect(peers2.has("2")).toBe(false) // Self not in peers
 
-    // Verify repo2 has REMOVED repo1's state
-    // It should be undefined or empty
-    expect(handle2.presence.all[peerId1]).toBeUndefined()
+    // Test getAll (includes self)
+    const all1 = handle1.presence.getAll()
+    expect(all1.get("1")).toEqual({ status: "online" })
+    expect(all1.get("2")).toEqual({ status: "away" })
+
+    // Cleanup
+    repo1.synchronizer.stopHeartbeat()
+    repo2.synchronizer.stopHeartbeat()
   })
 })

@@ -312,7 +312,7 @@ describe("handle-sync-response", () => {
     sourceDoc.getText("test").insert(0, "hello")
     const snapshotData = sourceDoc.export({ mode: "snapshot" })
 
-    // Create ephemeral data (new format: EphemeralPeerData[])
+    // Create ephemeral data (new format: EphemeralStoreData[])
     const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
 
     const message: SynchronizerMessage = {
@@ -331,6 +331,7 @@ describe("handle-sync-response", () => {
             {
               peerId,
               data: ephemeralData,
+              namespace: "presence",
             },
           ],
         },

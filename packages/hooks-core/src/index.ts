@@ -1,5 +1,12 @@
-import type { DocShape, Infer, ValueShape } from "@loro-extended/change"
-import type { DocId, Repo, TypedDocHandle } from "@loro-extended/repo"
+import type { DocShape, Infer } from "@loro-extended/change"
+import type {
+  DocId,
+  EphemeralDeclarations,
+  Handle,
+  HandleWithEphemerals,
+  Repo,
+  TypedEphemeral,
+} from "@loro-extended/repo"
 
 export interface FrameworkHooks {
   useState: <T>(
@@ -44,36 +51,38 @@ export function createHooks(framework: FrameworkHooks) {
   // useHandle - Get typed handle (stable, never re-renders)
   // ============================================
 
-  // Overload: without presence
+  // Overload: without ephemeral stores
   function useHandle<D extends DocShape>(
     docId: DocId,
     docSchema: D,
-  ): TypedDocHandle<D>
+  ): Handle<D, Record<string, never>>
 
-  // Overload: with presence
-  function useHandle<D extends DocShape, P extends ValueShape>(
+  // Overload: with ephemeral stores (including presence)
+  function useHandle<D extends DocShape, E extends EphemeralDeclarations>(
     docId: DocId,
     docSchema: D,
-    presenceSchema: P,
-  ): TypedDocHandle<D, P>
+    ephemeralShapes: E,
+  ): HandleWithEphemerals<D, E>
 
   // Implementation
-  function useHandle<D extends DocShape, P extends ValueShape>(
+  function useHandle<D extends DocShape, E extends EphemeralDeclarations>(
     docId: DocId,
     docSchema: D,
-    presenceSchema?: P,
-  ): TypedDocHandle<D, P> | TypedDocHandle<D> {
+    ephemeralShapes?: E,
+  ): HandleWithEphemerals<D, E> | Handle<D, Record<string, never>> {
     const repo = useRepo()
 
     // Synchronous initialization - no null state, no flickering
     const [handle] = useState(() => {
-      if (presenceSchema) {
-        return repo.get(docId, docSchema, presenceSchema)
+      if (ephemeralShapes) {
+        return repo.get(docId, docSchema, ephemeralShapes)
       }
       return repo.get(docId, docSchema)
     })
 
-    return handle
+    return handle as
+      | HandleWithEphemerals<D, E>
+      | Handle<D, Record<string, never>>
   }
 
   // ============================================
@@ -82,16 +91,18 @@ export function createHooks(framework: FrameworkHooks) {
 
   // Overload: with selector (fine-grained)
   function useDoc<D extends DocShape, R>(
-    handle: TypedDocHandle<D>,
+    handle: Handle<D, EphemeralDeclarations>,
     selector: (doc: Infer<D>) => R,
   ): R
 
   // Overload: without selector (full doc JSON)
-  function useDoc<D extends DocShape>(handle: TypedDocHandle<D>): Infer<D>
+  function useDoc<D extends DocShape>(
+    handle: Handle<D, EphemeralDeclarations>,
+  ): Infer<D>
 
   // Implementation
   function useDoc<D extends DocShape, R>(
-    handle: TypedDocHandle<D>,
+    handle: Handle<D, EphemeralDeclarations>,
     selector?: (doc: Infer<D>) => R,
   ): R | Infer<D> {
     // Use a ref to cache the snapshot and track version
@@ -108,16 +119,16 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       // Initialize cache
-      const version = handle.untyped.doc.opCount()
+      const version = handle.loroDoc.opCount()
       cacheRef.current = {
         version,
         value: computeValue(),
       }
 
       const subscribe = (onStoreChange: () => void) => {
-        return handle.untyped.doc.subscribe(() => {
+        return handle.loroDoc.subscribe(() => {
           // Update cache on change
-          const newVersion = handle.untyped.doc.opCount()
+          const newVersion = handle.loroDoc.opCount()
           if (!cacheRef.current || cacheRef.current.version !== newVersion) {
             cacheRef.current = {
               version: newVersion,
@@ -129,7 +140,7 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       const getSnapshot = (): R | Infer<D> => {
-        const currentVersion = handle.untyped.doc.opCount()
+        const currentVersion = handle.loroDoc.opCount()
         if (!cacheRef.current || cacheRef.current.version !== currentVersion) {
           cacheRef.current = {
             version: currentVersion,
@@ -152,27 +163,81 @@ export function createHooks(framework: FrameworkHooks) {
   // usePresence - Get presence state (reactive)
   // ============================================
 
-  function usePresence<D extends DocShape, P extends ValueShape>(
-    handle: TypedDocHandle<D, P>,
-  ): { self: Infer<P>; peers: Map<string, Infer<P>> } {
+  /**
+   * Hook to get reactive presence state from a handle with a 'presence' ephemeral store.
+   *
+   * @deprecated Use `useEphemeral(handle.presence)` instead. The `usePresence` hook assumes
+   * a hard-coded 'presence' store, but the unified ephemeral store model treats all stores
+   * equally. Using `useEphemeral` directly is more flexible and explicit.
+   *
+   * @param handle - A handle with a 'presence' ephemeral store
+   * @returns An object with `self` (your presence) and `peers` (others' presence)
+   *
+   * @example
+   * ```tsx
+   * // Deprecated:
+   * const { self, peers } = usePresence(handle)
+   *
+   * // Preferred:
+   * const { self, peers } = useEphemeral(handle.presence)
+   * ```
+   */
+  function usePresence<P>(handle: { presence: TypedEphemeral<P> }): {
+    self: P | undefined
+    peers: Map<string, P>
+  } {
+    // Deprecation warning - only show once per session
+    if (
+      typeof globalThis !== "undefined" &&
+      !(globalThis as Record<string, unknown>).__usePresenceDeprecationWarned
+    ) {
+      ;(globalThis as Record<string, unknown>).__usePresenceDeprecationWarned =
+        true
+      console.warn(
+        "[loro-extended] usePresence is deprecated. Use useEphemeral(handle.presence) instead.",
+      )
+    }
+    return useEphemeral(handle.presence)
+  }
+
+  // ============================================
+  // useEphemeral - Get any ephemeral store state (reactive)
+  // ============================================
+
+  /**
+   * Hook to get reactive state from any ephemeral store.
+   *
+   * @param ephemeral - A TypedEphemeral store
+   * @returns An object with `self` (your value) and `peers` (others' values)
+   *
+   * @example
+   * ```tsx
+   * const handle = useHandle(docId, DocSchema, { mouse: MouseSchema })
+   * const { self, peers } = useEphemeral(handle.mouse)
+   * ```
+   */
+  function useEphemeral<T>(ephemeral: TypedEphemeral<T>): {
+    self: T | undefined
+    peers: Map<string, T>
+  } {
     // Use a ref to cache the snapshot
     const cacheRef = useRef<{
-      self: Infer<P>
-      peers: Map<string, Infer<P>>
+      self: T | undefined
+      peers: Map<string, T>
     } | null>(null)
 
     const store = useMemo(() => {
       // Compute the current snapshot value
       const computeValue = () => ({
-        self: handle.presence.self,
-        peers: handle.presence.peers,
+        self: ephemeral.self,
+        peers: ephemeral.peers,
       })
 
       // Initialize cache
       cacheRef.current = computeValue()
 
       const subscribe = (onStoreChange: () => void) => {
-        return handle.presence.subscribe(() => {
+        return ephemeral.subscribe(() => {
           // Update cache on change
           cacheRef.current = computeValue()
           onStoreChange()
@@ -188,7 +253,7 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       return { subscribe, getSnapshot }
-    }, [handle])
+    }, [ephemeral])
 
     return useSyncExternalStore(store.subscribe, store.getSnapshot)
   }
@@ -203,5 +268,6 @@ export function createHooks(framework: FrameworkHooks) {
     useHandle,
     useDoc,
     usePresence,
+    useEphemeral,
   }
 }

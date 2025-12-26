@@ -1,8 +1,14 @@
+import { Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
 import { createVersionVector } from "../synchronizer/test-utils.js"
 import { generatePeerId } from "../utils/generate-peer-id.js"
+
+// Schema for test documents
+const DocSchema = Shape.doc({
+  title: Shape.text(),
+})
 
 describe("Synchronizer Permissions Edge Cases", () => {
   beforeEach(() => {
@@ -27,8 +33,10 @@ describe("Synchronizer Permissions Edge Cases", () => {
 
     // Create doc on repoA
     const docId = crypto.randomUUID()
-    const handleA = repoA.get(docId)
-    handleA.batch(doc => doc.getMap("doc").set("text", "secret"))
+    const handleA = repoA.get(docId, DocSchema)
+    handleA.change(draft => {
+      draft.title.insert(0, "secret")
+    })
 
     // Manually inject peer state into repoA to simulate that repoB ALREADY has the doc
     // We do this BEFORE creating repoB to avoid race conditions
@@ -64,8 +72,8 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // (even though canReveal is false)
     expect(repoB.has(docId)).toBe(true)
 
-    const handleB = repoB.get(docId)
+    const handleB = repoB.get(docId, DocSchema)
     await handleB.waitForNetwork()
-    expect(handleB.doc.getMap("doc").toJSON()).toEqual({ text: "secret" })
+    expect(handleB.doc.toJSON().title).toBe("secret")
   })
 })

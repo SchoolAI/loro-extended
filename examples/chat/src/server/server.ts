@@ -6,17 +6,19 @@ import {
 import {
   type DocId,
   generateUUID,
+  type HandleWithEphemerals,
   Repo,
-  TypedDocHandle,
 } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
 import express from "express"
 import {
+  ChatEphemeralDeclarations,
   ChatSchema,
+  type Message,
+  type MutableChatDoc,
   type MutableMessage,
   type Presence,
-  PresenceSchema,
 } from "../shared/types.js"
 import { logger, model } from "./config.js"
 import { requestLogger } from "./request-logger.js"
@@ -32,18 +34,23 @@ app.use(requestLogger())
 const subscriptions = new Map<DocId, () => void>()
 const presences = new Map<DocId, Record<string, Presence>>()
 
+type ChatHandle = HandleWithEphemerals<
+  typeof ChatSchema,
+  typeof ChatEphemeralDeclarations
+>
+
 /**
  * Stream LLM response directly into a mutable message reference.
  * This is the efficient "targetMessage" pattern - no repeated lookups needed.
  */
 async function streamLLMResponse(
-  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
+  handle: ChatHandle,
   targetMessage: MutableMessage,
 ): Promise<void> {
   try {
     // Convert chat history in document to LLM message context
     const messages: Array<{ role: "user" | "assistant"; content: string }> =
-      handle.doc.messages.toArray().flatMap(msg =>
+      handle.doc.messages.toArray().flatMap((msg: Message) =>
         msg.id === targetMessage.id
           ? []
           : [
@@ -52,7 +59,7 @@ async function streamLLMResponse(
                   msg.role === "assistant"
                     ? ("assistant" as const)
                     : ("user" as const),
-                content: msg.content.toString(),
+                content: msg.content,
               },
             ],
       )
@@ -82,12 +89,12 @@ async function streamLLMResponse(
  * The returned reference can be used for efficient streaming.
  */
 function appendAssistantMessage(
-  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
+  handle: ChatHandle,
   content: string,
 ): MutableMessage {
   const id = generateUUID()
 
-  handle.change(draft => {
+  handle.change((draft: MutableChatDoc) => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -100,16 +107,17 @@ function appendAssistantMessage(
   })
 
   // Return mutable reference to the newly added message
-  return handle.doc.messages.get(handle.doc.messages.length - 1)
+  const msg = handle.doc.messages.get(handle.doc.messages.length - 1)
+  if (!msg) {
+    throw new Error("Failed to get newly added message")
+  }
+  return msg
 }
 
 /**
  * Process document updates to trigger AI responses.
  */
-function processDocumentUpdate(
-  docId: DocId,
-  handle: TypedDocHandle<typeof ChatSchema, typeof PresenceSchema>,
-) {
+function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
   try {
     const messagesRef = handle.doc.messages
     logger.debug`Processing doc ${docId}. Message count: ${messagesRef.length}`
@@ -117,6 +125,8 @@ function processDocumentUpdate(
     if (messagesRef.length === 0) return
 
     const lastMsg = messagesRef.get(messagesRef.length - 1)
+    if (!lastMsg) return
+
     logger.debug`Doc ${docId} updated. Last message: ${lastMsg.role} - ${lastMsg.content.toString().substring(0, 20)}...`
 
     // Only process user messages
@@ -158,7 +168,7 @@ function processDocumentUpdate(
 
 /**
  * Subscribe to a document to react to changes.
- * Uses TypedDocHandle for type-safe document and presence access.
+ * Uses HandleWithEphemerals for type-safe document and presence access.
  */
 function subscribeToDocument(repo: Repo, docId: DocId) {
   if (subscriptions.has(docId)) {
@@ -168,8 +178,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
 
   logger.info("Subscribing to document {docId}", { docId })
 
-  const untypedHandle = repo.get(docId)
-  const handle = new TypedDocHandle(untypedHandle, ChatSchema, PresenceSchema)
+  const handle = repo.get(docId, ChatSchema, ChatEphemeralDeclarations)
 
   // Subscribe to messages changes using path-based subscription
   const unsubscribeDoc = handle.subscribe(
@@ -179,8 +188,16 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
     },
   )
 
-  // Subscribe to presence changes
-  const unsubscribePresence = handle.presence.subscribe(({ all }) => {
+  // Subscribe to presence changes - update the presences map on each change
+  const unsubscribePresence = handle.presence.subscribe(() => {
+    const all: Record<string, Presence> = {}
+    const self = handle.presence.self
+    if (self) {
+      all[handle.peerId] = self
+    }
+    for (const [peerId, presence] of handle.presence.peers.entries()) {
+      all[peerId] = presence
+    }
     presences.set(docId, all)
   })
 

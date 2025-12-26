@@ -105,10 +105,13 @@ describe("toProtocolMessages", () => {
         {
           docId: "doc-1",
           requesterDocVersion: version,
-          ephemeral: {
-            peerId: "peer-123" as any,
-            data: new Uint8Array([10, 11, 12]),
-          },
+          ephemeral: [
+            {
+              peerId: "peer-123" as `${number}`,
+              namespace: "presence",
+              data: new Uint8Array([10, 11, 12]),
+            },
+          ],
         },
       ],
       bidirectional: true,
@@ -139,10 +142,13 @@ describe("toProtocolMessages", () => {
         {
           docId: "doc-1",
           requesterDocVersion: version,
-          ephemeral: {
-            peerId: "peer-123" as any,
-            data: new Uint8Array([10, 11, 12]),
-          },
+          ephemeral: [
+            {
+              peerId: "peer-123" as `${number}`,
+              namespace: "presence",
+              data: new Uint8Array([10, 11, 12]),
+            },
+          ],
         },
         {
           docId: "doc-2",
@@ -265,11 +271,13 @@ describe("toProtocolMessages", () => {
       },
       ephemeral: [
         {
-          peerId: "peer-123" as any,
+          peerId: "peer-123" as `${number}`,
+          namespace: "presence",
           data: new Uint8Array([10, 11, 12]),
         },
         {
-          peerId: "peer-456" as any,
+          peerId: "peer-456" as `${number}`,
+          namespace: "presence",
           data: new Uint8Array([20, 21, 22]),
         },
       ],
@@ -307,7 +315,8 @@ describe("toProtocolMessages", () => {
       },
       ephemeral: [
         {
-          peerId: "peer-123" as any,
+          peerId: "peer-123" as `${number}`,
+          namespace: "presence",
           data: new Uint8Array([10, 11, 12]),
         },
       ],
@@ -351,7 +360,8 @@ describe("toProtocolMessages", () => {
       hopsRemaining: 1,
       stores: [
         {
-          peerId: "123456789" as any,
+          peerId: "123456789" as `${number}`,
+          namespace: "presence",
           data: new Uint8Array([10, 11, 12]),
         },
       ],
@@ -362,11 +372,12 @@ describe("toProtocolMessages", () => {
     expect(result).toHaveLength(1)
     expect(result[0].type).toBe(MESSAGE_TYPE.DocUpdate)
     expect((result[0] as DocUpdate).crdtType).toBe("ephemeral")
-    // The update now includes the peerId encoded with the data
-    // Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [data]
-    // "123456789" is 9 bytes, so: [0, 9, ...peerId bytes..., 10, 11, 12]
+    // The update now includes the peerId and namespace encoded with the data
+    // Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [namespaceLength (2 bytes)] [namespace (UTF-8)] [data]
+    // "123456789" is 9 bytes, "presence" is 8 bytes
+    // so: [0, 9, ...peerId bytes..., 0, 8, ...namespace bytes..., 10, 11, 12]
     const update = (result[0] as DocUpdate).updates[0]
-    expect(update.length).toBe(2 + 9 + 3) // 2 bytes length + 9 bytes peerId + 3 bytes data
+    expect(update.length).toBe(2 + 9 + 2 + 8 + 3) // 2 bytes peerId length + 9 bytes peerId + 2 bytes namespace length + 8 bytes namespace + 3 bytes data
     // Verify the peerId length prefix
     expect(update[0]).toBe(0) // high byte of length
     expect(update[1]).toBe(9) // low byte of length (9 chars)

@@ -50,11 +50,17 @@ export type ChannelMsgEstablishResponse = {
 }
 
 /**
- * Per-peer ephemeral data for sync messages.
+ * Per-peer ephemeral store data; always associated with a docId (room).
+ * Used in all ephemeral-related messages (sync-request, sync-response, channel/ephemeral).
  */
-export type EphemeralPeerData = {
+export type EphemeralStoreData = {
   peerId: PeerID
   data: Uint8Array
+  /**
+   * Namespace for the store (e.g., 'presence', 'cursors', 'mouse').
+   * Required for the unified ephemeral store model.
+   */
+  namespace: string
 }
 
 export type ChannelMsgSyncRequest = {
@@ -63,7 +69,7 @@ export type ChannelMsgSyncRequest = {
     docId: DocId
     requesterDocVersion: VersionVector
     /** Requester's ephemeral state for this doc (my presence data) */
-    ephemeral?: EphemeralPeerData
+    ephemeral?: EphemeralStoreData[]
   }[]
   /**
    * Whether the receiver should send a reciprocal sync-request back.
@@ -80,7 +86,7 @@ export type ChannelMsgSyncResponse = {
   docId: DocId
   transmission: SyncTransmission
   /** Responder's ephemeral snapshot (all known peers' presence data) */
-  ephemeral?: EphemeralPeerData[]
+  ephemeral?: EphemeralStoreData[]
 }
 
 export type ChannelMsgUpdate = {
@@ -122,14 +128,6 @@ export type ChannelMsgDeleteResponse = {
   type: "channel/delete-response"
   docId: DocId
   status: "deleted" | "ignored"
-}
-
-/**
- * Per-peer ephemeral store data; always associated with a docId (room)
- */
-export type EphemeralStoreData = {
-  peerId: PeerID
-  data: Uint8Array
 }
 
 export type ChannelMsgEphemeral = {

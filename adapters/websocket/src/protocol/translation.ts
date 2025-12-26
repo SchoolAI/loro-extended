@@ -152,14 +152,19 @@ function translateSyncRequest(
     })
 
     // If this doc has ephemeral data, send it as a separate DocUpdate
-    if (doc.ephemeral && doc.ephemeral.data.length > 0) {
+    if (doc.ephemeral && doc.ephemeral.length > 0) {
+      const updates = doc.ephemeral.map(store =>
+        encodeEphemeralWithPeerIdAndNamespace(
+          store.peerId,
+          store.namespace,
+          store.data,
+        ),
+      )
       result.push({
         type: MESSAGE_TYPE.DocUpdate,
         crdtType: "ephemeral" as CrdtType,
         roomId,
-        updates: [
-          encodeEphemeralWithPeerId(doc.ephemeral.peerId, doc.ephemeral.data),
-        ],
+        updates,
       })
     }
   }
@@ -201,7 +206,11 @@ function translateSyncResponse(
   // This ensures presence data is transmitted along with sync-response
   if (msg.ephemeral && msg.ephemeral.length > 0) {
     const ephemeralUpdates = msg.ephemeral.map(store =>
-      encodeEphemeralWithPeerId(store.peerId, store.data),
+      encodeEphemeralWithPeerIdAndNamespace(
+        store.peerId,
+        store.namespace,
+        store.data,
+      ),
     )
 
     if (ephemeralUpdates.length > 0) {
@@ -248,44 +257,61 @@ function translateUpdate(
 }
 
 /**
- * Encode a peerId and data into a single Uint8Array.
- * Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [data]
+ * Encode a peerId, namespace, and data into a single Uint8Array.
+ * Format: [peerIdLength (2 bytes)] [peerId (UTF-8)] [namespaceLength (2 bytes)] [namespace (UTF-8)] [data]
  */
-function encodeEphemeralWithPeerId(
+function encodeEphemeralWithPeerIdAndNamespace(
   peerId: string,
+  namespace: string,
   data: Uint8Array,
 ): Uint8Array {
   const encoder = new TextEncoder()
   const peerIdBytes = encoder.encode(peerId)
-  const result = new Uint8Array(2 + peerIdBytes.length + data.length)
+  const namespaceBytes = encoder.encode(namespace)
+  const result = new Uint8Array(
+    2 + peerIdBytes.length + 2 + namespaceBytes.length + data.length,
+  )
   // Store peerId length as 2 bytes (big-endian)
   result[0] = (peerIdBytes.length >> 8) & 0xff
   result[1] = peerIdBytes.length & 0xff
   result.set(peerIdBytes, 2)
-  result.set(data, 2 + peerIdBytes.length)
+  // Store namespace length as 2 bytes (big-endian)
+  const namespaceOffset = 2 + peerIdBytes.length
+  result[namespaceOffset] = (namespaceBytes.length >> 8) & 0xff
+  result[namespaceOffset + 1] = namespaceBytes.length & 0xff
+  result.set(namespaceBytes, namespaceOffset + 2)
+  // Store data
+  result.set(data, namespaceOffset + 2 + namespaceBytes.length)
   return result
 }
 
 /**
- * Decode a peerId and data from a single Uint8Array.
- * Returns { peerId, data } or null if invalid.
+ * Decode a peerId, namespace, and data from a single Uint8Array.
+ * Returns { peerId, namespace, data } or null if invalid.
  */
-function decodeEphemeralWithPeerId(
+function decodeEphemeralWithPeerIdAndNamespace(
   encoded: Uint8Array,
-): { peerId: string; data: Uint8Array } | null {
+): { peerId: string; namespace: string; data: Uint8Array } | null {
   if (encoded.length < 2) return null
   const peerIdLength = (encoded[0] << 8) | encoded[1]
-  if (encoded.length < 2 + peerIdLength) return null
+  if (encoded.length < 2 + peerIdLength + 2) return null
   const decoder = new TextDecoder()
   const peerId = decoder.decode(encoded.slice(2, 2 + peerIdLength))
-  const data = encoded.slice(2 + peerIdLength)
-  return { peerId, data }
+  const namespaceOffset = 2 + peerIdLength
+  const namespaceLength =
+    (encoded[namespaceOffset] << 8) | encoded[namespaceOffset + 1]
+  if (encoded.length < namespaceOffset + 2 + namespaceLength) return null
+  const namespace = decoder.decode(
+    encoded.slice(namespaceOffset + 2, namespaceOffset + 2 + namespaceLength),
+  )
+  const data = encoded.slice(namespaceOffset + 2 + namespaceLength)
+  return { peerId, namespace, data }
 }
 
 /**
  * Translate an ephemeral message to DocUpdate with ephemeral CRDT type.
- * The new format uses stores array with per-peer data.
- * We encode the peerId into each update so it survives the protocol translation.
+ * The new format uses stores array with per-peer data and namespace.
+ * We encode the peerId and namespace into each update so it survives the protocol translation.
  */
 function translateEphemeral(
   msg: ChannelMsgEphemeral,
@@ -293,9 +319,13 @@ function translateEphemeral(
 ): DocUpdate[] {
   const roomId = getRoomId(ctx, msg.docId)
 
-  // Encode each store with its peerId so we can recover it on the other side
+  // Encode each store with its peerId and namespace so we can recover it on the other side
   const updates = msg.stores.map(store =>
-    encodeEphemeralWithPeerId(store.peerId, store.data),
+    encodeEphemeralWithPeerIdAndNamespace(
+      store.peerId,
+      store.namespace,
+      store.data,
+    ),
   )
 
   if (updates.length === 0) {
@@ -434,21 +464,21 @@ function translateDocUpdateToChannel(
 
   // Handle ephemeral messages
   if (msg.crdtType === "ephemeral" || msg.crdtType === "ephemeral-persisted") {
-    // Decode each update to extract the peerId that was encoded when sending
+    // Decode each update to extract the peerId and namespace that was encoded when sending
     const stores = msg.updates
       .map(encoded => {
-        const decoded = decodeEphemeralWithPeerId(encoded)
+        const decoded = decodeEphemeralWithPeerIdAndNamespace(encoded)
         if (!decoded) {
           // Fallback for old format or invalid data
           return {
-            docId,
             peerId: (senderPeerId ?? "unknown") as `${number}`,
+            namespace: "presence",
             data: encoded,
           }
         }
         return {
-          docId,
           peerId: decoded.peerId as `${number}`,
+          namespace: decoded.namespace,
           data: decoded.data,
         }
       })

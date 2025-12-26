@@ -5,13 +5,13 @@ import type { Infer, PeerID } from "@loro-extended/repo"
 // Room Document Schema (Persistent CRDT)
 // ============================================================================
 
-export const ParticipantSchema = Shape.map({
+export const ParticipantSchema = Shape.struct({
   peerId: Shape.plain.string(),
   name: Shape.plain.string(),
   joinedAt: Shape.plain.number(),
 })
 
-export const RoomMetadataSchema = Shape.map({
+export const RoomMetadataSchema = Shape.struct({
   name: Shape.plain.string(),
   createdAt: Shape.plain.number(),
 })
@@ -57,11 +57,18 @@ export type SignalsMap = Record<string, SignalData[]>
  * with stable user metadata.
  */
 export type UserPresence = Infer<typeof UserPresenceSchema>
-export const UserPresenceSchema = Shape.plain.object({
+export const UserPresenceSchema = Shape.plain.struct({
   name: Shape.plain.string().placeholder("Anonymous"),
   wantsAudio: Shape.plain.boolean().placeholder(true),
   wantsVideo: Shape.plain.boolean().placeholder(true),
 })
+
+/**
+ * Ephemeral declarations for user presence
+ */
+export const UserEphemeralDeclarations = {
+  presence: UserPresenceSchema,
+}
 
 /**
  * Signaling presence - high-frequency, transient WebRTC signals.
@@ -71,7 +78,14 @@ export const UserPresenceSchema = Shape.plain.object({
  * to send to that peer.
  */
 export type SignalingPresence = Infer<typeof SignalingPresenceSchema>
-export const SignalingPresenceSchema = Shape.plain.object({
+export const SignalingPresenceSchema = Shape.plain.struct({
   instanceId: Shape.plain.string(),
-  signals: Shape.plain.record(Shape.plain.array(Shape.plain.object({}))),
+  signals: Shape.plain.record(Shape.plain.array(Shape.plain.struct({}))),
 })
+
+/**
+ * Ephemeral declarations for signaling presence
+ */
+export const SignalingEphemeralDeclarations = {
+  presence: SignalingPresenceSchema,
+}

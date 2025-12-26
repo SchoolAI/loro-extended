@@ -16,7 +16,9 @@ const containerGetter = {
   struct: "getMap", // Structs use LoroMap as their underlying container
   text: "getText",
   tree: "getTree",
-} as const
+} as const satisfies Record<string, keyof LoroDoc>
+
+type ContainerGetterKey = keyof typeof containerGetter
 
 // Doc Ref class -- the actual object passed to the change `mutation` function
 export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
@@ -47,7 +49,16 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     key: string,
     shape: S,
   ): TypedRefParams<ContainerShape> {
-    const getter = this._doc[containerGetter[shape._type]].bind(this._doc)
+    // Handle "any" shape type - it's an escape hatch that doesn't have a specific getter
+    if (shape._type === "any") {
+      throw new Error(
+        `Cannot get typed ref params for "any" shape type. ` +
+          `The "any" shape is an escape hatch for untyped containers and should be accessed directly via loroDoc.`,
+      )
+    }
+
+    const getterName = containerGetter[shape._type as ContainerGetterKey]
+    const getter = this._doc[getterName].bind(this._doc)
 
     return {
       shape,

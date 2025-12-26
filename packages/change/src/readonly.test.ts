@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "./functional-helpers.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 
@@ -14,7 +15,7 @@ describe("TypedDoc Mutable Mode", () => {
   it("should read values correctly", () => {
     const doc = createTypedDoc(schema)
 
-    doc.$.change(d => {
+    change(doc, d => {
       d.meta.count = 1
       d.meta.title = "updated"
       d.list.push("item1")
@@ -33,7 +34,7 @@ describe("TypedDoc Mutable Mode", () => {
 
     expect(liveMeta.count).toBe(0)
 
-    doc.$.change(d => {
+    change(doc, d => {
       d.meta.count = 5
     })
 
@@ -58,7 +59,7 @@ describe("TypedDoc Mutable Mode", () => {
   it("should support change() for grouped mutations", () => {
     const doc = createTypedDoc(schema)
 
-    doc.$.change(d => {
+    change(doc, d => {
       d.meta.count = 1
       d.meta.title = "batched"
       d.list.push("a")
@@ -74,7 +75,7 @@ describe("TypedDoc Mutable Mode", () => {
   it("should support toJSON for full serialization", () => {
     const doc = createTypedDoc(schema)
 
-    doc.$.change(d => {
+    change(doc, d => {
       d.meta.count = 1
       d.meta.title = "json"
       d.list.push("a")

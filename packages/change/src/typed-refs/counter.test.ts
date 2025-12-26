@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 
@@ -57,7 +58,7 @@ describe("Counter Ref", () => {
     })
     const doc = createTypedDoc(schema)
 
-    doc.$.change(draft => {
+    change(doc, draft => {
       draft.counter.increment(5)
     })
 

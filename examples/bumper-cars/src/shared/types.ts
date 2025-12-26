@@ -46,8 +46,8 @@ export type CarColor = (typeof CAR_COLORS)[number]
 // Document Schema (Persistent - Scoreboard)
 // ============================================================================
 
-// Player score uses a map with counter for bumps (allows concurrent increments)
-export const PlayerScoreSchema = Shape.map({
+// Player score uses a struct with counter for bumps (allows concurrent increments)
+export const PlayerScoreSchema = Shape.struct({
   name: Shape.plain.string(),
   color: Shape.plain.string(),
   bumps: Shape.counter(),
@@ -71,7 +71,7 @@ export type PlayerScore = {
 /**
  * Input state from a client's joystick/keyboard
  */
-const InputStateSchema = Shape.plain.object({
+const InputStateSchema = Shape.plain.struct({
   force: Shape.plain.number(), // 0-1 normalized force, default 0
   angle: Shape.plain.number(), // radians, default 0
 })
@@ -86,7 +86,7 @@ export type InputState = {
  * Contains their input state and identity info
  * Placeholder values are derived from .placeholder() annotations
  */
-export const ClientPresenceSchema = Shape.plain.object({
+export const ClientPresenceSchema = Shape.plain.struct({
   type: Shape.plain.string("client"),
   name: Shape.plain.string(), // default ""
   color: Shape.plain.string().placeholder(CAR_COLORS[0]),
@@ -105,7 +105,7 @@ export type ClientPresence = {
 /**
  * Car state in the game world
  */
-const CarStateSchema = Shape.plain.object({
+const CarStateSchema = Shape.plain.struct({
   x: Shape.plain.number(),
   y: Shape.plain.number(),
   vx: Shape.plain.number(),
@@ -132,7 +132,7 @@ export type CarState = {
  * Contains the authoritative game state
  * Placeholder values are derived from .placeholder() annotations
  */
-export const ServerPresenceSchema = Shape.plain.object({
+export const ServerPresenceSchema = Shape.plain.struct({
   type: Shape.plain.string("server"),
   cars: Shape.plain.record(CarStateSchema), // default {}
   tick: Shape.plain.number(), // default 0
@@ -154,6 +154,14 @@ export const GamePresenceSchema = Shape.plain.discriminatedUnion("type", {
   client: ClientPresenceSchema,
   server: ServerPresenceSchema,
 })
+
+/**
+ * Ephemeral declarations for the game - wraps the presence schema
+ * This is the format expected by useHandle's third argument
+ */
+export const GameEphemeralDeclarations = {
+  presence: GamePresenceSchema,
+}
 
 /**
  * Combined presence type - can be either client or server

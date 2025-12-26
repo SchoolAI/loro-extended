@@ -1,16 +1,21 @@
-import type { DocId, RepoParams, UntypedDocHandle } from "@loro-extended/repo"
+import type { DocId, Handle, RepoParams } from "@loro-extended/repo"
 import { InMemoryStorageAdapter } from "@loro-extended/repo"
 import { type RenderOptions, render } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { vi } from "vitest"
 import { RepoProvider } from "./repo-context.js"
 
-// Mock UntypedDocHandle for testing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyHandle = Handle<any, any>
+
+// Mock handle type for testing - allows any properties for flexibility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MockHandle = Partial<AnyHandle> & Record<string, any>
+
+// Mock Handle for testing
 // Note: This creates a partial mock - for full integration tests, use createRepoWrapper instead
-export function createMockDocHandle(
-  overrides: Partial<UntypedDocHandle> = {},
-): Partial<UntypedDocHandle> {
-  const mockHandle: Partial<UntypedDocHandle> = {
+export function createMockDocHandle(overrides: MockHandle = {}): MockHandle {
+  const mockHandle: MockHandle = {
     docId: "mock-doc-id",
     peerId: "mock-peer-id",
     doc: {
@@ -19,18 +24,9 @@ export function createMockDocHandle(
       subscribe: vi.fn().mockReturnValue(() => {}),
       commit: vi.fn(),
     } as any,
-    batch: vi.fn().mockReturnThis(),
+    change: vi.fn(),
     readyStates: [],
     onReadyStateChange: vi.fn().mockReturnValue(() => {}),
-    presence: {
-      set: vi.fn(),
-      get: vi.fn(),
-      self: {},
-      peers: new Map(),
-      all: {},
-      setRaw: vi.fn(),
-      subscribe: vi.fn().mockReturnValue(() => {}),
-    },
     ...overrides,
   }
 

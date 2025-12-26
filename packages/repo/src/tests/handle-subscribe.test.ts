@@ -1,37 +1,11 @@
 import { Shape } from "@loro-extended/change"
-import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import { TypedDocHandle } from "./typed-doc-handle.js"
-import type { UntypedDocHandle } from "./untyped-doc-handle.js"
+import { Repo } from "../repo.js"
 
 const crdt = Shape
 const value = Shape.plain
 
-// Create a minimal mock of UntypedDocHandle for testing
-function createMockUntypedHandle(doc: LoroDoc): UntypedDocHandle {
-  return {
-    docId: "test-doc",
-    peerId: "test-peer",
-    doc,
-    readyStates: [],
-    presence: {
-      set: vi.fn(),
-      get: vi.fn(),
-      self: {},
-      peers: new Map(),
-      all: {},
-      setRaw: vi.fn(),
-      subscribe: vi.fn(() => () => {}),
-    },
-    onReadyStateChange: vi.fn(() => () => {}),
-    waitUntilReady: vi.fn(async () => ({}) as UntypedDocHandle),
-    waitForStorage: vi.fn(async () => ({}) as UntypedDocHandle),
-    waitForNetwork: vi.fn(async () => ({}) as UntypedDocHandle),
-    batch: vi.fn(),
-  } as unknown as UntypedDocHandle
-}
-
-describe("TypedDocHandle.subscribe", () => {
+describe("Handle.subscribe", () => {
   const docShape = Shape.doc({
     books: crdt.list(
       crdt.struct({
@@ -51,15 +25,14 @@ describe("TypedDocHandle.subscribe", () => {
     ),
   })
 
-  const presenceShape = value.struct({
-    cursor: value.struct({ x: value.number(), y: value.number() }),
-  })
-
   describe("regular subscription (backward compatibility)", () => {
     it("should subscribe to all document changes", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe(listener)
@@ -84,14 +57,19 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Listener should not be called after unsubscribe
       expect(listener).not.toHaveBeenCalled()
+
+      repo.synchronizer.stopHeartbeat()
     })
   })
 
   describe("type-safe path selector DSL", () => {
     it("should subscribe to a simple property path", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe(p => p.config.theme, listener)
@@ -106,12 +84,16 @@ describe("TypedDocHandle.subscribe", () => {
       expect(listener).toHaveBeenCalledWith("dark", "")
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should provide previous value on subsequent changes", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const calls: Array<{ value: string; prev: string | undefined }> = []
       const unsubscribe = handle.subscribe(
@@ -137,12 +119,16 @@ describe("TypedDocHandle.subscribe", () => {
       ])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with $each for arrays", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       let receivedTitles: string[] = []
       const unsubscribe = handle.subscribe(
@@ -177,12 +163,16 @@ describe("TypedDocHandle.subscribe", () => {
       expect(receivedTitles).toEqual(["New Book", "Another Book"])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with $at for specific array index", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
       handle.change(draft => {
@@ -208,19 +198,26 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Modify the first book's title using the LoroText API
       handle.change(draft => {
-        draft.books.get(0).title.delete(0, draft.books.get(0).title.length)
-        draft.books.get(0).title.insert(0, "Updated First Book")
+        const book = draft.books.get(0)
+        if (book) {
+          book.title.delete(0, book.title.length)
+          book.title.insert(0, "Updated First Book")
+        }
       })
 
       expect(receivedTitle).toBe("Updated First Book")
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with $first and $last", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
       handle.change(draft => {
@@ -260,8 +257,10 @@ describe("TypedDocHandle.subscribe", () => {
       // Modify the first book
       handle.change(draft => {
         const firstBook = draft.books.get(0)
-        firstBook.title.delete(0, firstBook.title.length)
-        firstBook.title.insert(0, "Updated First")
+        if (firstBook) {
+          firstBook.title.delete(0, firstBook.title.length)
+          firstBook.title.insert(0, "Updated First")
+        }
       })
 
       expect(firstTitle).toBe("Updated First")
@@ -269,20 +268,26 @@ describe("TypedDocHandle.subscribe", () => {
       // Modify the last book
       handle.change(draft => {
         const lastBook = draft.books.get(2)
-        lastBook.title.delete(0, lastBook.title.length)
-        lastBook.title.insert(0, "Updated Third")
+        if (lastBook) {
+          lastBook.title.delete(0, lastBook.title.length)
+          lastBook.title.insert(0, "Updated Third")
+        }
       })
 
       expect(lastTitle).toBe("Updated Third")
 
       unsubFirst()
       unsubLast()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with $key for records", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data using the correct API
       handle.change(draft => {
@@ -300,18 +305,25 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Modify Alice's name
       handle.change(draft => {
-        draft.users.get("alice").name = "Alice Smith"
+        const alice = draft.users.get("alice")
+        if (alice) {
+          alice.name = "Alice Smith"
+        }
       })
 
       expect(aliceName).toBe("Alice Smith")
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with $each for records", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
       handle.change(draft => {
@@ -337,12 +349,16 @@ describe("TypedDocHandle.subscribe", () => {
       expect(allNames).toContain("Charlie")
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should filter false positives with deep equality", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
       handle.change(draft => {
@@ -359,7 +375,10 @@ describe("TypedDocHandle.subscribe", () => {
       // Modify a book's description (not title) - this should NOT trigger the callback
       // because the titles haven't changed
       handle.change(draft => {
-        draft.books.get(0).description = "Updated description"
+        const book = draft.books.get(0)
+        if (book) {
+          book.description = "Updated description"
+        }
       })
 
       // The WASM NFA may fire (false positive), but our deep equality check should filter it
@@ -369,8 +388,10 @@ describe("TypedDocHandle.subscribe", () => {
       // Now modify a title - this SHOULD trigger the callback
       handle.change(draft => {
         const book = draft.books.get(0)
-        book.title.delete(0, book.title.length)
-        book.title.insert(0, "Updated Book 1")
+        if (book) {
+          book.title.delete(0, book.title.length)
+          book.title.insert(0, "Updated Book 1")
+        }
       })
 
       expect(listener).toHaveBeenCalled()
@@ -379,14 +400,18 @@ describe("TypedDocHandle.subscribe", () => {
       expect(listener.mock.calls[0][1]).toEqual(["Book 1", "Book 2"])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
   })
 
   describe("JSONPath subscription (escape hatch)", () => {
     it("should subscribe to changes matching a JSONPath", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
@@ -401,12 +426,16 @@ describe("TypedDocHandle.subscribe", () => {
       expect(listener).toHaveBeenCalledWith(["dark"])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should provide the current value of the subscribed path", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       let receivedValue: unknown[] = []
       const unsubscribe = handle.subscribe("$.config.theme", value => {
@@ -428,31 +457,39 @@ describe("TypedDocHandle.subscribe", () => {
       expect(receivedValue).toEqual(["light"])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should not call listener for unrelated path changes", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
 
       // Make a change to a different path
-      const books = doc.getList("books")
+      const books = handle.loroDoc.getList("books")
       books.insert(0, { title: "Test Book", price: 20, description: "Test" })
-      doc.commit()
+      handle.loroDoc.commit()
 
       // Listener should NOT have been called (different path)
       expect(listener).not.toHaveBeenCalled()
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should stop calling listener after unsubscribe", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
@@ -467,12 +504,17 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Listener should not be called
       expect(listener).not.toHaveBeenCalled()
+
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should work with array wildcard paths", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       let receivedPrices: unknown[] = []
       // Use price (a plain value) instead of title (a LoroText container)
@@ -501,36 +543,18 @@ describe("TypedDocHandle.subscribe", () => {
       expect(receivedPrices).toEqual([15, 25])
 
       unsubscribe()
-    })
-  })
-
-  describe("jsonPath method", () => {
-    it("should execute JSONPath queries", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
-
-      // Set up initial data
-      handle.change(draft => {
-        draft.books.push({ title: "Book 1", price: 10, description: "Cheap" })
-        draft.books.push({
-          title: "Book 2",
-          price: 50,
-          description: "Expensive",
-        })
-      })
-
-      // Query prices (plain values) instead of titles (LoroText containers)
-      const allPrices = handle.jsonPath("$.books[*].price")
-      expect(allPrices).toEqual([10, 50])
+      repo.synchronizer.stopHeartbeat()
     })
   })
 
   describe("type safety", () => {
     it("should have correct types for regular subscription", () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // This should compile - listener receives LoroEventBatch
       handle.subscribe(event => {
@@ -540,12 +564,17 @@ describe("TypedDocHandle.subscribe", () => {
         expect(_by).toBeDefined()
         expect(_events).toBeDefined()
       })
+
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should have correct types for path selector subscription", () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // This should compile - listener receives typed value and prev
       handle.subscribe(
@@ -571,12 +600,17 @@ describe("TypedDocHandle.subscribe", () => {
           expect(_prev).toBeDefined()
         },
       )
+
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should have correct types for JSONPath subscription", () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // This should compile - listener receives unknown[]
       handle.subscribe("$.config.theme", value => {
@@ -584,14 +618,46 @@ describe("TypedDocHandle.subscribe", () => {
         const _value: unknown[] = value
         expect(_value).toBeDefined()
       })
+
+      repo.synchronizer.stopHeartbeat()
+    })
+  })
+
+  describe("jsonPath method", () => {
+    it("should execute JSONPath queries", async () => {
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
+
+      // Set up initial data
+      handle.change(draft => {
+        draft.books.push({ title: "Book 1", price: 10, description: "Cheap" })
+        draft.books.push({
+          title: "Book 2",
+          price: 50,
+          description: "Expensive",
+        })
+      })
+
+      // Query prices (plain values) instead of titles (LoroText containers)
+      const allPrices = handle.jsonPath("$.books[*].price")
+      expect(allPrices).toEqual([10, 50])
+
+      repo.synchronizer.stopHeartbeat()
     })
   })
 
   describe("negative index support", () => {
     it("should support negative indices in JSONPath query", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data with multiple books
       handle.change(draft => {
@@ -625,12 +691,17 @@ describe("TypedDocHandle.subscribe", () => {
 
       const secondToLastPrice = handle.jsonPath("$.books[-2].price")
       expect(secondToLastPrice).toEqual([20])
+
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should support negative indices in subscribeJsonpath", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
       handle.change(draft => {
@@ -653,7 +724,10 @@ describe("TypedDocHandle.subscribe", () => {
 
       // Modify the last book's price
       handle.change(draft => {
-        draft.books.get(1).price = 25
+        const book = draft.books.get(1)
+        if (book) {
+          book.price = 25
+        }
       })
 
       expect(lastPrice).toEqual([25])
@@ -670,12 +744,16 @@ describe("TypedDocHandle.subscribe", () => {
       expect(lastPrice).toEqual([30])
 
       unsubscribe()
+      repo.synchronizer.stopHeartbeat()
     })
 
     it("should handle out-of-bounds negative indices gracefully", async () => {
-      const doc = new LoroDoc()
-      const mockUntyped = createMockUntypedHandle(doc)
-      const handle = new TypedDocHandle(mockUntyped, docShape, presenceShape)
+      const repo = new Repo({
+        identity: { name: "test", type: "user" },
+        adapters: [],
+      })
+
+      const handle = repo.get("doc-1", docShape)
 
       // Add one item
       handle.change(draft => {
@@ -685,6 +763,8 @@ describe("TypedDocHandle.subscribe", () => {
       // Out of bounds negative index should return empty
       const outOfBounds = handle.jsonPath("$.books[-5].price")
       expect(outOfBounds).toEqual([])
+
+      repo.synchronizer.stopHeartbeat()
     })
   })
 })

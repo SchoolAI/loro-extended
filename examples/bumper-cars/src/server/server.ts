@@ -20,7 +20,7 @@ import { WebSocketServer } from "ws"
 import {
   ARENA_DOC_ID,
   ArenaSchema,
-  GamePresenceSchema,
+  GameEphemeralDeclarations,
   type ServerPresence,
 } from "../shared/types.js"
 import { logger } from "./config.js"
@@ -55,7 +55,7 @@ logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
 // Get or create the arena document with typed schemas
 // This provides type-safe access to both document and presence data
-const arenaHandle = repo.get(ARENA_DOC_ID, ArenaSchema, GamePresenceSchema)
+const arenaHandle = repo.get(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
 
 // Create game loop with the typed handle - no manual presence wiring needed
 const gameLoop = new GameLoop(arenaHandle)

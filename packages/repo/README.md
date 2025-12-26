@@ -29,14 +29,16 @@ const TodoSchema = Shape.doc({
   ),
 });
 
-// 2. Define your presence schema (optional)
-const PresenceSchema = Shape.plain.struct({
-  cursor: Shape.plain.struct({
-    x: Shape.plain.number(),
-    y: Shape.plain.number(),
+// 2. Define your ephemeral declarations (optional)
+const EphemeralDeclarations = {
+  presence: Shape.plain.struct({
+    cursor: Shape.plain.struct({
+      x: Shape.plain.number(),
+      y: Shape.plain.number(),
+    }),
+    name: Shape.plain.string().placeholder("Anonymous"),
   }),
-  name: Shape.plain.string().placeholder("Anonymous"),
-});
+};
 
 // 3. Create adapters
 const network = new SseClientNetworkAdapter({
@@ -52,7 +54,7 @@ const repo = new Repo({
 });
 
 // 5. Get a typed document handle
-const handle = repo.get("my-todos", TodoSchema, PresenceSchema);
+const handle = repo.get("my-todos", TodoSchema, EphemeralDeclarations);
 
 // 6. Make type-safe mutations
 handle.change((draft) => {
@@ -65,7 +67,7 @@ handle.change((draft) => {
 });
 
 // 7. Use presence for real-time collaboration
-handle.presence.set({ cursor: { x: 100, y: 200 }, name: "Alice" });
+handle.presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
 
 // 8. Read current state
 console.log(handle.doc.toJSON());
@@ -102,8 +104,8 @@ const repo = new Repo({
 Get typed document handles with `repo.get()`. Documents are immediately available—no loading states required.
 
 ```typescript
-// Get a typed handle with doc and presence schemas
-const handle = repo.get("doc-id", DocSchema, PresenceSchema);
+// Get a typed handle with doc and ephemeral schemas
+const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
 // Access the typed document
 handle.doc.title.insert(0, "Hello"); // Direct mutations (auto-commit)
@@ -119,7 +121,7 @@ handle.change((draft) => {
 const snapshot = handle.doc.toJSON();
 ```
 
-### Presence
+### Presence (Ephemeral State)
 
 Real-time ephemeral state for collaboration features like cursors, selections, and user status.
 
@@ -133,10 +135,10 @@ const PresenceSchema = Shape.plain.struct({
   status: Shape.plain.string().placeholder("online"),
 });
 
-const handle = repo.get("doc-id", DocSchema, PresenceSchema);
+const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
 // Set your presence
-handle.presence.set({ cursor: { x: 100, y: 200 }, name: "Alice" });
+handle.presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
 
 // Read your presence (with placeholder defaults)
 console.log(handle.presence.self);
@@ -150,9 +152,23 @@ for (const [peerId, presence] of handle.presence.peers) {
 }
 
 // Subscribe to presence changes
-handle.presence.subscribe(({ self, peers }) => {
-  console.log("Presence updated:", self, peers);
+handle.presence.subscribe(({ key, value, source }) => {
+  console.log(`Peer ${key} updated:`, value, `(source: ${source})`);
 });
+```
+
+### Multiple Ephemeral Stores
+
+You can declare multiple ephemeral stores for bandwidth isolation:
+
+```typescript
+const handle = repo.get("doc-id", DocSchema, {
+  mouse: MouseShape,      // High-frequency updates
+  profile: ProfileShape,  // Low-frequency updates
+});
+
+handle.mouse.setSelf({ x: 100, y: 200 });
+handle.profile.setSelf({ name: "Alice", avatar: "..." });
 ```
 
 ## Adapters
@@ -241,10 +257,10 @@ const repo = new Repo(params);
 #### Methods
 
 ```typescript
-// Get a typed document handle
-const handle = repo.get("doc-id", DocSchema, PresenceSchema);
+// Get a typed document handle with ephemeral stores
+const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
-// Get a typed handle without presence
+// Get a typed handle without ephemeral stores
 const handle = repo.get("doc-id", DocSchema);
 
 // Check if a document exists
@@ -257,9 +273,9 @@ await repo.delete("doc-id");
 repo.reset();
 ```
 
-### DocHandle
+### Handle
 
-The `DocHandle` provides typed access to documents and presence.
+The `Handle` provides typed access to documents and ephemeral stores.
 
 #### Properties
 
@@ -267,7 +283,7 @@ The `DocHandle` provides typed access to documents and presence.
 handle.docId; // string - The document ID
 handle.peerId; // string - The local peer ID
 handle.doc; // TypedDoc<D> - The typed document
-handle.presence; // TypedPresence<P> - The typed presence
+handle.presence; // TypedEphemeral<P> - The typed presence (if declared)
 handle.readyStates; // ReadyState[] - Current sync status
 ```
 
@@ -385,7 +401,7 @@ const repo = new Repo({
 });
 
 // Get handle
-const handle = repo.get("main-todos", TodoSchema, PresenceSchema);
+const handle = repo.get("main-todos", TodoSchema, { presence: PresenceSchema });
 
 // Wait for storage before displaying
 await handle.waitForStorage();
@@ -408,7 +424,7 @@ handle.change((draft) => {
 });
 
 // Set presence when editing
-handle.presence.set({ editing: "some-id", name: "Alice" });
+handle.presence.setSelf({ editing: "some-id", name: "Alice" });
 
 // Subscribe to changes
 getLoroDoc(handle.doc).subscribe(() => {
@@ -416,11 +432,9 @@ getLoroDoc(handle.doc).subscribe(() => {
 });
 
 // Subscribe to presence
-handle.presence.subscribe(({ peers }) => {
-  for (const [peerId, presence] of peers) {
-    if (presence.editing) {
-      console.log(`${presence.name} is editing ${presence.editing}`);
-    }
+handle.presence.subscribe(({ key, value }) => {
+  if (value?.editing) {
+    console.log(`${value.name} is editing ${value.editing}`);
   }
 });
 ```
@@ -461,24 +475,18 @@ For detailed documentation, see:
 
 ### Untyped Document Access
 
-For dynamic schemas or direct LoroDoc access, use `repo.getUntyped()`:
+For dynamic schemas or direct LoroDoc access, use `Shape.any()`:
 
 ```typescript
-// Get an untyped handle
-const handle = repo.getUntyped("doc-id");
+// Get a handle with untyped document
+const handle = repo.get("doc-id", Shape.any());
 
-// Access the raw LoroDoc
-handle.doc.getMap("root").set("key", "value");
-handle.doc.commit();
+// Access the raw LoroDoc via escape hatch
+handle.loroDoc.getMap("root").set("key", "value");
+handle.loroDoc.commit();
 
-// Batch mutations
-handle.batch((doc) => {
-  doc.getMap("root").set("title", "Hello");
-  doc.getList("items").push("item1");
-});
-
-// Access presence (untyped)
-handle.presence.set({ cursor: { x: 10, y: 20 } });
+// Or use the doc property (TypedDoc<AnyShape>)
+handle.doc.$.loroDoc.getMap("root").set("title", "Hello");
 ```
 
 ### Custom Storage Adapters

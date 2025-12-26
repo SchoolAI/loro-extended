@@ -18,7 +18,6 @@ export type {
   PathSelector,
 } from "./path-selector.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
-export type { ObjectValue, PresenceInterface } from "./presence-interface.js"
 export type {
   // Escape hatch shapes for untyped integration
   AnyContainerShape,
@@ -57,7 +56,6 @@ export type {
 export { Shape } from "./shape.js"
 export type { TypedDoc } from "./typed-doc.js"
 export { createTypedDoc } from "./typed-doc.js"
-export { TypedPresence } from "./typed-presence.js"
 export type {
   // Type inference - Infer<T> is the recommended unified helper
   Infer,

@@ -23,7 +23,7 @@ This directory contains architecture documentation and design documents for the 
 | :-------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
 | [**@loro-extended/change**](../packages/change/README.md) | Schema-driven, type-safe wrapper for Loro CRDT. Provides the `Shape` schema builders and `TypedDoc` for natural JavaScript mutations. |
 | [**@loro-extended/repo**](../packages/repo/README.md)     | The sync engine. Manages document lifecycle, storage, and network synchronization through a channel-based adapter architecture.       |
-| [**@loro-extended/react**](../packages/react/README.md)   | React hooks (`useDocument`, `usePresence`) for building reactive collaborative UIs.                                                   |
+| [**@loro-extended/react**](../packages/react/README.md)   | React hooks (`useDoc`, `useEphemeral`) for building reactive collaborative UIs.                                                       |
 | [**@loro-extended/hono**](../packages/hono/README.md)     | Hono JSX hooks mirroring the React API for Hono-based applications.                                                                   |
 
 ### Additional Repo Documentation
@@ -33,7 +33,7 @@ The `@loro-extended/repo` package contains additional in-depth documentation:
 | Document                                                      | Description                                                                  |
 | :------------------------------------------------------------ | :--------------------------------------------------------------------------- |
 | [Repo Architecture](../packages/repo/src/repo.md)             | Overall system architecture and design principles.                           |
-| [DocHandle Design](../packages/repo/src/doc-handle.md)        | Always-available document design and readiness APIs.                         |
+| [Handle Design](../packages/repo/src/doc-handle.md)           | Always-available document design and readiness APIs.                         |
 | [Synchronizer Protocol](../packages/repo/src/synchronizer.md) | Synchronization protocol details and state machine design.                   |
 | [Adapter System](../packages/repo/src/adapter/adapter.md)     | Adapter system design and implementation guide.                              |
 | [Message Protocol](../packages/repo/MESSAGES.md)              | Complete message flow documentation for peer connection and synchronization. |

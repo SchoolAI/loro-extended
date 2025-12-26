@@ -281,7 +281,7 @@ function handlePresence(presence: typeof result) {
 
 - The discriminant key (e.g., `"type"`) determines which variant shape to use
 - Missing fields are filled from the empty state of the matching variant
-- Works seamlessly with `@loro-extended/react`'s `usePresence` hook
+- Works seamlessly with `@loro-extended/react`'s `useEphemeral` hook
 - Full TypeScript support for discriminated union types
 
 ### Untyped Integration with External Libraries
@@ -306,10 +306,10 @@ const CursorPresenceSchema = Shape.plain.struct({
 // With @loro-extended/repo:
 
 // Option 1: Shape.any() directly - entire document is untyped
-const handle = repo.get(docId, Shape.any(), CursorPresenceSchema);
-handle.doc; // Raw LoroDoc - use Loro API directly
-handle.doc.getMap("anything").set("key", "value");
-handle.presence.set({
+const handle = repo.get(docId, Shape.any(), { presence: CursorPresenceSchema });
+handle.loroDoc; // Raw LoroDoc - use Loro API directly
+handle.loroDoc.getMap("anything").set("key", "value");
+handle.presence.setSelf({
   // Typed presence
   anchor: cursor.encode(), // Uint8Array directly
   focus: null,
@@ -324,7 +324,7 @@ const ProseMirrorDocShape = Shape.doc({
     title: Shape.text(),
   }),
 });
-const handle2 = repo.get(docId, ProseMirrorDocShape, CursorPresenceSchema);
+const handle2 = repo.get(docId, ProseMirrorDocShape, { presence: CursorPresenceSchema });
 handle2.doc.toJSON(); // { doc: unknown, metadata: { title: string } }
 ```
 
@@ -339,7 +339,7 @@ handle2.doc.toJSON(); // { doc: unknown, metadata: { title: string } }
 
 | Scenario                                    | Shape to Use                                                       |
 | ------------------------------------------- | ------------------------------------------------------------------ |
-| External library manages entire document    | `repo.get(docId, Shape.any(), presenceSchema)`                     |
+| External library manages entire document    | `repo.get(docId, Shape.any(), { presence: presenceSchema })`       |
 | External library manages one container      | `Shape.doc({ doc: Shape.any(), ... })`                             |
 | Flexible metadata in presence               | `Shape.plain.any()` for dynamic values                             |
 | Binary cursor/selection data                | `Shape.plain.bytes().nullable()` for `Uint8Array` \| `null`        |
@@ -448,10 +448,10 @@ change(doc, (draft) => {
 
 ## Path Selector DSL
 
-The `@loro-extended/change` package exports a type-safe path selector DSL for building (a subset of) JSONPath expressions with full TypeScript type inference. This is primarily used by `TypedDocHandle.subscribe()` in `@loro-extended/repo` for efficient, type-safe subscriptions:
+The `@loro-extended/change` package exports a type-safe path selector DSL for building (a subset of) JSONPath expressions with full TypeScript type inference. This is primarily used by `Handle.subscribe()` in `@loro-extended/repo` for efficient, type-safe subscriptions:
 
 ```typescript
-// In @loro-extended/repo, use with TypedDocHandle.subscribe():
+// In @loro-extended/repo, use with Handle.subscribe():
 handle.subscribe(
   (p) => p.books.$each.title, // Type-safe path selector
   (titles, prev) => {
@@ -469,7 +469,7 @@ handle.subscribe(
 // p.users.$key("alice") - Record value by key
 ```
 
-See `@loro-extended/repo` documentation for full details on `TypedDocHandle.subscribe()`.
+See `@loro-extended/repo` documentation for full details on `Handle.subscribe()`.
 
 ## API Reference
 
@@ -881,12 +881,12 @@ loroDoc.subscribe((event) => {
 });
 ```
 
-## TypedPresence
+## TypedEphemeral (Presence)
 
-The `TypedPresence` class provides type-safe access to ephemeral presence data with placeholder defaults:
+The `TypedEphemeral` interface in `@loro-extended/repo` provides type-safe access to ephemeral presence data with placeholder defaults. Define your presence schema and use it with `repo.get()`:
 
 ```typescript
-import { TypedPresence, Shape } from "@loro-extended/change";
+import { Shape } from "@loro-extended/change";
 
 // Define a presence schema with placeholders
 const PresenceSchema = Shape.plain.struct({
@@ -898,46 +898,28 @@ const PresenceSchema = Shape.plain.struct({
   status: Shape.plain.string().placeholder("online"),
 });
 
-// Create typed presence from a PresenceInterface
-// (Usually obtained from handle.presence in @loro-extended/repo)
-const typedPresence = new TypedPresence(PresenceSchema, presenceInterface);
+// Use with @loro-extended/repo
+const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
 // Read your presence (with placeholder defaults merged in)
-console.log(typedPresence.self);
+console.log(handle.presence.self);
 // { cursor: { x: 0, y: 0 }, name: "Anonymous", status: "online" }
 
 // Set presence values
-typedPresence.set({ cursor: { x: 100, y: 200 }, name: "Alice" });
+handle.presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
 
-// Read all peers' presence
-console.log(typedPresence.all);
-// { "peer-1": { cursor: { x: 100, y: 200 }, name: "Alice", status: "online" } }
+// Read other peers' presence
+for (const [peerId, presence] of handle.presence.peers) {
+  console.log(`${peerId}: ${presence.name}`);
+}
 
 // Subscribe to presence changes
-typedPresence.subscribe(({ self, all }) => {
-  console.log("My presence:", self);
-  console.log("All peers:", all);
+handle.presence.subscribe(({ key, value, source }) => {
+  console.log(`Peer ${key} updated:`, value);
 });
 ```
 
-### PresenceInterface
-
-`TypedPresence` works with any object implementing `PresenceInterface`:
-
-```typescript
-import type { PresenceInterface, ObjectValue } from "@loro-extended/change";
-
-interface PresenceInterface {
-  set: (values: ObjectValue) => void;
-  get: (key: string) => Value;
-  readonly self: ObjectValue;
-  readonly all: Record<string, ObjectValue>;
-  setRaw: (key: string, value: Value) => void;
-  subscribe: (cb: (values: ObjectValue) => void) => () => void;
-}
-```
-
-This is typically provided by `UntypedDocHandle.presence` in `@loro-extended/repo`.
+See `@loro-extended/repo` documentation for full details on the `TypedEphemeral` interface.
 
 ## Performance Considerations
 

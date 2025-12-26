@@ -1,4 +1,4 @@
-import { useDoc, useHandle, usePresence, useRepo } from "@loro-extended/react"
+import { useDoc, useEphemeral, useHandle, useRepo } from "@loro-extended/react"
 import type { PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -7,7 +7,7 @@ import {
   CAR_COLORS,
   type CarColor,
   type ClientPresence,
-  GamePresenceSchema,
+  GameEphemeralDeclarations,
   type ServerPresence,
 } from "../shared/types"
 import { ArenaCanvas } from "./components/arena-canvas"
@@ -40,10 +40,10 @@ export default function BumperCarsApp({
       CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
   )
 
-  // NEW API: Get handle with both doc and presence schemas
-  const handle = useHandle(ARENA_DOC_ID, ArenaSchema, GamePresenceSchema)
+  // NEW API: Get handle with both doc and ephemeral schemas
+  const handle = useHandle(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
   const doc = useDoc(handle)
-  const { self, peers } = usePresence(handle)
+  const { self, peers } = useEphemeral(handle.presence)
 
   // Get server presence (game state) - type-safe filtering
   // Combine self and peers into allPresence for backward compatibility
@@ -58,7 +58,7 @@ export default function BumperCarsApp({
 
   const serverPresence = useMemo(() => {
     for (const presence of Object.values(allPresence)) {
-      if (presence.type === "server") {
+      if (presence && presence.type === "server") {
         return presence as ServerPresence
       }
     }
@@ -69,7 +69,7 @@ export default function BumperCarsApp({
   const clientPresences = useMemo(() => {
     const clients: Record<PeerID, ClientPresence> = {}
     for (const [peerId, presence] of Object.entries(allPresence)) {
-      if (presence.type === "client") {
+      if (presence && presence.type === "client") {
         clients[peerId as PeerID] = presence as ClientPresence
       }
     }
@@ -129,7 +129,7 @@ export default function BumperCarsApp({
       input: currentInput,
     }
 
-    handle.presence.set(presence)
+    handle.presence.setSelf(presence)
   }, [hasJoined, playerName, playerColor, currentInput, handle])
 
   // Handle join
@@ -149,7 +149,7 @@ export default function BumperCarsApp({
         color,
         input: { force: 0, angle: 0 },
       }
-      handle.presence.set(presence)
+      handle.presence.setSelf(presence)
 
       setHasJoined(true)
     },
@@ -165,7 +165,7 @@ export default function BumperCarsApp({
       color: playerColor,
       input: { force: 0, angle: 0 },
     }
-    handle.presence.set(presence)
+    handle.presence.setSelf(presence)
     setHasJoined(false)
   }, [playerColor, handle])
 

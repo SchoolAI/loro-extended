@@ -1,11 +1,11 @@
-import type { PeerID, TypedDocHandle } from "@loro-extended/repo"
+import type { HandleWithEphemerals, PeerID } from "@loro-extended/repo"
 import {
   type ArenaSchema,
   type CarState,
   type ClientPresence,
   type Collision,
+  type GameEphemeralDeclarations,
   type GamePresence,
-  type GamePresenceSchema,
   TICK_INTERVAL,
 } from "../shared/types.js"
 import { logger } from "./config.js"
@@ -32,9 +32,9 @@ export class GameLoop {
   private readonly COLLISION_COOLDOWN = 500 // ms
 
   constructor(
-    private handle: TypedDocHandle<
+    private handle: HandleWithEphemerals<
       typeof ArenaSchema,
-      typeof GamePresenceSchema
+      typeof GameEphemeralDeclarations
     >,
   ) {}
 
@@ -68,8 +68,15 @@ export class GameLoop {
   private update(): void {
     this.tick++
 
-    // Get all client presences - TypedPresence provides type-safe access
-    const allPresence = this.handle.presence.all
+    // Get all client presences - combine self and peers
+    const allPresence: Record<string, GamePresence | undefined> = {}
+    const self = this.handle.presence.self
+    if (self) {
+      allPresence[this.handle.peerId] = self
+    }
+    for (const [peerId, presence] of this.handle.presence.peers.entries()) {
+      allPresence[peerId] = presence
+    }
     const clientInputs = this.getClientInputs(allPresence)
 
     // Update existing cars and remove disconnected ones
@@ -105,12 +112,12 @@ export class GameLoop {
    * Extract client inputs from presence data
    */
   private getClientInputs(
-    allPresence: Record<string, GamePresence>,
+    allPresence: Record<string, GamePresence | undefined>,
   ): Map<PeerID, ClientPresence> {
     const inputs = new Map<PeerID, ClientPresence>()
 
     for (const [peerId, presence] of Object.entries(allPresence)) {
-      if (presence.type === "client") {
+      if (presence && presence.type === "client") {
         inputs.set(peerId as PeerID, presence)
       }
     }
@@ -285,7 +292,7 @@ export class GameLoop {
     }
 
     // TypedPresence provides type-safe presence updates
-    this.handle.presence.set({
+    this.handle.presence.setSelf({
       type: "server",
       cars: carsRecord,
       tick: this.tick,

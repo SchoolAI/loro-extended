@@ -1,6 +1,16 @@
 import { PostgresStorageAdapter } from "@loro-extended/adapter-postgres/server"
-import { Repo } from "@loro-extended/repo"
+import { Repo, Shape } from "@loro-extended/repo"
 import { Pool } from "pg"
+
+// Define the document schema
+const DocSchema = Shape.doc({
+  root: Shape.struct({
+    message: Shape.plain.string(),
+    timestamp: Shape.plain.number(),
+    updated: Shape.plain.boolean(),
+    updateTime: Shape.plain.number(),
+  }),
+})
 
 async function main() {
   console.log("🐘 PostgreSQL Storage Adapter Example\n")
@@ -25,10 +35,10 @@ async function main() {
 
   // Create and modify a document
   console.log("\n📝 Creating document...")
-  const handle = repo.get("my-doc")
-  handle.batch(doc => {
-    doc.getMap("root").set("message", "Hello from PostgreSQL!")
-    doc.getMap("root").set("timestamp", Date.now())
+  const handle = repo.get("my-doc", DocSchema)
+  handle.change(doc => {
+    doc.root.message = "Hello from PostgreSQL!"
+    doc.root.timestamp = Date.now()
   })
 
   console.log("✅ Document created:", handle.docId)
@@ -50,9 +60,9 @@ async function main() {
 
   // Make another change
   console.log("\n📝 Making another change...")
-  handle.batch(doc => {
-    doc.getMap("root").set("updated", true)
-    doc.getMap("root").set("updateTime", Date.now())
+  handle.change(doc => {
+    doc.root.updated = true
+    doc.root.updateTime = Date.now()
   })
 
   console.log(
