@@ -75,7 +75,7 @@ const persistentPeerId = getOrCreatePeerId()
 
 // Create the WebSocket network adapter
 export const wsAdapter = new WsClientNetworkAdapter({
-  url: (peerId) => {
+  url: peerId => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     return `${protocol}//${window.location.host}/ws?peerId=${peerId}`
   },

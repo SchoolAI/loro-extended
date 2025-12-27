@@ -15,11 +15,11 @@
  */
 
 import type { HandleWithEphemerals } from "@loro-extended/repo"
-import { type PeerID } from "loro-crdt"
+import type { PeerID } from "loro-crdt"
 import {
   CursorEphemeralStore,
-  LoroEphemeralCursorPlugin,
   type LoroDocType,
+  LoroEphemeralCursorPlugin,
   LoroSyncPlugin,
   LoroUndoPlugin,
   redo,
@@ -116,9 +116,9 @@ export function Editor({ handle, userName }: EditorProps) {
         doc: loroDoc as LoroDocType,
       }),
       keymap({
-        "Mod-z": (state) => undo(state, () => {}),
-        "Mod-y": (state) => redo(state, () => {}),
-        "Mod-Shift-z": (state) => redo(state, () => {}),
+        "Mod-z": state => undo(state, () => {}),
+        "Mod-y": state => redo(state, () => {}),
+        "Mod-Shift-z": state => redo(state, () => {}),
       }),
       LoroEphemeralCursorPlugin(cursorStore, {
         user: {

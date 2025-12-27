@@ -55,7 +55,11 @@ logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
 // Get or create the arena document with typed schemas
 // This provides type-safe access to both document and presence data
-const arenaHandle = repo.get(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
+const arenaHandle = repo.get(
+  ARENA_DOC_ID,
+  ArenaSchema,
+  GameEphemeralDeclarations,
+)
 
 // Create game loop with the typed handle - no manual presence wiring needed
 const gameLoop = new GameLoop(arenaHandle)

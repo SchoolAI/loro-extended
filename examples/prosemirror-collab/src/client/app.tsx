@@ -92,7 +92,7 @@ function UserNameEditor({
   if (isEditing) {
     return (
       <form
-        onSubmit={(e) => {
+        onSubmit={e => {
           e.preventDefault()
           handleSubmit()
         }}
@@ -101,7 +101,7 @@ function UserNameEditor({
         <input
           type="text"
           value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
+          onChange={e => setEditValue(e.target.value)}
           onBlur={handleSubmit}
           className="px-2 py-1 text-sm border rounded"
           placeholder="Your name"
