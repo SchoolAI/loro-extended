@@ -12,8 +12,10 @@ This directory contains architecture documentation and design documents for the 
 
 | Document                                                                | Description                                                                                                                                                                     |
 | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Repo Architecture](./repo-architecture.md)                             | High-level architecture of the repo package, including system overview, core components, and design decisions.                                                                  |
 | [Discovery and Sync Architecture](./discovery-and-sync-architecture.md) | Detailed architecture for document discovery and synchronization, including the pull-based discovery model, peer awareness tracking, and the Rules system for privacy controls. |
 | [Presence (Ephemeral Data)](./presence.md)                              | Theory and implementation of ephemeral/presence data propagation, including the hop-based relay system and disconnect cleanup strategies.                                       |
+| [Creating Custom Adapters](./creating-adapters.md)                      | Guide for implementing custom storage and network adapters.                                                                                                                     |
 
 ---
 

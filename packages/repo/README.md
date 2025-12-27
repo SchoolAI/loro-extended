@@ -95,10 +95,12 @@ const repo = new Repo({
     peerId: "123456789", // Optional - auto-generated if not provided
   },
   rules: {
-    // Optional: permission rules
-    canReveal: (ctx) => true,
-    canUpdate: (ctx) => true,
-    canDelete: (ctx) => true,
+    // Optional: permission rules (all 5 shown below)
+    canBeginSync: (ctx) => true,  // Should we start syncing with this peer?
+    canReveal: (ctx) => true,     // Can we tell this peer about a document?
+    canUpdate: (ctx) => true,     // Do we accept updates from this peer?
+    canDelete: (ctx) => true,     // Can this peer delete this document?
+    canCreate: (ctx) => true,     // Can this peer create a new document?
   },
 });
 
@@ -354,7 +356,15 @@ handle.doc.$.loroDoc.subscribe((event) => {
 
 ## Permission System
 
-Control document access with the `Rules` interface:
+Control document access with the `Rules` interface. There are 5 permission rules:
+
+| Rule | Purpose |
+|------|---------|
+| `canBeginSync` | Should we start syncing with this peer? |
+| `canReveal` | Can we tell this peer about a document? |
+| `canUpdate` | Do we accept updates from this peer? |
+| `canDelete` | Can this peer delete this document? |
+| `canCreate` | Can this peer create a new document? |
 
 ```typescript
 const repo = new Repo({
@@ -369,7 +379,7 @@ const repo = new Repo({
       return ctx.docId.startsWith("public-");
     },
 
-    // Control who can update documents (use peerId or peerType for reliable checks)
+    // Control who can update documents
     canUpdate: (ctx) => {
       return ctx.peerType === "user" || ctx.peerId === "trusted-service-123";
     },
@@ -377,6 +387,11 @@ const repo = new Repo({
     // Control who can delete documents
     canDelete: (ctx) => {
       return ctx.peerType === "service" || ctx.peerId === "admin-456";
+    },
+
+    // Control who can create new documents
+    canCreate: (ctx) => {
+      return ctx.peerType !== "bot";
     },
   },
 });
@@ -398,113 +413,15 @@ type RuleContext = {
 };
 ```
 
-## Complete Example
-
-A full collaborative todo application:
-
-```typescript
-import { Repo, Shape, getLoroDoc } from "@loro-extended/repo";
-import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
-
-// Define schemas
-const TodoSchema = Shape.doc({
-  todos: Shape.list(
-    Shape.plain.struct({
-      id: Shape.plain.string(),
-      text: Shape.plain.string(),
-      completed: Shape.plain.boolean(),
-    })
-  ),
-});
-
-const PresenceSchema = Shape.plain.struct({
-  editing: Shape.plain.string().placeholder(""),
-  name: Shape.plain.string().placeholder("Anonymous"),
-});
-
-// Create repo
-const repo = new Repo({
-  adapters: [
-    new SseClientNetworkAdapter({
-      postUrl: "/api/sync",
-      eventSourceUrl: (peerId) => `/api/events?peerId=${peerId}`,
-    }),
-    new IndexedDBStorageAdapter(),
-  ],
-  identity: { name: "todo-app", type: "user" },
-});
-
-// Get handle
-const handle = repo.get("main-todos", TodoSchema, { presence: PresenceSchema });
-
-// Wait for storage before displaying
-await handle.waitForStorage();
-
-// Add a todo
-handle.change((draft) => {
-  draft.todos.push({
-    id: crypto.randomUUID(),
-    text: "Learn about Loro",
-    completed: false,
-  });
-});
-
-// Toggle a todo
-handle.change((draft) => {
-  const todo = draft.todos.find((t) => t.id === "some-id");
-  if (todo) {
-    todo.completed = !todo.completed;
-  }
-});
-
-// Set presence when editing
-handle.presence.setSelf({ editing: "some-id", name: "Alice" });
-
-// Subscribe to changes
-getLoroDoc(handle.doc).subscribe(() => {
-  console.log("Todos updated:", handle.doc.toJSON());
-});
-
-// Subscribe to presence
-handle.presence.subscribe(({ key, value }) => {
-  if (value?.editing) {
-    console.log(`${value.name} is editing ${value.editing}`);
-  }
-});
-```
-
 ## Architecture
 
-The repo package follows a layered architecture:
+The repo package uses a layered architecture with the Repo as the central orchestrator, coordinating DocHandles, a Synchronizer, and Adapters via an AdapterManager.
 
-```
-┌─────────────────────────────────────────┐
-│             Application                 │
-├─────────────────────────────────────────┤
-│                Repo                     │
-│  ┌─────────────┐  ┌──────────────────┐  │
-│  │  DocHandle  │  │  Synchronizer    │  │
-│  └─────────────┘  └──────────────────┘  │
-│         │                  │            │
-│         │          ┌───────▼────────┐   │
-│         │          │ AdapterManager │   │
-│         │          └───────┬────────┘   │
-│         │                  │            │
-│  ┌──────▼──────────────────▼─────────┐  │
-│  │         Adapters (via Channels)   │  │
-│  │  ┌─────────┐      ┌────────────┐  │  │
-│  │  │ Storage │      │  Network   │  │  │
-│  │  └─────────┘      └────────────┘  │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-```
+For detailed architecture documentation, see:
 
-For detailed documentation, see:
-
-- [`repo.md`](./src/repo.md) - System architecture
-- [`synchronizer.md`](./src/synchronizer.md) - Sync protocol details
-- [`adapter/adapter.md`](./src/adapter/adapter.md) - Adapter system design
+- [Architecture Overview](../../docs/repo-architecture.md) - System design and components
+- [Synchronizer Protocol](./src/synchronizer.md) - Sync protocol details
+- [Creating Custom Adapters](../../docs/creating-adapters.md) - Adapter implementation guide
 
 ## Advanced Usage
 
@@ -524,80 +441,9 @@ handle.loroDoc.commit();
 handle.doc.$.loroDoc.getMap("root").set("title", "Hello");
 ```
 
-### Custom Storage Adapters
+### Custom Adapters
 
-Create custom storage by extending `StorageAdapter`:
-
-```typescript
-import {
-  StorageAdapter,
-  type StorageKey,
-  type Chunk,
-} from "@loro-extended/repo";
-
-class MyStorageAdapter extends StorageAdapter {
-  constructor() {
-    super({
-      adapterType: "my-storage",
-      adapterId: "my-storage-instance" // Optional: auto-generated if not provided
-    });
-  }
-
-  async load(key: StorageKey): Promise<Uint8Array | undefined> {
-    // Load data for the given key
-  }
-
-  async save(key: StorageKey, data: Uint8Array): Promise<void> {
-    // Save data for the given key
-  }
-
-  async remove(key: StorageKey): Promise<void> {
-    // Remove data for the given key
-  }
-
-  async loadRange(keyPrefix: StorageKey): Promise<Chunk[]> {
-    // Load all chunks with the given prefix
-  }
-
-  async removeRange(keyPrefix: StorageKey): Promise<void> {
-    // Remove all chunks with the given prefix
-  }
-}
-```
-
-### Custom Network Adapters
-
-Create custom network adapters by extending `Adapter`:
-
-```typescript
-import { Adapter, type GeneratedChannel } from "@loro-extended/repo";
-
-class MyNetworkAdapter extends Adapter<ConnectionContext> {
-  constructor(options: { adapterId?: string }) {
-    super({
-      adapterType: "my-network",
-      adapterId: options.adapterId // Optional: auto-generated if not provided
-    });
-  }
-
-  protected generate(context: ConnectionContext): GeneratedChannel {
-    return {
-      kind: "network",
-      adapterType: this.adapterType,
-      send: (msg) => context.connection.send(JSON.stringify(msg)),
-      stop: () => context.connection.close(),
-    };
-  }
-
-  async onStart(): Promise<void> {
-    // Set up connections and call this.addChannel()
-  }
-
-  async onStop(): Promise<void> {
-    // Clean up connections
-  }
-}
-```
+For creating custom storage or network adapters, see the [Creating Custom Adapters](../../docs/creating-adapters.md) guide.
 
 ## Logging
 
