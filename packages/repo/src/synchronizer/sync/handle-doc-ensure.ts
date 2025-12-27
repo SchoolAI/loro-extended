@@ -10,12 +10,12 @@
  * When creating a new document:
  * 1. Create empty Loro document with the specified docId
  * 2. Register it in the synchronizer model
- * 3. Send sync-request to all channels (filtered by canReveal)
+ * 3. Send sync-request to all channels (filtered by visibility permission)
  * 4. Subscribe to local changes
  *
  * ## Permission Filtering
  *
- * We only request from channels where `canReveal` permits:
+ * We only request from channels where `visibility` permits:
  * - Storage adapters typically see all documents
  * - Network peers may be restricted by permission rules
  * - This prevents leaking document existence to unauthorized peers
@@ -64,16 +64,16 @@
 
 import type { VersionVector } from "loro-crdt"
 import { isEstablished } from "../../channel.js"
-import type { Rules } from "../../rules.js"
+import type { Permissions } from "../../permissions.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import { createDocState, type DocId } from "../../types.js"
-import { getRuleContext } from "../rule-context.js"
+import { getPermissionContext } from "../permission-context.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleDocEnsure(
   msg: { type: "synchronizer/doc-ensure"; docId: DocId },
   model: SynchronizerModel,
-  rules: Rules,
+  permissions: Permissions,
 ): Command | undefined {
   const { docId } = msg
 
@@ -98,17 +98,20 @@ export function handleDocEnsure(
     },
   ]
 
-  // Send sync-request to all established channels where canReveal permits
+  // Send sync-request to all established channels where visibility permits
   for (const channel of model.channels.values()) {
     if (isEstablished(channel)) {
-      const context = getRuleContext({
+      const context = getPermissionContext({
         channel,
         docState,
         model,
       })
 
-      // Check canReveal permission - can we ask this channel about this document?
-      if (!(context instanceof Error) && rules.canReveal(context)) {
+      // Check visibility permission - can we ask this channel about this document?
+      if (
+        !(context instanceof Error) &&
+        permissions.visibility(context.doc, context.peer)
+      ) {
         // Send sync-request to load document data
         // Note: When channel responds, it will add to peer's subscriptions
         commands.push({

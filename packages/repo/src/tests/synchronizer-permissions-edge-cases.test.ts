@@ -19,15 +19,15 @@ describe("Synchronizer Permissions Edge Cases", () => {
     vi.useRealTimers()
   })
 
-  it("should sync a document if peer already has it, even if canReveal becomes false", async () => {
+  it("should sync a document if peer already has it, even if visibility becomes false", async () => {
     const bridge = new Bridge()
 
-    // repoA has the doc and restrictive rules
+    // repoA has the doc and restrictive permissions
     const repoA = new Repo({
       identity: { name: "repoA", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
-      rules: {
-        canReveal: () => false, // Deny everything by default
+      permissions: {
+        visibility: () => false, // Deny everything by default
       },
     })
 
@@ -69,7 +69,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     await vi.runAllTimersAsync()
 
     // repoB should have received the doc because repoA knows repoB has it
-    // (even though canReveal is false)
+    // (even though visibility is false)
     expect(repoB.has(docId)).toBe(true)
 
     const handleB = repoB.get(docId, DocSchema)

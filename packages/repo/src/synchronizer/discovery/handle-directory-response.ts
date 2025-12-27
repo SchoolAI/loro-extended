@@ -3,7 +3,7 @@
  *
  * This is the response to our directory-request, or an unsolicited announcement
  * of new documents. The peer is telling us what documents they have (filtered
- * by their `canReveal` rules).
+ * by their `visibility` permissions).
  *
  * ## Pull-Based Discovery Model
  *

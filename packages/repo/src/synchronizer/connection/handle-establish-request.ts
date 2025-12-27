@@ -42,7 +42,7 @@ import { batchAsNeeded, filterAllowedDocs, getAllDocsToSync } from "../utils.js"
 
 export function handleEstablishRequest(
   message: ChannelMsgEstablishRequest,
-  { channel, model, fromChannelId, rules }: ChannelHandlerContext,
+  { channel, model, fromChannelId, permissions }: ChannelHandlerContext,
 ): Command | undefined {
   const commands: Command[] = []
 
@@ -82,7 +82,7 @@ export function handleEstablishRequest(
     model.documents,
     establishedChannel,
     model,
-    rules,
+    permissions,
   )
   const docsToSync = getAllDocsToSync(allowedDocs)
 

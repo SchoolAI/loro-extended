@@ -5,7 +5,7 @@ import {
 } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
-import { getRuleContext } from "../rule-context.js"
+import { getPermissionContext } from "../permission-context.js"
 import type { ChannelHandlerContext } from "../types.js"
 
 /**
@@ -14,7 +14,7 @@ import type { ChannelHandlerContext } from "../types.js"
  */
 export function applySyncTransmission(
   message: ChannelMsgSyncResponse | ChannelMsgUpdate,
-  { channel, model, rules, logger }: ChannelHandlerContext,
+  { channel, model, permissions, logger }: ChannelHandlerContext,
 ): Command[] {
   if (!isEstablished(channel)) {
     logger.warn(
@@ -64,15 +64,15 @@ export function applySyncTransmission(
         return []
       }
 
-      // Check canUpdate permission before applying data
+      // Check mutability permission before applying data
       // This enforces write rules and enables read-only replicas
-      const context = getRuleContext({ channel, docState, model })
+      const context = getPermissionContext({ channel, docState, model })
       if (context instanceof Error) {
-        logger.warn(`can't check canUpdate: ${context.message}`)
+        logger.warn(`can't check mutability: ${context.message}`)
         return []
       }
-      if (!rules.canUpdate(context)) {
-        logger.warn(`rejecting update from ${context.peerName}`)
+      if (!permissions.mutability(context.doc, context.peer)) {
+        logger.warn(`rejecting update from ${context.peer.peerName}`)
         return []
       }
 

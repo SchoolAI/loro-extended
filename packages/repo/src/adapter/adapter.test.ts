@@ -283,7 +283,11 @@ describe("Adapter", () => {
       channel.onReceive(message)
 
       expect(context.onChannelReceive).toHaveBeenCalledTimes(1)
-      expect(context.onChannelReceive).toHaveBeenCalledWith(channel, message)
+      // Note: onChannelReceive now receives channelId instead of channel object
+      expect(context.onChannelReceive).toHaveBeenCalledWith(
+        channel.channelId,
+        message,
+      )
     })
 
     it("hooks are available in 'started' state", async () => {
@@ -339,9 +343,9 @@ describe("Adapter", () => {
       const newChannel = adapter.testAddChannel("new-context")
       newChannel.onReceive(message)
 
-      // New context should be called for new channel
+      // New context should be called for new channel (with channelId)
       expect(newContext.onChannelReceive).toHaveBeenCalledWith(
-        newChannel,
+        newChannel.channelId,
         message,
       )
       expect(context.onChannelReceive).not.toHaveBeenCalled()
@@ -366,9 +370,12 @@ describe("Adapter", () => {
 
       channel.onReceive(message)
 
-      // Should call the lifecycle's onChannelReceive with the channel and message
+      // Should call the lifecycle's onChannelReceive with the channelId and message
       expect(context.onChannelReceive).toHaveBeenCalledTimes(1)
-      expect(context.onChannelReceive).toHaveBeenCalledWith(channel, message)
+      expect(context.onChannelReceive).toHaveBeenCalledWith(
+        channel.channelId,
+        message,
+      )
     })
 
     it("multiple channels each have their own onReceive wired correctly", async () => {
@@ -394,12 +401,12 @@ describe("Adapter", () => {
       expect(context.onChannelReceive).toHaveBeenCalledTimes(2)
       expect(context.onChannelReceive).toHaveBeenNthCalledWith(
         1,
-        channel1,
+        channel1.channelId,
         message1,
       )
       expect(context.onChannelReceive).toHaveBeenNthCalledWith(
         2,
-        channel2,
+        channel2.channelId,
         message2,
       )
     })

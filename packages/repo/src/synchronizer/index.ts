@@ -18,7 +18,7 @@ export {
   setPeerDocumentAwareness,
   shouldSyncWithPeer,
 } from "./peer-state-helpers.js"
-export { getRuleContext } from "./rule-context.js"
+export { getPermissionContext } from "./permission-context.js"
 export { handleDocDelete } from "./sync/handle-doc-delete.js"
 export { handleDocEnsure } from "./sync/handle-doc-ensure.js"
 export { handleLocalDocChange } from "./sync/handle-local-doc-change.js"

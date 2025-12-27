@@ -1,5 +1,5 @@
 import type { Logger } from "@logtape/logtape"
-import type { Rules } from "../rules.js"
+import type { Permissions } from "../permissions.js"
 import type {
   Command,
   SynchronizerMessage,
@@ -18,7 +18,7 @@ import { handleLocalDocChange } from "./sync/handle-local-doc-change.js"
 export function synchronizerDispatcher(
   msg: SynchronizerMessage,
   model: SynchronizerModel,
-  rules: Rules,
+  permissions: Permissions,
   logger: Logger,
 ): Command | undefined {
   switch (msg.type) {
@@ -83,13 +83,13 @@ export function synchronizerDispatcher(
       return handleChannelRemoved(msg, model, logger)
 
     case "synchronizer/doc-ensure":
-      return handleDocEnsure(msg, model, rules)
+      return handleDocEnsure(msg, model, permissions)
 
     case "synchronizer/local-doc-change":
-      return handleLocalDocChange(msg, model, rules, logger)
+      return handleLocalDocChange(msg, model, permissions, logger)
 
     case "synchronizer/doc-imported":
-      return handleDocImported(msg, model, rules, logger)
+      return handleDocImported(msg, model, permissions, logger)
 
     case "synchronizer/doc-delete":
       return handleDocDelete(msg, model, logger)
@@ -100,7 +100,7 @@ export function synchronizerDispatcher(
         msg.envelope.message,
         model,
         msg.envelope.fromChannelId,
-        rules,
+        permissions,
         logger,
       )
   }

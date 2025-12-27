@@ -2,7 +2,7 @@
  * Handle new-doc - Discover documents announced by a peer
  *
  * This is an unsolicited announcement from a peer that they have new documents.
- * The peer is telling us what documents they have (filtered by their `canReveal` rules).
+ * The peer is telling us what documents they have (filtered by their `visibility` permissions).
  *
  * ## Pull-Based Discovery Model
  *

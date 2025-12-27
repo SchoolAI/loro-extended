@@ -1,13 +1,13 @@
 import type { ChannelMsgDirectoryRequest } from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
-import { getRuleContext } from "../rule-context.js"
+import { getPermissionContext } from "../permission-context.js"
 import type { ChannelHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleDirectoryRequest(
   _message: ChannelMsgDirectoryRequest,
-  { channel, model, fromChannelId, rules, logger }: ChannelHandlerContext,
+  { channel, model, fromChannelId, permissions, logger }: ChannelHandlerContext,
 ): Command | undefined {
   // Require established channel for directory operations
   if (!isEstablished(channel)) {
@@ -17,7 +17,7 @@ export function handleDirectoryRequest(
     return
   }
 
-  // Filter documents based on canReveal rule
+  // Filter documents based on visibility permission
   // We use a Result type to track both successes and errors
   type Result =
     | { success: true; docId: string }
@@ -26,8 +26,8 @@ export function handleDirectoryRequest(
   const docResults: Result[] = Array.from(
     model.documents.keys(),
   ).flatMap<Result>(docId => {
-    // Get rule context for permission checking
-    const context = getRuleContext({
+    // Get permission context for permission checking
+    const context = getPermissionContext({
       channel,
       docState: model.documents.get(docId),
       model,
@@ -39,8 +39,8 @@ export function handleDirectoryRequest(
       return []
     }
 
-    // Check canReveal rule - can we tell this peer about this document?
-    if (rules.canReveal(context)) {
+    // Check visibility permission - can we tell this peer about this document?
+    if (permissions.visibility(context.doc, context.peer)) {
       return [{ success: true, docId }]
     } else {
       // Permission denied - don't reveal this document

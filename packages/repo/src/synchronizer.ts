@@ -13,7 +13,13 @@ import type {
   SyncTransmission,
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
-import { createRules, type Rules } from "./rules.js"
+import type { Middleware } from "./middleware.js"
+import { type MiddlewareContext, runMiddleware } from "./middleware.js"
+import {
+  createPermissions,
+  type DocContext,
+  type Permissions,
+} from "./permissions.js"
 import { getReadyStates } from "./synchronizer/state-helpers.js"
 import {
   type Command,
@@ -59,7 +65,8 @@ type SynchronizerEvents = {
 type SynchronizerParams = {
   identity: PeerIdentityDetails
   adapters?: AnyAdapter[]
-  rules?: Rules
+  permissions?: Permissions
+  middleware?: Middleware[]
   onUpdate?: HandleUpdateFn
   logger?: Logger
 }
@@ -103,10 +110,13 @@ export class Synchronizer {
 
   heartbeat: ReturnType<typeof setInterval> | undefined
 
+  #middleware: Middleware[]
+
   constructor({
     identity,
     adapters = [],
-    rules,
+    permissions,
+    middleware = [],
     onUpdate,
     logger: preferredLogger,
   }: SynchronizerParams) {
@@ -114,13 +124,14 @@ export class Synchronizer {
     this.logger = logger.getChild("synchronizer")
 
     this.identity = identity
+    this.#middleware = middleware
 
     this.logger.debug("new Synchronizer: {identity}", {
       identity: this.identity,
     })
 
     this.updateFn = createSynchronizerUpdate({
-      rules: createRules(rules),
+      permissions: createPermissions(permissions),
       onUpdate,
       logger,
     })
@@ -174,18 +185,155 @@ export class Synchronizer {
     this.heartbeat = undefined
   }
 
-  channelReceive(channel: Channel, message: ChannelMsg) {
+  /**
+   * Get the number of middleware configured (for debugging).
+   */
+  get middlewareCount(): number {
+    return this.#middleware.length
+  }
+
+  /**
+   * Handle incoming channel messages.
+   *
+   * If middleware is configured, it runs BEFORE the synchronizer processes the message.
+   * Middleware can reject messages (e.g., rate limiting, auth).
+   *
+   * Note: This method handles async middleware by running it in a microtask.
+   * The callback signature is sync (returns void) but middleware may be async.
+   *
+   * @param channelId - The channel ID (we look up the current channel from the model
+   *                    to ensure we have the latest state, since the model uses immutable updates)
+   * @param message - The message received on the channel
+   */
+  channelReceive(channelId: ChannelId, message: ChannelMsg): void {
     this.logger.trace("onReceive: {messageType} from {channelId}", {
-      channelId: channel.channelId,
+      channelId,
       messageType: message.type,
     })
+
+    // Look up the current channel from the model
+    // This ensures we have the latest state (e.g., established vs connected)
+    const channel = this.model.channels.get(channelId)
+
+    // Run middleware if configured
+    if (this.#middleware.length > 0 && channel) {
+      // Build peer context from channel
+      const peerContext = this.#buildPeerContextFromChannel(channel)
+
+      if (peerContext) {
+        // Extract document and transmission context from message
+        const { docId, transmission } = this.#extractContextFromMessage(message)
+
+        // Look up document if we have a docId
+        let docContext: DocContext | undefined
+
+        if (docId) {
+          const doc = this.model.documents.get(docId)
+
+          if (doc) {
+            docContext = { id: docId, doc: doc.doc }
+          }
+        }
+
+        const middlewareCtx: MiddlewareContext = {
+          message,
+          peer: peerContext,
+          document: docContext,
+          transmission,
+        }
+
+        // Run middleware asynchronously but handle the result
+        // This allows async middleware while keeping the callback signature sync
+        void runMiddleware(this.#middleware, middlewareCtx, this.logger).then(
+          result => {
+            if (result.allow) {
+              this.#dispatch({
+                type: "synchronizer/channel-receive-message",
+                envelope: {
+                  fromChannelId: channelId,
+                  message,
+                },
+              })
+            }
+            // If !result.allow, message is dropped (middleware rejected it)
+          },
+        )
+        return
+      }
+    }
+
+    // No middleware or no peer context - dispatch immediately
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
       envelope: {
-        fromChannelId: channel.channelId,
+        fromChannelId: channelId,
         message,
       },
     })
+  }
+
+  /**
+   * Build peer context from a channel for middleware.
+   * Returns undefined if channel is not established or peer state not found.
+   */
+  #buildPeerContextFromChannel(channel: Channel) {
+    if (!isEstablishedFn(channel)) {
+      return undefined
+    }
+
+    const peerState = this.model.peers.get(channel.peerId)
+    if (!peerState) {
+      return undefined
+    }
+
+    return {
+      peerId: peerState.identity.peerId,
+      peerName: peerState.identity.name,
+      peerType: peerState.identity.type,
+      channelId: channel.channelId,
+      channelKind: channel.kind,
+    }
+  }
+
+  /**
+   * Extract document and transmission context from a channel message.
+   * Used to provide full context to middleware.
+   */
+  #extractContextFromMessage(message: ChannelMsg): {
+    docId?: DocId
+    transmission?: { type: "snapshot" | "update"; sizeBytes: number }
+  } {
+    // Handle messages with docId field
+    if ("docId" in message && typeof message.docId === "string") {
+      const docId = message.docId as DocId
+
+      // Handle sync-response and update messages with transmission data
+      if (
+        (message.type === "channel/sync-response" ||
+          message.type === "channel/update") &&
+        "transmission" in message
+      ) {
+        const t = message.transmission
+        if (
+          (t.type === "snapshot" || t.type === "update") &&
+          "data" in t &&
+          t.data instanceof Uint8Array
+        ) {
+          return {
+            docId,
+            transmission: { type: t.type, sizeBytes: t.data.length },
+          }
+        }
+      }
+
+      return { docId }
+    }
+
+    // Handle sync-request (has docs array, not single docId)
+    // For middleware, we don't provide document context for multi-doc messages
+    // Middleware can inspect message.docs directly if needed
+
+    return {}
   }
 
   // Helper functions for adapter callbacks

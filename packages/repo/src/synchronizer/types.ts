@@ -1,6 +1,6 @@
 import type { Logger } from "@logtape/logtape"
 import type { Channel, ChannelId } from "../channel.js"
-import type { Rules } from "../rules.js"
+import type { Permissions } from "../permissions.js"
 import type { SynchronizerModel } from "../synchronizer-program.js"
 
 /**
@@ -10,6 +10,6 @@ export type ChannelHandlerContext = {
   channel: Channel
   model: SynchronizerModel
   fromChannelId: ChannelId
-  rules: Rules
+  permissions: Permissions
   logger: Logger
 }

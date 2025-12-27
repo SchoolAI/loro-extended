@@ -42,7 +42,7 @@
  */
 
 import type { Logger } from "@logtape/logtape"
-import type { Rules } from "../../rules.js"
+import type { Permissions } from "../../permissions.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import type { DocId } from "../../types.js"
 import { batchAsNeeded } from "../utils.js"
@@ -54,7 +54,7 @@ export function handleLocalDocChange(
     docId: DocId
   },
   model: SynchronizerModel,
-  rules: Rules,
+  permissions: Permissions,
   logger: Logger,
 ): Command | undefined {
   const { docId } = msg
@@ -81,7 +81,7 @@ export function handleLocalDocChange(
     docState,
     ourVersion,
     model,
-    rules,
+    permissions,
     logger,
     logPrefix: "local-doc-change",
   })

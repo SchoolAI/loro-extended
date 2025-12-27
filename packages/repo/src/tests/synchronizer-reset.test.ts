@@ -7,7 +7,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import { createRules } from "../rules.js"
+import { createPermissions } from "../permissions.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -64,7 +64,7 @@ describe("Synchronizer - Reset Functionality", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      rules: createRules(),
+      permissions: createPermissions(),
     })
   })
 

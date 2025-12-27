@@ -8,7 +8,7 @@
  *
  * ## Decision Tree
  *
- * For each established channel where `canReveal=true`:
+ * For each established channel where `visibility=true`:
  *
  * 1. **If peer has subscribed** (in peer's `subscriptions` set):
  *    - Send `sync-response` with update data directly
@@ -29,14 +29,14 @@ import type { Logger } from "@logtape/logtape"
 import type { VersionVector } from "loro-crdt"
 import type { SyncTransmission } from "../../channel.js"
 import { type EstablishedChannel, isEstablished } from "../../channel.js"
-import type { Rules } from "../../rules.js"
+import type { Permissions } from "../../permissions.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import type { DocId, DocState, PeerID } from "../../types.js"
 import {
   setPeerDocumentAwareness,
   shouldSyncWithPeer,
 } from "../peer-state-helpers.js"
-import { getRuleContext } from "../rule-context.js"
+import { getPermissionContext } from "../permission-context.js"
 
 export type PropagationOptions = {
   /** The document ID to propagate */
@@ -47,8 +47,8 @@ export type PropagationOptions = {
   ourVersion: VersionVector
   /** The synchronizer model */
   model: SynchronizerModel
-  /** Rules for canReveal checks */
-  rules: Rules
+  /** Permissions for visibility checks */
+  permissions: Permissions
   /** Logger for debugging */
   logger: Logger
   /** Optional: Peer ID to exclude from propagation (e.g., the source of an import) */
@@ -68,7 +68,7 @@ export function propagateToPeers(options: PropagationOptions): Command[] {
     docState,
     ourVersion,
     model,
-    rules,
+    permissions,
     logger,
     excludePeerId,
     logPrefix,
@@ -106,7 +106,7 @@ export function propagateToPeers(options: PropagationOptions): Command[] {
       docState,
       ourVersion,
       model,
-      rules,
+      permissions,
       logger,
       logPrefix,
     })
@@ -123,7 +123,7 @@ type PropagateToSinglePeerOptions = {
   docState: DocState
   ourVersion: VersionVector
   model: SynchronizerModel
-  rules: Rules
+  permissions: Permissions
   logger: Logger
   logPrefix: string
 }
@@ -140,7 +140,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     docState,
     ourVersion,
     model,
-    rules,
+    permissions,
     logger,
     logPrefix,
   } = options
@@ -152,19 +152,26 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
   const isSubscribed = peerState?.subscriptions.has(docId)
 
   // Check if we're allowed to reveal this document to this channel
-  // This enforces privacy rules (e.g., tenant isolation, repo rules)
+  // This enforces privacy rules (e.g., tenant isolation, repo permissions)
   // NOTE: If the peer is already subscribed, they know about the document, so we skip this check
+  // (visibility bypass for subscribed peers)
   if (!isSubscribed) {
-    const context = getRuleContext({
+    const context = getPermissionContext({
       channel,
       docState,
       model,
     })
 
-    if (context instanceof Error || !rules.canReveal(context)) {
-      logger.debug(`${logPrefix}: skipping channel {channelId} due to rules`, {
-        channelId: channel.channelId,
-      })
+    if (
+      context instanceof Error ||
+      !permissions.visibility(context.doc, context.peer)
+    ) {
+      logger.debug(
+        `${logPrefix}: skipping channel {channelId} due to permissions`,
+        {
+          channelId: channel.channelId,
+        },
+      )
       return commands // Not allowed to reveal to this channel
     }
   }

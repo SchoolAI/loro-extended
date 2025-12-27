@@ -10,8 +10,8 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
+import { createPermissions } from "../permissions.js"
 import { Repo } from "../repo.js"
-import { createRules } from "../rules.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -94,8 +94,8 @@ describe("Synchronizer - Permissions Integration", () => {
     const restrictiveSync = new Synchronizer({
       identity: { peerId: "1", name: "test", type: "user" },
       adapters: [freshAdapter as AnyAdapter],
-      rules: createRules({
-        canReveal: context => context.docId !== "secret-doc",
+      permissions: createPermissions({
+        visibility: doc => doc.id !== "secret-doc",
       }),
     })
 
@@ -106,7 +106,7 @@ describe("Synchronizer - Permissions Integration", () => {
     await freshAdapter.waitForStart()
     const channel = freshAdapter.simulateChannelAdded("test-channel")
 
-    // Establish the channel first so getRuleContext works
+    // Establish the channel first so getPermissionContext works
     freshAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/establish-request",
       identity: { peerId: "1" as any, name: "requester-peer", type: "user" },
@@ -144,8 +144,8 @@ describe("Synchronizer - Permissions Integration", () => {
     const repo2 = new Repo({
       identity: { name: "Peer 2", type: "user" },
       adapters: [adapter2],
-      rules: {
-        canCreate: () => true, // Allow creation
+      permissions: {
+        creation: () => true, // Allow creation
       },
     })
 
@@ -175,8 +175,8 @@ describe("Synchronizer - Permissions Integration", () => {
     const repo2 = new Repo({
       identity: { name: "Peer 2", type: "user" },
       adapters: [adapter2],
-      rules: {
-        canCreate: () => false, // Deny creation
+      permissions: {
+        creation: () => false, // Deny creation
       },
     })
 

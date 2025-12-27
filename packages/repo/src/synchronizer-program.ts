@@ -10,16 +10,16 @@
  *
  * 1. **Discovery Flow** (what documents exist):
  *    - `directory-request/response` - Peers announce and discover documents
- *    - Controlled by `canReveal` rule
+ *    - Controlled by `permissions.visibility`
  *
  * 2. **Sync Flow** (transferring document data):
  *    - `sync-request/response` - Peers explicitly request and receive document data
- *    - Controlled by `canUpdate` rule
+ *    - Controlled by `permissions.mutability`
  *
  * ## Key Design Principles
  *
  * - **Separation of Concerns**: Discovery and sync are separate, explicit steps
- * - **Privacy by Design**: Rules checked at every decision point
+ * - **Privacy by Design**: Permissions checked at every decision point
  * - **Symmetric Protocol**: Both peers use the same patterns (no client/server roles)
  * - **Pull-Based**: Peers announce documents, interested peers request them
  *
@@ -28,7 +28,7 @@
  * ### Pattern 1: New Document Created
  * ```
  * 1. local-doc-change triggered
- * 2. Send directory-response (announcement) to channels where canReveal=true
+ * 2. Send directory-response (announcement) to channels where visibility=true
  * 3. Interested peers send sync-request
  * 4. Send sync-response with document data
  * ```
@@ -63,7 +63,7 @@ import type {
   EphemeralStoreData,
   ReturnEnvelope,
 } from "./channel.js"
-import type { Rules } from "./rules.js"
+import type { Permissions } from "./permissions.js"
 import { synchronizerDispatcher } from "./synchronizer/synchronizer-dispatcher.js"
 import type {
   ChannelId,
@@ -247,7 +247,7 @@ export function init(
 }
 
 type CreateSynchronizerUpdateParams = {
-  rules: Rules
+  permissions: Permissions
   logger?: Logger
   onUpdate?: (patches: Patch[]) => void
 }
@@ -262,28 +262,28 @@ type CreateSynchronizerUpdateParams = {
  *
  * ```typescript
  * const update = createSynchronizerUpdate({
- *   rules: {
- *     canReveal: (ctx) => ctx.channelKind === "storage" || isOwner(ctx),
- *     canUpdate: (ctx) => ctx.channelKind === "storage" || hasWriteAccess(ctx),
+ *   permissions: {
+ *     visibility: (doc, peer) => peer.channelKind === "storage" || isOwner(doc, peer),
+ *     mutability: (doc, peer) => peer.channelKind === "storage" || hasWriteAccess(doc, peer),
  *   },
  *   logger: getLogger(["my-app", "sync"]),
  *   onUpdate: (patches) => console.log("State changed:", patches),
  * })
  * ```
  *
- * @param rules - Rules for canReveal and canUpdate checks
+ * @param permissions - Permissions for visibility, mutability, creation, and deletion checks
  * @param logger - Optional logger (defaults to @loro-extended/repo logger)
  * @param onUpdate - Optional callback for debugging state changes
  * @returns Immutable update function compatible with TEA pattern
  */
 export function createSynchronizerUpdate({
-  rules,
+  permissions,
   logger,
   onUpdate,
 }: CreateSynchronizerUpdateParams) {
   return makeImmutableUpdate(
     createSynchronizerLogic(
-      rules,
+      permissions,
       logger ?? getLogger(["@loro-extended", "repo"]),
     ),
     onUpdate,
@@ -291,7 +291,7 @@ export function createSynchronizerUpdate({
 }
 
 /**
- * Creates the core synchronizer update logic with rules captured in closure
+ * Creates the core synchronizer update logic with permissions captured in closure
  *
  * This function creates a mutative update function that's easier to write and reason about.
  * The mutative library automatically converts it to an immutable update function.
@@ -309,11 +309,14 @@ export function createSynchronizerUpdate({
  *    - Protocol messages from peers (establish, sync, directory)
  *    - Routed to mutatingChannelUpdate for dispatch
  *
- * @param rules - Rules for canReveal and canUpdate checks
+ * @param permissions - Permissions for visibility, mutability, creation, and deletion checks
  * @param synchronizerLogger - Logger for tracing message flow
  * @returns Mutative update function (converted to immutable by makeImmutableUpdate)
  */
-function createSynchronizerLogic(rules: Rules, synchronizerLogger: Logger) {
+function createSynchronizerLogic(
+  permissions: Permissions,
+  synchronizerLogger: Logger,
+) {
   const logger = synchronizerLogger.getChild("program")
 
   // A mutating update function is easier to read and write, because we need only concern ourselves
@@ -329,6 +332,6 @@ function createSynchronizerLogic(rules: Rules, synchronizerLogger: Logger) {
       logger.trace("{type}", detail)
     }
 
-    return synchronizerDispatcher(msg, model, rules, logger)
+    return synchronizerDispatcher(msg, model, permissions, logger)
   }
 }

@@ -31,7 +31,13 @@ type AdapterParams = {
 export type AdapterContext = {
   identity: PeerIdentityDetails
   logger: Logger
-  onChannelReceive: (channel: Channel, message: ChannelMsg) => void
+  /**
+   * Called when a message is received on a channel.
+   * Note: channelId is passed instead of channel object because the channel
+   * object may be stale (due to immutable state updates in the synchronizer).
+   * The synchronizer should look up the current channel from its model.
+   */
+  onChannelReceive: (channelId: ChannelId, message: ChannelMsg) => void
   onChannelAdded: (channel: ConnectedChannel) => void
   onChannelRemoved: (channel: Channel) => void
   onChannelEstablish: (channel: ConnectedChannel) => void
@@ -112,7 +118,7 @@ export abstract class Adapter<G> {
     }
 
     const channel = this.channels.create(context, message =>
-      lifecycle.onChannelReceive(channel, message),
+      lifecycle.onChannelReceive(channel.channelId, message),
     )
 
     lifecycle.onChannelAdded(channel)

@@ -218,9 +218,9 @@ const storageAdapter = new LevelDBStorageAdapter("loro-chat-app.db")
 const repo = new Repo({
   identity: { name: "example-chat-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
-  rules: {
-    canReveal(context) {
-      if (context.channelKind === "storage") return true
+  permissions: {
+    visibility(_doc, peer) {
+      if (peer.channelKind === "storage") return true
 
       // Don't reveal documents unrelated to the one that the client asks for
       return false

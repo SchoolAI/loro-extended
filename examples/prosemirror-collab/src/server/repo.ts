@@ -22,10 +22,10 @@ export const repo = new Repo({
     type: "service",
   },
   adapters: [wsAdapter, storageAdapter],
-  rules: {
+  permissions: {
     // Allow storage to reveal documents
-    canReveal(context) {
-      if (context.channelKind === "storage") return true
+    visibility(_doc, peer) {
+      if (peer.channelKind === "storage") return true
       // Don't reveal documents unrelated to what the client asks for
       return false
     },

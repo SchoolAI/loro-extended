@@ -74,8 +74,8 @@ describe("Repo E2E", () => {
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
-      rules: {
-        canUpdate: () => repo1CanWrite,
+      permissions: {
+        mutability: () => repo1CanWrite,
       },
     })
     const repo2 = new Repo({
@@ -116,7 +116,7 @@ describe("Repo E2E", () => {
     const repo1 = new Repo({
       identity: { name: "repo1", type: "user" },
       adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
-      rules: { canDelete: () => false },
+      permissions: { deletion: () => false },
     })
     const repo2 = new Repo({
       identity: { name: "repo2", type: "user" },
@@ -148,11 +148,11 @@ describe("Repo E2E", () => {
       bridge = new Bridge()
     })
 
-    it("should reveal all documents when canReveal is always true", async () => {
+    it("should reveal all documents when visibility is always true", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
-        rules: { canReveal: () => true },
+        permissions: { visibility: () => true },
       })
       const handle1 = repoA.get(crypto.randomUUID(), DocSchema)
       const handle2 = repoA.get(crypto.randomUUID(), DocSchema)
@@ -175,11 +175,11 @@ describe("Repo E2E", () => {
       expect(bHandle2.doc).toBeDefined()
     }, 500)
 
-    it("should not announce documents when canReveal is false", async () => {
+    it("should not announce documents when visibility is false", async () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
-        rules: { canReveal: () => false },
+        permissions: { visibility: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
@@ -200,7 +200,7 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
-        rules: { canReveal: () => false },
+        permissions: { visibility: () => false },
       })
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
@@ -226,8 +226,8 @@ describe("Repo E2E", () => {
       repoA = new Repo({
         identity: { name: "repoA", type: "user" },
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
-        rules: {
-          canReveal: context => context.docId.startsWith("allowed"),
+        permissions: {
+          visibility: doc => doc.id.startsWith("allowed"),
         },
       })
 

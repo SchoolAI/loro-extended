@@ -69,7 +69,7 @@ import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncRequest(
   message: ChannelMsgSyncRequest,
-  { channel, model, fromChannelId, logger, rules }: ChannelHandlerContext,
+  { channel, model, fromChannelId, logger, permissions }: ChannelHandlerContext,
 ): Command | undefined {
   // Require established channel for sync operations
   if (!isEstablished(channel)) {
@@ -114,8 +114,8 @@ export function handleSyncRequest(
     // This allows peers to initialize documents on the server just by requesting them
     if (!docState) {
       // Check if peer is allowed to create this document
-      const context = {
-        docId,
+      // Use creation permission with peer context
+      const peerContext = {
         peerId: peerState.identity.peerId,
         peerName: peerState.identity.name,
         peerType: peerState.identity.type,
@@ -123,7 +123,7 @@ export function handleSyncRequest(
         channelKind: channel.kind,
       }
 
-      if (rules.canCreate(context)) {
+      if (permissions.creation(docId, peerContext)) {
         logger.debug(
           "sync-request: creating new document ({docId}) from peer request",
           {

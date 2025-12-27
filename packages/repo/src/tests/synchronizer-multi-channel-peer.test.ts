@@ -19,7 +19,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import { createRules } from "../rules.js"
+import { createPermissions } from "../permissions.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -91,7 +91,7 @@ describe("Multi-channel peer scenarios", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [sseAdapter as AnyAdapter, webrtcAdapter as AnyAdapter],
-      rules: createRules(),
+      permissions: createPermissions(),
     })
   })
 
@@ -104,19 +104,14 @@ describe("Multi-channel peer scenarios", () => {
       const sseChannel = sseAdapter.simulateChannelAdded("sse-channel")
 
       // Establish the SSE channel with the remote peer
-      const connectedSseChannel = synchronizer.getChannel(sseChannel.channelId)
-      expect(connectedSseChannel).toBeDefined()
-
-      if (connectedSseChannel) {
-        synchronizer.channelReceive(connectedSseChannel, {
-          type: "channel/establish-response",
-          identity: {
-            peerId: remotePeerId,
-            name: "remote-peer",
-            type: "user",
-          },
-        })
-      }
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/establish-response",
+        identity: {
+          peerId: remotePeerId,
+          name: "remote-peer",
+          type: "user",
+        },
+      })
 
       // Verify peer state exists with one channel
       const establishedSseChannel = synchronizer.getChannel(
@@ -127,21 +122,15 @@ describe("Multi-channel peer scenarios", () => {
       // Add second channel (WebRTC) for the SAME peer
       const webrtcChannel = webrtcAdapter.simulateChannelAdded("webrtc-channel")
 
-      const connectedWebrtcChannel = synchronizer.getChannel(
-        webrtcChannel.channelId,
-      )
-      expect(connectedWebrtcChannel).toBeDefined()
-
-      if (connectedWebrtcChannel) {
-        synchronizer.channelReceive(connectedWebrtcChannel, {
-          type: "channel/establish-response",
-          identity: {
-            peerId: remotePeerId, // Same peer ID!
-            name: "remote-peer",
-            type: "user",
-          },
-        })
-      }
+      // Establish WebRTC channel with the same peer
+      synchronizer.channelReceive(webrtcChannel.channelId, {
+        type: "channel/establish-response",
+        identity: {
+          peerId: remotePeerId, // Same peer ID!
+          name: "remote-peer",
+          type: "user",
+        },
+      })
 
       // Verify peer now has two channels
       const establishedWebrtcChannel = synchronizer.getChannel(
@@ -154,16 +143,11 @@ describe("Multi-channel peer scenarios", () => {
       synchronizer.getOrCreateDocumentState(docId)
 
       // Simulate sync-request from peer on SSE channel
-      if (
-        establishedSseChannel &&
-        establishedSseChannel.type === "established"
-      ) {
-        synchronizer.channelReceive(establishedSseChannel, {
-          type: "channel/sync-request",
-          docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
-          bidirectional: false,
-        })
-      }
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/sync-request",
+        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        bidirectional: false,
+      })
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10))
@@ -193,32 +177,25 @@ describe("Multi-channel peer scenarios", () => {
       // Add only one channel
       const sseChannel = sseAdapter.simulateChannelAdded("sse-channel")
 
-      const connectedChannel = synchronizer.getChannel(sseChannel.channelId)
-      expect(connectedChannel).toBeDefined()
-
-      if (connectedChannel) {
-        synchronizer.channelReceive(connectedChannel, {
-          type: "channel/establish-response",
-          identity: {
-            peerId: remotePeerId,
-            name: "remote-peer",
-            type: "user",
-          },
-        })
-      }
+      // Establish the channel
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/establish-response",
+        identity: {
+          peerId: remotePeerId,
+          name: "remote-peer",
+          type: "user",
+        },
+      })
 
       // Create a document and subscribe the peer
       const docId = "test-doc"
       synchronizer.getOrCreateDocumentState(docId)
 
-      const establishedChannel = synchronizer.getChannel(sseChannel.channelId)
-      if (establishedChannel && establishedChannel.type === "established") {
-        synchronizer.channelReceive(establishedChannel, {
-          type: "channel/sync-request",
-          docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
-          bidirectional: false,
-        })
-      }
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/sync-request",
+        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        bidirectional: false,
+      })
 
       await new Promise(resolve => setTimeout(resolve, 10))
 
@@ -245,29 +222,18 @@ describe("Multi-channel peer scenarios", () => {
 
       // Add and establish SSE channel
       const sseChannel = sseAdapter.simulateChannelAdded("sse-channel")
-      const connectedSseChannel = synchronizer.getChannel(sseChannel.channelId)
 
-      if (connectedSseChannel) {
-        synchronizer.channelReceive(connectedSseChannel, {
-          type: "channel/establish-response",
-          identity: { peerId: remotePeerId, name: "remote-peer", type: "user" },
-        })
-      }
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/establish-response",
+        identity: { peerId: remotePeerId, name: "remote-peer", type: "user" },
+      })
 
       // Subscribe via SSE channel
-      const establishedSseChannel = synchronizer.getChannel(
-        sseChannel.channelId,
-      )
-      if (
-        establishedSseChannel &&
-        establishedSseChannel.type === "established"
-      ) {
-        synchronizer.channelReceive(establishedSseChannel, {
-          type: "channel/sync-request",
-          docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
-          bidirectional: false,
-        })
-      }
+      synchronizer.channelReceive(sseChannel.channelId, {
+        type: "channel/sync-request",
+        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        bidirectional: false,
+      })
 
       await new Promise(resolve => setTimeout(resolve, 10))
 
@@ -277,31 +243,18 @@ describe("Multi-channel peer scenarios", () => {
 
       // Add and establish WebRTC channel for same peer
       const webrtcChannel = webrtcAdapter.simulateChannelAdded("webrtc-channel")
-      const connectedWebrtcChannel = synchronizer.getChannel(
-        webrtcChannel.channelId,
-      )
 
-      if (connectedWebrtcChannel) {
-        synchronizer.channelReceive(connectedWebrtcChannel, {
-          type: "channel/establish-response",
-          identity: { peerId: remotePeerId, name: "remote-peer", type: "user" },
-        })
-      }
+      synchronizer.channelReceive(webrtcChannel.channelId, {
+        type: "channel/establish-response",
+        identity: { peerId: remotePeerId, name: "remote-peer", type: "user" },
+      })
 
       // Send sync-request via WebRTC channel (same doc)
-      const establishedWebrtcChannel = synchronizer.getChannel(
-        webrtcChannel.channelId,
-      )
-      if (
-        establishedWebrtcChannel &&
-        establishedWebrtcChannel.type === "established"
-      ) {
-        synchronizer.channelReceive(establishedWebrtcChannel, {
-          type: "channel/sync-request",
-          docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
-          bidirectional: false,
-        })
-      }
+      synchronizer.channelReceive(webrtcChannel.channelId, {
+        type: "channel/sync-request",
+        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        bidirectional: false,
+      })
 
       await new Promise(resolve => setTimeout(resolve, 10))
 

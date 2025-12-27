@@ -6,7 +6,8 @@ import {
   type EphemeralDeclarations,
   type HandleWithEphemerals,
 } from "./handle.js"
-import { createRules, type Rules } from "./rules.js"
+import type { Middleware } from "./middleware.js"
+import { createPermissions, type Permissions } from "./permissions.js"
 import { type HandleUpdateFn, Synchronizer } from "./synchronizer.js"
 import type { DocId, PeerIdentityDetails } from "./types.js"
 import { generatePeerId } from "./utils/generate-peer-id.js"
@@ -15,7 +16,54 @@ import { validatePeerId } from "./utils/validate-peer-id.js"
 export interface RepoParams {
   identity?: Partial<PeerIdentityDetails>
   adapters?: AnyAdapter[]
-  rules?: Partial<Rules>
+  /**
+   * Permissions control access to documents.
+   *
+   * Permissions are simple, synchronous predicates that determine what peers can do.
+   * For advanced use cases (rate limiting, external auth, audit logging),
+   * use middleware instead.
+   *
+   * @example
+   * ```typescript
+   * const repo = new Repo({
+   *   permissions: {
+   *     visibility: (doc, peer) => doc.id.startsWith('public/'),
+   *     mutability: (doc, peer) => peer.peerType !== 'bot',
+   *     deletion: (doc, peer) => peer.peerType === 'service',
+   *   }
+   * })
+   * ```
+   */
+  permissions?: Partial<Permissions>
+  /**
+   * Middleware for advanced access control and cross-cutting concerns.
+   *
+   * Middleware runs BEFORE the synchronizer processes messages, at the async boundary.
+   * Use middleware for:
+   * - Rate limiting
+   * - Size limits
+   * - External auth service integration
+   * - Audit logging
+   *
+   * For simple permission checks, use `permissions` instead.
+   *
+   * @example
+   * ```typescript
+   * const repo = new Repo({
+   *   middleware: [
+   *     {
+   *       name: 'rate-limiter',
+   *       requires: ['peer'],
+   *       check: (ctx) => {
+   *         const count = getRequestCount(ctx.peer.peerId)
+   *         return count < 100 ? { allow: true } : { allow: false, reason: 'rate-limited' }
+   *       }
+   *     }
+   *   ]
+   * })
+   * ```
+   */
+  middleware?: Middleware[]
   onUpdate?: HandleUpdateFn
 }
 
@@ -40,7 +88,8 @@ export class Repo {
   constructor({
     identity = {},
     adapters = [],
-    rules,
+    permissions,
+    middleware,
     onUpdate,
   }: RepoParams = {}) {
     // Validate peerId if provided, otherwise generate one
@@ -65,7 +114,8 @@ export class Repo {
     const synchronizer = new Synchronizer({
       identity: this.identity,
       adapters,
-      rules: createRules(rules),
+      permissions: createPermissions(permissions),
+      middleware: middleware ?? [],
       logger,
       onUpdate,
     })

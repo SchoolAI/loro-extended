@@ -26,10 +26,10 @@ const storageAdapter = new LevelDBStorageAdapter("loro-video-conference.db")
 const repo = new Repo({
   identity: { name: "video-conference-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
-  rules: {
-    canReveal(context) {
+  permissions: {
+    visibility(_doc, peer) {
       // Storage adapters can always see documents
-      if (context.channelKind === "storage") return true
+      if (peer.channelKind === "storage") return true
 
       // Network peers can only see room documents that they themselves reveal
       return false

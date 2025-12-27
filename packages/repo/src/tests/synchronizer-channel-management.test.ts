@@ -8,7 +8,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import { createRules } from "../rules.js"
+import { createPermissions } from "../permissions.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -73,7 +73,7 @@ describe("Synchronizer - Channel Management", () => {
     synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      rules: createRules(),
+      permissions: createPermissions(),
     })
   })
 
@@ -113,46 +113,38 @@ describe("Synchronizer - Channel Management", () => {
     synchronizer.getOrCreateDocumentState(docId2)
 
     // Simulate receiving establish-response to create peer state
-    // We need to get the channel first to pass it to onChannelReceive
-    const connectedChannel = synchronizer.getChannel(channel.channelId)
-    expect(connectedChannel).toBeDefined()
-
-    if (connectedChannel) {
-      synchronizer.channelReceive(connectedChannel, {
-        type: "channel/establish-response",
-        identity: {
-          peerId: "12345",
-          name: "test-peer",
-          type: "user",
-        },
-      })
-    }
+    synchronizer.channelReceive(channel.channelId, {
+      type: "channel/establish-response",
+      identity: {
+        peerId: "12345",
+        name: "test-peer",
+        type: "user",
+      },
+    })
 
     // Get the established channel and simulate the peer subscribing
     const updatedChannel = synchronizer.getChannel(channel.channelId)
     expect(updatedChannel?.type).toBe("established")
 
-    if (updatedChannel && updatedChannel.type === "established") {
-      // Now simulate sync-requests which will add subscriptions
-      synchronizer.channelReceive(updatedChannel, {
-        type: "channel/sync-request",
-        docs: [
-          {
-            docId: docId1,
-            requesterDocVersion: synchronizer
-              .getOrCreateDocumentState(docId1)
-              .doc.version(),
-          },
-          {
-            docId: docId2,
-            requesterDocVersion: synchronizer
-              .getOrCreateDocumentState(docId2)
-              .doc.version(),
-          },
-        ],
-        bidirectional: false,
-      })
-    }
+    // Now simulate sync-requests which will add subscriptions
+    synchronizer.channelReceive(channel.channelId, {
+      type: "channel/sync-request",
+      docs: [
+        {
+          docId: docId1,
+          requesterDocVersion: synchronizer
+            .getOrCreateDocumentState(docId1)
+            .doc.version(),
+        },
+        {
+          docId: docId2,
+          requesterDocVersion: synchronizer
+            .getOrCreateDocumentState(docId2)
+            .doc.version(),
+        },
+      ],
+      bidirectional: false,
+    })
 
     // Wait for async operations to complete
     await new Promise(resolve => setTimeout(resolve, 0))

@@ -33,7 +33,7 @@
  */
 
 import type { Logger } from "@logtape/logtape"
-import type { Rules } from "../../rules.js"
+import type { Permissions } from "../../permissions.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
 import type { DocId, PeerID } from "../../types.js"
 import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
@@ -47,7 +47,7 @@ export function handleDocImported(
     fromPeerId: PeerID
   },
   model: SynchronizerModel,
-  rules: Rules,
+  permissions: Permissions,
   logger: Logger,
 ): Command | undefined {
   const { docId, fromPeerId } = msg
@@ -94,7 +94,7 @@ export function handleDocImported(
     docState,
     ourVersion,
     model,
-    rules,
+    permissions,
     logger,
     logPrefix: "doc-imported",
     excludePeerId: fromPeerId,

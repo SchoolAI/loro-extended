@@ -7,7 +7,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import { createRules } from "../rules.js"
+import { createPermissions } from "../permissions.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -81,7 +81,7 @@ describe("Synchronizer - Initialization", () => {
     const synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      rules: createRules(),
+      permissions: createPermissions(),
     })
 
     // Adapters are initialized via _initialize() in constructor
@@ -93,8 +93,8 @@ describe("Synchronizer - Initialization", () => {
     const restrictiveSync = new Synchronizer({
       identity: { peerId: "1", name: "test", type: "user" },
       adapters: [],
-      rules: createRules({
-        canReveal: () => false,
+      permissions: createPermissions({
+        visibility: () => false,
       }),
     })
 
@@ -107,7 +107,7 @@ describe("Synchronizer - Initialization", () => {
     const synchronizer = new Synchronizer({
       identity: { peerId: "1", name: "test-synchronizer", type: "user" },
       adapters: [mockAdapter as AnyAdapter],
-      rules: createRules(),
+      permissions: createPermissions(),
       onUpdate: onPatch,
     })
 

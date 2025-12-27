@@ -1,6 +1,6 @@
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createRules } from "../../rules.js"
+import { createPermissions } from "../../permissions.js"
 import {
   createSynchronizerUpdate,
   type SynchronizerMessage,
@@ -18,7 +18,7 @@ describe("handle-local-doc-change", () => {
 
   beforeEach(() => {
     update = createSynchronizerUpdate({
-      rules: createRules(),
+      permissions: createPermissions(),
     })
   })
 
@@ -147,16 +147,16 @@ describe("handle-local-doc-change", () => {
     expect(command).toBeUndefined()
   })
 
-  it("should respect canReveal permissions", () => {
-    const restrictivePermissions = createRules({
-      canReveal: context => {
+  it("should respect visibility permissions", () => {
+    const restrictivePermissions = createPermissions({
+      visibility: (_doc, peer) => {
         // Only reveal to storage adapters
-        return context.channelKind === "storage"
+        return peer.channelKind === "storage"
       },
     })
 
     const restrictiveUpdate = createSynchronizerUpdate({
-      rules: restrictivePermissions,
+      permissions: restrictivePermissions,
     })
 
     const networkPeer = createEstablishedChannel("network-peer" as PeerID, {

@@ -298,10 +298,10 @@ describe("Subscription Hang Investigation", () => {
       const originalReceive = repo2.synchronizer.channelReceive.bind(
         repo2.synchronizer,
       )
-      repo2.synchronizer.channelReceive = (channel, message) => {
+      repo2.synchronizer.channelReceive = (channelId, message) => {
         receiveTimes.push(Date.now())
         console.log(`Received at ${receiveTimes[receiveTimes.length - 1]}`)
-        return originalReceive(channel, message)
+        return originalReceive(channelId, message)
       }
 
       // Ensure doc state exists

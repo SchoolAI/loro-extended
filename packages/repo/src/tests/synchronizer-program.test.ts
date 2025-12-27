@@ -2,7 +2,7 @@
 
 import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createRules } from "../rules.js"
+import { createPermissions } from "../permissions.js"
 import {
   createEstablishedChannel,
   createMockChannel,
@@ -22,7 +22,7 @@ describe("Synchronizer Program - Integration Tests", () => {
 
   beforeEach(() => {
     update = createSynchronizerUpdate({
-      rules: createRules(),
+      permissions: createPermissions(),
     })
   })
 
@@ -67,15 +67,15 @@ describe("Synchronizer Program - Integration Tests", () => {
   })
 
   describe("permission integration", () => {
-    it("should respect canReveal permissions in directory response", () => {
-      const restrictivePermissions = createRules({
-        canReveal: context => {
-          return context.docId !== "secret-doc"
+    it("should respect visibility permissions in directory response", () => {
+      const restrictivePermissions = createPermissions({
+        visibility: doc => {
+          return doc.id !== "secret-doc"
         },
       })
 
       const restrictiveUpdate = createSynchronizerUpdate({
-        rules: restrictivePermissions,
+        permissions: restrictivePermissions,
       })
 
       const peerId = "test-peer-id" as PeerID

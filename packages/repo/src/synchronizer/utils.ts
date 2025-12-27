@@ -1,9 +1,9 @@
 import type { ChannelMsgSyncRequest, EstablishedChannel } from "../channel.js"
-import type { Rules } from "../rules.js"
+import type { Permissions } from "../permissions.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
 import type { DocState, PeerState } from "../types.js"
 import { shouldSyncWithPeer } from "./peer-state-helpers.js"
-import { getRuleContext } from "./rule-context.js"
+import { getPermissionContext } from "./permission-context.js"
 
 /**
  * Batch multiple commands into a single command if needed
@@ -30,7 +30,7 @@ export function filterAllowedDocs(
   documents: Map<string, DocState>,
   channel: EstablishedChannel,
   model: SynchronizerModel,
-  rules: Rules,
+  permissions: Permissions,
 ): Map<string, DocState> {
   const allowedDocs = new Map<string, DocState>()
   const peerState = model.peers.get(channel.peerId)
@@ -41,14 +41,15 @@ export function filterAllowedDocs(
     const peerHasDoc = peerAwareness?.awareness === "has-doc"
 
     if (peerHasDoc) {
-      // Peer already knows about it, so we allow it regardless of canReveal
+      // Peer already knows about it, so we allow it regardless of visibility
+      // (visibility bypass for subscribed peers)
       allowedDocs.set(docId, docState)
       continue
     }
 
-    const context = getRuleContext({ channel, docState, model })
+    const context = getPermissionContext({ channel, docState, model })
     if (context instanceof Error) continue
-    if (rules.canReveal(context)) {
+    if (permissions.visibility(context.doc, context.peer)) {
       allowedDocs.set(docId, docState)
     }
   }

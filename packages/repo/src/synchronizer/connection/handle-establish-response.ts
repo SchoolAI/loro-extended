@@ -69,7 +69,7 @@ import {
 
 export function handleEstablishResponse(
   message: ChannelMsgEstablishResponse,
-  { channel, model, logger, rules }: ChannelHandlerContext,
+  { channel, model, logger, permissions }: ChannelHandlerContext,
 ): Command | undefined {
   const commands: Command[] = []
 
@@ -89,18 +89,18 @@ export function handleEstablishResponse(
   // Get or create our representation of the remote peer's state
   const peerState = ensurePeerState(model, message.identity, channel.channelId)
 
-  // Note: We don't set canReveal or subscriptions during establishment
-  // - canReveal will be checked on-the-fly when needed
+  // Note: We don't set visibility or subscriptions during establishment
+  // - visibility will be checked on-the-fly when needed
   // - Subscriptions will be set when peer sends sync-request
 
   let docsToSync: ChannelMsgSyncRequest["docs"] = []
 
-  // Filter documents based on canReveal permission
+  // Filter documents based on visibility permission
   const allowedDocs = filterAllowedDocs(
     model.documents,
     establishedChannel,
     model,
-    rules,
+    permissions,
   )
 
   if (!isReconnection) {

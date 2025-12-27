@@ -1,7 +1,7 @@
 import type { Logger } from "@logtape/logtape"
 import { omit } from "lodash-es"
 import { type ChannelMsg, isEstablished } from "../channel.js"
-import type { Rules } from "../rules.js"
+import type { Permissions } from "../permissions.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
 import type { ChannelId } from "../types.js"
 import { handleEstablishRequest } from "./connection/handle-establish-request.js"
@@ -10,6 +10,7 @@ import { handleDirectoryRequest } from "./discovery/handle-directory-request.js"
 import { handleDirectoryResponse } from "./discovery/handle-directory-response.js"
 import { handleNewDoc } from "./discovery/handle-new-doc.js"
 import { handleEphemeral } from "./ephemeral/handle-ephemeral.js"
+import { handleDeleteRequest } from "./sync/handle-delete-request.js"
 import { handleSyncRequest } from "./sync/handle-sync-request.js"
 import { handleSyncResponse } from "./sync/handle-sync-response.js"
 import { handleSyncUpdate } from "./sync/handle-sync-update.js"
@@ -32,11 +33,11 @@ import type { ChannelHandlerContext } from "./types.js"
  *
  * **Discovery** (what documents exist):
  * - `directory-request` - Ask peer what documents they have
- * - `directory-response` - Announce documents (filtered by canReveal)
+ * - `directory-response` - Announce documents (filtered by visibility)
  *
  * **Sync** (transfer document data):
  * - `sync-request` - Request document data
- * - `sync-response` - Send document data (filtered by canUpdate)
+ * - `sync-response` - Send document data (filtered by mutability)
  *
  * @see docs/discovery-and-sync-architecture.md for protocol details
  */
@@ -44,7 +45,7 @@ export function channelDispatcher(
   channelMessage: ChannelMsg,
   model: SynchronizerModel,
   fromChannelId: ChannelId,
-  rules: Rules,
+  permissions: Permissions,
   logger: Logger,
 ): Command | undefined {
   const channel = model.channels.get(fromChannelId)
@@ -81,7 +82,7 @@ export function channelDispatcher(
     channel,
     model,
     fromChannelId,
-    rules,
+    permissions,
     logger,
   }
 
@@ -116,8 +117,14 @@ export function channelDispatcher(
       return handleEphemeral(channelMessage, ctx)
 
     case "channel/delete-request":
+      return handleDeleteRequest(channelMessage, ctx)
+
     case "channel/delete-response":
-      // Delete messages are handled elsewhere or not yet implemented
+      // Delete responses are informational - log and continue
+      logger.info("delete-response received: {docId} status={status}", {
+        docId: channelMessage.docId,
+        status: channelMessage.status,
+      })
       return
   }
 }
