@@ -1,5 +1,287 @@
 # @loro-extended/change
 
+## 2.0.0
+
+### Major Changes
+
+- 977922e: # Unified Ephemeral Store System v2
+
+  This release implements a major refactor of the ephemeral (presence) store system, providing a unified API for managing ephemeral data across documents.
+
+  ## Breaking Changes
+
+  ### Handle API Changes
+
+  - **`TypedDocHandle` removed** - Use `Handle` or `HandleWithEphemerals` instead
+  - **`UntypedDocHandle` removed** - Use `Handle` with `Shape.any()` for untyped documents
+  - **`usePresence(handle)` deprecated** - Use `useEphemeral(handle.presence)` instead
+  - **`handle.presence.set(value)` changed** - Use `handle.presence.setSelf(value)` instead
+  - **`handle.presence.all` removed** - Use `{ self, peers }` from `useEphemeral()` or access `handle.presence.self` and `handle.presence.peers` directly
+
+  ### Schema API Changes
+
+  - **`Shape.map()` deprecated** - Use `Shape.struct()` for CRDT container structs
+  - **`Shape.plain.object()` deprecated** - Use `Shape.plain.struct()` for plain value structs
+
+  ### Ephemeral Declarations Format
+
+  The third argument to `repo.get()` now expects an `EphemeralDeclarations` object:
+
+  ```typescript
+  // Before
+  const handle = repo.get(docId, DocSchema, PresenceSchema);
+
+  // After
+  const handle = repo.get(docId, DocSchema, { presence: PresenceSchema });
+  ```
+
+  ## New Features
+
+  ### Unified Handle Class
+
+  All handle types are now unified into a single `Handle<D, E>` class:
+
+  - `doc` is always a `TypedDoc<D>` (use `Shape.any()` for untyped)
+  - Ephemeral stores are accessed as properties via the declarations
+  - Full sync infrastructure (readyStates, waitUntilReady, etc.)
+
+  ### Multiple Ephemeral Stores
+
+  You can now declare multiple ephemeral stores per document for bandwidth isolation:
+
+  ```typescript
+  const handle = repo.get(docId, DocSchema, {
+    mouse: MouseShape, // High-frequency updates
+    profile: ProfileShape, // Low-frequency updates
+  });
+
+  handle.mouse.setSelf({ x: 100, y: 200 });
+  handle.profile.setSelf({ name: "Alice" });
+  ```
+
+  ### TypedEphemeral Interface
+
+  New unified interface for ephemeral stores:
+
+  ```typescript
+  interface TypedEphemeral<T> {
+    // Core API
+    set(key: string, value: T): void;
+    get(key: string): T | undefined;
+    getAll(): Map<string, T>;
+    delete(key: string): void;
+
+    // Convenience API for per-peer pattern
+    readonly self: T | undefined;
+    setSelf(value: T): void;
+    readonly peers: Map<string, T>;
+
+    // Subscription
+    subscribe(cb: (event) => void): () => void;
+
+    // Escape hatch
+    readonly raw: EphemeralStore;
+  }
+  ```
+
+  ### External Store Integration
+
+  Libraries can register their own ephemeral stores for network sync:
+
+  ```typescript
+  const externalStore = new LibraryEphemeralStore();
+  handle.addEphemeral("library-data", externalStore);
+  ```
+
+  ### useEphemeral Hook
+
+  New hook for subscribing to ephemeral store changes:
+
+  ```typescript
+  const { self, peers } = useEphemeral(handle.presence);
+  ```
+
+  ## Migration Guide
+
+  ### Updating Schema Definitions
+
+  ```typescript
+  // Before
+  const MessageSchema = Shape.map({
+    id: Shape.plain.string(),
+    content: Shape.text(),
+  });
+
+  const PresenceSchema = Shape.plain.object({
+    name: Shape.plain.string(),
+  });
+
+  // After
+  const MessageSchema = Shape.struct({
+    id: Shape.plain.string(),
+    content: Shape.text(),
+  });
+
+  const PresenceSchema = Shape.plain.struct({
+    name: Shape.plain.string(),
+  });
+
+  const EphemeralDeclarations = {
+    presence: PresenceSchema,
+  };
+  ```
+
+  ### Updating Handle Usage
+
+  ```typescript
+  // Before
+  const handle = repo.get(docId, DocSchema, PresenceSchema);
+  const { self, peers } = usePresence(handle);
+  handle.presence.set({ name: "Alice" });
+
+  // After
+  const handle = repo.get(docId, DocSchema, { presence: PresenceSchema });
+  const { self, peers } = useEphemeral(handle.presence);
+  handle.presence.setSelf({ name: "Alice" });
+  ```
+
+  ### Updating Server Code
+
+  ```typescript
+  // Before
+  import { TypedDocHandle } from "@loro-extended/repo";
+  const handle = new TypedDocHandle(untypedHandle, DocSchema, PresenceSchema);
+
+  // After
+  import { HandleWithEphemerals } from "@loro-extended/repo";
+  const handle = repo.get(docId, DocSchema, { presence: PresenceSchema });
+  ```
+
+### Minor Changes
+
+- 686006d: Add `Shape.any()`, `Shape.plain.any()`, and `Shape.plain.bytes()` for graceful untyped integration
+
+  This release adds escape hatches for integrating with external libraries that manage their own document structure (like loro-prosemirror):
+
+  ### @loro-extended/change
+
+  - **`Shape.any()`** - Container escape hatch that represents "any LoroContainer". Use at document root level when you want typed presence but untyped document content.
+  - **`Shape.plain.any()`** - Value escape hatch that represents "any Loro Value". Use in presence schemas for flexible metadata.
+  - **`Shape.plain.bytes()`** - Alias for `Shape.plain.uint8Array()` for better discoverability when working with binary data like cursor positions.
+  - **`Shape.plain.uint8Array().nullable()`** - Added `.nullable()` support for binary data.
+
+  ### @loro-extended/repo
+
+  - **`repo.get(docId, Shape.any(), presenceShape)`** - New overload that returns an `UntypedWithPresenceHandle` when `Shape.any()` is passed directly as the document shape. This provides raw `LoroDoc` access with typed presence.
+  - **`UntypedWithPresenceHandle`** - New handle type for documents where the structure is untyped but presence is typed.
+
+  ### Example usage
+
+  ```typescript
+  // Option 1: Shape.any() directly (entire document is untyped)
+  const handle = repo.get(docId, Shape.any(), CursorPresenceSchema)
+  handle.doc // Raw LoroDoc
+  handle.presence.set({ ... }) // Typed presence
+
+  // Option 2: Shape.any() in a container (one container is untyped)
+  const ProseMirrorDocShape = Shape.doc({
+    doc: Shape.any(), // loro-prosemirror manages this
+  })
+  const handle = repo.get(docId, ProseMirrorDocShape, CursorPresenceSchema)
+  handle.doc.toJSON() // { doc: unknown }
+  handle.presence.set({ ... }) // Typed presence
+
+  // Fully typed presence with binary cursor data
+  const CursorPresenceSchema = Shape.plain.struct({
+    anchor: Shape.plain.bytes().nullable(),
+    focus: Shape.plain.bytes().nullable(),
+    user: Shape.plain.struct({
+      name: Shape.plain.string(),
+      color: Shape.plain.string(),
+    }).nullable(),
+  })
+
+  // Presence is fully typed, Uint8Array works directly (no base64 encoding needed!)
+  handle.presence.set({
+    anchor: cursor.encode(), // Uint8Array directly
+    focus: null,
+    user: { name: "Alice", color: "#ff0000" },
+  })
+  ```
+
+- a901004: Add type-safe path selector DSL for `TypedDocHandle.subscribe`
+
+  ## `@loro-extended/change`
+
+  New exports for building type-safe path selectors:
+
+  - `createPathBuilder(docShape)` - Creates a path builder for a document schema
+  - `compileToJsonPath(segments)` - Compiles path segments to JSONPath strings
+  - `evaluatePath(doc, selector)` - Evaluates a path selector against a TypedDoc
+  - `evaluatePathOnValue(value, segments)` - Evaluates path segments against plain values
+  - `hasWildcard(segments)` - Checks if a path contains wildcard segments
+  - `PathBuilder<D>` - Type for the path builder
+  - `PathSelector<T>` - Type for path selectors with result type inference
+  - `PathSegment` - Type for individual path segments
+  - `PathNode<S, InArray>` - Type for path nodes in the DSL
+
+  ## `@loro-extended/repo`
+
+  ### New `TypedDocHandle.subscribe` overload
+
+  Type-safe path selector DSL for subscriptions with full TypeScript type inference:
+
+  ```typescript
+  // Type-safe path selector DSL:
+  handle.subscribe(
+    (p) => p.books.$each.title, // PathSelector<string[]>
+    (titles, prev) => {
+      // titles: string[], prev: string[] | undefined
+      console.log("Titles changed from", prev, "to", titles);
+    }
+  );
+  ```
+
+  **DSL constructs:**
+
+  - Property access: `p.config.theme`
+  - Array wildcards: `p.books.$each`
+  - Array indices: `p.books.$at(0)`, `p.books.$first`, `p.books.$last`
+  - Negative indices: `p.books.$at(-1)` (last element)
+  - Record wildcards: `p.users.$each`
+  - Record keys: `p.users.$key("alice")`
+
+  **Two-stage filtering:**
+
+  1. WASM-side: `subscribeJsonpath` NFA matcher for fast O(1) path matching
+  2. JS-side: Deep equality check to filter false positives from wildcard paths
+
+  ### Simplified JSONPath subscription
+
+  The raw JSONPath escape hatch now has a simpler callback signature:
+
+  ```typescript
+  // Before (deprecated getPath parameter):
+  handle.subscribe("$.books[*].title", (values, getPath) => { ... })
+
+  // After (simpler):
+  handle.subscribe("$.books[*].title", (values) => { ... })
+  ```
+
+  ### New `TypedDocHandle.jsonPath` method
+
+  General-purpose JSONPath query method for ad-hoc queries:
+
+  ```typescript
+  const expensiveBooks = handle.jsonPath("$.books[?@.price>10]");
+  const allTitles = handle.jsonPath("$..title");
+  ```
+
+  See also:
+
+  - https://loro.dev/docs/advanced/jsonpath
+  - https://github.com/loro-dev/loro/pull/883
+
 ## 1.1.0
 
 ### Minor Changes
