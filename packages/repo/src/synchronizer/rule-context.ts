@@ -31,7 +31,9 @@ export function getRuleContext({
   }
 
   return {
+    peerId: peerState.identity.peerId,
     peerName: peerState.identity.name,
+    peerType: peerState.identity.type,
     channelId: channel.channelId,
     doc: docState.doc,
     docId: docState.docId,

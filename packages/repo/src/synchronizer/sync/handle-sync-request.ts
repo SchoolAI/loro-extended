@@ -116,7 +116,9 @@ export function handleSyncRequest(
       // Check if peer is allowed to create this document
       const context = {
         docId,
-        peerName: channel.peerId, // Use peerId as name if name not available
+        peerId: peerState.identity.peerId,
+        peerName: peerState.identity.name,
+        peerType: peerState.identity.type,
         channelId: channel.channelId,
         channelKind: channel.kind,
       }

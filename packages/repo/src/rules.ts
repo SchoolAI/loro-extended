@@ -1,11 +1,16 @@
 import type { LoroDoc } from "loro-crdt"
 import type { ChannelKind } from "./channel.js"
-import type { ChannelId, DocId } from "./types.js"
+import type { ChannelId, DocId, PeerID } from "./types.js"
 
 export type RuleContext = {
   doc: LoroDoc
   docId: DocId
-  peerName: string
+  /** Unique identifier for the peer */
+  peerId: PeerID
+  /** Human-readable name (optional) */
+  peerName?: string
+  /** Type of peer: "user" | "bot" | "service" */
+  peerType: "user" | "bot" | "service"
   channelId: ChannelId
   channelKind: ChannelKind // "storage" | "network" | "other"
 }

@@ -369,17 +369,33 @@ const repo = new Repo({
       return ctx.docId.startsWith("public-");
     },
 
-    // Control who can update documents
+    // Control who can update documents (use peerId or peerType for reliable checks)
     canUpdate: (ctx) => {
-      return ctx.peerType === "user" || ctx.peerName === "trusted-bot";
+      return ctx.peerType === "user" || ctx.peerId === "trusted-service-123";
     },
 
     // Control who can delete documents
     canDelete: (ctx) => {
-      return ctx.peerName === "admin";
+      return ctx.peerType === "service" || ctx.peerId === "admin-456";
     },
   },
 });
+```
+
+### RuleContext
+
+The `RuleContext` provides information about the peer and document:
+
+```typescript
+type RuleContext = {
+  doc: LoroDoc;
+  docId: DocId;
+  peerId: PeerID;                        // Unique peer identifier
+  peerName?: string;                     // Human-readable name (optional)
+  peerType: "user" | "bot" | "service";  // Peer type
+  channelId: ChannelId;
+  channelKind: "storage" | "network" | "other";
+};
 ```
 
 ## Complete Example
