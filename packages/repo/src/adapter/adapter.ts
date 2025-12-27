@@ -9,12 +9,19 @@ import type {
 } from "../channel.js"
 import { ChannelDirectory } from "../channel-directory.js"
 import type { AdapterType, PeerIdentityDetails } from "../types.js"
+import { generateUUID } from "../utils/generate-uuid.js"
 import type { HandleSendFn } from "./types.js"
 
 export type AnyAdapter = Adapter<any>
 
 type AdapterParams = {
   adapterType: AdapterType
+  /**
+   * Unique identifier for this adapter instance.
+   * If not provided, auto-generated as `{adapterType}-{uuid}`.
+   * Used for idempotent add/remove operations.
+   */
+  adapterId?: string
 }
 
 /**
@@ -60,6 +67,11 @@ type AdapterLifecycleState =
 
 export abstract class Adapter<G> {
   readonly adapterType: AdapterType
+  /**
+   * Unique identifier for this adapter instance.
+   * Used for idempotent add/remove operations.
+   */
+  readonly adapterId: string
   // Logger is set during _initialize() with the Synchronizer's logger
   // Before initialization, uses a placeholder logger
   logger: Logger
@@ -73,8 +85,9 @@ export abstract class Adapter<G> {
 
   #lifecycle: AdapterLifecycleState = { state: "created" }
 
-  constructor({ adapterType }: AdapterParams) {
+  constructor({ adapterType, adapterId }: AdapterParams) {
     this.adapterType = adapterType
+    this.adapterId = adapterId ?? `${adapterType}-${generateUUID()}`
     // Use a placeholder logger until _initialize() provides the real one
     // This logger won't output anything unless LogTape is configured at the root level
     this.logger = getLogger().getChild("adapter").with({ adapterType })

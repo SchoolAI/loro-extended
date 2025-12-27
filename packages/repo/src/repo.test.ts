@@ -215,4 +215,85 @@ describe("Repo", () => {
       expect(repo.has(handle.docId)).toBe(false)
     })
   })
+
+  describe("identity defaults", () => {
+    it("creates valid identity with no params", () => {
+      const repo = new Repo()
+
+      expect(repo.identity.peerId).toMatch(/^\d+$/) // Valid PeerID format
+      expect(repo.identity.type).toBe("user")
+      expect(repo.identity.name).toBeUndefined()
+
+      repo.synchronizer.stopHeartbeat()
+    })
+
+    it("uses provided identity fields", () => {
+      const repo = new Repo({
+        identity: { name: "test", type: "service" },
+      })
+
+      expect(repo.identity.name).toBe("test")
+      expect(repo.identity.type).toBe("service")
+      expect(repo.identity.peerId).toBeDefined() // Still auto-generated
+
+      repo.synchronizer.stopHeartbeat()
+    })
+
+    it("uses provided peerId when specified", () => {
+      const repo = new Repo({
+        identity: { peerId: "12345" as `${number}` },
+      })
+
+      expect(repo.identity.peerId).toBe("12345")
+
+      repo.synchronizer.stopHeartbeat()
+    })
+  })
+
+  describe("dynamic adapter management", () => {
+    it("can add adapter after construction", async () => {
+      const repo = new Repo() // No adapters
+      const bridge = new Bridge()
+      const adapter = new BridgeAdapter({ adapterType: "test", bridge })
+
+      expect(repo.adapters.length).toBe(0)
+
+      await repo.addAdapter(adapter)
+
+      expect(repo.adapters.length).toBe(1)
+      expect(repo.hasAdapter(adapter.adapterId)).toBe(true)
+
+      repo.synchronizer.stopHeartbeat()
+    })
+
+    it("can remove adapter at runtime", async () => {
+      const bridge = new Bridge()
+      const adapter = new BridgeAdapter({ adapterType: "test", bridge })
+      const repo = new Repo({ adapters: [adapter] })
+
+      expect(repo.adapters.length).toBe(1)
+
+      await repo.removeAdapter(adapter.adapterId)
+
+      expect(repo.adapters.length).toBe(0)
+      expect(repo.hasAdapter(adapter.adapterId)).toBe(false)
+
+      repo.synchronizer.stopHeartbeat()
+    })
+
+    it("getAdapter returns adapter or undefined", async () => {
+      const bridge = new Bridge()
+      const adapter = new BridgeAdapter({
+        adapterType: "test",
+        adapterId: "my-adapter",
+        bridge,
+      })
+      const repo = new Repo({ adapters: [adapter] })
+
+      expect(repo.getAdapter("my-adapter")).toBe(adapter)
+      expect(repo.getAdapter("nonexistent")).toBeUndefined()
+
+      repo.synchronizer.stopHeartbeat()
+    })
+  })
 })

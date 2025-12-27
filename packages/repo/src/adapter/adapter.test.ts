@@ -798,4 +798,45 @@ describe("Adapter", () => {
       expect(remaining).toContain(channel3)
     })
   })
+
+  describe("adapterId", () => {
+    it("auto-generates unique adapterId when not provided", () => {
+      const adapter1 = new MockAdapter("test")
+      const adapter2 = new MockAdapter("test")
+
+      expect(adapter1.adapterId).toMatch(/^test-/)
+      expect(adapter2.adapterId).toMatch(/^test-/)
+      expect(adapter1.adapterId).not.toBe(adapter2.adapterId)
+    })
+
+    it("uses provided adapterId", () => {
+      class AdapterWithId extends Adapter<string> {
+        constructor(adapterType: string, adapterId: string) {
+          super({ adapterType, adapterId })
+        }
+
+        protected generate(): GeneratedChannel {
+          return {
+            adapterType: this.adapterType,
+            kind: "network",
+            send: vi.fn(),
+            stop: vi.fn(),
+          }
+        }
+
+        async onStart(): Promise<void> {}
+        async onStop(): Promise<void> {}
+      }
+
+      const adapter = new AdapterWithId("test", "my-custom-id")
+
+      expect(adapter.adapterId).toBe("my-custom-id")
+    })
+
+    it("adapterId format is {adapterType}-{uuid} when auto-generated", () => {
+      const adapter = new MockAdapter("my-type")
+
+      expect(adapter.adapterId).toMatch(/^my-type-[a-f0-9-]+$/)
+    })
+  })
 })

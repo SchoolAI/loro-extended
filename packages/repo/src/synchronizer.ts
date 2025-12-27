@@ -58,7 +58,7 @@ type SynchronizerEvents = {
 
 type SynchronizerParams = {
   identity: PeerIdentityDetails
-  adapters: AnyAdapter[]
+  adapters?: AnyAdapter[]
   rules?: Rules
   onUpdate?: HandleUpdateFn
   logger?: Logger
@@ -105,7 +105,7 @@ export class Synchronizer {
 
   constructor({
     identity,
-    adapters,
+    adapters = [],
     rules,
     onUpdate,
     logger: preferredLogger,
@@ -119,8 +119,31 @@ export class Synchronizer {
       identity: this.identity,
     })
 
+    this.updateFn = createSynchronizerUpdate({
+      rules: createRules(rules),
+      onUpdate,
+      logger,
+    })
+
+    // Initialize model BEFORE creating AdapterManager, since adapters may
+    // trigger channelAdded which needs the model
+    const [initialModel, initialCommand] = programInit(this.identity)
+    this.model = initialModel
+
+    // Create adapter context for dynamic adapter initialization
+    const adapterContext = {
+      identity: this.identity,
+      logger: this.logger,
+      onChannelAdded: this.channelAdded.bind(this),
+      onChannelRemoved: this.channelRemoved.bind(this),
+      onChannelReceive: this.channelReceive.bind(this),
+      onChannelEstablish: this.channelEstablish.bind(this),
+    }
+
+    // Create AdapterManager (initializes adapters but doesn't start them yet)
     this.adapters = new AdapterManager({
       adapters,
+      context: adapterContext,
       onReset: (adapter: AnyAdapter) => {
         for (const channel of adapter.channels) {
           this.channelRemoved(channel)
@@ -129,35 +152,13 @@ export class Synchronizer {
       logger,
     })
 
-    this.updateFn = createSynchronizerUpdate({
-      rules: createRules(rules),
-      onUpdate,
-      logger,
-    })
-
-    const [initialModel, initialCommand] = programInit(this.identity)
-    this.model = initialModel
+    // Execute initial command AFTER adapters is assigned (commands may access this.adapters)
     if (initialCommand) {
       this.#executeCommand(initialCommand)
     }
 
-    // Phase 1: Initialize all adapters
-    for (const adapter of adapters) {
-      adapter._initialize({
-        identity: this.identity,
-        logger: this.logger,
-        onChannelAdded: this.channelAdded.bind(this),
-        onChannelRemoved: this.channelRemoved.bind(this),
-        onChannelReceive: this.channelReceive.bind(this),
-        onChannelEstablish: this.channelEstablish.bind(this),
-      })
-    }
-
-    // Phase 2: Start all adapters (async, but don't wait)
-    // Channels will be added as they become ready
-    for (const adapter of adapters) {
-      void adapter._start()
-    }
+    // Start all adapters now that everything is initialized
+    this.adapters.startAll()
 
     this.startHeartbeat()
   }
@@ -454,6 +455,40 @@ export class Synchronizer {
       }
     }
     return channelIds
+  }
+
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // PUBLIC API - Adapter Management
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  /**
+   * Add an adapter at runtime.
+   * Idempotent: adding an adapter with the same adapterId is a no-op.
+   */
+  async addAdapter(adapter: AnyAdapter): Promise<void> {
+    await this.adapters.addAdapter(adapter)
+  }
+
+  /**
+   * Remove an adapter at runtime.
+   * Idempotent: removing a non-existent adapter is a no-op.
+   */
+  async removeAdapter(adapterId: string): Promise<void> {
+    await this.adapters.removeAdapter(adapterId)
+  }
+
+  /**
+   * Check if an adapter exists by ID.
+   */
+  hasAdapter(adapterId: string): boolean {
+    return this.adapters.hasAdapter(adapterId)
+  }
+
+  /**
+   * Get an adapter by ID.
+   */
+  getAdapter(adapterId: string): AnyAdapter | undefined {
+    return this.adapters.getAdapter(adapterId)
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -1229,10 +1264,8 @@ export class Synchronizer {
 
     const [initialModel] = programInit(this.model.identity)
 
-    // Stop all adapters
-    await Promise.all(
-      Array.from(this.adapters.adapters.values()).map(a => a._stop()),
-    )
+    // Reset all adapters via AdapterManager
+    this.adapters.reset()
 
     this.model = initialModel
   }

@@ -17,7 +17,7 @@ export type LoroDocMutator<T extends DocContent> = (doc: LoroDoc<T>) => void
 
 export type PeerIdentityDetails = {
   peerId: PeerID // Globally unique, stable identifier (not generated per-connection)
-  name: string // peer can give itself a name; this is not unique
+  name?: string // Optional - peer can give itself a name; this is not unique
   type: "user" | "bot" | "service"
   // publicKey?: Uint8Array // Future: For cryptographic identity
 }

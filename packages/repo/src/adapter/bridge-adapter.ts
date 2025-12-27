@@ -74,6 +74,11 @@ type BridgeAdapterContext = {
 
 type BridgeAdapterParams = {
   adapterType: AdapterType
+  /**
+   * Unique identifier for this adapter instance.
+   * If not provided, defaults to adapterType for backwards compatibility.
+   */
+  adapterId?: string
   bridge: Bridge
   logger?: Logger
 }
@@ -86,8 +91,9 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   private channelToAdapter = new Map<ChannelId, AdapterType>()
   private adapterToChannel = new Map<AdapterType, ChannelId>()
 
-  constructor({ adapterType, bridge, logger }: BridgeAdapterParams) {
-    super({ adapterType: adapterType })
+  constructor({ adapterType, adapterId, bridge, logger }: BridgeAdapterParams) {
+    // Default adapterId to adapterType for backwards compatibility
+    super({ adapterType, adapterId: adapterId ?? adapterType })
     this.bridge = bridge
     this.logger = (logger ?? getLogger(["@loro-extended", "repo"])).with({
       adapterType,

@@ -47,10 +47,10 @@ const network = new SseClientNetworkAdapter({
 });
 const storage = new IndexedDBStorageAdapter();
 
-// 4. Create the Repo with identity
+// 4. Create the Repo (identity and adapters are optional)
 const repo = new Repo({
   adapters: [network, storage],
-  identity: { name: "my-app", type: "user" },
+  identity: { name: "my-app", type: "user" }, // Optional - defaults provided
 });
 
 // 5. Get a typed document handle
@@ -83,12 +83,16 @@ The `Repo` class is the central orchestrator. It manages document lifecycle, coo
 ```typescript
 import { Repo } from "@loro-extended/repo";
 
+// Minimal - all parameters are optional
+const repo = new Repo();
+
+// With configuration
 const repo = new Repo({
-  adapters: [networkAdapter, storageAdapter],
+  adapters: [networkAdapter, storageAdapter], // Optional - defaults to []
   identity: {
-    name: "my-peer", // Human-readable name
-    type: "user", // "user" | "bot" | "service"
-    peerId: "123456789", // Optional: auto-generated if not provided
+    name: "my-peer", // Optional - human-readable name
+    type: "user", // Optional - defaults to "user" ("user" | "bot" | "service")
+    peerId: "123456789", // Optional - auto-generated if not provided
   },
   rules: {
     // Optional: permission rules
@@ -97,6 +101,12 @@ const repo = new Repo({
     canDelete: (ctx) => true,
   },
 });
+
+// Add adapters dynamically
+await repo.addAdapter(networkAdapter);
+
+// Remove adapters at runtime
+await repo.removeAdapter(networkAdapter.adapterId);
 ```
 
 ### Document Handles
@@ -241,16 +251,18 @@ const repo = new Repo({
 
 ```typescript
 interface RepoParams {
-  identity: {
-    name: string; // Human-readable peer name
-    type: "user" | "bot" | "service"; // Peer type
+  identity?: {
+    name?: string; // Optional: human-readable peer name
+    type?: "user" | "bot" | "service"; // Optional: defaults to "user"
     peerId?: string; // Optional: auto-generated if not provided
   };
-  adapters: AnyAdapter[]; // Network and storage adapters
+  adapters?: AnyAdapter[]; // Optional: defaults to []
   rules?: Partial<Rules>; // Optional permission rules
   onUpdate?: HandleUpdateFn; // Optional update callback, for logs/debug
 }
 
+// All parameters are optional
+const repo = new Repo();
 const repo = new Repo(params);
 ```
 
@@ -271,6 +283,13 @@ await repo.delete("doc-id");
 
 // Reset the repo (disconnect adapters, clear state)
 repo.reset();
+
+// Dynamic adapter management
+await repo.addAdapter(adapter); // Add adapter at runtime (idempotent)
+await repo.removeAdapter(adapterId); // Remove adapter at runtime (idempotent)
+repo.hasAdapter(adapterId); // Check if adapter exists
+repo.getAdapter(adapterId); // Get adapter by ID
+repo.adapters; // Get all current adapters
 ```
 
 ### Handle
@@ -502,7 +521,10 @@ import {
 
 class MyStorageAdapter extends StorageAdapter {
   constructor() {
-    super({ adapterId: "my-storage" });
+    super({
+      adapterType: "my-storage",
+      adapterId: "my-storage-instance" // Optional: auto-generated if not provided
+    });
   }
 
   async load(key: StorageKey): Promise<Uint8Array | undefined> {
@@ -535,10 +557,17 @@ Create custom network adapters by extending `Adapter`:
 import { Adapter, type GeneratedChannel } from "@loro-extended/repo";
 
 class MyNetworkAdapter extends Adapter<ConnectionContext> {
+  constructor(options: { adapterId?: string }) {
+    super({
+      adapterType: "my-network",
+      adapterId: options.adapterId // Optional: auto-generated if not provided
+    });
+  }
+
   protected generate(context: ConnectionContext): GeneratedChannel {
     return {
       kind: "network",
-      adapterId: this.adapterId,
+      adapterType: this.adapterType,
       send: (msg) => context.connection.send(JSON.stringify(msg)),
       stop: () => context.connection.close(),
     };

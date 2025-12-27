@@ -13,8 +13,8 @@ import { generatePeerId } from "./utils/generate-peer-id.js"
 import { validatePeerId } from "./utils/validate-peer-id.js"
 
 export interface RepoParams {
-  identity: Omit<PeerIdentityDetails, "peerId"> & { peerId?: `${number}` }
-  adapters: AnyAdapter[]
+  identity?: Partial<PeerIdentityDetails>
+  adapters?: AnyAdapter[]
   rules?: Partial<Rules>
   onUpdate?: HandleUpdateFn
 }
@@ -37,13 +37,22 @@ export class Repo {
   // Subsystems
   readonly #synchronizer: Synchronizer
 
-  constructor({ identity, adapters, rules, onUpdate }: RepoParams) {
+  constructor({
+    identity = {},
+    adapters = [],
+    rules,
+    onUpdate,
+  }: RepoParams = {}) {
     // Validate peerId if provided, otherwise generate one
     const peerId = identity.peerId ?? generatePeerId()
     validatePeerId(peerId)
 
-    // Ensure identity has both peerId and name
-    this.identity = { ...identity, peerId }
+    // Build complete identity with defaults
+    this.identity = {
+      peerId,
+      name: identity.name, // undefined is fine - peerId is the unique identifier
+      type: identity.type ?? "user",
+    }
 
     const logger = getLogger(["@loro-extended", "repo"]).with({
       identity: this.identity,
@@ -140,6 +149,47 @@ export class Repo {
   reset(): void {
     // Clear synchronizer model
     this.#synchronizer.reset()
+  }
+
+  //
+  // PUBLIC API - Adapter Management
+  //
+
+  /**
+   * Add an adapter at runtime.
+   * Idempotent: adding an adapter with the same adapterId is a no-op.
+   */
+  async addAdapter(adapter: AnyAdapter): Promise<void> {
+    await this.#synchronizer.addAdapter(adapter)
+  }
+
+  /**
+   * Remove an adapter at runtime.
+   * Idempotent: removing a non-existent adapter is a no-op.
+   */
+  async removeAdapter(adapterId: string): Promise<void> {
+    await this.#synchronizer.removeAdapter(adapterId)
+  }
+
+  /**
+   * Check if an adapter exists by ID.
+   */
+  hasAdapter(adapterId: string): boolean {
+    return this.#synchronizer.hasAdapter(adapterId)
+  }
+
+  /**
+   * Get an adapter by ID.
+   */
+  getAdapter(adapterId: string): AnyAdapter | undefined {
+    return this.#synchronizer.getAdapter(adapterId)
+  }
+
+  /**
+   * Get all current adapters.
+   */
+  get adapters(): AnyAdapter[] {
+    return this.#synchronizer.adapters.adapters
   }
 
   // For debugging/testing purposes
