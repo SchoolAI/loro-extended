@@ -8,7 +8,7 @@ This package provides React-specific bindings for Loro CRDT documents with a han
 
 - **`useHandle`** - Get a stable, typed document handle
 - **`useDoc`** - Subscribe to document changes with optional selectors
-- **`usePresence`** - Subscribe to presence state changes
+- **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 ### Key Features
 
@@ -28,7 +28,7 @@ pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crd
 ## Quick Start
 
 ```tsx
-import { Shape, useHandle, useDoc, usePresence, RepoProvider } from "@loro-extended/react"
+import { Shape, useHandle, useDoc, useEphemeral, RepoProvider } from "@loro-extended/react"
 import type { RepoParams } from "@loro-extended/repo"
 
 // Define your document schema
@@ -54,16 +54,16 @@ const PresenceSchema = Shape.plain.object({
 
 function TodoApp() {
   // Get a stable handle (never re-renders)
-  const handle = useHandle("todo-doc", TodoSchema, PresenceSchema)
+  const handle = useHandle("todo-doc", TodoSchema, { presence: PresenceSchema })
   
   // Subscribe to document changes
   const doc = useDoc(handle)
   
   // Subscribe to presence changes
-  const { self, peers } = usePresence(handle)
+  const { self, peers } = useEphemeral(handle.presence)
 
   const addTodo = (text: string) => {
-    handle.batch(d => {
+    handle.change(d => {
       d.todos.push({
         id: Date.now().toString(),
         text,
@@ -73,7 +73,7 @@ function TodoApp() {
   }
 
   const toggleTodo = (index: number) => {
-    handle.batch(d => {
+    handle.change(d => {
       const todo = d.todos.get(index)
       if (todo) {
         todo.completed = !todo.completed
@@ -87,7 +87,7 @@ function TodoApp() {
       
       {/* Show connected users */}
       <div>
-        Online: {self.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
+        Online: {self?.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
       </div>
 
       {doc.todos.map((todo, index) => (
@@ -142,10 +142,10 @@ const handle = useHandle(docId, docSchema, presenceSchema)
 - `docSchema: DocShape` - The document schema
 - `presenceSchema?: ValueShape` - Optional presence schema
 
-**Returns:** `TypedDocHandle<D, P>` with:
-- `handle.value` - Current document value (readonly)
-- `handle.batch(fn)` - Mutate the document (batched transaction)
-- `handle.presence` - Typed presence API
+**Returns:** `Handle<D, E>` with:
+- `handle.doc` - The typed document (TypedDoc)
+- `handle.change(fn)` - Mutate the document (batched transaction)
+- `handle.loroDoc` - Raw LoroDoc for untyped access
 - `handle.docId` - The document ID
 - `handle.readyStates` - Sync status information
 
@@ -168,18 +168,37 @@ const todoCount = useDoc(handle, d => d.todos.length)
 
 **Returns:** The document value or selected value
 
-### `usePresence(handle)`
+### `useEphemeral(ephemeral)`
+
+Subscribes to any ephemeral store and returns the current state. This is the preferred way to subscribe to presence and other ephemeral data.
+
+```typescript
+// For presence
+const { self, peers } = useEphemeral(handle.presence)
+
+// For other ephemeral stores
+const { self, peers } = useEphemeral(handle.cursors)
+
+// Update your value
+handle.presence.setSelf({ cursor: { x: 100, y: 200 } })
+```
+
+**Parameters:**
+- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store from the handle
+
+**Returns:** `{ self: T | undefined, peers: Map<string, T> }`
+
+### `usePresence(handle)` (Deprecated)
+
+> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
 
 Subscribes to presence changes.
 
 ```typescript
 const { self, peers } = usePresence(handle)
-
-// Update your presence
-handle.presence.set({ cursor: { x: 100, y: 200 } })
 ```
 
-**Returns:** `{ self: Infer<P>, peers: Map<string, Infer<P>> }`
+**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
 
 ### `useRepo()`
 
@@ -229,12 +248,12 @@ const PresenceSchema = Shape.plain.object({
 })
 
 function CollaborativeEditor() {
-  const handle = useHandle("doc", DocSchema, PresenceSchema)
-  const { self, peers } = usePresence(handle)
+  const handle = useHandle("doc", DocSchema, { presence: PresenceSchema })
+  const { self, peers } = useEphemeral(handle.presence)
 
   // Update cursor position
   const handleMouseMove = (e: MouseEvent) => {
-    handle.presence.set({
+    handle.presence.setSelf({
       cursor: { x: e.clientX, y: e.clientY }
     })
   }
@@ -318,7 +337,7 @@ const doc = useDoc(handle)
 // doc.title is typed as string
 // doc.count is typed as number
 
-handle.batch(d => {
+handle.change(d => {
   d.title.insert(0, "Hello") // TypedText methods
   d.count.increment(1)       // Counter methods
 })
@@ -339,12 +358,12 @@ setSelf({ cursor: { x: 10, y: 20 } })
 
 **After:**
 ```typescript
-const handle = useHandle(docId, schema, PresenceSchema)
+const handle = useHandle(docId, schema, { presence: PresenceSchema })
 const doc = useDoc(handle)
-const { self, peers } = usePresence(handle)
+const { self, peers } = useEphemeral(handle.presence)
 
-handle.batch(d => { d.title.update("new") })
-handle.presence.set({ cursor: { x: 10, y: 20 } })
+handle.change(d => { d.title.update("new") })
+handle.presence.setSelf({ cursor: { x: 10, y: 20 } })
 ```
 
 ## Examples

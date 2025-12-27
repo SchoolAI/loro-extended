@@ -8,7 +8,7 @@ This package implements a "handle-first" pattern for working with Loro documents
 
 1. **`useHandle`** - Get a stable, typed document handle (never re-renders)
 2. **`useDoc`** - Subscribe to document changes with optional selectors
-3. **`usePresence`** - Subscribe to presence state changes
+3. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 ## Installation
 
@@ -38,7 +38,8 @@ export const {
   useRepo,
   useHandle,
   useDoc,
-  usePresence,
+  useEphemeral,
+  usePresence, // deprecated
 } = createHooks(React)
 ```
 
@@ -82,28 +83,29 @@ Returns the Repo instance from context.
 const repo = useRepo()
 ```
 
-#### `useHandle(docId, docSchema, presenceSchema?)`
+#### `useHandle(docId, docSchema, ephemeralShapes?)`
 
-Returns a stable `TypedDocHandle` for the given document. The handle is created synchronously and never changes, preventing unnecessary re-renders.
+Returns a stable `Handle` for the given document. The handle is created synchronously and never changes, preventing unnecessary re-renders.
 
 ```typescript
-// Without presence
+// Without ephemeral stores
 const handle = useHandle(docId, docSchema)
 
-// With presence
-const handle = useHandle(docId, docSchema, presenceSchema)
+// With ephemeral stores (e.g., presence)
+const handle = useHandle(docId, docSchema, { presence: PresenceSchema })
 ```
 
 **Parameters:**
 - `docId: DocId` - The document identifier
 - `docSchema: DocShape` - The document schema (from `@loro-extended/change`)
-- `presenceSchema?: ValueShape` - Optional presence schema
+- `ephemeralShapes?: EphemeralDeclarations` - Optional ephemeral store declarations
 
-**Returns:** `TypedDocHandle<D, P>` - A typed handle with:
-- `handle.value` - Current document value (readonly)
+**Returns:** `Handle<D, E>` - A typed handle with:
+- `handle.doc` - The typed document (TypedDoc)
 - `handle.change(fn)` - Mutate the document
-- `handle.presence` - Typed presence API
-- `handle.untyped` - Access to underlying `UntypedDocHandle`
+- `handle.loroDoc` - Raw LoroDoc for untyped access
+- `handle.docId` - The document ID
+- `handle.readyStates` - Sync status information
 
 #### `useDoc(handle, selector?)`
 
@@ -124,27 +126,44 @@ const todoCount = useDoc(handle, d => d.todos.length)
 
 **Returns:** The document value or selected value
 
-#### `usePresence(handle)`
+#### `usePresence(handle)` (Deprecated)
+
+> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
 
 Subscribes to presence changes and returns the current presence state.
 
 ```typescript
 const { self, peers } = usePresence(handle)
 
-// self: Infer<P> - Your own presence state
-// peers: Map<string, Infer<P>> - Other peers' presence states
+// self: P | undefined - Your own presence state
+// peers: Map<string, P> - Other peers' presence states
 ```
 
 **Parameters:**
-- `handle: TypedDocHandle<D, P>` - The document handle with presence schema
+- `handle` - A handle with a `presence` ephemeral store
 
-**Returns:** `{ self: Infer<P>, peers: Map<string, Infer<P>> }`
+**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
+
+#### `useEphemeral(ephemeral)`
+
+Subscribes to any ephemeral store and returns the current state.
+
+```typescript
+const { self, peers } = useEphemeral(handle.presence)
+// Or for other ephemeral stores:
+const { self, peers } = useEphemeral(handle.cursors)
+```
+
+**Parameters:**
+- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store
+
+**Returns:** `{ self: T | undefined, peers: Map<string, T> }`
 
 ## Usage Pattern
 
 ```typescript
 import { Shape } from "@loro-extended/change"
-import { useHandle, useDoc, usePresence } from "@loro-extended/react"
+import { useHandle, useDoc, useEphemeral } from "@loro-extended/react"
 
 const DocSchema = Shape.doc({
   title: Shape.text().placeholder("Untitled"),
@@ -160,25 +179,25 @@ const PresenceSchema = Shape.plain.object({
 })
 
 function MyComponent({ docId }) {
-  // Get stable handle
-  const handle = useHandle(docId, DocSchema, PresenceSchema)
+  // Get stable handle with ephemeral stores
+  const handle = useHandle(docId, DocSchema, { presence: PresenceSchema })
   
   // Subscribe to document
   const doc = useDoc(handle)
   
   // Subscribe to presence
-  const { self, peers } = usePresence(handle)
+  const { self, peers } = useEphemeral(handle.presence)
   
   // Mutate document
   const addItem = (text) => {
-    handle.batch(d => {
+    handle.change(d => {
       d.items.push(text)
     })
   }
   
   // Update presence
   const updateCursor = (x, y) => {
-    handle.presence.set({ cursor: { x, y } })
+    handle.presence.setSelf({ cursor: { x, y } })
   }
   
   return (

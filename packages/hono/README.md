@@ -8,7 +8,7 @@ This package provides Hono JSX-specific bindings for Loro CRDT documents with a 
 
 - **`useHandle`** - Get a stable, typed document handle
 - **`useDoc`** - Subscribe to document changes with optional selectors
-- **`usePresence`** - Subscribe to presence state changes
+- **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 This package mirrors the API of `@loro-extended/react` but uses Hono's JSX implementation (`hono/jsx`) instead of React.
 
@@ -48,13 +48,13 @@ function Counter() {
   const doc = useDoc(handle)
 
   const increment = () => {
-    handle.batch(d => {
+    handle.change(d => {
       d.count.increment(1)
     })
   }
 
   const decrement = () => {
-    handle.batch(d => {
+    handle.change(d => {
       d.count.decrement(1)
     })
   }
@@ -104,10 +104,10 @@ const handle = useHandle(docId, docSchema, presenceSchema)
 - `docSchema: DocShape` - The document schema
 - `presenceSchema?: ValueShape` - Optional presence schema
 
-**Returns:** `TypedDocHandle<D, P>` with:
-- `handle.value` - Current document value (readonly)
-- `handle.batch(fn)` - Mutate the document (batched transaction)
-- `handle.presence` - Typed presence API
+**Returns:** `Handle<D, E>` with:
+- `handle.doc` - The typed document (TypedDoc)
+- `handle.change(fn)` - Mutate the document (batched transaction)
+- `handle.loroDoc` - Raw LoroDoc for untyped access
 - `handle.docId` - The document ID
 - `handle.readyStates` - Sync status information
 
@@ -129,18 +129,34 @@ const count = useDoc(handle, d => d.count)
 
 **Returns:** The document value or selected value
 
-### `usePresence(handle)`
+### `useEphemeral(ephemeral)`
+
+Subscribes to any ephemeral store and returns the current state. This is the preferred way to subscribe to presence and other ephemeral data.
+
+```typescript
+// For presence
+const { self, peers } = useEphemeral(handle.presence)
+
+// Update your value
+handle.presence.setSelf({ cursor: { x: 100, y: 200 } })
+```
+
+**Parameters:**
+- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store from the handle
+
+**Returns:** `{ self: T | undefined, peers: Map<string, T> }`
+
+### `usePresence(handle)` (Deprecated)
+
+> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
 
 Subscribes to presence changes.
 
 ```typescript
 const { self, peers } = usePresence(handle)
-
-// Update your presence
-handle.presence.set({ cursor: { x: 100, y: 200 } })
 ```
 
-**Returns:** `{ self: Infer<P>, peers: Map<string, Infer<P>> }`
+**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
 
 ### `useRepo()`
 
@@ -167,12 +183,12 @@ const PresenceSchema = Shape.plain.object({
 })
 
 function CollaborativeEditor() {
-  const handle = useHandle("doc", DocSchema, PresenceSchema)
+  const handle = useHandle("doc", DocSchema, { presence: PresenceSchema })
   const doc = useDoc(handle)
-  const { self, peers } = usePresence(handle)
+  const { self, peers } = useEphemeral(handle.presence)
 
   const handleMouseMove = (e: MouseEvent) => {
-    handle.presence.set({
+    handle.presence.setSelf({
       cursor: { x: e.clientX, y: e.clientY }
     })
   }
@@ -230,7 +246,7 @@ changeDoc(d => { d.count.increment(1) })
 ```typescript
 const handle = useHandle(docId, schema)
 const doc = useDoc(handle)
-handle.batch(d => { d.count.increment(1) })
+handle.change(d => { d.count.increment(1) })
 ```
 
 ## Differences from @loro-extended/react

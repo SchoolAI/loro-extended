@@ -1,21 +1,29 @@
-# What is an Adapter?
+# Adapter Documentation
 
-An adapter for `@loro-extended/repo` provides the Repo class with access to storage (e.g. postgres, leveldb, redis, files) and network (e.g. POST/SSE, WebSockets, WebRTC, etc.). The Adapter's job is to implement init/deinit, and generate channels as needed in order to send/receive Loro-compatible updates to LoroDoc. Each Adapter implementation is specific to the storage or network layer it is "adapting" to.
+For comprehensive documentation on creating adapters, see:
 
-# When is an Adapter ready?
+**[Creating Adapters Guide](../../../../docs/creating-adapters.md)**
 
-There is a coordination issue that takes place when a Repo is initialized. All Adapters must be created before a Repo initializes:
+This guide covers:
+- What adapters are and how they work
+- Network adapters vs storage adapters
+- The Channel abstraction
+- Step-by-step implementation guide
+- Testing strategies
+- Best practices
 
-```ts
-const bridge = new Bridge();
+## Quick Reference
 
-const repoA = new Repo({
-  adapters: [new InlineNetworkAdapter(bridge, "a")],
-});
+Adapters provide the Repo with access to:
+- **Storage** (e.g., IndexedDB, LevelDB, PostgreSQL)
+- **Network** (e.g., SSE, WebSocket, WebRTC)
 
-const repoB = new Repo({
-  adapters: [new InlineNetworkAdapter(bridge, "b")],
-});
-```
+Key interfaces:
+- `Adapter` - Base class for all adapters
+- `StorageAdapter` - Extended base for storage adapters
+- `Channel` - Communication channel abstraction
 
-Many adapters need to listen for a connection (like InlineNetworkAdapter). 
+See the source files in this directory for implementation details:
+- [`adapter.ts`](./adapter.ts) - Base Adapter class
+- [`adapter-manager.ts`](./adapter-manager.ts) - Adapter lifecycle management
+- [`bridge-adapter.ts`](./bridge-adapter.ts) - Example in-memory adapter
