@@ -256,6 +256,31 @@ const repo = new Repo({
 });
 ```
 
+## Batched Messages and Rate Limiting
+
+When messages are batched using `channel/batch`, the rate limiter operates at the **network packet level**. This means:
+
+- A `channel/batch` containing 10 sync-requests counts as **1 message** for rate limiting
+- If a batch is rate-limited, **all messages in the batch are rejected together**
+- This preserves atomic all-or-nothing behavior
+
+```typescript
+// A batch of 10 ephemeral messages counts as 1 rate limit hit
+{
+  type: "channel/batch",
+  messages: [
+    { type: "channel/ephemeral", docId: "doc-1", ... },
+    { type: "channel/ephemeral", docId: "doc-2", ... },
+    // ... 8 more
+  ]
+}
+```
+
+This design choice ensures that:
+1. Batching provides transport efficiency without gaming rate limits
+2. Legitimate use cases (heartbeats across many docs) aren't penalized
+3. The rate limiter remains simple and predictable
+
 ## Error Handling
 
 Middleware errors are logged but don't crash the system. If a middleware throws, the message is rejected:

@@ -15,6 +15,7 @@ import { handleSyncRequest } from "./sync/handle-sync-request.js"
 import { handleSyncResponse } from "./sync/handle-sync-response.js"
 import { handleSyncUpdate } from "./sync/handle-sync-update.js"
 import type { ChannelHandlerContext } from "./types.js"
+import { batchAsNeeded } from "./utils.js"
 
 /**
  * Dispatches channel protocol messages to their handlers
@@ -126,5 +127,15 @@ export function channelDispatcher(
         status: channelMessage.status,
       })
       return
+
+    case "channel/batch":
+      // Dispatch each message in the batch and collect commands
+      // This allows multiple messages to be sent in a single network payload
+      // while still being processed individually by their handlers
+      return batchAsNeeded(
+        ...channelMessage.messages.map(msg =>
+          channelDispatcher(msg, model, fromChannelId, permissions, logger),
+        ),
+      )
   }
 }

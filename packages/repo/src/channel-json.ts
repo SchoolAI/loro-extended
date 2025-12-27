@@ -1,7 +1,7 @@
 // packages/repo/src/channel-serialization.ts
 
 import { VersionVector } from "loro-crdt"
-import type { ChannelMsg, SyncTransmission } from "./channel.js"
+import type { BatchableMsg, ChannelMsg, SyncTransmission } from "./channel.js"
 import type { PeerID } from "./types.js"
 
 /**
@@ -74,11 +74,9 @@ export type ChannelMsgJSON =
     }
   | {
       type: "channel/sync-request"
-      docs: {
-        docId: string
-        requesterDocVersion: VersionVectorJSON
-        ephemeral?: EphemeralPeerDataJSON[]
-      }[]
+      docId: string
+      requesterDocVersion: VersionVectorJSON
+      ephemeral?: EphemeralPeerDataJSON[]
       bidirectional: boolean
     }
   | {
@@ -119,6 +117,18 @@ export type ChannelMsgJSON =
       hopsRemaining: number
       stores: EphemeralStoreDataJSON[]
     }
+  | {
+      type: "channel/batch"
+      messages: BatchableMsgJSON[]
+    }
+
+/**
+ * JSON-serializable version of BatchableMsg (all established messages except batch itself)
+ */
+export type BatchableMsgJSON = Exclude<
+  ChannelMsgJSON,
+  { type: "channel/batch" }
+>
 
 /**
  * Utility functions for serialization
@@ -186,22 +196,22 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
       // These messages don't contain VersionVector or Uint8Array
       return msg as ChannelMsgJSON
 
-    case "channel/sync-request":
-      return {
-        ...msg,
-        docs: msg.docs.map(doc => ({
-          docId: doc.docId,
-          requesterDocVersion: versionVectorToJSON(doc.requesterDocVersion),
-          ...(doc.ephemeral &&
-            doc.ephemeral.length > 0 && {
-              ephemeral: doc.ephemeral.map(ep => ({
-                peerId: ep.peerId,
-                data: uint8ArrayToJSON(ep.data),
-                namespace: ep.namespace,
-              })),
-            }),
-        })),
+    case "channel/sync-request": {
+      const result: ChannelMsgJSON = {
+        type: msg.type,
+        docId: msg.docId,
+        requesterDocVersion: versionVectorToJSON(msg.requesterDocVersion),
+        bidirectional: msg.bidirectional,
       }
+      if (msg.ephemeral && msg.ephemeral.length > 0) {
+        result.ephemeral = msg.ephemeral.map(ep => ({
+          peerId: ep.peerId,
+          data: uint8ArrayToJSON(ep.data),
+          namespace: ep.namespace,
+        }))
+      }
+      return result
+    }
 
     case "channel/sync-response": {
       const result: ChannelMsgJSON = {
@@ -233,6 +243,14 @@ export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
           data: uint8ArrayToJSON(s.data),
           namespace: s.namespace,
         })),
+      }
+
+    case "channel/batch":
+      return {
+        type: "channel/batch",
+        messages: msg.messages.map(
+          m => serializeChannelMsg(m) as BatchableMsgJSON,
+        ),
       }
   }
 }
@@ -277,22 +295,22 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
     case "channel/delete-response":
       return json as ChannelMsg
 
-    case "channel/sync-request":
-      return {
-        ...json,
-        docs: json.docs.map(doc => ({
-          docId: doc.docId,
-          requesterDocVersion: versionVectorFromJSON(doc.requesterDocVersion),
-          ...(doc.ephemeral &&
-            doc.ephemeral.length > 0 && {
-              ephemeral: doc.ephemeral.map(ep => ({
-                peerId: ep.peerId,
-                data: uint8ArrayFromJSON(ep.data),
-                namespace: ep.namespace,
-              })),
-            }),
-        })),
+    case "channel/sync-request": {
+      const result: ChannelMsg = {
+        type: json.type,
+        docId: json.docId,
+        requesterDocVersion: versionVectorFromJSON(json.requesterDocVersion),
+        bidirectional: json.bidirectional,
       }
+      if (json.ephemeral && json.ephemeral.length > 0) {
+        result.ephemeral = json.ephemeral.map(ep => ({
+          peerId: ep.peerId,
+          data: uint8ArrayFromJSON(ep.data),
+          namespace: ep.namespace,
+        }))
+      }
+      return result
+    }
 
     case "channel/sync-response": {
       const result: ChannelMsg = {
@@ -324,6 +342,14 @@ export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
           data: uint8ArrayFromJSON(s.data),
           namespace: s.namespace,
         })),
+      }
+
+    case "channel/batch":
+      return {
+        type: "channel/batch",
+        messages: json.messages.map(
+          m => deserializeChannelMsg(m) as BatchableMsg,
+        ),
       }
   }
 }

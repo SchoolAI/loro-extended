@@ -101,7 +101,8 @@ describe("Synchronizer - Echo Prevention", () => {
     // Simulate peer subscription (via sync-request)
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [{ docId, requesterDocVersion: docState.doc.version() }],
+      docId,
+      requesterDocVersion: docState.doc.version(),
       bidirectional: true,
     })
 
@@ -155,7 +156,8 @@ describe("Synchronizer - Echo Prevention", () => {
     // Simulate peer subscription (via sync-request)
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [{ docId, requesterDocVersion: docState.doc.version() }],
+      docId,
+      requesterDocVersion: docState.doc.version(),
       bidirectional: true,
     })
 
@@ -223,7 +225,8 @@ describe("Synchronizer - Echo Prevention", () => {
     // Simulate peer subscription
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [{ docId, requesterDocVersion: docState.doc.version() }],
+      docId,
+      requesterDocVersion: docState.doc.version(),
       bidirectional: true,
     })
 

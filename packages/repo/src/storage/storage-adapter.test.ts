@@ -182,19 +182,25 @@ describe("StorageAdapter", () => {
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      // Should receive establish-response followed by sync-request
+      // Should receive establish-response followed by sync-request (batched for multiple docs)
       expect(receivedMessages.length).toBe(2)
       expect(receivedMessages[0].type).toBe("channel/establish-response")
-      expect(receivedMessages[1].type).toBe("channel/sync-request")
+      expect(receivedMessages[1].type).toBe("channel/batch")
 
-      // Verify sync-request contains both stored documents
-      const syncRequest = receivedMessages[1]
-      if (syncRequest.type === "channel/sync-request") {
-        expect(syncRequest.docs).toHaveLength(2)
-        const docIds = syncRequest.docs.map(d => d.docId)
+      // Verify batch contains sync-requests for both stored documents
+      const batchMsg = receivedMessages[1]
+      if (batchMsg.type === "channel/batch") {
+        expect(batchMsg.messages).toHaveLength(2)
+        const docIds = batchMsg.messages.map(m =>
+          m.type === "channel/sync-request" ? m.docId : null,
+        )
         expect(docIds).toContain("doc1")
         expect(docIds).toContain("doc2")
-        expect(syncRequest.bidirectional).toBe(true)
+        // Check bidirectional on first message
+        const firstMsg = batchMsg.messages[0]
+        if (firstMsg.type === "channel/sync-request") {
+          expect(firstMsg.bidirectional).toBe(true)
+        }
       }
     })
 
@@ -226,15 +232,17 @@ describe("StorageAdapter", () => {
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      // Should receive establish-response followed by sync-request
+      // Should receive establish-response followed by batch (for multiple docs)
       expect(receivedMessages.length).toBe(2)
-      expect(receivedMessages[1].type).toBe("channel/sync-request")
+      expect(receivedMessages[1].type).toBe("channel/batch")
 
-      // Verify sync-request contains unique docIds (not one per chunk)
-      const syncRequest = receivedMessages[1]
-      if (syncRequest.type === "channel/sync-request") {
-        expect(syncRequest.docs).toHaveLength(2) // Not 4!
-        const docIds = syncRequest.docs.map(d => d.docId)
+      // Verify batch contains unique docIds (not one per chunk)
+      const batchMsg = receivedMessages[1]
+      if (batchMsg.type === "channel/batch") {
+        expect(batchMsg.messages).toHaveLength(2) // Not 4!
+        const docIds = batchMsg.messages.map(m =>
+          m.type === "channel/sync-request" ? m.docId : null,
+        )
         expect(docIds).toContain("doc1")
         expect(docIds).toContain("doc2")
       }
@@ -257,12 +265,8 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "test-doc",
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          },
-        ],
+        docId: "test-doc",
+        requesterDocVersion: new LoroDoc().oplogVersion(),
         bidirectional: false,
       })
 
@@ -279,12 +283,8 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "nonexistent-doc",
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          },
-        ],
+        docId: "nonexistent-doc",
+        requesterDocVersion: new LoroDoc().oplogVersion(),
         bidirectional: false,
       })
 
@@ -312,12 +312,8 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "test-doc",
-            requesterDocVersion: doc.oplogVersion(),
-          },
-        ],
+        docId: "test-doc",
+        requesterDocVersion: doc.oplogVersion(),
         bidirectional: false,
       })
 
@@ -342,12 +338,8 @@ describe("StorageAdapter", () => {
       // Requester has empty version
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "test-doc",
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          },
-        ],
+        docId: "test-doc",
+        requesterDocVersion: new LoroDoc().oplogVersion(),
         bidirectional: false,
       })
 
@@ -571,12 +563,8 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "test-doc",
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          },
-        ],
+        docId: "test-doc",
+        requesterDocVersion: new LoroDoc().oplogVersion(),
         bidirectional: false,
       })
 
@@ -609,12 +597,8 @@ describe("StorageAdapter", () => {
 
       await channel.send({
         type: "channel/sync-request",
-        docs: [
-          {
-            docId: "test-doc",
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          },
-        ],
+        docId: "test-doc",
+        requesterDocVersion: new LoroDoc().oplogVersion(),
         bidirectional: false,
       })
 
@@ -675,13 +659,12 @@ describe("StorageAdapter", () => {
       // Step 3: VERIFY THE FIX - the sync-request should contain the stored version
       // NOT an empty version!
       if (syncRequest?.type === "channel/sync-request") {
-        const docRequest = syncRequest.docs.find(d => d.docId === "test-doc")
-        expect(docRequest).toBeDefined()
+        // Single-doc format now
+        expect(syncRequest.docId).toBe("test-doc")
 
         // The requesterDocVersion should match the stored document's version
         // (not be empty)
-        if (!docRequest) throw new Error(`docRequest can't be null`)
-        const requestedVersion = docRequest.requesterDocVersion
+        const requestedVersion = syncRequest.requesterDocVersion
         const storedVersion = doc.oplogVersion()
 
         // Verify the version is NOT empty

@@ -131,12 +131,12 @@ channel.peer = {
   identity: { name: "server-uuid" }
 }
 
-// 3. Send sync request for all server documents
+// 3. Send sync request for all server documents (batched)
 {
-  type: "channel/sync-request",
-  docs: [
-    { docId: "doc1", requesterDocVersion: VersionVector },
-    { docId: "doc2", requesterDocVersion: VersionVector }
+  type: "channel/batch",
+  messages: [
+    { type: "channel/sync-request", docId: "doc1", requesterDocVersion: VersionVector, bidirectional: true },
+    { type: "channel/sync-request", docId: "doc2", requesterDocVersion: VersionVector, bidirectional: true }
   ]
 }
 ```
@@ -170,10 +170,13 @@ for (const docState of model.documents.values()) {
   }
 }
 
-// 3. Send sync request for all client documents
+// 3. Send sync request for all client documents (batched)
 {
-  type: "channel/sync-request",
-  docs: [...]
+  type: "channel/batch",
+  messages: [
+    { type: "channel/sync-request", docId: "doc1", ... },
+    { type: "channel/sync-request", docId: "doc2", ... }
+  ]
 }
 ```
 
@@ -181,18 +184,14 @@ for (const docState of model.documents.values()) {
 
 #### 8. Sync Requests (Both Directions)
 
-Both peers send `channel/sync-request` messages (defined in [`channel.ts`](../packages/repo/src/channel.ts)) through their respective channels:
+Both peers send `channel/sync-request` messages (defined in [`channel.ts`](../packages/repo/src/channel.ts)) through their respective channels. Each sync-request is for a **single document**:
 
 ```typescript
 {
   type: "channel/sync-request",
-  docs: [
-    {
-      docId: "doc-uuid",
-      requesterDocVersion: VersionVector, // Current version at requester
-      ephemeral?: EphemeralStoreData[]    // Requester's ephemeral data for this doc
-    }
-  ],
+  docId: "doc-uuid",
+  requesterDocVersion: VersionVector, // Current version at requester
+  ephemeral?: EphemeralStoreData[],   // Requester's ephemeral data for this doc
   bidirectional: true // true for initiating request, false for reciprocal
 }
 
@@ -201,6 +200,18 @@ type EphemeralStoreData = {
   peerId: PeerID
   data: Uint8Array
   namespace: string  // e.g., 'presence', 'cursors', 'mouse'
+}
+```
+
+When multiple documents need to be synced, they are wrapped in a `channel/batch` message for transport efficiency:
+
+```typescript
+{
+  type: "channel/batch",
+  messages: [
+    { type: "channel/sync-request", docId: "doc-1", ... },
+    { type: "channel/sync-request", docId: "doc-2", ... },
+  ]
 }
 ```
 
@@ -215,37 +226,37 @@ The optional `ephemeral` field contains the requester's ephemeral data for this 
 When receiving `channel/sync-request` via [`handleSyncRequest`](../packages/repo/src/synchronizer/sync/handle-sync-request.ts):
 
 ```typescript
-for (const { docId, requesterDocVersion, ephemeral } of docs) {
-  const docState = model.documents.get(docId)
+// Each sync-request is for a single document
+const { docId, requesterDocVersion, ephemeral } = message
+const docState = model.documents.get(docId)
 
-  if (docState) {
-    // 1. Set awareness that this channel has the doc
-    setAwarenessState(docState, fromChannelId, "has-doc")
+if (docState) {
+  // 1. Set awareness that this channel has the doc
+  setAwarenessState(docState, fromChannelId, "has-doc")
 
-    // 2. Apply incoming ephemeral data if present
-    if (ephemeral) {
-      applyEphemeral(docId, ephemeral)
-      // Relay to other peers
-      relayEphemeralToOtherPeers(docId, ephemeral)
-    }
+  // 2. Apply incoming ephemeral data if present
+  if (ephemeral) {
+    applyEphemeral(docId, ephemeral)
+    // Relay to other peers
+    relayEphemeralToOtherPeers(docId, ephemeral)
+  }
 
-    // 3. Export document data as update from requester's version
-    const data = docState.doc.export({
-      mode: "update",
-      from: requesterDocVersion
-    })
+  // 3. Export document data as update from requester's version
+  const data = docState.doc.export({
+    mode: "update",
+    from: requesterDocVersion
+  })
 
-    // 4. Send sync response through our channel (with all known ephemeral)
-    {
-      type: "channel/sync-response",
-      docId,
-      transmission: {
-        type: "update",
-        data: Uint8Array,
-        version: VersionVector
-      },
-      ephemeral?: EphemeralStoreData[] // All known ephemeral data for this doc
-    }
+  // 4. Send sync response through our channel (with all known ephemeral)
+  {
+    type: "channel/sync-response",
+    docId,
+    transmission: {
+      type: "update",
+      data: Uint8Array,
+      version: VersionVector
+    },
+    ephemeral?: EphemeralStoreData[] // All known ephemeral data for this doc
   }
 }
 ```
@@ -330,7 +341,7 @@ All messages are defined in [`channel.ts`](../packages/repo/src/channel.ts) (see
 - **`channel/establish-response`**: Handshake acknowledgment
 
 **Established Messages** (after peer is established):
-- **`channel/sync-request`**: Request document synchronization
+- **`channel/sync-request`**: Request document synchronization (single document)
 - **`channel/sync-response`**: Provide document data or updates
 - **`channel/update`**: Push document updates (unsolicited)
 - **`channel/directory-request`**: Request list of available documents (for glob-based discovery)
@@ -339,6 +350,7 @@ All messages are defined in [`channel.ts`](../packages/repo/src/channel.ts) (see
 - **`channel/delete-request`**: Request document deletion
 - **`channel/delete-response`**: Confirm document deletion
 - **`channel/ephemeral`**: Broadcast ephemeral/presence data with hop count for relay
+- **`channel/batch`**: Wrapper for multiple messages (transport optimization)
 
 ### Synchronizer Messages
 
@@ -372,7 +384,8 @@ Commands are side effects returned by the update function (see `Command` type in
 
 **Ephemeral Operations:**
 - **`cmd/apply-ephemeral`**: Apply ephemeral/presence data
-- **`cmd/broadcast-ephemeral`**: Broadcast ephemeral data to peers
+- **`cmd/broadcast-ephemeral`**: Broadcast ephemeral data to peers (single doc)
+- **`cmd/broadcast-ephemeral-batch`**: Broadcast ephemeral data for multiple docs to a single peer (batched)
 - **`cmd/remove-ephemeral-peer`**: Remove a peer's ephemeral data
 - **`cmd/emit-ephemeral-change`**: Emit ephemeral change event
 

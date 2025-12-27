@@ -63,14 +63,18 @@ export type EphemeralStoreData = {
   namespace: string
 }
 
+/**
+ * Request to sync a single document with a peer.
+ *
+ * When multiple documents need to be synced, wrap multiple sync-request
+ * messages in a channel/batch message.
+ */
 export type ChannelMsgSyncRequest = {
   type: "channel/sync-request"
-  docs: {
-    docId: DocId
-    requesterDocVersion: VersionVector
-    /** Requester's ephemeral state for this doc (my presence data) */
-    ephemeral?: EphemeralStoreData[]
-  }[]
+  docId: DocId
+  requesterDocVersion: VersionVector
+  /** Requester's ephemeral state for this doc (my presence data) */
+  ephemeral?: EphemeralStoreData[]
   /**
    * Whether the receiver should send a reciprocal sync-request back.
    * - initiating sync-request should set bidirectional to `true`
@@ -138,6 +142,40 @@ export type ChannelMsgEphemeral = {
   stores: EphemeralStoreData[]
 }
 
+/**
+ * Batch multiple established messages into a single network transmission.
+ *
+ * This is a transport optimization that allows sending multiple messages
+ * to the same peer in a single network payload. The receiver will dispatch
+ * each inner message individually.
+ *
+ * Use cases:
+ * - Batching multiple sync-requests after connection establishment
+ * - Batching ephemeral messages for heartbeat (one batch per peer)
+ * - Any scenario where multiple messages go to the same peer
+ *
+ * Note: Nested batches are not allowed (messages cannot contain ChannelMsgBatch).
+ */
+export type ChannelMsgBatch = {
+  type: "channel/batch"
+  messages: BatchableMsg[]
+}
+
+/**
+ * Messages that can be included in a batch.
+ * Excludes ChannelMsgBatch to prevent nested batches.
+ */
+export type BatchableMsg =
+  | ChannelMsgSyncRequest
+  | ChannelMsgSyncResponse
+  | ChannelMsgUpdate
+  | ChannelMsgDirectoryRequest
+  | ChannelMsgDirectoryResponse
+  | ChannelMsgNewDoc
+  | ChannelMsgDeleteRequest
+  | ChannelMsgDeleteResponse
+  | ChannelMsgEphemeral
+
 export type AddressedEstablishmentEnvelope = {
   toChannelIds: ChannelId[]
   message: EstablishmentMsg
@@ -189,6 +227,7 @@ export type EstablishedMsg =
   | ChannelMsgDeleteRequest
   | ChannelMsgDeleteResponse
   | ChannelMsgEphemeral
+  | ChannelMsgBatch
 
 /** All channel messages */
 export type ChannelMsg = EstablishmentMsg | EstablishedMsg

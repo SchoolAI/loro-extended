@@ -62,7 +62,6 @@
  * @see handle-sync-response.ts - How channels respond with data
  */
 
-import type { VersionVector } from "loro-crdt"
 import { isEstablished } from "../../channel.js"
 import type { Permissions } from "../../permissions.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
@@ -90,14 +89,6 @@ export function handleDocEnsure(
 
   const commands: Command[] = []
 
-  // Prepare sync-request for this document
-  const docs: Array<{ docId: DocId; requesterDocVersion: VersionVector }> = [
-    {
-      docId,
-      requesterDocVersion: docState.doc.version(),
-    },
-  ]
-
   // Send sync-request to all established channels where visibility permits
   for (const channel of model.channels.values()) {
     if (isEstablished(channel)) {
@@ -120,7 +111,8 @@ export function handleDocEnsure(
             toChannelIds: [channel.channelId],
             message: {
               type: "channel/sync-request",
-              docs,
+              docId,
+              requesterDocVersion: docState.doc.version(),
               bidirectional: true,
             },
           },

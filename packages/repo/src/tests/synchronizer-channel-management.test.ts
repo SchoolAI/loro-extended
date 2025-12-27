@@ -126,24 +126,27 @@ describe("Synchronizer - Channel Management", () => {
     const updatedChannel = synchronizer.getChannel(channel.channelId)
     expect(updatedChannel?.type).toBe("established")
 
-    // Now simulate sync-requests which will add subscriptions
+    // Now simulate sync-requests which will add subscriptions (now sent as batch)
     synchronizer.channelReceive(channel.channelId, {
-      type: "channel/sync-request",
-      docs: [
+      type: "channel/batch",
+      messages: [
         {
+          type: "channel/sync-request",
           docId: docId1,
           requesterDocVersion: synchronizer
             .getOrCreateDocumentState(docId1)
             .doc.version(),
+          bidirectional: false,
         },
         {
+          type: "channel/sync-request",
           docId: docId2,
           requesterDocVersion: synchronizer
             .getOrCreateDocumentState(docId2)
             .doc.version(),
+          bidirectional: false,
         },
       ],
-      bidirectional: false,
     })
 
     // Wait for async operations to complete

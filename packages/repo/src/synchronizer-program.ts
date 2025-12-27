@@ -198,6 +198,14 @@ export type Command =
       toChannelIds: ChannelId[]
     }
   | {
+      /** Batched ephemeral broadcast - sends multiple docs' ephemeral data in one message per peer */
+      type: "cmd/broadcast-ephemeral-batch"
+      docIds: DocId[]
+      allPeerData: boolean
+      hopsRemaining: number
+      toChannelId: ChannelId
+    }
+  | {
       type: "cmd/remove-ephemeral-peer"
       peerId: PeerID
     }

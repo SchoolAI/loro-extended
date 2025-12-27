@@ -48,12 +48,8 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId,
-              requesterDocVersion: createVersionVector(),
-            },
-          ],
+          docId,
+          requesterDocVersion: createVersionVector(),
           bidirectional: true,
         },
       },
@@ -89,6 +85,7 @@ describe("handle-sync-request", () => {
         expect((reciprocalRequest.envelope.message as any).bidirectional).toBe(
           false,
         )
+        expect((reciprocalRequest.envelope.message as any).docId).toBe(docId)
       }
     } else {
       // If it's not a batch, it must be just the sync response (if bidirectional was false or failed)
@@ -123,12 +120,8 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId,
-              requesterDocVersion: createVersionVector(),
-            },
-          ],
+          docId,
+          requesterDocVersion: createVersionVector(),
           bidirectional: true,
         },
       },
@@ -148,9 +141,7 @@ describe("handle-sync-request", () => {
         expect((reciprocalRequest.envelope.message as any).bidirectional).toBe(
           false,
         )
-        expect((reciprocalRequest.envelope.message as any).docs[0].docId).toBe(
-          docId,
-        )
+        expect((reciprocalRequest.envelope.message as any).docId).toBe(docId)
       }
     }
   })
@@ -180,12 +171,8 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId,
-              requesterDocVersion: createVersionVector(),
-            },
-          ],
+          docId,
+          requesterDocVersion: createVersionVector(),
           bidirectional: false,
         },
       },
@@ -213,12 +200,8 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId: "nonexistent-doc",
-              requesterDocVersion: createVersionVector(),
-            },
-          ],
+          docId: "nonexistent-doc",
+          requesterDocVersion: createVersionVector(),
           bidirectional: false,
         },
       },
@@ -257,17 +240,13 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
+          docId,
+          requesterDocVersion: createVersionVector(),
+          ephemeral: [
             {
-              docId,
-              requesterDocVersion: createVersionVector(),
-              ephemeral: [
-                {
-                  peerId,
-                  data: ephemeralData,
-                  namespace: "presence",
-                },
-              ],
+              peerId,
+              data: ephemeralData,
+              namespace: "presence",
             },
           ],
           bidirectional: false,
@@ -347,17 +326,13 @@ describe("handle-sync-request", () => {
         fromChannelId: channel1.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
+          docId,
+          requesterDocVersion: createVersionVector(),
+          ephemeral: [
             {
-              docId,
-              requesterDocVersion: createVersionVector(),
-              ephemeral: [
-                {
-                  peerId: peerId1,
-                  data: ephemeralData,
-                  namespace: "presence",
-                },
-              ],
+              peerId: peerId1,
+              data: ephemeralData,
+              namespace: "presence",
             },
           ],
           bidirectional: false,
@@ -422,13 +397,9 @@ describe("handle-sync-request", () => {
         fromChannelId: channel.channelId,
         message: {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId,
-              requesterDocVersion: createVersionVector(),
-              // No ephemeral in request
-            },
-          ],
+          docId,
+          requesterDocVersion: createVersionVector(),
+          // No ephemeral in request
           bidirectional: false,
         },
       },

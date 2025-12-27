@@ -121,12 +121,8 @@ describe("Synchronizer - Command Execution", () => {
     // Simulate sync request that should trigger sync response
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: createVersionVector(),
-        },
-      ],
+      docId,
+      requesterDocVersion: createVersionVector(),
       bidirectional: false,
     })
 

@@ -33,6 +33,7 @@
 
 import type {
   ChannelMsgEstablishRequest,
+  ChannelMsgSyncRequest,
   EstablishedChannel,
 } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
@@ -86,15 +87,36 @@ export function handleEstablishRequest(
   )
   const docsToSync = getAllDocsToSync(allowedDocs)
 
-  if (docsToSync.length > 0) {
+  if (docsToSync.length === 1) {
+    // Single document - send single sync-request
     commands.push({
       type: "cmd/send-message",
       envelope: {
         toChannelIds: [fromChannelId],
         message: {
           type: "channel/sync-request",
-          docs: docsToSync,
+          docId: docsToSync[0].docId,
+          requesterDocVersion: docsToSync[0].requesterDocVersion,
           bidirectional: true,
+        },
+      },
+    })
+  } else if (docsToSync.length > 1) {
+    // Multiple documents - batch sync-requests
+    const syncRequests: ChannelMsgSyncRequest[] = docsToSync.map(doc => ({
+      type: "channel/sync-request",
+      docId: doc.docId,
+      requesterDocVersion: doc.requesterDocVersion,
+      bidirectional: true,
+    }))
+
+    commands.push({
+      type: "cmd/send-message",
+      envelope: {
+        toChannelIds: [fromChannelId],
+        message: {
+          type: "channel/batch",
+          messages: syncRequests,
         },
       },
     })

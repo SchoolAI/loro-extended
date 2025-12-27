@@ -149,12 +149,8 @@ describe("Synchronizer - Sync Functionality", () => {
     // Simulate receiving sync request with current version
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: currentVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: currentVersion,
       bidirectional: false,
     })
 
@@ -191,12 +187,8 @@ describe("Synchronizer - Sync Functionality", () => {
     // Simulate receiving sync request with ahead version
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: aheadVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: aheadVersion,
       bidirectional: false,
     })
 

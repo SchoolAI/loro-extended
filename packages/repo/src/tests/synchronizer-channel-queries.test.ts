@@ -114,14 +114,23 @@ describe("Synchronizer - Channel Queries", () => {
       identity: { peerId: "1", name: "test-peer", type: "user" },
     })
 
-    // Simulate sync requests to establish subscriptions
+    // Simulate sync requests to establish subscriptions (now sent as batch)
     mockAdapter.simulateChannelMessage(channel.channelId, {
-      type: "channel/sync-request",
-      docs: [
-        { docId: docId1, requesterDocVersion: createVersionVector() },
-        { docId: docId2, requesterDocVersion: createVersionVector() },
+      type: "channel/batch",
+      messages: [
+        {
+          type: "channel/sync-request",
+          docId: docId1,
+          requesterDocVersion: createVersionVector(),
+          bidirectional: false,
+        },
+        {
+          type: "channel/sync-request",
+          docId: docId2,
+          requesterDocVersion: createVersionVector(),
+          bidirectional: false,
+        },
       ],
-      bidirectional: false,
     })
 
     const docIds = synchronizer.getChannelDocIds(channel.channelId)

@@ -54,7 +54,6 @@
 
 import type {
   ChannelMsgEstablishResponse,
-  ChannelMsgSyncRequest,
   EstablishedChannel,
 } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
@@ -65,6 +64,7 @@ import {
   filterAllowedDocs,
   getAllDocsToSync,
   getChangedDocsToSync,
+  type SyncRequestDoc,
 } from "../utils.js"
 
 export function handleEstablishResponse(
@@ -93,7 +93,7 @@ export function handleEstablishResponse(
   // - visibility will be checked on-the-fly when needed
   // - Subscriptions will be set when peer sends sync-request
 
-  let docsToSync: ChannelMsgSyncRequest["docs"] = []
+  let docsToSync: SyncRequestDoc[] = []
 
   // Filter documents based on visibility permission
   const allowedDocs = filterAllowedDocs(

@@ -363,9 +363,7 @@ describe("Adapter", () => {
 
       // Call it and verify it triggers the lifecycle hook
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       channel.onReceive(message)
@@ -496,9 +494,7 @@ describe("Adapter", () => {
       const sendSpy2 = vi.spyOn(channel2, "send")
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       const sentCount = adapter._send({
@@ -524,9 +520,7 @@ describe("Adapter", () => {
       const sendSpy3 = vi.spyOn(channel3, "send")
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       const sentCount = adapter._send({
@@ -545,9 +539,7 @@ describe("Adapter", () => {
       await adapter._start()
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       const sentCount = adapter._send({
@@ -567,9 +559,7 @@ describe("Adapter", () => {
       adapter.onSend = onSendSpy
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       adapter._send({
@@ -591,9 +581,7 @@ describe("Adapter", () => {
       const channel = adapter.testAddChannel("context-1")
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       expect(() =>
@@ -775,9 +763,7 @@ describe("Adapter", () => {
       await adapter._start()
 
       const message: ChannelMsg = {
-        type: "channel/sync-request",
-        docs: [],
-        bidirectional: false,
+        type: "channel/directory-request",
       }
 
       const sentCount = adapter._send({

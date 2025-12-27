@@ -55,7 +55,11 @@
  * @see handle-directory-response.ts - Similar handler for directory-request/response flow
  */
 
-import type { ChannelMsgNewDoc, ChannelMsgSyncRequest } from "../../channel.js"
+import type {
+  BatchableMsg,
+  ChannelMsgNewDoc,
+  ChannelMsgSyncRequest,
+} from "../../channel.js"
 import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
@@ -82,7 +86,7 @@ export function handleNewDoc(
   }
 
   const commands: (Command | undefined)[] = []
-  const docsToSync: ChannelMsgSyncRequest["docs"] = []
+  const syncRequests: ChannelMsgSyncRequest[] = []
 
   // Process each announced document
   for (const docId of message.docIds) {
@@ -102,11 +106,10 @@ export function handleNewDoc(
 
     // Since peer has the doc, send our ephemeral state
     commands.push({
-      type: "cmd/broadcast-ephemeral",
-      docId,
-      allPeerData: true,
+      type: "cmd/broadcast-ephemeral-batch",
+      docIds: [docId],
       hopsRemaining: 0,
-      toChannelIds: [fromChannelId],
+      toChannelId: fromChannelId,
     })
 
     logger.debug("new-doc: updated peer awareness", {
@@ -115,25 +118,35 @@ export function handleNewDoc(
       awareness: "has-doc",
     })
 
-    // Add to sync request to actually load the document data
+    // Add sync-request to actually load the document data
     // This is the "pull" in pull-based discovery - we explicitly request
-    docsToSync.push({
+    syncRequests.push({
+      type: "channel/sync-request",
       docId,
       requesterDocVersion: docState.doc.version(), // Empty for new docs
+      bidirectional: true,
     })
   }
 
-  // Send sync-request to load the actual document data
+  // Send sync-requests to load the actual document data
   // This completes the discovery → request → transfer flow
-  if (docsToSync.length > 0) {
+  // Use channel/batch if multiple documents, single message otherwise
+  if (syncRequests.length === 1) {
+    commands.push({
+      type: "cmd/send-message",
+      envelope: {
+        toChannelIds: [fromChannelId],
+        message: syncRequests[0],
+      },
+    })
+  } else if (syncRequests.length > 1) {
     commands.push({
       type: "cmd/send-message",
       envelope: {
         toChannelIds: [fromChannelId],
         message: {
-          type: "channel/sync-request",
-          docs: docsToSync,
-          bidirectional: true,
+          type: "channel/batch",
+          messages: syncRequests as BatchableMsg[],
         },
       },
     })

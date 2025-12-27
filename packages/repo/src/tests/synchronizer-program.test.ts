@@ -150,12 +150,8 @@ describe("Synchronizer Program - Integration Tests", () => {
           fromChannelId: 999,
           message: {
             type: "channel/sync-request",
-            docs: [
-              {
-                docId: "nonexistent-doc",
-                requesterDocVersion: createVersionVector(),
-              },
-            ],
+            docId: "nonexistent-doc",
+            requesterDocVersion: createVersionVector(),
             bidirectional: false,
           },
         },

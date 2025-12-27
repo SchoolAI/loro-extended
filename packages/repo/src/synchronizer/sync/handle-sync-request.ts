@@ -87,168 +87,158 @@ export function handleSyncRequest(
     return
   }
 
-  const { docs, bidirectional = true } = message
+  const {
+    docId,
+    requesterDocVersion,
+    ephemeral,
+    bidirectional = true,
+  } = message
   const commands: (Command | undefined)[] = []
-  const reciprocalDocs: ChannelMsgSyncRequest["docs"] = []
 
-  // Process each requested document
-  for (const { docId, requesterDocVersion, ephemeral } of docs) {
-    // ALWAYS track subscription and awareness
-    // The peer is explicitly telling us they want this document and what version they have
-    // This ensures that if we get the document later, we know to send it to them
-    addPeerSubscription(peerState, docId)
-    setPeerDocumentAwareness(peerState, docId, "has-doc", requesterDocVersion)
+  // ALWAYS track subscription and awareness
+  // The peer is explicitly telling us they want this document and what version they have
+  // This ensures that if we get the document later, we know to send it to them
+  addPeerSubscription(peerState, docId)
+  setPeerDocumentAwareness(peerState, docId, "has-doc", requesterDocVersion)
 
-    let docState = model.documents.get(docId)
+  let docState = model.documents.get(docId)
 
-    logger.debug(
-      "sync-request: updated peer {peerId} awareness ({awareness}) and subscription ({docId})",
-      {
-        peerId: channel.peerId,
-        docId,
-        awareness: "has-doc",
-      },
-    )
-
-    // If we don't have the document, create it!
-    // This allows peers to initialize documents on the server just by requesting them
-    if (!docState) {
-      // Check if peer is allowed to create this document
-      // Use creation permission with peer context
-      const peerContext = {
-        peerId: peerState.identity.peerId,
-        peerName: peerState.identity.name,
-        peerType: peerState.identity.type,
-        channelId: channel.channelId,
-        channelKind: channel.kind,
-      }
-
-      if (permissions.creation(docId, peerContext)) {
-        logger.debug(
-          "sync-request: creating new document ({docId}) from peer request",
-          {
-            docId,
-            peerId: channel.peerId,
-          },
-        )
-        docState = createDocState({ docId })
-        model.documents.set(docId, docState)
-        commands.push({
-          type: "cmd/subscribe-doc",
-          docId,
-        })
-      } else {
-        logger.warn(
-          "sync-request: peer {peerId} not allowed to create document {docId}, ignoring request",
-          {
-            docId,
-            peerId: channel.peerId,
-          },
-        )
-        // Skip processing this document since we can't create it
-        continue
-      }
-    }
-
-    // Apply incoming ephemeral data from the requester if provided
-    // ephemeral is now EphemeralStoreData[]: { peerId, data, namespace }[]
-    if (ephemeral && ephemeral.length > 0) {
-      for (const store of ephemeral) {
-        logger.debug(
-          "sync-request: applying ephemeral data from {peerId} for {docId} namespace {namespace}",
-          {
-            peerId: store.peerId,
-            docId,
-            namespace: store.namespace,
-          },
-        )
-        commands.push({
-          type: "cmd/apply-ephemeral",
-          docId,
-          stores: [
-            {
-              peerId: store.peerId,
-              data: store.data,
-              namespace: store.namespace,
-            },
-          ],
-        })
-
-        // Relay requester's ephemeral to other peers (not back to requester)
-        const otherChannelIds = getEstablishedChannelsForDoc(
-          model.channels,
-          model.peers,
-          docId,
-        ).filter(id => id !== fromChannelId)
-
-        if (otherChannelIds.length > 0) {
-          logger.debug(
-            "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
-            {
-              peerId: store.peerId,
-              count: otherChannelIds.length,
-              docId,
-            },
-          )
-          commands.push({
-            type: "cmd/send-message",
-            envelope: {
-              toChannelIds: otherChannelIds,
-              message: {
-                type: "channel/ephemeral",
-                docId,
-                hopsRemaining: 0, // Direct relay only
-                stores: [
-                  {
-                    peerId: store.peerId,
-                    data: store.data,
-                    namespace: store.namespace,
-                  },
-                ],
-              },
-            },
-          })
-        }
-      }
-    }
-
-    logger.debug("sending sync-response due to channel/sync-request", {
-      docId,
+  logger.debug(
+    "sync-request: updated peer {peerId} awareness ({awareness}) and subscription ({docId})",
+    {
       peerId: channel.peerId,
-    })
-
-    // Send sync-response with document data and ephemeral snapshot
-    // The cmd/send-sync-response command will determine whether to send
-    // a snapshot (full doc) or update (delta) based on requesterDocVersion
-    // The includeEphemeral flag tells it to include all known ephemeral state
-    commands.push({
-      type: "cmd/send-sync-response",
-      toChannelId: fromChannelId,
       docId,
-      requesterDocVersion,
-      includeEphemeral: true,
-    })
+      awareness: "has-doc",
+    },
+  )
 
-    // Collect docs for reciprocal sync-request
-    // If bidirectional is true, we want to ensure we are also subscribed to this document
-    // and have the latest version from the peer.
-    if (bidirectional) {
-      reciprocalDocs.push({
+  // If we don't have the document, create it!
+  // This allows peers to initialize documents on the server just by requesting them
+  if (!docState) {
+    // Check if peer is allowed to create this document
+    // Use creation permission with peer context
+    const peerContext = {
+      peerId: peerState.identity.peerId,
+      peerName: peerState.identity.name,
+      peerType: peerState.identity.type,
+      channelId: channel.channelId,
+      channelKind: channel.kind,
+    }
+
+    if (permissions.creation(docId, peerContext)) {
+      logger.debug(
+        "sync-request: creating new document ({docId}) from peer request",
+        {
+          docId,
+          peerId: channel.peerId,
+        },
+      )
+      docState = createDocState({ docId })
+      model.documents.set(docId, docState)
+      commands.push({
+        type: "cmd/subscribe-doc",
         docId,
-        requesterDocVersion: docState.doc.version(),
       })
+    } else {
+      logger.warn(
+        "sync-request: peer {peerId} not allowed to create document {docId}, ignoring request",
+        {
+          docId,
+          peerId: channel.peerId,
+        },
+      )
+      // Can't create the document, return early
+      return
     }
   }
 
-  // Send reciprocal sync-request if needed
-  if (reciprocalDocs.length > 0) {
-    logger.debug(
-      "sending reciprocal sync-request to {peerId} for {docCount} docs",
-      {
-        peerId: channel.peerId,
-        docCount: reciprocalDocs.length,
-      },
-    )
+  // Apply incoming ephemeral data from the requester if provided
+  // ephemeral is now EphemeralStoreData[]: { peerId, data, namespace }[]
+  if (ephemeral && ephemeral.length > 0) {
+    for (const store of ephemeral) {
+      logger.debug(
+        "sync-request: applying ephemeral data from {peerId} for {docId} namespace {namespace}",
+        {
+          peerId: store.peerId,
+          docId,
+          namespace: store.namespace,
+        },
+      )
+      commands.push({
+        type: "cmd/apply-ephemeral",
+        docId,
+        stores: [
+          {
+            peerId: store.peerId,
+            data: store.data,
+            namespace: store.namespace,
+          },
+        ],
+      })
+
+      // Relay requester's ephemeral to other peers (not back to requester)
+      const otherChannelIds = getEstablishedChannelsForDoc(
+        model.channels,
+        model.peers,
+        docId,
+      ).filter(id => id !== fromChannelId)
+
+      if (otherChannelIds.length > 0) {
+        logger.debug(
+          "sync-request: relaying ephemeral from {peerId} to {count} other peers for {docId}",
+          {
+            peerId: store.peerId,
+            count: otherChannelIds.length,
+            docId,
+          },
+        )
+        commands.push({
+          type: "cmd/send-message",
+          envelope: {
+            toChannelIds: otherChannelIds,
+            message: {
+              type: "channel/ephemeral",
+              docId,
+              hopsRemaining: 0, // Direct relay only
+              stores: [
+                {
+                  peerId: store.peerId,
+                  data: store.data,
+                  namespace: store.namespace,
+                },
+              ],
+            },
+          },
+        })
+      }
+    }
+  }
+
+  logger.debug("sending sync-response due to channel/sync-request", {
+    docId,
+    peerId: channel.peerId,
+  })
+
+  // Send sync-response with document data and ephemeral snapshot
+  // The cmd/send-sync-response command will determine whether to send
+  // a snapshot (full doc) or update (delta) based on requesterDocVersion
+  // The includeEphemeral flag tells it to include all known ephemeral state
+  commands.push({
+    type: "cmd/send-sync-response",
+    toChannelId: fromChannelId,
+    docId,
+    requesterDocVersion,
+    includeEphemeral: true,
+  })
+
+  // Send reciprocal sync-request if bidirectional
+  // If bidirectional is true, we want to ensure we are also subscribed to this document
+  // and have the latest version from the peer.
+  if (bidirectional) {
+    logger.debug("sending reciprocal sync-request to {peerId} for {docId}", {
+      peerId: channel.peerId,
+      docId,
+    })
 
     commands.push({
       type: "cmd/send-message",
@@ -256,7 +246,8 @@ export function handleSyncRequest(
         toChannelIds: [fromChannelId],
         message: {
           type: "channel/sync-request",
-          docs: reciprocalDocs,
+          docId,
+          requesterDocVersion: docState.doc.version(),
           bidirectional: false, // Prevent infinite loops
         },
       },

@@ -145,7 +145,8 @@ describe("Multi-channel peer scenarios", () => {
       // Simulate sync-request from peer on SSE channel
       synchronizer.channelReceive(sseChannel.channelId, {
         type: "channel/sync-request",
-        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        docId,
+        requesterDocVersion: new VersionVector(null),
         bidirectional: false,
       })
 
@@ -193,7 +194,8 @@ describe("Multi-channel peer scenarios", () => {
 
       synchronizer.channelReceive(sseChannel.channelId, {
         type: "channel/sync-request",
-        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        docId,
+        requesterDocVersion: new VersionVector(null),
         bidirectional: false,
       })
 
@@ -231,7 +233,8 @@ describe("Multi-channel peer scenarios", () => {
       // Subscribe via SSE channel
       synchronizer.channelReceive(sseChannel.channelId, {
         type: "channel/sync-request",
-        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        docId,
+        requesterDocVersion: new VersionVector(null),
         bidirectional: false,
       })
 
@@ -252,7 +255,8 @@ describe("Multi-channel peer scenarios", () => {
       // Send sync-request via WebRTC channel (same doc)
       synchronizer.channelReceive(webrtcChannel.channelId, {
         type: "channel/sync-request",
-        docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+        docId,
+        requesterDocVersion: new VersionVector(null),
         bidirectional: false,
       })
 

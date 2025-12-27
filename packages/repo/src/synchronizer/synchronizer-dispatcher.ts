@@ -5,6 +5,7 @@ import type {
   SynchronizerMessage,
   SynchronizerModel,
 } from "../synchronizer-program.js"
+import type { ChannelId, DocId } from "../types.js"
 import { getEstablishedChannelsForDoc } from "../utils/get-established-channels-for-doc.js"
 import { channelDispatcher } from "./channel-dispatcher.js"
 import { handleChannelAdded } from "./connection/handle-channel-added.js"
@@ -24,7 +25,11 @@ export function synchronizerDispatcher(
   switch (msg.type) {
     case "synchronizer/heartbeat": {
       // Broadcast all ephemeral state for all documents to all peers
-      const commands: Command[] = []
+      // Optimization: Group documents by peer to send one batched message per peer
+      // This reduces O(docs × peers) messages to O(peers) messages
+
+      // Step 1: Build a map of channelId -> docIds
+      const peerDocs = new Map<ChannelId, DocId[]>()
 
       for (const docId of model.documents.keys()) {
         const channelIds = getEstablishedChannelsForDoc(
@@ -33,15 +38,25 @@ export function synchronizerDispatcher(
           docId,
         )
 
-        if (channelIds.length > 0) {
-          commands.push({
-            type: "cmd/broadcast-ephemeral",
-            docId,
-            allPeerData: true,
-            hopsRemaining: 1, // Allow server to relay heartbeat to other clients
-            toChannelIds: channelIds,
-          })
+        for (const channelId of channelIds) {
+          const docs = peerDocs.get(channelId) ?? []
+          docs.push(docId)
+          peerDocs.set(channelId, docs)
         }
+      }
+
+      // Step 2: Create one cmd/broadcast-ephemeral-batch per peer
+      // Each command will send a channel/batch containing multiple channel/ephemeral messages
+      const commands: Command[] = []
+
+      for (const [channelId, docIds] of peerDocs) {
+        commands.push({
+          type: "cmd/broadcast-ephemeral-batch",
+          docIds,
+          allPeerData: true,
+          hopsRemaining: 1, // Allow server to relay heartbeat to other clients
+          toChannelId: channelId,
+        })
       }
 
       return commands.length > 0 ? { type: "cmd/batch", commands } : undefined

@@ -6,7 +6,9 @@ import {
 } from "loro-crdt"
 import { Adapter } from "../adapter/adapter.js"
 import type {
+  BatchableMsg,
   ChannelMsg,
+  ChannelMsgBatch,
   ChannelMsgDeleteRequest,
   ChannelMsgDirectoryRequest,
   ChannelMsgNewDoc,
@@ -119,6 +121,9 @@ export abstract class StorageAdapter extends Adapter<void> {
         case "channel/ephemeral":
           // Storage adapters ignore ephemeral messages
           return
+        case "channel/batch":
+          // Handle batched messages by dispatching each one
+          return await this.handleBatch(msg)
         default:
           this.logger.warn("unhandled message type", {
             type: (msg as ChannelMsg).type,
@@ -126,6 +131,15 @@ export abstract class StorageAdapter extends Adapter<void> {
       }
     } catch (error) {
       this.logger.error("error handling channel message", { error, msg })
+    }
+  }
+
+  /**
+   * Handle batched messages by dispatching each one.
+   */
+  private async handleBatch(msg: ChannelMsgBatch): Promise<void> {
+    for (const innerMsg of msg.messages) {
+      await this.handleChannelMessage(innerMsg)
     }
   }
 
@@ -175,132 +189,112 @@ export abstract class StorageAdapter extends Adapter<void> {
    * a more memory-efficient reconstruction strategy.
    */
   private async handleSyncRequest(msg: ChannelMsgSyncRequest): Promise<void> {
+    const { docId, requesterDocVersion, bidirectional } = msg
+
     this.logger.debug("handleSyncRequest: received request", {
-      docCount: msg.docs.length,
-      docIds: msg.docs.map(d => d.docId),
-      bidirectional: msg.bidirectional,
+      docId,
+      bidirectional,
     })
 
-    // Collect docIds for reciprocal sync-request
-    // This is critical: by sending a sync-request back to the Repo, we get added
-    // to the Repo's subscriptions list, which means we'll receive future updates
-    const docsForReciprocalRequest: Array<{
-      docId: DocId
-      requesterDocVersion: ReturnType<LoroDoc["oplogVersion"]>
-    }> = []
+    try {
+      // Load all data for this document (snapshot + updates)
+      const chunks = await this.loadRange([docId])
+      this.logger.debug("handleSyncRequest: loaded chunks", {
+        docId,
+        count: chunks.length,
+      })
 
-    for (const { docId, requesterDocVersion } of msg.docs) {
-      try {
-        // Load all data for this document (snapshot + updates)
-        const chunks = await this.loadRange([docId])
-        this.logger.debug("handleSyncRequest: loaded chunks", {
+      if (chunks.length === 0) {
+        // Document not found in storage yet
+        // Send "unavailable" to indicate we don't have the data
+        this.logger.debug("handleSyncRequest: document not found in storage", {
           docId,
-          count: chunks.length,
         })
-
-        if (chunks.length === 0) {
-          // Document not found in storage yet
-          // Send "unavailable" to indicate we don't have the data
-          this.logger.debug(
-            "handleSyncRequest: document not found in storage",
-            {
-              docId,
-            },
-          )
-          this.replyUnavailable(docId)
-
-          // Even though we don't have the document, we want to receive future updates
-          // Add to reciprocal request with empty version
-          docsForReciprocalRequest.push({
-            docId,
-            requesterDocVersion: new LoroDoc().oplogVersion(),
-          })
-          continue
-        }
-
-        // Reconstruct document from storage chunks
-        // Note: Order doesn't matter - Loro's CRDT is commutative
-        const tempDoc = new LoroDoc()
-
-        try {
-          const updates = chunks.map(chunk => chunk.data)
-          tempDoc.importBatch(updates)
-          this.logger.debug("handleSyncRequest: imported chunks into tempDoc", {
-            docId,
-            chunkCount: chunks.length,
-          })
-        } catch (error) {
-          this.logger.warn("failed to import chunk batch", {
-            docId,
-            error,
-          })
-        }
-
-        // Export version-aware response
-        const currentVersion = tempDoc.oplogVersion()
-
-        // Use Loro's built-in version comparison
-        const comparison = requesterDocVersion.compare(currentVersion)
-        this.logger.debug("handleSyncRequest: version comparison", {
-          docId,
-          comparison,
-          requesterVersionLength: requesterDocVersion.length(),
-          currentVersionLength: currentVersion.length(),
-        })
-
-        if (comparison === 0) {
-          // Versions are equal - requester is up to date
-          this.logger.debug("handleSyncRequest: replying up-to-date", { docId })
-          this.replyUpToDate(docId, currentVersion)
-        } else if (comparison === 1) {
-          // Requester version is greater - they're ahead (shouldn't happen normally)
-          this.logger.debug(
-            "handleSyncRequest: requester ahead, replying up-to-date",
-            { docId },
-          )
-          this.replyUpToDate(docId, currentVersion)
-        } else {
-          // Requester version is less than or concurrent - send updates
-          const data = tempDoc.export({
-            mode: "update",
-            from: requesterDocVersion,
-          })
-          this.logger.debug("handleSyncRequest: sending update", {
-            docId,
-            dataLength: data.length,
-          })
-
-          this.replyWithSyncResponse(docId, data, currentVersion)
-        }
-
-        // Add to reciprocal request with our current version
-        docsForReciprocalRequest.push({
-          docId,
-          requesterDocVersion: currentVersion,
-        })
-      } catch (error) {
-        this.logger.error("sync request failed", { docId, error })
         this.replyUnavailable(docId)
 
-        // Still want updates even if we failed to load
-        docsForReciprocalRequest.push({
+        // Even though we don't have the document, we want to receive future updates
+        // Send reciprocal sync-request with empty version
+        this.replyWithSyncRequest(
+          [{ docId, requesterDocVersion: new LoroDoc().oplogVersion() }],
+          false,
+        )
+        return
+      }
+
+      // Reconstruct document from storage chunks
+      // Note: Order doesn't matter - Loro's CRDT is commutative
+      const tempDoc = new LoroDoc()
+
+      try {
+        const updates = chunks.map(chunk => chunk.data)
+        tempDoc.importBatch(updates)
+        this.logger.debug("handleSyncRequest: imported chunks into tempDoc", {
           docId,
-          requesterDocVersion: new LoroDoc().oplogVersion(),
+          chunkCount: chunks.length,
+        })
+      } catch (error) {
+        this.logger.warn("failed to import chunk batch", {
+          docId,
+          error,
         })
       }
-    }
 
-    // Send reciprocal sync-request to get added to the Repo's subscriptions
-    // This ensures we receive future updates for these documents
-    if (docsForReciprocalRequest.length > 0) {
+      // Export version-aware response
+      const currentVersion = tempDoc.oplogVersion()
+
+      // Use Loro's built-in version comparison
+      const comparison = requesterDocVersion.compare(currentVersion)
+      this.logger.debug("handleSyncRequest: version comparison", {
+        docId,
+        comparison,
+        requesterVersionLength: requesterDocVersion.length(),
+        currentVersionLength: currentVersion.length(),
+      })
+
+      if (comparison === 0) {
+        // Versions are equal - requester is up to date
+        this.logger.debug("handleSyncRequest: replying up-to-date", { docId })
+        this.replyUpToDate(docId, currentVersion)
+      } else if (comparison === 1) {
+        // Requester version is greater - they're ahead (shouldn't happen normally)
+        this.logger.debug(
+          "handleSyncRequest: requester ahead, replying up-to-date",
+          { docId },
+        )
+        this.replyUpToDate(docId, currentVersion)
+      } else {
+        // Requester version is less than or concurrent - send updates
+        const data = tempDoc.export({
+          mode: "update",
+          from: requesterDocVersion,
+        })
+        this.logger.debug("handleSyncRequest: sending update", {
+          docId,
+          dataLength: data.length,
+        })
+
+        this.replyWithSyncResponse(docId, data, currentVersion)
+      }
+
+      // Send reciprocal sync-request to get added to the Repo's subscriptions
+      // This ensures we receive future updates for this document
       this.logger.debug(
         "handleSyncRequest: sending reciprocal sync-request for subscription",
-        {
-          docCount: docsForReciprocalRequest.length,
-          docIds: docsForReciprocalRequest.map(d => d.docId),
-        },
+        { docId },
       )
-      this.replyWithSyncRequest(docsForReciprocalRequest, false)
+      this.replyWithSyncRequest(
+        [{ docId, requesterDocVersion: currentVersion }],
+        false,
+      )
+    } catch (error) {
+      this.logger.error("sync request failed", { docId, error })
+      this.replyUnavailable(docId)
+
+      // Still want updates even if we failed to load
+      this.replyWithSyncRequest(
+        [{ docId, requesterDocVersion: new LoroDoc().oplogVersion() }],
+        false,
+      )
     }
   }
 
@@ -608,17 +602,39 @@ export abstract class StorageAdapter extends Adapter<void> {
   }
 
   /**
-   * Reply with a sync request containing document data.
+   * Reply with sync request(s) for the given documents.
+   * Uses channel/batch if multiple documents, single message otherwise.
    */
   private replyWithSyncRequest(
-    docs: ChannelMsgSyncRequest["docs"],
+    docs: Array<{ docId: DocId; requesterDocVersion: VersionVector }>,
     bidirectional: boolean,
   ): void {
-    this.reply({
-      type: "channel/sync-request",
-      docs,
-      bidirectional,
-    })
+    if (docs.length === 0) {
+      return
+    }
+
+    if (docs.length === 1) {
+      // Single document - send single sync-request
+      this.reply({
+        type: "channel/sync-request",
+        docId: docs[0].docId,
+        requesterDocVersion: docs[0].requesterDocVersion,
+        bidirectional,
+      })
+    } else {
+      // Multiple documents - batch sync-requests
+      const syncRequests: ChannelMsgSyncRequest[] = docs.map(doc => ({
+        type: "channel/sync-request",
+        docId: doc.docId,
+        requesterDocVersion: doc.requesterDocVersion,
+        bidirectional,
+      }))
+
+      this.reply({
+        type: "channel/batch",
+        messages: syncRequests as BatchableMsg[],
+      })
+    }
   }
 
   /**

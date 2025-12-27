@@ -124,12 +124,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate sync request with empty version (new client)
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: emptyVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: emptyVersion,
       bidirectional: false,
     })
 
@@ -170,12 +166,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate sync request with non-empty version
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: nonEmptyVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: nonEmptyVersion,
       bidirectional: false,
     })
 
@@ -211,12 +203,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate sync request with empty version (new client)
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: createVersionVector(),
-        },
-      ],
+      docId,
+      requesterDocVersion: createVersionVector(),
       bidirectional: false,
     })
 
@@ -258,12 +246,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate sync request with non-empty version
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: nonEmptyVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: nonEmptyVersion,
       bidirectional: false,
     })
 
@@ -300,12 +284,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate client refresh: empty version vector
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: createVersionVector(),
-        },
-      ],
+      docId,
+      requesterDocVersion: createVersionVector(),
       bidirectional: false,
     })
 
@@ -349,12 +329,8 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
     // Simulate sync request with client's version
     mockAdapter.simulateChannelMessage(channel.channelId, {
       type: "channel/sync-request",
-      docs: [
-        {
-          docId,
-          requesterDocVersion: clientVersion,
-        },
-      ],
+      docId,
+      requesterDocVersion: clientVersion,
       bidirectional: false,
     })
 

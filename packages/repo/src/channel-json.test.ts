@@ -217,54 +217,23 @@ describe("Channel JSON Serialization", () => {
     })
 
     describe("sync messages", () => {
-      it("should serialize sync-request with single doc", () => {
+      it("should serialize sync-request", () => {
         const doc = new LoroDoc()
         doc.setPeerId("1")
         doc.getText("text").insert(0, "test")
 
         const msg: ChannelMsg = {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId: "doc-1",
-              requesterDocVersion: doc.version(),
-            },
-          ],
+          docId: "doc-1",
+          requesterDocVersion: doc.version(),
           bidirectional: false,
         }
 
         const json = serializeChannelMsg(msg)
         expect(json.type).toBe("channel/sync-request")
         if (json.type === "channel/sync-request") {
-          expect(json.docs).toHaveLength(1)
-          expect(json.docs[0].docId).toBe("doc-1")
-          expect(json.docs[0].requesterDocVersion).toEqual({ "1": 4 })
-        }
-      })
-
-      it("should serialize sync-request with multiple docs", () => {
-        const doc1 = new LoroDoc()
-        doc1.setPeerId("1")
-        doc1.getText("text").insert(0, "a")
-
-        const doc2 = new LoroDoc()
-        doc2.setPeerId("2")
-        doc2.getText("text").insert(0, "b")
-
-        const msg: ChannelMsg = {
-          type: "channel/sync-request",
-          docs: [
-            { docId: "doc-1", requesterDocVersion: doc1.version() },
-            { docId: "doc-2", requesterDocVersion: doc2.version() },
-          ],
-          bidirectional: false,
-        }
-
-        const json = serializeChannelMsg(msg)
-        if (json.type === "channel/sync-request") {
-          expect(json.docs).toHaveLength(2)
-          expect(json.docs[0].requesterDocVersion).toEqual({ "1": 1 })
-          expect(json.docs[1].requesterDocVersion).toEqual({ "2": 1 })
+          expect(json.docId).toBe("doc-1")
+          expect(json.requesterDocVersion).toEqual({ "1": 4 })
         }
       })
 
@@ -368,7 +337,8 @@ describe("Channel JSON Serialization", () => {
 
         const original: ChannelMsg = {
           type: "channel/sync-request",
-          docs: [{ docId: "doc-1", requesterDocVersion: doc.version() }],
+          docId: "doc-1",
+          requesterDocVersion: doc.version(),
           bidirectional: false,
         }
 
@@ -377,10 +347,9 @@ describe("Channel JSON Serialization", () => {
 
         expect(restored.type).toBe("channel/sync-request")
         if (restored.type === "channel/sync-request") {
-          expect(restored.docs).toHaveLength(1)
-          expect(restored.docs[0].docId).toBe("doc-1")
-          expect(restored.docs[0].requesterDocVersion.toJSON()).toEqual(
-            original.docs[0].requesterDocVersion.toJSON(),
+          expect(restored.docId).toBe("doc-1")
+          expect(restored.requesterDocVersion.toJSON()).toEqual(
+            original.requesterDocVersion.toJSON(),
           )
         }
       })
@@ -427,17 +396,13 @@ describe("Channel JSON Serialization", () => {
 
         const msg: ChannelMsg = {
           type: "channel/sync-request",
-          docs: [
+          docId: "doc-1",
+          requesterDocVersion: doc.version(),
+          ephemeral: [
             {
-              docId: "doc-1",
-              requesterDocVersion: doc.version(),
-              ephemeral: [
-                {
-                  peerId: "123456789",
-                  data: ephemeralData,
-                  namespace: "presence",
-                },
-              ],
+              peerId: "123456789",
+              data: ephemeralData,
+              namespace: "presence",
             },
           ],
           bidirectional: false,
@@ -446,11 +411,10 @@ describe("Channel JSON Serialization", () => {
         const json = serializeChannelMsg(msg)
         expect(json.type).toBe("channel/sync-request")
         if (json.type === "channel/sync-request") {
-          expect(json.docs).toHaveLength(1)
-          expect(json.docs[0].ephemeral).toBeDefined()
-          expect(json.docs[0].ephemeral?.[0].peerId).toBe("123456789")
-          expect(typeof json.docs[0].ephemeral?.[0].data).toBe("string")
-          expect(json.docs[0].ephemeral?.[0].namespace).toBe("presence")
+          expect(json.ephemeral).toBeDefined()
+          expect(json.ephemeral?.[0].peerId).toBe("123456789")
+          expect(typeof json.ephemeral?.[0].data).toBe("string")
+          expect(json.ephemeral?.[0].namespace).toBe("presence")
         }
       })
 
@@ -499,17 +463,13 @@ describe("Channel JSON Serialization", () => {
 
         const original: ChannelMsg = {
           type: "channel/sync-request",
-          docs: [
+          docId: "doc-1",
+          requesterDocVersion: doc.version(),
+          ephemeral: [
             {
-              docId: "doc-1",
-              requesterDocVersion: doc.version(),
-              ephemeral: [
-                {
-                  peerId: "123456789",
-                  data: ephemeralData,
-                  namespace: "presence",
-                },
-              ],
+              peerId: "123456789",
+              data: ephemeralData,
+              namespace: "presence",
             },
           ],
           bidirectional: false,
@@ -520,14 +480,13 @@ describe("Channel JSON Serialization", () => {
 
         expect(restored.type).toBe("channel/sync-request")
         if (restored.type === "channel/sync-request") {
-          expect(restored.docs).toHaveLength(1)
-          expect(restored.docs[0].ephemeral).toBeDefined()
-          if (restored.docs[0].ephemeral?.[0]) {
-            expect(restored.docs[0].ephemeral[0].peerId).toBe("123456789")
-            expect(Array.from(restored.docs[0].ephemeral[0].data)).toEqual(
+          expect(restored.ephemeral).toBeDefined()
+          if (restored.ephemeral?.[0]) {
+            expect(restored.ephemeral[0].peerId).toBe("123456789")
+            expect(Array.from(restored.ephemeral[0].data)).toEqual(
               Array.from(ephemeralData),
             )
-            expect(restored.docs[0].ephemeral[0].namespace).toBe("presence")
+            expect(restored.ephemeral[0].namespace).toBe("presence")
           }
         }
       })
@@ -587,13 +546,9 @@ describe("Channel JSON Serialization", () => {
 
         const original: ChannelMsg = {
           type: "channel/sync-request",
-          docs: [
-            {
-              docId: "doc-1",
-              requesterDocVersion: doc.version(),
-              // No ephemeral field
-            },
-          ],
+          docId: "doc-1",
+          requesterDocVersion: doc.version(),
+          // No ephemeral field
           bidirectional: false,
         }
 
@@ -602,7 +557,7 @@ describe("Channel JSON Serialization", () => {
 
         expect(restored.type).toBe("channel/sync-request")
         if (restored.type === "channel/sync-request") {
-          expect(restored.docs[0].ephemeral).toBeUndefined()
+          expect(restored.ephemeral).toBeUndefined()
         }
       })
 
@@ -755,6 +710,194 @@ describe("Channel JSON Serialization", () => {
         )
       })
     })
+
+    describe("batch messages", () => {
+      it("should serialize batch with single message", () => {
+        const msg: ChannelMsg = {
+          type: "channel/batch",
+          messages: [
+            {
+              type: "channel/directory-request",
+            },
+          ],
+        }
+
+        const json = serializeChannelMsg(msg)
+        expect(json.type).toBe("channel/batch")
+        if (json.type === "channel/batch") {
+          expect(json.messages).toHaveLength(1)
+          expect(json.messages[0].type).toBe("channel/directory-request")
+        }
+      })
+
+      it("should serialize batch with multiple messages", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "test")
+
+        const msg: ChannelMsg = {
+          type: "channel/batch",
+          messages: [
+            {
+              type: "channel/sync-request",
+              docId: "doc-1",
+              requesterDocVersion: doc.version(),
+              bidirectional: true,
+            },
+            {
+              type: "channel/sync-request",
+              docId: "doc-2",
+              requesterDocVersion: doc.version(),
+              bidirectional: true,
+            },
+          ],
+        }
+
+        const json = serializeChannelMsg(msg)
+        expect(json.type).toBe("channel/batch")
+        if (json.type === "channel/batch") {
+          expect(json.messages).toHaveLength(2)
+          expect(json.messages[0].type).toBe("channel/sync-request")
+          expect(json.messages[1].type).toBe("channel/sync-request")
+        }
+      })
+
+      it("should serialize batch with ephemeral messages", () => {
+        const ephemeralData = new Uint8Array([1, 2, 3, 4, 5])
+
+        const msg: ChannelMsg = {
+          type: "channel/batch",
+          messages: [
+            {
+              type: "channel/ephemeral",
+              docId: "doc-1",
+              hopsRemaining: 1,
+              stores: [
+                {
+                  peerId: "123456789",
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
+            },
+            {
+              type: "channel/ephemeral",
+              docId: "doc-2",
+              hopsRemaining: 1,
+              stores: [
+                {
+                  peerId: "123456789",
+                  data: ephemeralData,
+                  namespace: "cursors",
+                },
+              ],
+            },
+          ],
+        }
+
+        const json = serializeChannelMsg(msg)
+        expect(json.type).toBe("channel/batch")
+        if (json.type === "channel/batch") {
+          expect(json.messages).toHaveLength(2)
+          expect(json.messages[0].type).toBe("channel/ephemeral")
+          expect(json.messages[1].type).toBe("channel/ephemeral")
+          // Verify ephemeral data was serialized
+          if (json.messages[0].type === "channel/ephemeral") {
+            expect(typeof json.messages[0].stores[0].data).toBe("string")
+          }
+        }
+      })
+
+      it("should round-trip batch message", () => {
+        const doc = new LoroDoc()
+        doc.setPeerId("1")
+        doc.getText("text").insert(0, "test")
+
+        const original: ChannelMsg = {
+          type: "channel/batch",
+          messages: [
+            {
+              type: "channel/sync-request",
+              docId: "doc-1",
+              requesterDocVersion: doc.version(),
+              bidirectional: true,
+            },
+            {
+              type: "channel/directory-request",
+            },
+          ],
+        }
+
+        const json = serializeChannelMsg(original)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/batch")
+        if (restored.type === "channel/batch") {
+          expect(restored.messages).toHaveLength(2)
+          expect(restored.messages[0].type).toBe("channel/sync-request")
+          expect(restored.messages[1].type).toBe("channel/directory-request")
+          // Verify version vector was restored
+          if (restored.messages[0].type === "channel/sync-request") {
+            expect(restored.messages[0].requesterDocVersion.toJSON()).toEqual(
+              doc.version().toJSON(),
+            )
+          }
+        }
+      })
+
+      it("should round-trip batch with ephemeral through full JSON cycle", () => {
+        const ephemeralData = new Uint8Array([10, 20, 30, 40, 50])
+
+        const original: ChannelMsg = {
+          type: "channel/batch",
+          messages: [
+            {
+              type: "channel/ephemeral",
+              docId: "doc-1",
+              hopsRemaining: 1,
+              stores: [
+                {
+                  peerId: "123456789",
+                  data: ephemeralData,
+                  namespace: "presence",
+                },
+              ],
+            },
+          ],
+        }
+
+        // Full cycle: serialize -> stringify -> parse -> deserialize
+        const json = serializeChannelMsg(original)
+        const stringified = JSON.stringify(json)
+        const parsed = JSON.parse(stringified)
+        const restored = deserializeChannelMsg(parsed)
+
+        expect(restored.type).toBe("channel/batch")
+        if (restored.type === "channel/batch") {
+          expect(restored.messages).toHaveLength(1)
+          if (restored.messages[0].type === "channel/ephemeral") {
+            expect(Array.from(restored.messages[0].stores[0].data)).toEqual(
+              Array.from(ephemeralData),
+            )
+          }
+        }
+      })
+
+      it("should handle empty batch", () => {
+        const msg: ChannelMsg = {
+          type: "channel/batch",
+          messages: [],
+        }
+
+        const json = serializeChannelMsg(msg)
+        const restored = deserializeChannelMsg(json)
+
+        expect(restored.type).toBe("channel/batch")
+        if (restored.type === "channel/batch") {
+          expect(restored.messages).toHaveLength(0)
+        }
+      })
+    })
   })
 
   describe("JSON stringification", () => {
@@ -765,7 +908,8 @@ describe("Channel JSON Serialization", () => {
 
       const original: ChannelMsg = {
         type: "channel/sync-request",
-        docs: [{ docId: "doc-1", requesterDocVersion: doc.version() }],
+        docId: "doc-1",
+        requesterDocVersion: doc.version(),
         bidirectional: false,
       }
 
@@ -776,8 +920,8 @@ describe("Channel JSON Serialization", () => {
 
       expect(restored.type).toBe("channel/sync-request")
       if (restored.type === "channel/sync-request") {
-        expect(restored.docs[0].requesterDocVersion.toJSON()).toEqual(
-          original.docs[0].requesterDocVersion.toJSON(),
+        expect(restored.requesterDocVersion.toJSON()).toEqual(
+          original.requesterDocVersion.toJSON(),
         )
       }
     })

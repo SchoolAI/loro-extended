@@ -5,11 +5,13 @@ import { create, type Patch } from "mutative"
 import type { AnyAdapter } from "./adapter/adapter.js"
 import { AdapterManager } from "./adapter/adapter-manager.js"
 import type {
+  BatchableMsg,
   Channel,
   ChannelMsg,
   ChannelMsgSyncResponse,
   ConnectedChannel,
   EphemeralStoreData,
+  EstablishedMsg,
   SyncTransmission,
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
@@ -1029,6 +1031,94 @@ export class Synchronizer {
         break
       }
 
+      case "cmd/broadcast-ephemeral-batch": {
+        // Batched ephemeral broadcast - sends multiple docs' ephemeral data in one message
+        // This reduces O(docs × peers) messages to O(peers) messages for heartbeats
+        const myPeerId = this.identity.peerId
+        const ephemeralMessages: BatchableMsg[] = []
+
+        for (const docId of command.docIds) {
+          const namespaceStores = this.docNamespacedStores.get(docId)
+
+          if (!namespaceStores || namespaceStores.size === 0) {
+            continue
+          }
+
+          // Collect stores to broadcast for this doc
+          const storesToSend: {
+            peerId: PeerID
+            data: Uint8Array
+            namespace: string
+          }[] = []
+
+          for (const [namespace, store] of namespaceStores) {
+            // Touch the store to update timestamps before encoding
+            if (store instanceof TimerlessEphemeralStore) {
+              store.touch()
+            }
+
+            if (command.allPeerData) {
+              // Send all data (for sync-response to late joiners)
+              const data = store.encodeAll()
+              if (data.length > 0) {
+                storesToSend.push({ peerId: myPeerId, data, namespace })
+              }
+            } else {
+              // Heartbeat: only send if this store has a key matching my peerId
+              const allStates = store.getAllStates()
+              if (allStates[myPeerId] !== undefined) {
+                const data = store.encodeAll()
+                if (data.length > 0) {
+                  storesToSend.push({ peerId: myPeerId, data, namespace })
+                }
+              }
+            }
+          }
+
+          if (storesToSend.length > 0) {
+            ephemeralMessages.push({
+              type: "channel/ephemeral",
+              docId,
+              hopsRemaining: command.hopsRemaining,
+              stores: storesToSend,
+            })
+          }
+        }
+
+        if (ephemeralMessages.length === 0) {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral-batch: skipping (no data to send)",
+          )
+          break
+        }
+
+        // Send as a single message (batch if multiple, single if one)
+        let messageToSend: EstablishedMsg
+        if (ephemeralMessages.length === 1) {
+          messageToSend = ephemeralMessages[0]
+        } else {
+          messageToSend = {
+            type: "channel/batch",
+            messages: ephemeralMessages,
+          }
+        }
+
+        const sent = this.adapters.send({
+          toChannelIds: [command.toChannelId],
+          message: messageToSend,
+        })
+
+        this.logger.trace(
+          "cmd/broadcast-ephemeral-batch: sent {docCount} docs' ephemeral to channel {channelId} ({sent} adapters)",
+          {
+            docCount: ephemeralMessages.length,
+            channelId: command.toChannelId,
+            sent,
+          },
+        )
+        break
+      }
+
       case "cmd/remove-ephemeral-peer": {
         // Remove the peer's data from all documents' namespaced stores
         for (const [docId, namespaceStores] of this.docNamespacedStores) {
@@ -1270,15 +1360,19 @@ export class Synchronizer {
       return
     }
 
-    // Build docs array with optional ephemeral data
-    const docsWithEphemeral = docs.map(doc => {
+    // Build sync-request messages with optional ephemeral data
+    const syncRequests = docs.map(doc => {
       const result: {
+        type: "channel/sync-request"
         docId: DocId
         requesterDocVersion: VersionVector
+        bidirectional: boolean
         ephemeral?: EphemeralStoreData[]
       } = {
+        type: "channel/sync-request",
         docId: doc.docId,
         requesterDocVersion: doc.requesterDocVersion,
+        bidirectional,
       }
 
       // Include ephemeral data if requested
@@ -1306,13 +1400,28 @@ export class Synchronizer {
       return result
     })
 
-    const messageToSend = {
-      toChannelIds: [toChannelId],
-      message: {
-        type: "channel/sync-request" as const,
-        docs: docsWithEphemeral,
-        bidirectional,
-      },
+    // Send single message or batch depending on count
+    let messageToSend: {
+      toChannelIds: ChannelId[]
+      message: EstablishedMsg
+    }
+
+    if (syncRequests.length === 1) {
+      messageToSend = {
+        toChannelIds: [toChannelId],
+        message: syncRequests[0],
+      }
+    } else if (syncRequests.length > 1) {
+      messageToSend = {
+        toChannelIds: [toChannelId],
+        message: {
+          type: "channel/batch",
+          messages: syncRequests as BatchableMsg[],
+        },
+      }
+    } else {
+      // No docs to sync
+      return
     }
 
     const sentCount = this.adapters.send(messageToSend)

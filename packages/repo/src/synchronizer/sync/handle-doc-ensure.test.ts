@@ -58,8 +58,7 @@ describe("handle-doc-ensure", () => {
     expectCommand(cmd0, "cmd/send-message")
     expect(cmd0.envelope.message.type).toBe("channel/sync-request")
     if (cmd0.envelope.message.type === "channel/sync-request") {
-      expect(cmd0.envelope.message.docs).toHaveLength(1)
-      expect(cmd0.envelope.message.docs[0].docId).toBe("new-doc")
+      expect(cmd0.envelope.message.docId).toBe("new-doc")
     }
 
     expectCommand(cmd1, "cmd/subscribe-doc")

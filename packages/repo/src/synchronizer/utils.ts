@@ -1,7 +1,17 @@
-import type { ChannelMsgSyncRequest, EstablishedChannel } from "../channel.js"
+import type { VersionVector } from "loro-crdt"
+import type { EstablishedChannel } from "../channel.js"
 import type { Permissions } from "../permissions.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
-import type { DocState, PeerState } from "../types.js"
+import type { DocId, DocState, PeerState } from "../types.js"
+
+/**
+ * Type for docs array used by cmd/send-sync-request
+ */
+export type SyncRequestDoc = {
+  docId: DocId
+  requesterDocVersion: VersionVector
+}
+
 import { shouldSyncWithPeer } from "./peer-state-helpers.js"
 import { getPermissionContext } from "./permission-context.js"
 
@@ -66,8 +76,8 @@ export function getAllDocsToSync(documents: Map<string, DocState>) {
 export function getChangedDocsToSync(
   peerState: PeerState,
   documents: Map<string, DocState>,
-) {
-  const docsToSync: ChannelMsgSyncRequest["docs"] = []
+): SyncRequestDoc[] {
+  const docsToSync: SyncRequestDoc[] = []
 
   for (const [docId, docState] of documents.entries()) {
     const peerAwareness = peerState.documentAwareness.get(docId)
