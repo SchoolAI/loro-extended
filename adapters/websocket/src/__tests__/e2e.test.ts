@@ -9,7 +9,7 @@ describe("WebSocket Adapter E2E", () => {
   let serverAdapter: WsServerNetworkAdapter
   let clientAdapter1: WsClientNetworkAdapter
   let clientAdapter2: WsClientNetworkAdapter
-  let _serverRepo: Repo
+  let serverRepo: Repo
   let clientRepo1: Repo
   let clientRepo2: Repo
   let port: number
@@ -42,7 +42,7 @@ describe("WebSocket Adapter E2E", () => {
     })
 
     // Setup repos
-    _serverRepo = new Repo({
+    serverRepo = new Repo({
       identity: { peerId: "1000", name: "server", type: "service" },
       adapters: [serverAdapter],
     })
@@ -91,17 +91,35 @@ describe("WebSocket Adapter E2E", () => {
       text: Shape.text(),
     })
 
-    // Client 1 creates doc and makes changes
+    // Wait for both clients to connect
+    await new Promise<void>(resolve => {
+      const checkConnected = () => {
+        if (clientAdapter1.isConnected && clientAdapter2.isConnected) {
+          resolve()
+        } else {
+          setTimeout(checkConnected, 50)
+        }
+      }
+      checkConnected()
+    })
+
+    // Server also needs to have the document for relay to work
+    // The server acts as a hub - it needs to know about the document
+    serverRepo.get(docId, DocSchema)
+
+    // Both clients need to "join" the document
     const handle1 = clientRepo1.get(docId, DocSchema)
+    const handle2 = clientRepo2.get(docId, DocSchema)
+
+    // Wait for all parties to sync
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Client 1 makes changes
     handle1.change(draft => {
       draft.text.insert(0, "Hello")
     })
 
-    // Wait for sync
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Client 2 should receive changes
-    const handle2 = clientRepo2.get(docId, DocSchema)
+    // Wait for sync to propagate
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("Sync timeout")), 5000)
 

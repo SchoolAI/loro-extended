@@ -262,6 +262,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
       // Simulate handshake completion so Synchronizer starts syncing
       // We use a placeholder peerId for the server
+      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
       this.serverChannel.onReceive({
         type: "channel/establish-response",
         identity: {
@@ -325,6 +326,9 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
   /**
    * Handle a decoded protocol message.
+   *
+   * Delivers messages synchronously. The Synchronizer's receive queue handles
+   * recursion prevention by queuing messages and processing them iteratively.
    */
   private handleProtocolMessage(msg: ProtocolMessage): void {
     if (!this.serverChannel) {
@@ -338,6 +342,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     })
 
     if (translated) {
+      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
       this.serverChannel.onReceive(translated.channelMsg)
     }
   }

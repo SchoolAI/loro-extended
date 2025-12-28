@@ -261,6 +261,9 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   /**
    * Deliver a message from another adapter to the appropriate channel.
    * Called by Bridge.routeMessage().
+   *
+   * Delivers messages synchronously. The Synchronizer's receive queue handles
+   * recursion prevention by queuing messages and processing them iteratively.
    */
   deliverMessage(fromAdapterType: AdapterType, message: ChannelMsg): void {
     const channelId = this.adapterToChannel.get(fromAdapterType)
@@ -275,7 +278,7 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
             channelId,
           },
         )
-        // Deliver to the channel's onReceive callback (set by synchronizer)
+        // Deliver synchronously - the Synchronizer's receive queue prevents recursion
         channel.onReceive(message)
       } else {
         this.logger.warn(

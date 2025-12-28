@@ -10,6 +10,7 @@ import type {
   GeneratedChannel,
 } from "../channel.js"
 import { createPermissions } from "../permissions.js"
+import { findMessage } from "../synchronizer/test-utils.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -154,13 +155,16 @@ describe("Synchronizer - Sync Functionality", () => {
       bidirectional: false,
     })
 
-    // Check response
-    const syncResponse = mockAdapter.sentMessages.find(
-      m => m.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Check response (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
 
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("up-to-date")
+    expect(syncResponse?.message.transmission.type).toBe("up-to-date")
   })
 
   it("should respond with up-to-date when requester is ahead", async () => {
@@ -192,12 +196,15 @@ describe("Synchronizer - Sync Functionality", () => {
       bidirectional: false,
     })
 
-    // Check response
-    const syncResponse = mockAdapter.sentMessages.find(
-      m => m.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Check response (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
 
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("up-to-date")
+    expect(syncResponse?.message.transmission.type).toBe("up-to-date")
   })
 })

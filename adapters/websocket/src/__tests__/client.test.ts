@@ -200,6 +200,10 @@ describe("WsClientNetworkAdapter", () => {
     })
 
     await testAdapter._start()
+
+    // Wait for microtasks to flush (simulated handshake uses queueMicrotask)
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
     const socket = MockWebSocket.instances[0]
 
     // Simulate incoming JoinResponseOk
@@ -215,6 +219,9 @@ describe("WsClientNetworkAdapter", () => {
     const encoded = encodeMessage(joinResponse)
     // The adapter expects ArrayBuffer because binaryType is set to 'arraybuffer'
     socket.simulateMessage(encoded.buffer)
+
+    // Wait for microtasks to flush (handleProtocolMessage uses queueMicrotask)
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
 
     expect(onChannelReceive).toHaveBeenCalled()
     // We expect establish-response first due to simulateHandshake

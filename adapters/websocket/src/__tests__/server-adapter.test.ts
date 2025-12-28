@@ -209,6 +209,9 @@ describe("WsServerNetworkAdapter", () => {
     })
     start()
 
+    // Wait for microtasks to flush (simulateHandshake uses queueMicrotask)
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
     // Create a JoinRequest message
     const joinRequest = {
       type: MESSAGE_TYPE.JoinRequest,
@@ -220,6 +223,9 @@ describe("WsServerNetworkAdapter", () => {
 
     const encoded = encodeMessage(joinRequest)
     mockSocket.simulateMessage(encoded)
+
+    // Wait for microtasks to flush (handleProtocolMessage uses queueMicrotask)
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
 
     // Should have triggered onChannelReceive with translated message
     expect(onChannelReceive).toHaveBeenCalled()

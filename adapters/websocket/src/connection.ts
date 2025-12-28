@@ -113,6 +113,9 @@ export class WsConnection {
 
   /**
    * Handle a decoded protocol message.
+   *
+   * Delivers messages synchronously. The Synchronizer's receive queue handles
+   * recursion prevention by queuing messages and processing them iteratively.
    */
   private handleProtocolMessage(msg: ProtocolMessage): void {
     if (!this.channel) {
@@ -139,6 +142,7 @@ export class WsConnection {
     })
 
     if (translated) {
+      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
       this.channel.onReceive(translated.channelMsg)
     }
   }
@@ -186,6 +190,9 @@ export class WsConnection {
    * This is necessary because the Loro Protocol doesn't have a peer-level handshake,
    * but the Synchronizer expects one before sending sync messages.
    *
+   * Delivers messages synchronously. The Synchronizer's receive queue handles
+   * recursion prevention by queuing messages and processing them iteratively.
+   *
    * @param remotePeerId The peer ID of the remote peer
    */
   simulateHandshake(remotePeerId: PeerID): void {
@@ -195,6 +202,7 @@ export class WsConnection {
     // or establish-response (if we are client)
     // To be safe, we can simulate both directions to ensure state is consistent
 
+    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
     // 1. We tell Synchronizer that the remote peer wants to establish
     this.channel.onReceive({
       type: "channel/establish-request",

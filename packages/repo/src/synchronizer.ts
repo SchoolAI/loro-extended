@@ -8,10 +8,10 @@ import type {
   BatchableMsg,
   Channel,
   ChannelMsg,
+  ChannelMsgEphemeral,
+  ChannelMsgSyncRequest,
   ChannelMsgSyncResponse,
   ConnectedChannel,
-  EphemeralStoreData,
-  EstablishedMsg,
   SyncTransmission,
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
@@ -87,6 +87,19 @@ export class Synchronizer {
   readonly logger: Logger
 
   readonly updateFn: SynchronizerUpdate
+
+  // Deferred send infrastructure for batch response aggregation
+  // Queue of pending sends, grouped by channel
+  #pendingSends: Map<ChannelId, BatchableMsg[]> = new Map()
+
+  // Track dispatch depth for nested dispatches (cmd/dispatch can recurse)
+  #dispatchDepth = 0
+
+  // Receive queue infrastructure to prevent recursion from synchronous adapters
+  // (e.g., BridgeAdapter, StorageAdapter). Messages are queued and processed
+  // iteratively rather than recursively.
+  #receiveQueue: Array<{ channelId: ChannelId; message: ChannelMsg }> = []
+  #isProcessingReceive = false
 
   /**
    * Per-doc namespaced ephemeral stores (unified model).
@@ -198,17 +211,47 @@ export class Synchronizer {
   /**
    * Handle incoming channel messages.
    *
+   * Uses a receive queue to prevent recursion when adapters deliver messages
+   * synchronously (e.g., BridgeAdapter, StorageAdapter). Messages are queued
+   * and processed iteratively rather than recursively.
+   *
    * If middleware is configured, it runs BEFORE the synchronizer processes the message.
    * Middleware can reject messages (e.g., rate limiting, auth).
-   *
-   * Note: This method handles async middleware by running it in a microtask.
-   * The callback signature is sync (returns void) but middleware may be async.
    *
    * @param channelId - The channel ID (we look up the current channel from the model
    *                    to ensure we have the latest state, since the model uses immutable updates)
    * @param message - The message received on the channel
    */
   channelReceive(channelId: ChannelId, message: ChannelMsg): void {
+    // Queue the message
+    this.#receiveQueue.push({ channelId, message })
+
+    // If already processing, the message will be handled when the current
+    // processing completes. This prevents recursion when adapters deliver
+    // messages synchronously (e.g., BridgeAdapter, StorageAdapter).
+    if (this.#isProcessingReceive) {
+      return
+    }
+
+    // Process all queued messages
+    this.#isProcessingReceive = true
+    try {
+      while (this.#receiveQueue.length > 0) {
+        const item = this.#receiveQueue.shift()
+        if (item) {
+          this.#channelReceiveInternal(item.channelId, item.message)
+        }
+      }
+    } finally {
+      this.#isProcessingReceive = false
+    }
+  }
+
+  /**
+   * Internal message processing after queue management.
+   * This contains the actual message handling logic.
+   */
+  #channelReceiveInternal(channelId: ChannelId, message: ChannelMsg): void {
     this.logger.trace("onReceive: {messageType} from {channelId}", {
       channelId,
       messageType: message.type,
@@ -218,54 +261,174 @@ export class Synchronizer {
     // This ensures we have the latest state (e.g., established vs connected)
     const channel = this.model.channels.get(channelId)
 
+    // Handle channel/batch messages by running middleware on each message individually
+    // This ensures size-limiting middleware can reject individual messages in a batch
+    if (message.type === "channel/batch") {
+      this.#handleBatchMessage(channelId, message.messages, channel)
+      return
+    }
+
     // Run middleware if configured
     if (this.#middleware.length > 0 && channel) {
-      // Build peer context from channel
-      const peerContext = this.#buildPeerContextFromChannel(channel)
-
-      if (peerContext) {
-        // Extract document and transmission context from message
-        const { docId, transmission } = this.#extractContextFromMessage(message)
-
-        // Look up document if we have a docId
-        let docContext: DocContext | undefined
-
-        if (docId) {
-          const doc = this.model.documents.get(docId)
-
-          if (doc) {
-            docContext = { id: docId, doc: doc.doc }
-          }
-        }
-
-        const middlewareCtx: MiddlewareContext = {
-          message,
-          peer: peerContext,
-          document: docContext,
-          transmission,
-        }
-
-        // Run middleware asynchronously but handle the result
-        // This allows async middleware while keeping the callback signature sync
-        void runMiddleware(this.#middleware, middlewareCtx, this.logger).then(
-          result => {
-            if (result.allow) {
-              this.#dispatch({
-                type: "synchronizer/channel-receive-message",
-                envelope: {
-                  fromChannelId: channelId,
-                  message,
-                },
-              })
-            }
-            // If !result.allow, message is dropped (middleware rejected it)
-          },
-        )
-        return
-      }
+      this.#runMiddlewareAndDispatch(channelId, message, channel)
+      return
     }
 
     // No middleware or no peer context - dispatch immediately
+    this.#dispatch({
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channelId,
+        message,
+      },
+    })
+  }
+
+  /**
+   * Handle a batch message by running middleware on each message individually.
+   * Messages that pass middleware are collected and dispatched together.
+   */
+  #handleBatchMessage(
+    channelId: ChannelId,
+    messages: BatchableMsg[],
+    channel: Channel | undefined,
+  ): void {
+    if (this.#middleware.length === 0 || !channel) {
+      // No middleware - dispatch the batch directly
+      this.#dispatch({
+        type: "synchronizer/channel-receive-message",
+        envelope: {
+          fromChannelId: channelId,
+          message: { type: "channel/batch", messages },
+        },
+      })
+      return
+    }
+
+    // Run middleware on each message individually
+    const peerContext = this.#buildPeerContextFromChannel(channel)
+    if (!peerContext) {
+      // No peer context - dispatch the batch directly
+      this.#dispatch({
+        type: "synchronizer/channel-receive-message",
+        envelope: {
+          fromChannelId: channelId,
+          message: { type: "channel/batch", messages },
+        },
+      })
+      return
+    }
+
+    // Process each message through middleware
+    const middlewarePromises = messages.map(async msg => {
+      const { docId, transmission } = this.#extractContextFromMessage(msg)
+
+      let docContext: DocContext | undefined
+      if (docId) {
+        const doc = this.model.documents.get(docId)
+        if (doc) {
+          docContext = { id: docId, doc: doc.doc }
+        }
+      }
+
+      const middlewareCtx: MiddlewareContext = {
+        message: msg,
+        peer: peerContext,
+        document: docContext,
+        transmission,
+      }
+
+      const result = await runMiddleware(
+        this.#middleware,
+        middlewareCtx,
+        this.logger,
+      )
+      return { msg, allowed: result.allow }
+    })
+
+    // Wait for all middleware checks and dispatch allowed messages
+    void Promise.all(middlewarePromises).then(results => {
+      const allowedMessages = results.filter(r => r.allowed).map(r => r.msg)
+
+      if (allowedMessages.length === 0) {
+        // All messages rejected
+        return
+      }
+
+      if (allowedMessages.length === 1) {
+        // Single message - dispatch directly
+        this.#dispatch({
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: channelId,
+            message: allowedMessages[0],
+          },
+        })
+      } else {
+        // Multiple messages - dispatch as batch
+        this.#dispatch({
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: channelId,
+            message: { type: "channel/batch", messages: allowedMessages },
+          },
+        })
+      }
+    })
+  }
+
+  /**
+   * Run middleware on a single message and dispatch if allowed.
+   */
+  #runMiddlewareAndDispatch(
+    channelId: ChannelId,
+    message: ChannelMsg,
+    channel: Channel,
+  ): void {
+    const peerContext = this.#buildPeerContextFromChannel(channel)
+
+    if (peerContext) {
+      // Extract document and transmission context from message
+      const { docId, transmission } = this.#extractContextFromMessage(message)
+
+      // Look up document if we have a docId
+      let docContext: DocContext | undefined
+
+      if (docId) {
+        const doc = this.model.documents.get(docId)
+
+        if (doc) {
+          docContext = { id: docId, doc: doc.doc }
+        }
+      }
+
+      const middlewareCtx: MiddlewareContext = {
+        message,
+        peer: peerContext,
+        document: docContext,
+        transmission,
+      }
+
+      // Run middleware asynchronously but handle the result
+      // This allows async middleware while keeping the callback signature sync
+      void runMiddleware(this.#middleware, middlewareCtx, this.logger).then(
+        result => {
+          if (result.allow) {
+            this.#dispatch({
+              type: "synchronizer/channel-receive-message",
+              envelope: {
+                fromChannelId: channelId,
+                message,
+              },
+            })
+          }
+          // If !result.allow, message is dropped (middleware rejected it)
+        },
+      )
+      return
+    }
+
+    // No peer context - dispatch immediately
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
       envelope: {
@@ -702,17 +865,37 @@ export class Synchronizer {
       throw new Error("synchronizer model required")
     }
 
-    const [newModel, command] = this.updateFn(message, this.model)
+    this.#dispatchDepth++
 
-    // We update the Synchronizer instance's model here, allowing us access to data
-    // "inside" the TEA program. This is useful because we want the DocHandle class
-    // to be able to wrap the Synchronizer as a public API.
-    this.model = newModel
+    try {
+      const [newModel, command] = this.updateFn(message, this.model)
 
-    if (command) {
-      this.#executeCommand(command)
+      // We update the Synchronizer instance's model here, allowing us access to data
+      // "inside" the TEA program. This is useful because we want the DocHandle class
+      // to be able to wrap the Synchronizer as a public API.
+      this.model = newModel
+
+      if (command) {
+        this.#executeCommand(command)
+      }
+    } finally {
+      this.#dispatchDepth--
+
+      // Only flush and emit events at the outermost dispatch level
+      if (this.#dispatchDepth === 0) {
+        // Flush sends synchronously. The receive queue (see channelReceive) prevents
+        // infinite recursion when adapters deliver messages synchronously.
+        this.#flushPendingSends()
+        this.#emitReadyStateChanges()
+      }
     }
+  }
 
+  /**
+   * Check for ready-state changes and emit events.
+   * Only called at the outermost dispatch level.
+   */
+  #emitReadyStateChanges() {
     // After all changes, compare ready-states before and after; emit ready-state-changed
     // We need to check both:
     // 1. Documents that exist in the model (may have changed)
@@ -795,25 +978,19 @@ export class Synchronizer {
       }
 
       case "cmd/send-message": {
-        // Validate channels before sending
+        // Queue messages for deferred send (aggregated at end of dispatch)
         for (const channelId of command.envelope.toChannelIds) {
-          this.#validateChannelForSend(channelId)
+          if (!this.#validateChannelForSend(channelId)) continue
+
+          // Flatten nested batches
+          if (command.envelope.message.type === "channel/batch") {
+            for (const msg of command.envelope.message.messages) {
+              this.#queueSend(channelId, msg)
+            }
+          } else {
+            this.#queueSend(channelId, command.envelope.message as BatchableMsg)
+          }
         }
-
-        // Let the AdapterManager handle routing the envelope to the right place(s)
-        const sentCount = this.adapters.send(command.envelope)
-
-        if (sentCount < command.envelope.toChannelIds.length) {
-          this.logger.warn(
-            "cmd/send-message could not deliver {messageType} to all {expectedCount} channels",
-            {
-              messageType: command.envelope.message.type,
-              expectedCount: command.envelope.toChannelIds.length,
-              channelIds: command.envelope.toChannelIds,
-            },
-          )
-        }
-
         break
       }
 
@@ -986,25 +1163,28 @@ export class Synchronizer {
           break
         }
 
-        const sent = this.adapters.send({
-          toChannelIds,
-          message: {
-            type: "channel/ephemeral",
-            docId,
-            hopsRemaining,
-            stores: [
-              {
-                peerId: this.identity.peerId,
-                data,
-                namespace,
-              },
-            ],
-          },
-        })
+        // Build the ephemeral message
+        const message: ChannelMsgEphemeral = {
+          type: "channel/ephemeral",
+          docId,
+          hopsRemaining,
+          stores: [
+            {
+              peerId: this.identity.peerId,
+              data,
+              namespace,
+            },
+          ],
+        }
+
+        // Queue for each channel (deferred send will aggregate)
+        for (const channelId of toChannelIds) {
+          this.#queueSend(channelId, message)
+        }
 
         this.logger.trace(
-          "cmd/broadcast-ephemeral-namespace: sent {namespace} for {docId} to {sent} channels",
-          { namespace, docId, sent },
+          "cmd/broadcast-ephemeral-namespace: queued {namespace} for {docId} to {channelCount} channels",
+          { namespace, docId, channelCount: toChannelIds.length },
         )
         break
       }
@@ -1035,19 +1215,22 @@ export class Synchronizer {
             )
 
             if (channelIds.length > 0 && storesToBroadcast.length > 0) {
-              this.adapters.send({
-                toChannelIds: channelIds,
-                message: {
-                  type: "channel/ephemeral",
-                  docId,
-                  hopsRemaining: 0,
-                  stores: storesToBroadcast.map(s => ({
-                    peerId: command.peerId,
-                    data: new Uint8Array(0), // Empty data signals deletion
-                    namespace: s.namespace,
-                  })),
-                },
-              })
+              // Build the ephemeral deletion message
+              const message: ChannelMsgEphemeral = {
+                type: "channel/ephemeral",
+                docId,
+                hopsRemaining: 0,
+                stores: storesToBroadcast.map(s => ({
+                  peerId: command.peerId,
+                  data: new Uint8Array(0), // Empty data signals deletion
+                  namespace: s.namespace,
+                })),
+              }
+
+              // Queue for each channel (deferred send will aggregate)
+              for (const channelId of channelIds) {
+                this.#queueSend(channelId, message)
+              }
             }
 
             // Emit change event so UI updates immediately
@@ -1098,16 +1281,63 @@ export class Synchronizer {
     return true
   }
 
-  #executeSendSyncResponse(
+  /**
+   * Queue a message to be sent to a channel.
+   * Messages are aggregated by channel and flushed at the end of the dispatch cycle.
+   */
+  #queueSend(channelId: ChannelId, message: BatchableMsg): void {
+    const queue = this.#pendingSends.get(channelId) ?? []
+    queue.push(message)
+    this.#pendingSends.set(channelId, queue)
+  }
+
+  /**
+   * Flush all pending sends, aggregating messages by channel.
+   * Single messages are sent directly; multiple messages are wrapped in a batch.
+   *
+   * IMPORTANT: Storage channels are NOT batched because they have a synchronous
+   * request/response pattern that can cause infinite loops when batched.
+   * Storage adapters process batches by calling handleChannelMessage for each
+   * message, which may trigger more replies, which would get batched again.
+   */
+  #flushPendingSends(): void {
+    for (const [channelId, messages] of this.#pendingSends) {
+      if (messages.length === 0) continue
+
+      // Check if this is a storage channel - don't batch storage channels
+      const channel = this.model.channels.get(channelId)
+      const isStorageChannel = channel?.kind === "storage"
+
+      if (messages.length === 1 || isStorageChannel) {
+        // Send messages individually for storage channels or single messages
+        for (const message of messages) {
+          this.adapters.send({ toChannelIds: [channelId], message })
+        }
+      } else {
+        // Batch messages for network channels
+        this.adapters.send({
+          toChannelIds: [channelId],
+          message: { type: "channel/batch", messages },
+        })
+      }
+    }
+    this.#pendingSends.clear()
+  }
+
+  /**
+   * Build a sync-response message for a document.
+   * Returns undefined if the message cannot be built (doc not found, channel not found).
+   */
+  #buildSyncResponseMessage(
     docId: DocId,
     requesterDocVersion: VersionVector,
     toChannelId: ChannelId,
     includeEphemeral?: boolean,
-  ) {
+  ): ChannelMsgSyncResponse | undefined {
     const docState = this.model.documents.get(docId)
     if (!docState) {
       this.logger.warn("can't get doc-state, doc {docId} not found", { docId })
-      return
+      return undefined
     }
 
     // No need to check channel state - just verify channel exists
@@ -1119,7 +1349,7 @@ export class Synchronizer {
           toChannelId,
         },
       )
-      return
+      return undefined
     }
 
     // Check if requester has empty version (new client)
@@ -1134,7 +1364,7 @@ export class Synchronizer {
     const isEmpty = requesterDocVersion.length() === 0
 
     this.logger.info(
-      "#executeSendSyncResponse version check for {docId} on {channelId}",
+      "#buildSyncResponseMessage version check for {docId} on {channelId}",
       {
         channelId: toChannelId,
         docId,
@@ -1152,7 +1382,7 @@ export class Synchronizer {
     // If comparison is 0 (equal) or -1 (they are ahead), we have nothing new to send
     if ((comparison === 0 || comparison === -1) && !isEmpty) {
       this.logger.debug(
-        "sending sync-response (up-to-date) for {docId} to {channelId}",
+        "building sync-response (up-to-date) for {docId} to {channelId}",
         {
           channelId: toChannelId,
           docId,
@@ -1174,7 +1404,7 @@ export class Synchronizer {
       })
 
       this.logger.debug(
-        "sending sync-response ({transmissionType}) for {docId} to {channelId}",
+        "building sync-response ({transmissionType}) for {docId} to {channelId}",
         {
           channelId: toChannelId,
           docId,
@@ -1224,18 +1454,63 @@ export class Synchronizer {
       }
     }
 
-    const messageToSend = {
-      toChannelIds: [toChannelId],
-      message: syncResponseMessage,
+    return syncResponseMessage
+  }
+
+  #executeSendSyncResponse(
+    docId: DocId,
+    requesterDocVersion: VersionVector,
+    toChannelId: ChannelId,
+    includeEphemeral?: boolean,
+  ) {
+    const message = this.#buildSyncResponseMessage(
+      docId,
+      requesterDocVersion,
+      toChannelId,
+      includeEphemeral,
+    )
+    if (message) {
+      this.#queueSend(toChannelId, message)
+    }
+  }
+
+  /**
+   * Build a single sync-request message for a document.
+   */
+  #buildSyncRequestMessage(
+    doc: { docId: DocId; requesterDocVersion: VersionVector },
+    bidirectional: boolean,
+    includeEphemeral?: boolean,
+  ): ChannelMsgSyncRequest {
+    const result: ChannelMsgSyncRequest = {
+      type: "channel/sync-request",
+      docId: doc.docId,
+      requesterDocVersion: doc.requesterDocVersion,
+      bidirectional,
     }
 
-    const sentCount = this.adapters.send(messageToSend)
+    // Include ephemeral data if requested
+    // For sync-request, we encode all our namespaced stores
+    if (includeEphemeral) {
+      const stores = this.#encodeAllPeerStores(doc.docId)
 
-    if (sentCount === 0) {
-      this.logger.warn("can't send sync-response to channel {toChannelId}", {
-        toChannelId,
-      })
+      if (stores.length > 0) {
+        result.ephemeral = stores.map(s => ({
+          peerId: this.identity.peerId,
+          data: s.data,
+          namespace: s.namespace,
+        }))
+        this.logger.debug(
+          "building sync-request with ephemeral data for {docId}",
+          {
+            docId: doc.docId,
+            storeCount: stores.length,
+          },
+        )
+      }
     }
+
+    return result
   }
 
   #executeSendSyncRequest(
@@ -1254,76 +1529,15 @@ export class Synchronizer {
       return
     }
 
-    // Build sync-request messages with optional ephemeral data
-    const syncRequests = docs.map(doc => {
-      const result: {
-        type: "channel/sync-request"
-        docId: DocId
-        requesterDocVersion: VersionVector
-        bidirectional: boolean
-        ephemeral?: EphemeralStoreData[]
-      } = {
-        type: "channel/sync-request",
-        docId: doc.docId,
-        requesterDocVersion: doc.requesterDocVersion,
+    // Queue each sync-request message individually
+    // The deferred send layer will aggregate them into a batch at flush time
+    for (const doc of docs) {
+      const message = this.#buildSyncRequestMessage(
+        doc,
         bidirectional,
-      }
-
-      // Include ephemeral data if requested
-      // For sync-request, we encode all our namespaced stores
-      if (includeEphemeral) {
-        const stores = this.#encodeAllPeerStores(doc.docId)
-
-        if (stores.length > 0) {
-          result.ephemeral = stores.map(s => ({
-            peerId: this.identity.peerId,
-            data: s.data,
-            namespace: s.namespace,
-          }))
-          this.logger.debug(
-            "including ephemeral data in sync-request for {docId} to {channelId}",
-            {
-              docId: doc.docId,
-              channelId: toChannelId,
-              storeCount: stores.length,
-            },
-          )
-        }
-      }
-
-      return result
-    })
-
-    // Send single message or batch depending on count
-    let messageToSend: {
-      toChannelIds: ChannelId[]
-      message: EstablishedMsg
-    }
-
-    if (syncRequests.length === 1) {
-      messageToSend = {
-        toChannelIds: [toChannelId],
-        message: syncRequests[0],
-      }
-    } else if (syncRequests.length > 1) {
-      messageToSend = {
-        toChannelIds: [toChannelId],
-        message: {
-          type: "channel/batch",
-          messages: syncRequests as BatchableMsg[],
-        },
-      }
-    } else {
-      // No docs to sync
-      return
-    }
-
-    const sentCount = this.adapters.send(messageToSend)
-
-    if (sentCount === 0) {
-      this.logger.warn("can't send sync-request to channel {toChannelId}", {
-        toChannelId,
-      })
+        includeEphemeral,
+      )
+      this.#queueSend(toChannelId, message)
     }
   }
 
@@ -1378,6 +1592,10 @@ export class Synchronizer {
 
   /**
    * Remove a document from the synchronizer and send delete messages to all channels.
+   *
+   * The dispatch handles both:
+   * 1. Removing the document from the model
+   * 2. Sending delete-request messages to all subscribed peers (via deferred send)
    */
   public async removeDocument(docId: DocId): Promise<void> {
     const docState = this.model.documents.get(docId)
@@ -1387,26 +1605,7 @@ export class Synchronizer {
       return
     }
 
-    // Get all channels whose peers have subscribed to this document
-    const channelIds: ChannelId[] = []
-    for (const peerState of this.model.peers.values()) {
-      if (peerState.subscriptions.has(docId)) {
-        channelIds.push(...peerState.channels)
-      }
-    }
-
-    // Send delete-request to all channels
-    if (channelIds.length > 0) {
-      this.adapters.send({
-        toChannelIds: channelIds,
-        message: {
-          type: "channel/delete-request",
-          docId,
-        },
-      })
-    }
-
-    // Remove the document from the model
+    // Dispatch handles both model update and sending delete-request
     this.#dispatch({ type: "synchronizer/doc-delete", docId })
   }
 

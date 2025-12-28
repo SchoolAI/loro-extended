@@ -10,6 +10,7 @@ import type {
   GeneratedChannel,
 } from "../channel.js"
 import { createPermissions } from "../permissions.js"
+import { findMessage } from "../synchronizer/test-utils.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -129,15 +130,18 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Should have sent sync-response with snapshot
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Should have sent sync-response with snapshot (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
 
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("snapshot")
-    expect(syncResponse.message.transmission.data).toBeDefined()
-    expect(syncResponse.message.transmission.version).toBeDefined()
+    expect(syncResponse?.message.transmission.type).toBe("snapshot")
+    expect(syncResponse?.message.transmission.data).toBeDefined()
+    expect(syncResponse?.message.transmission.version).toBeDefined()
   })
 
   it("should send update when requester has non-empty version vector", async () => {
@@ -171,15 +175,18 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Should have sent sync-response with update
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Should have sent sync-response with update (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("update")
-    expect(syncResponse.message.transmission.data).toBeDefined()
+    expect(syncResponse?.message.transmission.type).toBe("update")
+    expect(syncResponse?.message.transmission.data).toBeDefined()
     // Update SHOULD include version field now
-    expect(syncResponse.message.transmission.version).toBeDefined()
+    expect(syncResponse?.message.transmission.version).toBeDefined()
   })
 
   it("should include version in snapshot transmission", async () => {
@@ -208,11 +215,15 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Get the sync response
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Get the sync response (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
-    const transmission = syncResponse.message.transmission
+    expect(syncResponse).toBeDefined()
+    const transmission = syncResponse?.message.transmission
 
     // Verify snapshot includes version
     expect(transmission.type).toBe("snapshot")
@@ -251,11 +262,15 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Get the sync response
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Get the sync response (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
-    const transmission = syncResponse.message.transmission
+    expect(syncResponse).toBeDefined()
+    const transmission = syncResponse?.message.transmission
 
     // Verify update DOES include version
     expect(transmission.type).toBe("update")
@@ -289,14 +304,17 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Should send snapshot with all data
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Should send snapshot with all data (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("snapshot")
-    expect(syncResponse.message.transmission.data).toBeDefined()
-    expect(syncResponse.message.transmission.data.length).toBeGreaterThan(0)
+    expect(syncResponse?.message.transmission.type).toBe("snapshot")
+    expect(syncResponse?.message.transmission.data).toBeDefined()
+    expect(syncResponse?.message.transmission.data.length).toBeGreaterThan(0)
   })
 
   it("should handle incremental sync scenario (non-empty version)", async () => {
@@ -334,12 +352,15 @@ describe("Synchronizer - Snapshot vs Update Behavior", () => {
       bidirectional: false,
     })
 
-    // Should send update (not snapshot)
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
+    // Should send update (not snapshot) (may be inside a batch)
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.transmission.type).toBe("update")
-    expect(syncResponse.message.transmission.version).toBeDefined()
+    expect(syncResponse?.message.transmission.type).toBe("update")
+    expect(syncResponse?.message.transmission.version).toBeDefined()
   })
 })

@@ -449,11 +449,15 @@ export abstract class StorageAdapter extends Adapter<void> {
   /**
    * Send a reply message through the storage channel.
    * Throws an error if the channel is not properly initialized.
+   *
+   * Delivers messages synchronously. The Synchronizer's receive queue handles
+   * recursion prevention by queuing messages and processing them iteratively.
    */
   private reply(msg: ChannelMsg): void {
     if (!this.storageChannel) {
       throw new Error("Cannot reply: storage channel not initialized")
     }
+    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
     this.storageChannel.onReceive(msg)
   }
 

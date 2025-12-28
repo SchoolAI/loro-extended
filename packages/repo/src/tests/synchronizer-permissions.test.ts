@@ -120,6 +120,8 @@ describe("Synchronizer - Permissions Integration", () => {
       type: "channel/directory-request",
     })
 
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+
     // Should only return public documents
     const directoryResponse = freshAdapter.sentMessages.find(
       msg => msg.message.type === "channel/directory-response",

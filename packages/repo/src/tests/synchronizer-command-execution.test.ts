@@ -11,6 +11,7 @@ import type {
 } from "../channel.js"
 import { isEstablished } from "../channel.js"
 import { createPermissions } from "../permissions.js"
+import { findMessage } from "../synchronizer/test-utils.js"
 import { Synchronizer } from "../synchronizer.js"
 import type { ChannelId } from "../types.js"
 
@@ -126,13 +127,17 @@ describe("Synchronizer - Command Execution", () => {
       bidirectional: false,
     })
 
-    // Should have sent sync-response
+    // MockAdapter delivers synchronously, so no need to wait for microtasks
+    // (BridgeAdapter uses queueMicrotask for async delivery, but MockAdapter doesn't)
+
+    // Should have sent sync-response (may be inside a batch)
     expect(mockAdapter.sentMessages.length).toBeGreaterThanOrEqual(1)
-    const syncResponse = mockAdapter.sentMessages.find(
-      msg => msg.message.type === "channel/sync-response",
+    const syncResponse = findMessage(
+      mockAdapter.sentMessages,
+      "channel/sync-response",
     )
     expect(syncResponse).toBeDefined()
-    expect(syncResponse.message.docId).toBe(docId)
+    expect(syncResponse?.message.docId).toBe(docId)
   })
 
   it("should handle establish channel doc command", async () => {

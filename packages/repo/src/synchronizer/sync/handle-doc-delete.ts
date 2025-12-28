@@ -61,7 +61,7 @@
 
 import type { Logger } from "@logtape/logtape"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
-import type { DocId } from "../../types.js"
+import type { ChannelId, DocId } from "../../types.js"
 
 export function handleDocDelete(
   msg: { type: "synchronizer/doc-delete"; docId: DocId },
@@ -78,11 +78,34 @@ export function handleDocDelete(
     return
   }
 
+  // Get channels to notify BEFORE deleting
+  // We need to notify all peers who have subscribed to this document
+  const channelIds: ChannelId[] = []
+  for (const peerState of model.peers.values()) {
+    if (peerState.subscriptions.has(docId)) {
+      channelIds.push(...peerState.channels)
+    }
+  }
+
   // Remove the document from the model
   // This removes:
   // - The Loro document instance
   // - All synchronization metadata
   model.documents.delete(docId)
 
-  return
+  // Return send command if there are channels to notify
+  if (channelIds.length > 0) {
+    return {
+      type: "cmd/send-message",
+      envelope: {
+        toChannelIds: channelIds,
+        message: {
+          type: "channel/delete-request",
+          docId,
+        },
+      },
+    }
+  }
+
+  return undefined
 }
