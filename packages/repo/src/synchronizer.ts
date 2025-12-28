@@ -40,6 +40,7 @@ import type {
   ReadyState,
 } from "./types.js"
 import { equal } from "./utils/equal.js"
+import { getEstablishedChannelsForDoc } from "./utils/get-established-channels-for-doc.js"
 import { TimerlessEphemeralStore } from "./utils/timerless-ephemeral-store.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
@@ -454,6 +455,8 @@ export class Synchronizer {
    * Broadcast a namespaced store to all peers.
    * This is called explicitly by the Handle when local changes are made.
    *
+   * Routes through dispatch for TEA compliance and message aggregation.
+   *
    * @param docId The document ID
    * @param namespace The store namespace
    */
@@ -467,12 +470,11 @@ export class Synchronizer {
       return
     }
 
-    this.#broadcastNamespacedStore(docId, namespace, store)
-
-    // Emit change event for UI updates
-    void this.emitter.emit("ephemeral-change", {
+    // Route through dispatch for TEA compliance
+    this.#dispatch({
+      type: "synchronizer/ephemeral-local-change",
       docId,
-      source: "local",
+      namespace,
     })
   }
 
@@ -485,6 +487,8 @@ export class Synchronizer {
    *
    * This works for both internal TypedEphemeral stores AND external stores
    * (like loro-prosemirror) because they all use the same EphemeralStore API.
+   *
+   * Routes through dispatch for TEA compliance and message aggregation.
    */
   #subscribeToNamespacedStore(
     docId: DocId,
@@ -494,66 +498,17 @@ export class Synchronizer {
     const unsub = store.subscribe(event => {
       // Only broadcast local changes (not imported data from network)
       if (event.by === "local") {
-        this.#broadcastNamespacedStore(docId, namespace, store)
-
-        // Emit change event for UI updates
-        void this.emitter.emit("ephemeral-change", {
+        // Route through dispatch for TEA compliance
+        this.#dispatch({
+          type: "synchronizer/ephemeral-local-change",
           docId,
-          source: "local",
+          namespace,
         })
       }
     })
 
     // Store the unsubscribe function for cleanup
     this.#externalStoreSubscriptions.set(store, unsub)
-  }
-
-  /**
-   * Broadcast a namespaced store to all peers subscribed to the document.
-   *
-   * Note: We intentionally do NOT call store.touch() here. The touch() method
-   * calls set() on each key, which triggers the subscription callback with
-   * by='local'. This would cause an infinite loop when broadcasting from
-   * within a subscription callback.
-   *
-   * For heartbeat broadcasts (which need fresh timestamps), use the
-   * cmd/broadcast-ephemeral command which handles touch() appropriately.
-   */
-  #broadcastNamespacedStore(
-    docId: DocId,
-    namespace: string,
-    store: EphemeralStore,
-  ): void {
-    const data = store.encodeAll()
-    if (data.length === 0) {
-      return
-    }
-
-    const channelIds = this.#getChannelsForDoc(docId)
-    if (channelIds.length === 0) {
-      return
-    }
-
-    this.adapters.send({
-      toChannelIds: channelIds,
-      message: {
-        type: "channel/ephemeral",
-        docId,
-        hopsRemaining: 1, // Allow hub/server to relay to other clients
-        stores: [
-          {
-            peerId: this.identity.peerId,
-            data,
-            namespace, // Include namespace in the message
-          },
-        ],
-      },
-    })
-
-    this.logger.trace(
-      "Broadcast namespaced store {namespace} for doc {docId} to {channelCount} channels",
-      { namespace, docId, channelCount: channelIds.length },
-    )
   }
 
   /**
@@ -589,22 +544,6 @@ export class Synchronizer {
     }
 
     return result
-  }
-
-  /**
-   * Get channel IDs for all peers subscribed to a document.
-   */
-  #getChannelsForDoc(docId: DocId): ChannelId[] {
-    const channelIds: ChannelId[] = []
-    for (const [channelId, channel] of this.model.channels) {
-      if (isEstablishedFn(channel)) {
-        const peerState = this.model.peers.get(channel.peerId)
-        if (peerState?.subscriptions.has(docId)) {
-          channelIds.push(channelId)
-        }
-      }
-    }
-    return channelIds
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -962,80 +901,11 @@ export class Synchronizer {
         break
       }
 
-      case "cmd/broadcast-ephemeral": {
-        const docId = command.docId
-        const myPeerId = this.identity.peerId
-        const namespaceStores = this.docNamespacedStores.get(docId)
-
-        if (!namespaceStores || namespaceStores.size === 0) {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral: skipping for {docId} (no stores)",
-            () => ({ docId }),
-          )
-          break
-        }
-
-        // Collect stores to broadcast
-        // For heartbeat: only send keys matching self.peerId from each store
-        // For allPeerData (sync-response): send all data
-        const storesToSend: {
-          peerId: PeerID
-          data: Uint8Array
-          namespace: string
-        }[] = []
-
-        for (const [namespace, store] of namespaceStores) {
-          // Touch the store to update timestamps before encoding
-          if (store instanceof TimerlessEphemeralStore) {
-            store.touch()
-          }
-
-          if (command.allPeerData) {
-            // Send all data (for sync-response to late joiners)
-            const data = store.encodeAll()
-            if (data.length > 0) {
-              storesToSend.push({ peerId: myPeerId, data, namespace })
-            }
-          } else {
-            // Heartbeat: only send if this store has a key matching my peerId
-            const allStates = store.getAllStates()
-            if (allStates[myPeerId] !== undefined) {
-              const data = store.encodeAll()
-              if (data.length > 0) {
-                storesToSend.push({ peerId: myPeerId, data, namespace })
-              }
-            }
-          }
-        }
-
-        if (storesToSend.length > 0) {
-          const sent = this.adapters.send({
-            toChannelIds: command.toChannelIds,
-            message: {
-              type: "channel/ephemeral",
-              docId,
-              hopsRemaining: command.hopsRemaining,
-              stores: storesToSend,
-            },
-          })
-          this.logger.trace(
-            "cmd/broadcast-ephemeral: sent {docId} ephemeral to {sent} peers ({storeCount} stores)",
-            { docId, sent, storeCount: storesToSend.length },
-          )
-        } else {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral: skipping for {docId} (no data to send)",
-            () => ({ docId }),
-          )
-        }
-        break
-      }
-
       case "cmd/broadcast-ephemeral-batch": {
-        // Batched ephemeral broadcast - sends multiple docs' ephemeral data in one message
-        // This reduces O(docs × peers) messages to O(peers) messages for heartbeats
-        const myPeerId = this.identity.peerId
-        const ephemeralMessages: BatchableMsg[] = []
+        // Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands
+        // This enables future message aggregation via deferred send layer
+        // Note: Currently sends N individual messages; will be batched when deferred send is implemented
+        const subCommands: Command[] = []
 
         for (const docId of command.docIds) {
           const namespaceStores = this.docNamespacedStores.get(docId)
@@ -1044,77 +914,97 @@ export class Synchronizer {
             continue
           }
 
-          // Collect stores to broadcast for this doc
-          const storesToSend: {
-            peerId: PeerID
-            data: Uint8Array
-            namespace: string
-          }[] = []
-
-          for (const [namespace, store] of namespaceStores) {
-            // Touch the store to update timestamps before encoding
+          // Touch all stores before encoding (for heartbeat timestamp refresh)
+          for (const store of namespaceStores.values()) {
             if (store instanceof TimerlessEphemeralStore) {
               store.touch()
             }
-
-            if (command.allPeerData) {
-              // Send all data (for sync-response to late joiners)
-              const data = store.encodeAll()
-              if (data.length > 0) {
-                storesToSend.push({ peerId: myPeerId, data, namespace })
-              }
-            } else {
-              // Heartbeat: only send if this store has a key matching my peerId
-              const allStates = store.getAllStates()
-              if (allStates[myPeerId] !== undefined) {
-                const data = store.encodeAll()
-                if (data.length > 0) {
-                  storesToSend.push({ peerId: myPeerId, data, namespace })
-                }
-              }
-            }
           }
 
-          if (storesToSend.length > 0) {
-            ephemeralMessages.push({
-              type: "channel/ephemeral",
+          // Create a command for each namespace
+          for (const namespace of namespaceStores.keys()) {
+            subCommands.push({
+              type: "cmd/broadcast-ephemeral-namespace",
               docId,
+              namespace,
               hopsRemaining: command.hopsRemaining,
-              stores: storesToSend,
+              toChannelIds: [command.toChannelId],
             })
           }
         }
 
-        if (ephemeralMessages.length === 0) {
+        if (subCommands.length === 0) {
           this.logger.debug(
-            "cmd/broadcast-ephemeral-batch: skipping (no data to send)",
+            "cmd/broadcast-ephemeral-batch: skipping (no stores to broadcast)",
           )
           break
         }
 
-        // Send as a single message (batch if multiple, single if one)
-        let messageToSend: EstablishedMsg
-        if (ephemeralMessages.length === 1) {
-          messageToSend = ephemeralMessages[0]
-        } else {
-          messageToSend = {
-            type: "channel/batch",
-            messages: ephemeralMessages,
-          }
+        // Execute all sub-commands
+        // Note: This currently sends N messages; future deferred send layer will aggregate them
+        for (const cmd of subCommands) {
+          this.#executeCommand(cmd)
+        }
+
+        this.logger.trace(
+          "cmd/broadcast-ephemeral-batch: expanded into {cmdCount} namespace broadcasts for channel {channelId}",
+          {
+            cmdCount: subCommands.length,
+            channelId: command.toChannelId,
+          },
+        )
+        break
+      }
+
+      case "cmd/broadcast-ephemeral-namespace": {
+        // Broadcast a single namespace's ephemeral data for a document
+        const { docId, namespace, hopsRemaining, toChannelIds } = command
+        const store = this.getNamespacedStore(docId, namespace)
+
+        if (!store) {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (store not found)",
+            () => ({ docId, namespace }),
+          )
+          break
+        }
+
+        const data = store.encodeAll()
+        if (data.length === 0) {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (no data)",
+            () => ({ docId, namespace }),
+          )
+          break
+        }
+
+        if (toChannelIds.length === 0) {
+          this.logger.debug(
+            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (no channels)",
+            () => ({ docId, namespace }),
+          )
+          break
         }
 
         const sent = this.adapters.send({
-          toChannelIds: [command.toChannelId],
-          message: messageToSend,
+          toChannelIds,
+          message: {
+            type: "channel/ephemeral",
+            docId,
+            hopsRemaining,
+            stores: [
+              {
+                peerId: this.identity.peerId,
+                data,
+                namespace,
+              },
+            ],
+          },
         })
 
         this.logger.trace(
-          "cmd/broadcast-ephemeral-batch: sent {docCount} docs' ephemeral to channel {channelId} ({sent} adapters)",
-          {
-            docCount: ephemeralMessages.length,
-            channelId: command.toChannelId,
-            sent,
-          },
+          "cmd/broadcast-ephemeral-namespace: sent {namespace} for {docId} to {sent} channels",
+          { namespace, docId, sent },
         )
         break
       }
@@ -1137,8 +1027,12 @@ export class Synchronizer {
           }
 
           if (peerDataRemoved) {
-            // Broadcast deletion to other peers
-            const channelIds = this.#getChannelsForDoc(docId)
+            // Broadcast deletion to other peers using the utility function
+            const channelIds = getEstablishedChannelsForDoc(
+              this.model.channels,
+              this.model.peers,
+              docId,
+            )
 
             if (channelIds.length > 0 && storesToBroadcast.length > 0) {
               this.adapters.send({

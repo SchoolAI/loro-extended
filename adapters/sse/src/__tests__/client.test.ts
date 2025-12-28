@@ -2,9 +2,24 @@
  * Tests for the SSE client network adapter.
  */
 
-import type { AdapterContext, PeerID } from "@loro-extended/repo"
+import type {
+  AdapterContext,
+  ChannelMsgSyncRequest,
+  PeerID,
+} from "@loro-extended/repo"
+import { VersionVector } from "loro-crdt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SseClientNetworkAdapter } from "../client.js"
+
+// Helper to create a valid sync-request message
+function createSyncRequest(): ChannelMsgSyncRequest {
+  return {
+    type: "channel/sync-request",
+    docId: "test-doc",
+    requesterDocVersion: new VersionVector(null),
+    bidirectional: false,
+  }
+}
 
 // Store the current mock instance
 let currentMockEventSource: {
@@ -180,15 +195,8 @@ describe("SseClientNetworkAdapter", () => {
       // Simulate EventSource being closed
       currentMockEventSource.readyState = 2 // CLOSED
 
-      // Try to send a message
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      // Send should trigger reconnection, not throw
-      await channel.send(message)
+      // Try to send a message - Send should trigger reconnection, not throw
+      await channel.send(createSyncRequest())
 
       // Should have closed the old EventSource
       expect(oldEventSource.close).toHaveBeenCalled()
@@ -209,13 +217,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource.readyState = 2 // CLOSED
 
       // Try to send a message
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await channel.send(message)
+      await channel.send(createSyncRequest())
 
       // Fetch should NOT have been called because we detected closed state
       expect(mockFetch).not.toHaveBeenCalled()
@@ -236,13 +238,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource.readyState = 1
 
       // Send a message
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await channel.send(message)
+      await channel.send(createSyncRequest())
 
       // Fetch should have been called
       expect(mockFetch).toHaveBeenCalledWith(
@@ -333,13 +329,7 @@ describe("SseClientNetworkAdapter", () => {
       // Manually clear peerId to simulate uninitialized state
       ;(adapter as any).peerId = undefined
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await expect(channel.send(message)).rejects.toThrow(
+      await expect(channel.send(createSyncRequest())).rejects.toThrow(
         "Adapter not initialized - peerId not available",
       )
     })
@@ -356,13 +346,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await expect(channel.send(message)).rejects.toThrow(
+      await expect(channel.send(createSyncRequest())).rejects.toThrow(
         "Server error: Internal Server Error",
       )
     })
@@ -504,11 +488,7 @@ describe("SseClientNetworkAdapter", () => {
 
       // Trigger send, which triggers reconnect()
       const channel = Array.from(adapter.channels)[0]
-      await channel.send({
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      })
+      await channel.send(createSyncRequest())
 
       // Channel should still exist
       expect(adapter.channels.size).toBe(1)
@@ -554,13 +534,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await channel.send(message)
+      await channel.send(createSyncRequest())
 
       // Should have been called twice
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -581,13 +555,9 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
-
-      await expect(channel.send(message)).rejects.toThrow("Failed to fetch")
+      await expect(channel.send(createSyncRequest())).rejects.toThrow(
+        "Failed to fetch",
+      )
 
       // Should have been called 3 times
       expect(mockFetch).toHaveBeenCalledTimes(3)
@@ -619,11 +589,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
-      const sendPromise = channel.send({
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      })
+      const sendPromise = channel.send(createSyncRequest())
 
       // First call happens immediately
       expect(mockFetch).toHaveBeenCalledTimes(1)
@@ -653,11 +619,7 @@ describe("SseClientNetworkAdapter", () => {
       currentMockEventSource?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
-      const sendPromise = channel.send({
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      })
+      const sendPromise = channel.send(createSyncRequest())
 
       // First call happens immediately
       expect(mockFetch).toHaveBeenCalledTimes(1)

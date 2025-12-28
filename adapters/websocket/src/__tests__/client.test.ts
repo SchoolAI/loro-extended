@@ -133,12 +133,8 @@ describe("WsClientNetworkAdapter", () => {
 
     const msg = {
       type: "channel/sync-request" as const,
-      docs: [
-        {
-          docId: "doc-1",
-          requesterDocVersion: new LoroDoc().version(),
-        },
-      ],
+      docId: "doc-1",
+      requesterDocVersion: new LoroDoc().version(),
       bidirectional: true,
     }
 

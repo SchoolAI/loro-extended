@@ -118,7 +118,11 @@ export type SynchronizerModel = {
 export type SynchronizerMessage =
   // A heartbeat signal given to us from Synchronizer runtime; used for ephemeral store
   | { type: "synchronizer/heartbeat" }
-  | { type: "synchronizer/ephemeral-local-change"; docId: DocId }
+  | {
+      type: "synchronizer/ephemeral-local-change"
+      docId: DocId
+      namespace: string
+    }
 
   // Channel lifecycle messages
   | { type: "synchronizer/channel-added"; channel: ConnectedChannel }
@@ -191,17 +195,21 @@ export type Command =
       stores: EphemeralStoreData[]
     }
   | {
-      type: "cmd/broadcast-ephemeral"
+      /** Broadcast a single namespace's ephemeral data for a document */
+      type: "cmd/broadcast-ephemeral-namespace"
       docId: DocId
-      allPeerData: boolean
+      namespace: string
       hopsRemaining: number
       toChannelIds: ChannelId[]
     }
   | {
-      /** Batched ephemeral broadcast - sends multiple docs' ephemeral data in one message per peer */
+      /**
+       * Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands.
+       * Used by heartbeat to broadcast all namespaces for multiple docs to a single peer.
+       * Note: Currently sends N individual messages; future deferred send layer will aggregate them.
+       */
       type: "cmd/broadcast-ephemeral-batch"
       docIds: DocId[]
-      allPeerData: boolean
       hopsRemaining: number
       toChannelId: ChannelId
     }

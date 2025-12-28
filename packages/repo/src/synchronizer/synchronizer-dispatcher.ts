@@ -46,14 +46,13 @@ export function synchronizerDispatcher(
       }
 
       // Step 2: Create one cmd/broadcast-ephemeral-batch per peer
-      // Each command will send a channel/batch containing multiple channel/ephemeral messages
+      // This is a macro command that expands into per-namespace broadcasts
       const commands: Command[] = []
 
       for (const [channelId, docIds] of peerDocs) {
         commands.push({
           type: "cmd/broadcast-ephemeral-batch",
           docIds,
-          allPeerData: true,
           hopsRemaining: 1, // Allow server to relay heartbeat to other clients
           toChannelId: channelId,
         })
@@ -77,9 +76,9 @@ export function synchronizerDispatcher(
             docId: msg.docId,
           },
           {
-            type: "cmd/broadcast-ephemeral",
+            type: "cmd/broadcast-ephemeral-namespace",
             docId: msg.docId,
-            allPeerData: false,
+            namespace: msg.namespace,
             // Allow a hub-and-spoke server to propagate one more hop
             hopsRemaining: 1,
             toChannelIds: channelIds,

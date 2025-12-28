@@ -1,6 +1,21 @@
-import type { AdapterContext, PeerID } from "@loro-extended/repo"
+import type {
+  AdapterContext,
+  ChannelMsgSyncRequest,
+  PeerID,
+} from "@loro-extended/repo"
+import { VersionVector } from "loro-crdt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { HttpPollingClientNetworkAdapter } from "../client.js"
+
+// Helper to create a valid sync-request message
+function createSyncRequest(): ChannelMsgSyncRequest {
+  return {
+    type: "channel/sync-request",
+    docId: "test-doc",
+    requesterDocVersion: new VersionVector(null),
+    bidirectional: false,
+  }
+}
 
 // Mock fetch
 const mockFetch = vi.fn()
@@ -108,11 +123,7 @@ describe("HttpPollingClientNetworkAdapter", () => {
       mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"))
       mockFetch.mockResolvedValueOnce({ ok: true })
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
+      const message = createSyncRequest()
 
       // Should succeed after retry
       await channel.send(message)
@@ -150,11 +161,7 @@ describe("HttpPollingClientNetworkAdapter", () => {
       // 2. Setup failures for the POST request
       mockFetch.mockRejectedValue(new TypeError("Failed to fetch"))
 
-      const message = {
-        type: "channel/sync-request" as const,
-        docs: [],
-        bidirectional: false,
-      }
+      const message = createSyncRequest()
 
       // Should throw after max attempts
       await expect(channel.send(message)).rejects.toThrow("Failed to fetch")

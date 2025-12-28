@@ -14,6 +14,7 @@ import type {
   ChannelMsgSyncRequest,
   ChannelMsgSyncResponse,
   ChannelMsgUpdate,
+  EphemeralStoreData,
   PeerIdentityDetails,
 } from "@loro-extended/repo"
 import { LoroDoc, VersionVector } from "loro-crdt"
@@ -125,8 +126,8 @@ export function toProtocolMessages(
 }
 
 /**
- * Translate a sync-request to JoinRequest messages and optional ephemeral DocUpdate messages.
- * Returns an array of protocol messages (JoinRequests followed by ephemeral DocUpdates for each doc).
+ * Translate a sync-request to JoinRequest message and optional ephemeral DocUpdate message.
+ * Returns an array of protocol messages (JoinRequest followed by ephemeral DocUpdate if present).
  */
 function translateSyncRequest(
   msg: ChannelMsgSyncRequest,
@@ -134,39 +135,37 @@ function translateSyncRequest(
 ): ProtocolMessage[] {
   const result: ProtocolMessage[] = []
 
-  for (const doc of msg.docs) {
-    const roomId = getRoomId(ctx, doc.docId)
-    // Register the mapping if not already registered
-    registerRoom(ctx, roomId, doc.docId)
+  const roomId = getRoomId(ctx, msg.docId)
+  // Register the mapping if not already registered
+  registerRoom(ctx, roomId, msg.docId)
 
-    // Add JoinRequest for this doc
+  // Add JoinRequest for this doc
+  result.push({
+    type: MESSAGE_TYPE.JoinRequest,
+    crdtType: "loro" as CrdtType,
+    roomId,
+    // Use authPayload to carry bidirectional flag
+    // [0] = bidirectional: false
+    // [] = bidirectional: true (default)
+    authPayload: msg.bidirectional ? new Uint8Array(0) : new Uint8Array([0]),
+    requesterVersion: msg.requesterDocVersion.encode(),
+  })
+
+  // If this doc has ephemeral data, send it as a separate DocUpdate
+  if (msg.ephemeral && msg.ephemeral.length > 0) {
+    const updates = msg.ephemeral.map((store: EphemeralStoreData) =>
+      encodeEphemeralWithPeerIdAndNamespace(
+        store.peerId,
+        store.namespace,
+        store.data,
+      ),
+    )
     result.push({
-      type: MESSAGE_TYPE.JoinRequest,
-      crdtType: "loro" as CrdtType,
+      type: MESSAGE_TYPE.DocUpdate,
+      crdtType: "ephemeral" as CrdtType,
       roomId,
-      // Use authPayload to carry bidirectional flag
-      // [0] = bidirectional: false
-      // [] = bidirectional: true (default)
-      authPayload: msg.bidirectional ? new Uint8Array(0) : new Uint8Array([0]),
-      requesterVersion: doc.requesterDocVersion.encode(),
+      updates,
     })
-
-    // If this doc has ephemeral data, send it as a separate DocUpdate
-    if (doc.ephemeral && doc.ephemeral.length > 0) {
-      const updates = doc.ephemeral.map(store =>
-        encodeEphemeralWithPeerIdAndNamespace(
-          store.peerId,
-          store.namespace,
-          store.data,
-        ),
-      )
-      result.push({
-        type: MESSAGE_TYPE.DocUpdate,
-        crdtType: "ephemeral" as CrdtType,
-        roomId,
-        updates,
-      })
-    }
   }
 
   return result
@@ -410,12 +409,8 @@ function translateJoinRequestToChannel(
 
   const channelMsg: ChannelMsgSyncRequest = {
     type: "channel/sync-request",
-    docs: [
-      {
-        docId,
-        requesterDocVersion,
-      },
-    ],
+    docId,
+    requesterDocVersion,
     bidirectional,
   }
 
