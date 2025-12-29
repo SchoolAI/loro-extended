@@ -88,30 +88,6 @@ export interface TypedEphemeral<T> {
 }
 
 /**
- * Deep equality check for values.
- * Used to detect which keys actually changed in the store.
- */
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true
-  if (a === null || b === null) return false
-  if (typeof a !== "object" || typeof b !== "object") return false
-
-  const aObj = a as Record<string, unknown>
-  const bObj = b as Record<string, unknown>
-
-  const aKeys = Object.keys(aObj)
-  const bKeys = Object.keys(bObj)
-
-  if (aKeys.length !== bKeys.length) return false
-
-  for (const key of aKeys) {
-    if (!deepEqual(aObj[key], bObj[key])) return false
-  }
-
-  return true
-}
-
-/**
  * Creates a TypedEphemeral wrapper around an EphemeralStore.
  *
  * Note: Broadcasting is handled automatically by the Synchronizer's subscription
@@ -189,7 +165,7 @@ export function createTypedEphemeral<T>(
         // Find keys that were added or changed
         for (const [key, value] of Object.entries(currentStates)) {
           const prevValue = previousStates[key]
-          if (!deepEqual(value, prevValue)) {
+          if (!equal(value, prevValue)) {
             cb({ key, value: value as T, source })
           }
         }
