@@ -88,18 +88,15 @@ export class Synchronizer {
 
   readonly updateFn: SynchronizerUpdate
 
-  // Deferred send infrastructure for batch response aggregation
-  // Queue of pending sends, grouped by channel
-  #pendingSends: Map<ChannelId, BatchableMsg[]> = new Map()
+  // Unified work queue for all deferred execution
+  // Prevents recursion when adapters deliver messages synchronously
+  // (e.g., BridgeAdapter, StorageAdapter)
+  #workQueue: Array<() => void> = []
+  #isProcessing = false
 
-  // Track dispatch depth for nested dispatches (cmd/dispatch can recurse)
-  #dispatchDepth = 0
-
-  // Receive queue infrastructure to prevent recursion from synchronous adapters
-  // (e.g., BridgeAdapter, StorageAdapter). Messages are queued and processed
-  // iteratively rather than recursively.
-  #receiveQueue: Array<{ channelId: ChannelId; message: ChannelMsg }> = []
-  #isProcessingReceive = false
+  // Batching buffer for outbound messages (separate concern from work queue)
+  // Messages are aggregated by channel and flushed at quiescence
+  #outboundBuffer: Map<ChannelId, BatchableMsg[]> = new Map()
 
   /**
    * Per-doc namespaced ephemeral stores (unified model).
@@ -209,9 +206,46 @@ export class Synchronizer {
   }
 
   /**
+   * Enqueue work to be processed.
+   * Work items are processed iteratively to prevent stack overflow from
+   * synchronous adapters (e.g., BridgeAdapter, StorageAdapter).
+   */
+  #enqueue(work: () => void): void {
+    this.#workQueue.push(work)
+    this.#processUntilQuiescent()
+  }
+
+  /**
+   * Process all queued work until quiescence, then flush outbound messages.
+   * Uses a guard flag to prevent recursive processing.
+   */
+  #processUntilQuiescent(): void {
+    if (this.#isProcessing) return
+
+    this.#isProcessing = true
+    try {
+      while (this.#workQueue.length > 0) {
+        const work = this.#workQueue.shift()!
+        work()
+      }
+      // Quiescent: flush outbound buffer
+      this.#flushOutbound()
+      // Emit ready state changes after flush
+      this.#emitReadyStateChanges()
+    } finally {
+      this.#isProcessing = false
+    }
+
+    // If flush generated new work (via synchronous adapter replies), process it
+    if (this.#workQueue.length > 0) {
+      this.#processUntilQuiescent()
+    }
+  }
+
+  /**
    * Handle incoming channel messages.
    *
-   * Uses a receive queue to prevent recursion when adapters deliver messages
+   * Uses a unified work queue to prevent recursion when adapters deliver messages
    * synchronously (e.g., BridgeAdapter, StorageAdapter). Messages are queued
    * and processed iteratively rather than recursively.
    *
@@ -223,28 +257,7 @@ export class Synchronizer {
    * @param message - The message received on the channel
    */
   channelReceive(channelId: ChannelId, message: ChannelMsg): void {
-    // Queue the message
-    this.#receiveQueue.push({ channelId, message })
-
-    // If already processing, the message will be handled when the current
-    // processing completes. This prevents recursion when adapters deliver
-    // messages synchronously (e.g., BridgeAdapter, StorageAdapter).
-    if (this.#isProcessingReceive) {
-      return
-    }
-
-    // Process all queued messages
-    this.#isProcessingReceive = true
-    try {
-      while (this.#receiveQueue.length > 0) {
-        const item = this.#receiveQueue.shift()
-        if (item) {
-          this.#channelReceiveInternal(item.channelId, item.message)
-        }
-      }
-    } finally {
-      this.#isProcessingReceive = false
-    }
+    this.#enqueue(() => this.#channelReceiveInternal(channelId, message))
   }
 
   /**
@@ -860,35 +873,46 @@ export class Synchronizer {
   // INTERNAL RUNTIME
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+  /**
+   * Dispatch a message to the synchronizer program.
+   *
+   * If we're already inside the work queue processing loop, execute inline.
+   * Otherwise, enqueue the work and process until quiescent.
+   *
+   * This unified approach handles both:
+   * 1. Preventing recursion from synchronous adapters
+   * 2. Batching outbound messages until quiescence
+   */
   #dispatch(message: SynchronizerMessage) {
+    if (this.#isProcessing) {
+      // Already inside work queue - execute inline
+      this.#dispatchInternal(message)
+    } else {
+      // Not processing - enqueue and process
+      this.#enqueue(() => this.#dispatchInternal(message))
+    }
+  }
+
+  /**
+   * Internal dispatch implementation.
+   * Runs the update function and executes any resulting command.
+   */
+  #dispatchInternal(message: SynchronizerMessage) {
     if (!this.model) {
       throw new Error("synchronizer model required")
     }
 
-    this.#dispatchDepth++
+    const [newModel, command] = this.updateFn(message, this.model)
 
-    try {
-      const [newModel, command] = this.updateFn(message, this.model)
+    // We update the Synchronizer instance's model here, allowing us access to data
+    // "inside" the TEA program. This is useful because we want the DocHandle class
+    // to be able to wrap the Synchronizer as a public API.
+    this.model = newModel
 
-      // We update the Synchronizer instance's model here, allowing us access to data
-      // "inside" the TEA program. This is useful because we want the DocHandle class
-      // to be able to wrap the Synchronizer as a public API.
-      this.model = newModel
-
-      if (command) {
-        this.#executeCommand(command)
-      }
-    } finally {
-      this.#dispatchDepth--
-
-      // Only flush and emit events at the outermost dispatch level
-      if (this.#dispatchDepth === 0) {
-        // Flush sends synchronously. The receive queue (see channelReceive) prevents
-        // infinite recursion when adapters deliver messages synchronously.
-        this.#flushPendingSends()
-        this.#emitReadyStateChanges()
-      }
+    if (command) {
+      this.#executeCommand(command)
     }
+    // Note: No flush here - flushing happens at quiescence in #processUntilQuiescent
   }
 
   /**
@@ -1283,45 +1307,41 @@ export class Synchronizer {
 
   /**
    * Queue a message to be sent to a channel.
-   * Messages are aggregated by channel and flushed at the end of the dispatch cycle.
+   * Messages are aggregated by channel and flushed at quiescence.
    */
   #queueSend(channelId: ChannelId, message: BatchableMsg): void {
-    const queue = this.#pendingSends.get(channelId) ?? []
+    const queue = this.#outboundBuffer.get(channelId) ?? []
     queue.push(message)
-    this.#pendingSends.set(channelId, queue)
+    this.#outboundBuffer.set(channelId, queue)
   }
 
   /**
-   * Flush all pending sends, aggregating messages by channel.
+   * Flush all buffered outbound messages, aggregating by channel.
    * Single messages are sent directly; multiple messages are wrapped in a batch.
    *
-   * IMPORTANT: Storage channels are NOT batched because they have a synchronous
-   * request/response pattern that can cause infinite loops when batched.
-   * Storage adapters process batches by calling handleChannelMessage for each
-   * message, which may trigger more replies, which would get batched again.
+   * All channels are batched uniformly - the unified work queue handles
+   * reentrancy from synchronous adapters (e.g., StorageAdapter, BridgeAdapter).
    */
-  #flushPendingSends(): void {
-    for (const [channelId, messages] of this.#pendingSends) {
+  #flushOutbound(): void {
+    // Snapshot and clear to handle reentrancy safely
+    // (synchronous adapter replies will queue to a fresh buffer)
+    const toSend = new Map(this.#outboundBuffer)
+    this.#outboundBuffer.clear()
+
+    for (const [channelId, messages] of toSend) {
       if (messages.length === 0) continue
 
-      // Check if this is a storage channel - don't batch storage channels
-      const channel = this.model.channels.get(channelId)
-      const isStorageChannel = channel?.kind === "storage"
-
-      if (messages.length === 1 || isStorageChannel) {
-        // Send messages individually for storage channels or single messages
-        for (const message of messages) {
-          this.adapters.send({ toChannelIds: [channelId], message })
-        }
+      if (messages.length === 1) {
+        // Single message - send directly without batch wrapper
+        this.adapters.send({ toChannelIds: [channelId], message: messages[0] })
       } else {
-        // Batch messages for network channels
+        // Multiple messages - wrap in batch
         this.adapters.send({
           toChannelIds: [channelId],
           message: { type: "channel/batch", messages },
         })
       }
     }
-    this.#pendingSends.clear()
   }
 
   /**

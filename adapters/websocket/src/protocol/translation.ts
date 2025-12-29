@@ -110,6 +110,13 @@ export function toProtocolMessages(
     case "channel/ephemeral":
       return translateEphemeral(msg, ctx)
 
+    case "channel/batch":
+      // Recursively translate each message in the batch
+      // This flattens the batch into individual protocol messages
+      return msg.messages.flatMap(batchedMsg =>
+        toProtocolMessages(batchedMsg, ctx),
+      )
+
     case "channel/directory-request":
     case "channel/directory-response":
     case "channel/new-doc":
