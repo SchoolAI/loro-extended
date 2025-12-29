@@ -1,5 +1,5 @@
 /**
- * Hub-spoke synchronization test for native WebSocket adapter.
+ * Hub-spoke synchronization test.
  *
  * This test replicates the todo-websocket example scenario where:
  * 1. Server acts as a hub/relay (does NOT explicitly get documents)
@@ -7,15 +7,19 @@
  * 3. Client 1 creates a document and makes changes
  * 4. Client 2 should see the changes via the server relay
  *
- * The native adapter should handle this without the translation issues
- * that affected the compat adapter (e.g., dropped batch messages).
+ * This is the scenario that was failing in the e2e test:
+ * examples/todo-websocket/tests/e2e/multi-client-sync.spec.ts
+ *
+ * The root cause was that `channel/batch` messages were not being
+ * translated to protocol messages, causing the reciprocal sync-request
+ * from server to client to be dropped.
  */
 
 import { type PeerID, Repo, Shape } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
-import { WsServerNetworkAdapter, wrapWsSocket } from "../server-adapter.js"
+import { WsServerNetworkAdapter, wrapWsSocket } from "../server.js"
 
 describe("Hub-Spoke Synchronization (Server as Relay)", () => {
   let wss: WebSocketServer
@@ -33,12 +37,12 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     await new Promise<void>(resolve => {
       wss.on("listening", resolve)
     })
-    port = (wss.address() as { port: number }).port
+    port = (wss.address() as any).port
 
     // Setup server adapter
     serverAdapter = new WsServerNetworkAdapter()
     wss.on("connection", (ws, req) => {
-      if (!req.url) throw new Error("request URL is required")
+      if (!req.url) throw new Error(`request URL is required`)
       const url = new URL(req.url, `http://localhost:${port}`)
       const peerId = url.searchParams.get("peerId")
 
@@ -60,7 +64,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     clientAdapter1 = new WsClientNetworkAdapter({
       url: `ws://localhost:${port}?peerId=2000`,
       reconnect: { enabled: false },
-      WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
+      WebSocket: WebSocket as any,
     })
     clientRepo1 = new Repo({
       identity: { peerId: "2000", name: "client-1", type: "user" },
@@ -70,7 +74,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     clientAdapter2 = new WsClientNetworkAdapter({
       url: `ws://localhost:${port}?peerId=3000`,
       reconnect: { enabled: false },
-      WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
+      WebSocket: WebSocket as any,
     })
     clientRepo2 = new Repo({
       identity: { peerId: "3000", name: "client-2", type: "user" },
@@ -140,7 +144,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
         return
       }
 
-      handle2.subscribe(() => {
+      handle2.subscribe((_event: any) => {
         const text = handle2.loroDoc.getText("text")
         if (text && text.toString() === "Hello from client 1") {
           clearTimeout(timeout)
@@ -209,7 +213,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
         return
       }
 
-      handle2.subscribe(() => {
+      handle2.subscribe((_event: any) => {
         const text = handle2.loroDoc.getText("text")
         if (text && text.toString() === "Hello from client 1") {
           clearTimeout(timeout)

@@ -1,20 +1,13 @@
 /**
- * WebSocket connection class.
+ * WebSocket connection class for native loro-extended protocol.
  *
- * Manages a single WebSocket connection to a peer, handling message
- * translation between the Loro Syncing Protocol and loro-extended messages.
+ * Manages a single WebSocket connection to a peer, directly transmitting
+ * ChannelMsg types without protocol translation.
  */
 
 import type { Channel, ChannelMsg, PeerID } from "@loro-extended/repo"
 import type { WsSocket } from "./handler/types.js"
-import { decodeMessage, encodeMessage } from "./protocol/index.js"
-import {
-  createTranslationContext,
-  fromProtocolMessage,
-  type TranslationContext,
-  toProtocolMessages,
-} from "./protocol/translation.js"
-import type { ProtocolMessage } from "./protocol/types.js"
+import { decodeFrame, encodeFrame } from "./wire-format.js"
 
 /**
  * Represents a WebSocket connection to a peer.
@@ -25,15 +18,12 @@ export class WsConnection {
 
   private socket: WsSocket
   private channel: Channel | null = null
-  private joinedRooms = new Set<string>()
-  private translationContext: TranslationContext
   private started = false
 
   constructor(peerId: PeerID, channelId: number, socket: WsSocket) {
     this.peerId = peerId
     this.channelId = channelId
     this.socket = socket
-    this.translationContext = createTranslationContext()
   }
 
   /**
@@ -57,39 +47,19 @@ export class WsConnection {
     this.socket.onMessage(data => {
       this.handleMessage(data)
     })
-
-    // We don't register onClose/onError here because the adapter handles cleanup
-    // and the WsSocket interface typically supports only one handler.
-    // If WsConnection needs to handle close/error, we should change the architecture
-    // to have the adapter notify the connection or support multiple listeners.
   }
 
   /**
    * Send a loro-extended message through the WebSocket.
-   * Translates the message to Loro Protocol format before sending.
+   * Encodes directly to wire format without translation.
    */
   send(msg: ChannelMsg): void {
     if (this.socket.readyState !== "open") {
       return
     }
 
-    const protocolMsgs = toProtocolMessages(msg, this.translationContext)
-
-    for (const pmsg of protocolMsgs) {
-      this.sendProtocolMessage(pmsg)
-    }
-  }
-
-  /**
-   * Send a raw protocol message.
-   */
-  sendProtocolMessage(msg: ProtocolMessage): void {
-    if (this.socket.readyState !== "open") {
-      return
-    }
-
-    const encoded = encodeMessage(msg)
-    this.socket.send(encoded)
+    const frame = encodeFrame(msg)
+    this.socket.send(frame)
   }
 
   /**
@@ -104,47 +74,29 @@ export class WsConnection {
 
     // Handle binary protocol messages
     try {
-      const msg = decodeMessage(data)
-      this.handleProtocolMessage(msg)
+      const messages = decodeFrame(data)
+      for (const msg of messages) {
+        this.handleChannelMessage(msg)
+      }
     } catch (error) {
-      console.error("Failed to decode protocol message:", error)
+      console.error("Failed to decode wire message:", error)
     }
   }
 
   /**
-   * Handle a decoded protocol message.
+   * Handle a decoded channel message.
    *
    * Delivers messages synchronously. The Synchronizer's receive queue handles
    * recursion prevention by queuing messages and processing them iteratively.
    */
-  private handleProtocolMessage(msg: ProtocolMessage): void {
+  private handleChannelMessage(msg: ChannelMsg): void {
     if (!this.channel) {
       console.error("Cannot handle message: channel not set")
       return
     }
 
-    // Track room joins
-    if (msg.type === 0x00) {
-      // JoinRequest
-      this.joinedRooms.add(msg.roomId)
-    } else if (msg.type === 0x01) {
-      // JoinResponseOk
-      this.joinedRooms.add(msg.roomId)
-    } else if (msg.type === 0x07) {
-      // Leave
-      this.joinedRooms.delete(msg.roomId)
-    }
-
-    // Translate to loro-extended message
-    // Pass the sender's peerId for ephemeral messages
-    const translated = fromProtocolMessage(msg, this.translationContext, {
-      senderPeerId: this.peerId,
-    })
-
-    if (translated) {
-      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-      this.channel.onReceive(translated.channelMsg)
-    }
+    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
+    this.channel.onReceive(msg)
   }
 
   /**
@@ -165,30 +117,7 @@ export class WsConnection {
   }
 
   /**
-   * Check if a room (docId) is joined.
-   */
-  isRoomJoined(roomId: string): boolean {
-    return this.joinedRooms.has(roomId)
-  }
-
-  /**
-   * Get all joined rooms.
-   */
-  getJoinedRooms(): string[] {
-    return Array.from(this.joinedRooms)
-  }
-
-  /**
-   * Get the translation context for this connection.
-   */
-  getTranslationContext(): TranslationContext {
-    return this.translationContext
-  }
-
-  /**
    * Simulate the establishment handshake to satisfy loro-extended's requirements.
-   * This is necessary because the Loro Protocol doesn't have a peer-level handshake,
-   * but the Synchronizer expects one before sending sync messages.
    *
    * Delivers messages synchronously. The Synchronizer's receive queue handles
    * recursion prevention by queuing messages and processing them iteratively.
@@ -197,10 +126,6 @@ export class WsConnection {
    */
   simulateHandshake(remotePeerId: PeerID): void {
     if (!this.channel) return
-
-    // Simulate receiving establish-request (if we are server)
-    // or establish-response (if we are client)
-    // To be safe, we can simulate both directions to ensure state is consistent
 
     // Deliver synchronously - the Synchronizer's receive queue prevents recursion
     // 1. We tell Synchronizer that the remote peer wants to establish

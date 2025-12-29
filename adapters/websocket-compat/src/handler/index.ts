@@ -1,7 +1,5 @@
 /**
- * Handler types for the native WebSocket adapter.
- *
- * @packageDocumentation
+ * WebSocket handler interface exports.
  */
 
 export type {
@@ -12,4 +10,5 @@ export type {
   WsSocket,
   WsSocketWrapper,
 } from "./types.js"
+
 export { wrapStandardWebSocket } from "./types.js"

@@ -1,8 +1,8 @@
 /**
- * WebSocket server network adapter for native loro-extended protocol.
+ * WebSocket server network adapter.
  *
- * This adapter manages WebSocket connections from clients, directly
- * transmitting ChannelMsg types without protocol translation.
+ * This adapter manages WebSocket connections from clients, translating
+ * between the Loro Syncing Protocol and loro-extended messages.
  */
 
 import {
@@ -52,6 +52,23 @@ function generatePeerId(): PeerID {
  *   })
  *   start()
  * })
+ * ```
+ *
+ * @example Hono:
+ * ```typescript
+ * import { WsServerNetworkAdapter, wrapHonoSocket } from '@loro-extended/adapter-websocket/server'
+ *
+ * const adapter = new WsServerNetworkAdapter()
+ *
+ * app.get('/ws', upgradeWebSocket((c) => ({
+ *   onOpen(evt, ws) {
+ *     const { connection, start } = adapter.handleConnection({
+ *       socket: wrapHonoSocket(ws),
+ *       peerId: c.req.query('peerId'),
+ *     })
+ *     start()
+ *   }
+ * })))
  * ```
  */
 export class WsServerNetworkAdapter extends Adapter<PeerID> {

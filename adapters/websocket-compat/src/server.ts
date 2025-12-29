@@ -1,5 +1,5 @@
 /**
- * Server-side exports for the native WebSocket adapter.
+ * Server-side exports for the WebSocket adapter.
  *
  * @packageDocumentation
  */
@@ -16,16 +16,19 @@ export type {
   WsSocketWrapper,
 } from "./handler/types.js"
 export { wrapStandardWebSocket } from "./handler/types.js"
+// Protocol (re-export commonly used items)
+export {
+  type CrdtType,
+  type DocUpdate,
+  decodeMessage,
+  encodeMessage,
+  type JoinError,
+  type JoinRequest,
+  type JoinResponseOk,
+  type Leave,
+  MESSAGE_TYPE,
+  type ProtocolMessage,
+  type UpdateError,
+} from "./protocol/index.js"
 // Server adapter
 export { WsServerNetworkAdapter, wrapWsSocket } from "./server-adapter.js"
-// Wire format (for advanced use cases)
-export {
-  decodeFrame,
-  encodeBatchFrame,
-  encodeFrame,
-  fromWireFormat,
-  MessageType,
-  toWireFormat,
-  WIRE_VERSION,
-  WireFlags,
-} from "./wire-format.js"

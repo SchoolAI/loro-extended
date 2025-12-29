@@ -1,8 +1,8 @@
 /**
- * WebSocket client network adapter for native loro-extended protocol.
+ * WebSocket client network adapter.
  *
- * This adapter connects to a WebSocket server and directly transmits
- * ChannelMsg types without protocol translation.
+ * This adapter connects to a WebSocket server and translates between
+ * the Loro Syncing Protocol and loro-extended messages.
  */
 
 import {
@@ -12,7 +12,14 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
-import { decodeFrame, encodeFrame } from "./wire-format.js"
+import { decodeMessage, encodeMessage } from "./protocol/index.js"
+import {
+  createTranslationContext,
+  fromProtocolMessage,
+  type TranslationContext,
+  toProtocolMessages,
+} from "./protocol/translation.js"
+import type { ProtocolMessage } from "./protocol/types.js"
 
 export type ConnectionState =
   | "disconnected"
@@ -56,7 +63,7 @@ const DEFAULT_RECONNECT = {
  * WebSocket client network adapter.
  *
  * Connects to a WebSocket server and handles bidirectional communication
- * using the native loro-extended wire protocol.
+ * using the Loro Syncing Protocol.
  *
  * @example
  * ```typescript
@@ -80,6 +87,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private keepaliveTimer?: ReturnType<typeof setInterval>
   private reconnectAttempts = 0
   private reconnectTimer?: ReturnType<typeof setTimeout>
+  private translationContext: TranslationContext
   private options: WsClientOptions
   private WebSocketImpl: typeof globalThis.WebSocket
   private isConnecting = false
@@ -91,6 +99,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
+    this.translationContext = createTranslationContext()
   }
 
   /**
@@ -126,8 +135,10 @@ export class WsClientNetworkAdapter extends Adapter<void> {
           return
         }
 
-        const frame = encodeFrame(msg)
-        this.socket.send(frame)
+        const protocolMsgs = toProtocolMessages(msg, this.translationContext)
+        for (const pmsg of protocolMsgs) {
+          this.sendProtocolMessage(pmsg)
+        }
       },
       stop: () => {
         this.disconnect()
@@ -305,10 +316,8 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     // Handle binary messages
     if (data instanceof ArrayBuffer) {
       try {
-        const messages = decodeFrame(new Uint8Array(data))
-        for (const msg of messages) {
-          this.handleChannelMessage(msg)
-        }
+        const msg = decodeMessage(new Uint8Array(data))
+        this.handleProtocolMessage(msg)
       } catch (error) {
         this.logger.error("Failed to decode message", { error })
       }
@@ -316,19 +325,26 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   }
 
   /**
-   * Handle a decoded channel message.
+   * Handle a decoded protocol message.
    *
    * Delivers messages synchronously. The Synchronizer's receive queue handles
    * recursion prevention by queuing messages and processing them iteratively.
    */
-  private handleChannelMessage(msg: ChannelMsg): void {
+  private handleProtocolMessage(msg: ProtocolMessage): void {
     if (!this.serverChannel) {
       this.logger.warn("Received message but server channel not available")
       return
     }
 
-    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-    this.serverChannel.onReceive(msg)
+    // Pass the server's peerId for ephemeral messages
+    const translated = fromProtocolMessage(msg, this.translationContext, {
+      senderPeerId: "server",
+    })
+
+    if (translated) {
+      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
+      this.serverChannel.onReceive(translated.channelMsg)
+    }
   }
 
   /**
@@ -353,6 +369,18 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     } else {
       this.setConnectionState("disconnected")
     }
+  }
+
+  /**
+   * Send a protocol message.
+   */
+  private sendProtocolMessage(msg: ProtocolMessage): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    const encoded = encodeMessage(msg)
+    this.socket.send(encoded)
   }
 
   /**

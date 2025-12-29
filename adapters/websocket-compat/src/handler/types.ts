@@ -62,6 +62,12 @@ export interface WsConnectionHandle {
 
   /** Close the connection */
   close(code?: number, reason?: string): void
+
+  /** Check if a room (docId) is joined */
+  isRoomJoined(roomId: string): boolean
+
+  /** Get all joined rooms */
+  getJoinedRooms(): string[]
 }
 
 /**
