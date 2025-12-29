@@ -1079,9 +1079,9 @@ export class Synchronizer {
       }
 
       case "cmd/broadcast-ephemeral-batch": {
-        // Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands
-        // This enables future message aggregation via deferred send layer
-        // Note: Currently sends N individual messages; will be batched when deferred send is implemented
+        // Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands.
+        // Each sub-command queues messages via #queueSend(); the deferred send layer
+        // aggregates them into a single channel/batch message at flush time.
         const subCommands: Command[] = []
 
         for (const docId of command.docIds) {
@@ -1117,8 +1117,8 @@ export class Synchronizer {
           break
         }
 
-        // Execute all sub-commands
-        // Note: This currently sends N messages; future deferred send layer will aggregate them
+        // Execute all sub-commands; each queues messages via #queueSend()
+        // The deferred send layer aggregates them at flush time
         for (const cmd of subCommands) {
           this.#executeCommand(cmd)
         }

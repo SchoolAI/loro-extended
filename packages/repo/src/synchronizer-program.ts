@@ -206,7 +206,7 @@ export type Command =
       /**
        * Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands.
        * Used by heartbeat to broadcast all namespaces for multiple docs to a single peer.
-       * Note: Currently sends N individual messages; future deferred send layer will aggregate them.
+       * Each sub-command queues messages; the deferred send layer aggregates them at flush time.
        */
       type: "cmd/broadcast-ephemeral-batch"
       docIds: DocId[]
