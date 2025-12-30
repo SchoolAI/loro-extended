@@ -4,12 +4,13 @@ This document describes the native wire protocol used by `@loro-extended/adapter
 
 ## Overview
 
-The protocol directly transmits loro-extended `ChannelMsg` types using MessagePack encoding. Unlike the Loro Syncing Protocol, this native protocol:
+The protocol directly transmits loro-extended `ChannelMsg` types using CBOR encoding (RFC 8949). Unlike the Loro Syncing Protocol, this native protocol:
 
 - Preserves full message semantics without translation
 - Supports all loro-extended message types natively
 - Handles batching at the wire level
 - Uses a simple 4-byte frame header
+- Uses CBOR for compact binary encoding (~1KB library)
 
 ## Frame Structure
 
@@ -23,7 +24,7 @@ Each WebSocket binary message is a frame with the following structure:
 │ (1 byte)│ (1 byte)│         (2 bytes, big-endian)           │
 ├─────────┴─────────┴─────────────────────────────────────────┤
 │                                                             │
-│              Payload (MessagePack encoded)                  │
+│              Payload (CBOR encoded, RFC 8949)               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -289,7 +290,8 @@ Client                                Server
 
 | Feature | Native Protocol | Loro Protocol |
 |---------|----------------|---------------|
-| Encoding | MessagePack | Custom binary |
+| Encoding | CBOR (RFC 8949) | Custom binary |
+| Library size | ~1KB gzipped | N/A |
 | Message types | 12 | 7 |
 | Batch support | Native | Not supported |
 | Directory/Delete | Supported | Not supported |

@@ -7,7 +7,7 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
-    external: ["@loro-extended/repo", "@msgpack/msgpack"],
+    external: ["@loro-extended/repo"],
   },
   {
     entry: ["src/server.ts"],
@@ -15,6 +15,6 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
-    external: ["@loro-extended/repo", "@msgpack/msgpack"],
+    external: ["@loro-extended/repo"],
   },
 ])

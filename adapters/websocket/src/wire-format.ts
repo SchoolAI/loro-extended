@@ -2,7 +2,7 @@
  * Wire format for native loro-extended WebSocket protocol.
  *
  * This module handles encoding/decoding of ChannelMsg types to/from
- * a binary wire format using MessagePack.
+ * a binary wire format using CBOR (RFC 8949).
  *
  * Frame Structure:
  * ┌─────────────────────────────────────────────────────────────┐
@@ -10,10 +10,11 @@
  * ├─────────────────────────────────────────────────────────────┤
  * │ Version (1) │ Flags (1) │ Payload Length (2, big-endian)    │
  * ├─────────────────────────────────────────────────────────────┤
- * │ Payload (MessagePack encoded)                               │
+ * │ Payload (CBOR encoded)                                      │
  * └─────────────────────────────────────────────────────────────┘
  */
 
+import { decodeCBOR, encodeCBOR, type CBORType } from "@levischuck/tiny-cbor"
 import type {
   BatchableMsg,
   ChannelMsg,
@@ -32,7 +33,6 @@ import type {
   EphemeralStoreData,
   SyncTransmission,
 } from "@loro-extended/repo"
-import { decode, encode } from "@msgpack/msgpack"
 import { type PeerID, VersionVector } from "loro-crdt"
 
 /** Current wire protocol version */
@@ -173,6 +173,54 @@ type WireEphemeral = {
 type WireBatch = {
   t: typeof MessageType.Batch
   m: WireMessage[] // messages (excluding nested batches)
+}
+
+/**
+ * Convert a plain object to a Map for CBOR encoding.
+ * Recursively handles nested objects and arrays.
+ */
+function objectToMap(obj: unknown): CBORType {
+  if (obj === null || obj === undefined) {
+    return obj as CBORType
+  }
+  if (obj instanceof Uint8Array) {
+    return obj
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(objectToMap)
+  }
+  if (typeof obj === "object") {
+    const map = new Map<string | number, CBORType>()
+    for (const [key, value] of Object.entries(obj)) {
+      map.set(key, objectToMap(value))
+    }
+    return map
+  }
+  return obj as CBORType
+}
+
+/**
+ * Convert a Map from CBOR decoding back to a plain object.
+ * Recursively handles nested Maps and arrays.
+ */
+function mapToObject(value: CBORType): unknown {
+  if (value === null || value === undefined) {
+    return value
+  }
+  if (value instanceof Uint8Array) {
+    return value
+  }
+  if (value instanceof Map) {
+    const obj: Record<string, unknown> = {}
+    for (const [key, val] of value.entries()) {
+      obj[String(key)] = mapToObject(val)
+    }
+    return obj
+  }
+  if (Array.isArray(value)) {
+    return value.map(mapToObject)
+  }
+  return value
 }
 
 /**
@@ -446,7 +494,7 @@ function fromWireEphemeralStore(wire: WireEphemeralStore): EphemeralStoreData {
  */
 export function encodeFrame(msg: ChannelMsg): Uint8Array {
   const wire = toWireFormat(msg)
-  const payload = encode(wire)
+  const payload = encodeCBOR(objectToMap(wire))
 
   // Create frame with header
   const frame = new Uint8Array(4 + payload.length)
@@ -468,7 +516,7 @@ export function encodeFrame(msg: ChannelMsg): Uint8Array {
  */
 export function encodeBatchFrame(msgs: ChannelMsg[]): Uint8Array {
   const wireMessages = msgs.map(toWireFormat)
-  const payload = encode(wireMessages)
+  const payload = encodeCBOR(objectToMap(wireMessages))
 
   // Create frame with header
   const frame = new Uint8Array(4 + payload.length)
@@ -511,13 +559,14 @@ export function decodeFrame(frame: Uint8Array): ChannelMsg[] {
   }
 
   const payload = frame.slice(4, 4 + payloadLength)
+  const decoded = decodeCBOR(payload)
 
   if (flags & WireFlags.BATCH) {
     // Batch frame - decode array of wire messages
-    const wireMessages = decode(payload) as WireMessage[]
+    const wireMessages = mapToObject(decoded) as WireMessage[]
     return wireMessages.map(fromWireFormat)
   }
   // Single message frame
-  const wire = decode(payload) as WireMessage
+  const wire = mapToObject(decoded) as WireMessage
   return [fromWireFormat(wire)]
 }

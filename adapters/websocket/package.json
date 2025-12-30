@@ -27,8 +27,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@levischuck/tiny-cbor": "^0.3.2",
     "@loro-extended/repo": "workspace:^",
-    "@msgpack/msgpack": "^3.0.0",
     "loro-crdt": "^1.10.3"
   },
   "devDependencies": {
