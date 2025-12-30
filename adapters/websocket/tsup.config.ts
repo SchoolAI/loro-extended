@@ -17,4 +17,12 @@ export default defineConfig([
     format: "esm",
     external: ["@loro-extended/repo"],
   },
+  {
+    entry: ["src/bun.ts"],
+    outDir: "dist",
+    dts: true,
+    sourcemap: true,
+    format: "esm",
+    external: ["@loro-extended/repo", "bun"],
+  },
 ])
