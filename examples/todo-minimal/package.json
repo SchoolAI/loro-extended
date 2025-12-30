@@ -1,0 +1,21 @@
+{
+  "name": "example-todo-minimal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/react": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "bun-types": "latest",
+    "typescript": "~5.8.3"
+  }
+}
