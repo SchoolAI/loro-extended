@@ -63,6 +63,12 @@ A simple counter app using Hono's jsx-dom with Vite. Shows how to integrate `@lo
 </td>
 <td width="50%">
 
+### [ProseMirror Collab](./examples/prosemirror-collab)
+
+Real-time collaborative rich text editor with ProseMirror. Features cursor presence, collaborative undo/redo, and WebSocket sync.
+
+<img src="./docs/images/loro-prosemirror-collab.webp" alt="ProseMirror Collab Screenshot" width="100%">
+
 </td>
 </tr>
 </table>
