@@ -77,7 +77,8 @@ Real-time collaborative rich text editor with ProseMirror. Features cursor prese
 
 | Example                                           | Description                                                                                                  |
 | :------------------------------------------------ | :----------------------------------------------------------------------------------------------------------- |
-| **[`todo-websocket`](./examples/todo-websocket)** | Same as `todo`, but uses WebSocket instead of SSE for real-time communication.                               |
+| **[`todo-minimal`](./examples/todo-minimal)**     | Minimal ~170 line example using Bun and WebSocket. No Vite, no concurrently—just Bun for server and bundling. |
+| **[`todo-websocket`](./examples/todo-websocket)** | Same as `todo-sse`, but uses WebSocket instead of SSE for real-time communication.                           |
 | **[`postgres`](./examples/postgres)**             | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database. |
 
 ---
