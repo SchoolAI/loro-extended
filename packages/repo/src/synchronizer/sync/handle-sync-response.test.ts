@@ -62,7 +62,10 @@ describe("handle-sync-response", () => {
     const peerState = newModel.peers.get(peerId)
     const awareness = peerState?.documentAwareness.get(docId)
     expect(awareness?.awareness).toBe("has-doc")
-    expect(awareness?.lastKnownVersion).toBeDefined()
+    // With discriminated union, lastKnownVersion is guaranteed when awareness === "has-doc"
+    if (awareness?.awareness === "has-doc") {
+      expect(awareness.lastKnownVersion).toBeDefined()
+    }
   })
 
   it("should handle snapshot response", () => {

@@ -201,7 +201,11 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
 
     if (shouldSync) {
       // Export update specifically for this peer based on their version
-      const theirVersion = peerAwareness?.lastKnownVersion
+      // With discriminated union, lastKnownVersion only exists when awareness === "has-doc"
+      const theirVersion =
+        peerAwareness?.awareness === "has-doc"
+          ? peerAwareness.lastKnownVersion
+          : undefined
 
       // Determine transmission type and export data
       let transmission: SyncTransmission
@@ -256,13 +260,17 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
           channelId: channel.channelId,
           docId,
           ourVersion: ourVersion.toJSON(),
-          theirVersion: peerAwareness?.lastKnownVersion?.toJSON(),
+          theirVersion:
+            peerAwareness?.awareness === "has-doc"
+              ? peerAwareness.lastKnownVersion.toJSON()
+              : undefined,
         },
       )
     }
   } else if (
     !peerAwareness ||
     peerAwareness.awareness === "unknown" ||
+    peerAwareness.awareness === "has-doc-unknown-version" ||
     (peerAwareness.awareness === "has-doc" &&
       shouldSyncWithPeer(docState, peerAwareness))
   ) {

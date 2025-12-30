@@ -15,7 +15,7 @@ import {
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "../synchronizer-program.js"
-import type { ChannelId } from "../types.js"
+import type { ChannelId, DocId, PeerDocumentAwareness } from "../types.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // MICROTASK FLUSHING UTILITIES
@@ -155,18 +155,22 @@ export function createModelWithKnownPeer(
 ): SynchronizerModel {
   const model = createModelWithChannel(channel)
 
-  const documentAwareness = new Map(
-    Array.from(docAwareness.entries()).map(
-      ([docId, { awareness, version }]) => [
-        docId,
-        {
-          awareness,
-          lastKnownVersion: version,
-          lastUpdated: new Date(),
-        },
-      ],
-    ),
-  )
+  const documentAwareness = new Map<DocId, PeerDocumentAwareness>()
+  for (const [docId, { awareness, version }] of docAwareness.entries()) {
+    const lastUpdated = new Date()
+    if (awareness === "has-doc") {
+      documentAwareness.set(docId, {
+        awareness: "has-doc",
+        lastKnownVersion: version,
+        lastUpdated,
+      })
+    } else {
+      documentAwareness.set(docId, {
+        awareness: "no-doc",
+        lastUpdated,
+      })
+    }
+  }
 
   model.peers.set(peerId, {
     identity: { peerId, name: "known-peer", type: "user" },

@@ -47,13 +47,19 @@ type ReadyStateAbsent = ReadyStateBase & {
 
 export type ReadyState = ReadyStateAware | ReadyStateLoaded | ReadyStateAbsent
 
-// TODO(duane): Refactor this type into discriminated union
-// - fix state-helpers use of `!` to assert existence of lastKnownVersion
-export type PeerDocumentAwareness = {
-  awareness: "unknown" | "has-doc" | "no-doc"
-  lastKnownVersion?: VersionVector
-  lastUpdated: Date
-}
+/**
+ * Discriminated union for peer document awareness.
+ * - "unknown": We don't know if the peer has this document
+ * - "no-doc": Peer explicitly doesn't have this document
+ * - "has-doc-unknown-version": Peer has this document but we don't know their version yet
+ *   (e.g., they announced via new-doc but we haven't synced yet)
+ * - "has-doc": Peer has this document with a known version
+ */
+export type PeerDocumentAwareness =
+  | { awareness: "unknown"; lastUpdated: Date }
+  | { awareness: "no-doc"; lastUpdated: Date }
+  | { awareness: "has-doc-unknown-version"; lastUpdated: Date }
+  | { awareness: "has-doc"; lastKnownVersion: VersionVector; lastUpdated: Date }
 
 export type PeerState = {
   identity: PeerIdentityDetails

@@ -25,25 +25,16 @@
  * @see permissions.ts - Deletion permission
  */
 
-import { type ChannelMsgDeleteRequest, isEstablished } from "../../channel.js"
+import type { ChannelMsgDeleteRequest } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { getPermissionContext } from "../permission-context.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 
 export function handleDeleteRequest(
   message: ChannelMsgDeleteRequest,
-  { channel, model, permissions, logger }: ChannelHandlerContext,
+  { channel, model, permissions, logger }: EstablishedHandlerContext,
 ): Command | undefined {
   const { docId } = message
-
-  // Must be an established channel
-  if (!isEstablished(channel)) {
-    logger.warn(
-      "delete-request: rejecting from non-established channel {channelId}",
-      { channelId: channel.channelId },
-    )
-    return
-  }
 
   const docState = model.documents.get(docId)
 

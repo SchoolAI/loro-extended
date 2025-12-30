@@ -53,7 +53,10 @@ export function getReadyStates(
       continue
     }
 
-    if (awareness.awareness === "has-doc") {
+    if (
+      awareness.awareness === "has-doc" ||
+      awareness.awareness === "has-doc-unknown-version"
+    ) {
       const channels: ReadyStateChannelMeta[] = []
 
       for (const channelId of peer.channels) {
@@ -67,21 +70,16 @@ export function getReadyStates(
         })
       }
 
-      if (awareness.lastKnownVersion) {
-        readyStates.push({
-          state: "loaded",
-          docId,
-          identity: { ...peer.identity },
-          channels,
-        })
-      } else {
-        readyStates.push({
-          state: "aware",
-          docId,
-          identity: { ...peer.identity },
-          channels,
-        })
-      }
+      // "has-doc" means we know their version (loaded)
+      // "has-doc-unknown-version" means they have it but we don't know their version yet (aware)
+      const state =
+        awareness.awareness === "has-doc-unknown-version" ? "aware" : "loaded"
+      readyStates.push({
+        state,
+        docId,
+        identity: { ...peer.identity },
+        channels,
+      })
     } else if (awareness.awareness === "no-doc") {
       readyStates.push({
         state: "absent",

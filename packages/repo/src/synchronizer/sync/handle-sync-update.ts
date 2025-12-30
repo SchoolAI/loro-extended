@@ -1,6 +1,6 @@
 import type { ChannelMsgUpdate } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 import { applySyncTransmission } from "./utils.js"
 
@@ -13,7 +13,7 @@ import { applySyncTransmission } from "./utils.js"
  */
 export function handleSyncUpdate(
   message: ChannelMsgUpdate,
-  context: ChannelHandlerContext,
+  context: EstablishedHandlerContext,
 ): Command | undefined {
   const commands = applySyncTransmission(message, context)
   return batchAsNeeded(...commands)

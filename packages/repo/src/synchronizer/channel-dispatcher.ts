@@ -14,7 +14,10 @@ import { handleDeleteRequest } from "./sync/handle-delete-request.js"
 import { handleSyncRequest } from "./sync/handle-sync-request.js"
 import { handleSyncResponse } from "./sync/handle-sync-response.js"
 import { handleSyncUpdate } from "./sync/handle-sync-update.js"
-import type { ChannelHandlerContext } from "./types.js"
+import type {
+  ChannelHandlerContext,
+  EstablishedHandlerContext,
+} from "./types.js"
 import { batchAsNeeded } from "./utils.js"
 
 /**
@@ -78,7 +81,7 @@ export function channelDispatcher(
     channelMessage: omit(channelMessage, "type"),
   })
 
-  // Build context for handlers
+  // Build context for establishment handlers (any channel state)
   const ctx: ChannelHandlerContext = {
     channel,
     model,
@@ -87,46 +90,13 @@ export function channelDispatcher(
     logger,
   }
 
-  // Route to appropriate handler
-  // Each handler is in its own file under src/synchronizer/
+  // Route establishment messages - these work with any channel state
   switch (channelMessage.type) {
     case "channel/establish-request":
       return handleEstablishRequest(channelMessage, ctx)
 
     case "channel/establish-response":
       return handleEstablishResponse(channelMessage, ctx)
-
-    case "channel/sync-request":
-      return handleSyncRequest(channelMessage, ctx)
-
-    case "channel/sync-response":
-      return handleSyncResponse(channelMessage, ctx)
-
-    case "channel/update":
-      return handleSyncUpdate(channelMessage, ctx)
-
-    case "channel/directory-request":
-      return handleDirectoryRequest(channelMessage, ctx)
-
-    case "channel/directory-response":
-      return handleDirectoryResponse(channelMessage, ctx)
-
-    case "channel/new-doc":
-      return handleNewDoc(channelMessage, ctx)
-
-    case "channel/ephemeral":
-      return handleEphemeral(channelMessage, ctx)
-
-    case "channel/delete-request":
-      return handleDeleteRequest(channelMessage, ctx)
-
-    case "channel/delete-response":
-      // Delete responses are informational - log and continue
-      logger.info("delete-response received: {docId} status={status}", {
-        docId: channelMessage.docId,
-        status: channelMessage.status,
-      })
-      return
 
     case "channel/batch":
       // Dispatch each message in the batch and collect commands
@@ -137,5 +107,67 @@ export function channelDispatcher(
           channelDispatcher(msg, model, fromChannelId, permissions, logger),
         ),
       )
+  }
+
+  // All other messages require an established channel
+  // Single validation point - not repeated in handlers!
+  if (!isEstablished(channel)) {
+    logger.warn(
+      `rejecting ${channelMessage.type} from non-established channel ${fromChannelId}`,
+    )
+    return
+  }
+
+  const peerState = model.peers.get(channel.peerId)
+  if (!peerState) {
+    logger.warn(
+      `rejecting ${channelMessage.type}: peer state not found for ${channel.peerId}`,
+    )
+    return
+  }
+
+  // Build established context with narrowed types
+  const establishedCtx: EstablishedHandlerContext = {
+    channel, // TypeScript knows this is EstablishedChannel
+    peerState, // Guaranteed to exist
+    model,
+    fromChannelId,
+    permissions,
+    logger,
+  }
+
+  // Route to handlers that require established channel
+  switch (channelMessage.type) {
+    case "channel/sync-request":
+      return handleSyncRequest(channelMessage, establishedCtx)
+
+    case "channel/sync-response":
+      return handleSyncResponse(channelMessage, establishedCtx)
+
+    case "channel/update":
+      return handleSyncUpdate(channelMessage, establishedCtx)
+
+    case "channel/directory-request":
+      return handleDirectoryRequest(channelMessage, establishedCtx)
+
+    case "channel/directory-response":
+      return handleDirectoryResponse(channelMessage, establishedCtx)
+
+    case "channel/new-doc":
+      return handleNewDoc(channelMessage, establishedCtx)
+
+    case "channel/ephemeral":
+      return handleEphemeral(channelMessage, establishedCtx)
+
+    case "channel/delete-request":
+      return handleDeleteRequest(channelMessage, establishedCtx)
+
+    case "channel/delete-response":
+      // Delete responses are informational - log and continue
+      logger.info("delete-response received: {docId} status={status}", {
+        docId: channelMessage.docId,
+        status: channelMessage.status,
+      })
+      return
   }
 }

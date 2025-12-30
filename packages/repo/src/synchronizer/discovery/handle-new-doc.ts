@@ -60,31 +60,22 @@ import type {
   ChannelMsgNewDoc,
   ChannelMsgSyncRequest,
 } from "../../channel.js"
-import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
 import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleNewDoc(
   message: ChannelMsgNewDoc,
-  { channel, model, fromChannelId, logger }: ChannelHandlerContext,
+  {
+    channel,
+    peerState,
+    model,
+    fromChannelId,
+    logger,
+  }: EstablishedHandlerContext,
 ): Command | undefined {
-  // Require established channel for new-doc operations
-  if (!isEstablished(channel)) {
-    logger.warn(
-      `rejecting new-doc from non-established channel ${fromChannelId}`,
-    )
-    return
-  }
-
-  const peerState = model.peers.get(channel.peerId)
-  if (!peerState) {
-    logger.warn(`rejecting new-doc: peer state not found for ${channel.peerId}`)
-    return
-  }
-
   const commands: (Command | undefined)[] = []
   const syncRequests: ChannelMsgSyncRequest[] = []
 
@@ -102,7 +93,8 @@ export function handleNewDoc(
     // Update peer awareness - peer has revealed they have this document
     // Note: Subscription NOT set yet - they haven't requested from us
     // That will be set when they send sync-request
-    setPeerDocumentAwareness(peerState, docId, "has-doc")
+    // We don't know their actual version yet - we'll learn it when we sync
+    setPeerDocumentAwareness(peerState, docId, "has-doc-unknown-version")
 
     // Since peer has the doc, send our ephemeral state
     commands.push({
@@ -115,7 +107,7 @@ export function handleNewDoc(
     logger.debug("new-doc: updated peer awareness", {
       peerId: channel.peerId,
       docId,
-      awareness: "has-doc",
+      awareness: "has-doc-unknown-version",
     })
 
     // Add sync-request to actually load the document data

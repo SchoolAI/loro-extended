@@ -1,22 +1,19 @@
 import type { ChannelMsgDirectoryRequest } from "../../channel.js"
-import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { getPermissionContext } from "../permission-context.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleDirectoryRequest(
   _message: ChannelMsgDirectoryRequest,
-  { channel, model, fromChannelId, permissions, logger }: ChannelHandlerContext,
+  {
+    channel,
+    model,
+    fromChannelId,
+    permissions,
+    logger,
+  }: EstablishedHandlerContext,
 ): Command | undefined {
-  // Require established channel for directory operations
-  if (!isEstablished(channel)) {
-    logger.warn(
-      `directory-request from unestablished channel ${channel.channelId}`,
-    )
-    return
-  }
-
   // Filter documents based on visibility permission
   // We use a Result type to track both successes and errors
   type Result =

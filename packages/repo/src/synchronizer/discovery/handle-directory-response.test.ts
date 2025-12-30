@@ -52,10 +52,15 @@ describe("handle-directory-response", () => {
     expect(newModel.documents.has("doc-1")).toBe(true)
     expect(newModel.documents.has("doc-2")).toBe(true)
 
-    // Peer awareness should be updated
+    // Peer awareness should be updated to "has-doc-unknown-version"
+    // (we know they have it, but we don't know their version yet - we'll learn it when we sync)
     const peerState = newModel.peers.get(peerId)
-    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe("has-doc")
-    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe("has-doc")
+    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe(
+      "has-doc-unknown-version",
+    )
+    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe(
+      "has-doc-unknown-version",
+    )
   })
 
   it("should update peer awareness", () => {
@@ -85,11 +90,15 @@ describe("handle-directory-response", () => {
 
     const [newModel, _command] = update(message, initialModel)
 
-    // Peer awareness should be updated
+    // Peer awareness should be updated to "has-doc-unknown-version"
     const peerState = newModel.peers.get(peerId)
     expect(peerState).toBeDefined()
-    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe("has-doc")
-    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe("has-doc")
+    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe(
+      "has-doc-unknown-version",
+    )
+    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe(
+      "has-doc-unknown-version",
+    )
     expect(
       peerState?.documentAwareness.get("doc-1")?.lastUpdated,
     ).toBeInstanceOf(Date)
@@ -146,13 +155,13 @@ describe("handle-directory-response", () => {
 
     const [newModel, _command] = update(message, initialModel)
 
-    // Both documents should have peer awareness
+    // Both documents should have peer awareness (has-doc-unknown-version)
     const peerState = newModel.peers.get(peerId)
     expect(peerState?.documentAwareness.get("existing-doc")?.awareness).toBe(
-      "has-doc",
+      "has-doc-unknown-version",
     )
     expect(peerState?.documentAwareness.get("new-doc")?.awareness).toBe(
-      "has-doc",
+      "has-doc-unknown-version",
     )
 
     // New document should be created

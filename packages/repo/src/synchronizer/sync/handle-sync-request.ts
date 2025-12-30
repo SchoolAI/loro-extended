@@ -56,7 +56,6 @@
  */
 
 import type { ChannelMsgSyncRequest } from "../../channel.js"
-import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
 import { getEstablishedChannelsForDoc } from "../../utils/get-established-channels-for-doc.js"
@@ -64,29 +63,20 @@ import {
   addPeerSubscription,
   setPeerDocumentAwareness,
 } from "../peer-state-helpers.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleSyncRequest(
   message: ChannelMsgSyncRequest,
-  { channel, model, fromChannelId, logger, permissions }: ChannelHandlerContext,
+  {
+    channel,
+    peerState,
+    model,
+    fromChannelId,
+    logger,
+    permissions,
+  }: EstablishedHandlerContext,
 ): Command | undefined {
-  // Require established channel for sync operations
-  if (!isEstablished(channel)) {
-    logger.warn(
-      `rejecting sync-request from non-established channel ${fromChannelId}`,
-    )
-    return
-  }
-
-  const peerState = model.peers.get(channel.peerId)
-  if (!peerState) {
-    logger.warn(
-      `rejecting sync-request: peer state not found for ${channel.peerId}`,
-    )
-    return
-  }
-
   const {
     docId,
     requesterDocVersion,

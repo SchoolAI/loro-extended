@@ -224,9 +224,10 @@ export class Synchronizer {
 
     this.#isProcessing = true
     try {
-      while (this.#workQueue.length > 0) {
-        const work = this.#workQueue.shift()!
+      let work = this.#workQueue.shift()
+      while (work) {
         work()
+        work = this.#workQueue.shift()
       }
       // Quiescent: flush outbound buffer
       this.#flushOutbound()

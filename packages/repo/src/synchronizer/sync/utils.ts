@@ -1,12 +1,8 @@
-import {
-  type ChannelMsgSyncResponse,
-  type ChannelMsgUpdate,
-  isEstablished,
-} from "../../channel.js"
+import type { ChannelMsgSyncResponse, ChannelMsgUpdate } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { setPeerDocumentAwareness } from "../peer-state-helpers.js"
 import { getPermissionContext } from "../permission-context.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 
 /**
  * Shared logic for applying sync transmissions (snapshot/update/up-to-date)
@@ -14,23 +10,8 @@ import type { ChannelHandlerContext } from "../types.js"
  */
 export function applySyncTransmission(
   message: ChannelMsgSyncResponse | ChannelMsgUpdate,
-  { channel, model, permissions, logger }: ChannelHandlerContext,
+  { channel, peerState, model, permissions, logger }: EstablishedHandlerContext,
 ): Command[] {
-  if (!isEstablished(channel)) {
-    logger.warn(
-      `rejecting sync transmission from non-established channel ${channel.channelId}`,
-    )
-    return []
-  }
-
-  const peerState = model.peers.get(channel.peerId)
-  if (!peerState) {
-    logger.warn(
-      `rejecting sync transmission: peer state not found for ${channel.peerId}`,
-    )
-    return []
-  }
-
   const docState = model.documents.get(message.docId)
   const commands: Command[] = []
 

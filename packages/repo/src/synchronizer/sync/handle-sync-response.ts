@@ -55,34 +55,17 @@
  */
 
 import type { ChannelMsgSyncResponse } from "../../channel.js"
-import { isEstablished } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
-import type { ChannelHandlerContext } from "../types.js"
+import type { EstablishedHandlerContext } from "../types.js"
 import { batchAsNeeded } from "../utils.js"
 import { applySyncTransmission } from "./utils.js"
 
 export function handleSyncResponse(
   message: ChannelMsgSyncResponse,
-  context: ChannelHandlerContext,
+  context: EstablishedHandlerContext,
 ): Command | undefined {
-  const { channel, model, fromChannelId, logger } = context
-
-  // Require established channel for sync operations
-  if (!isEstablished(channel)) {
-    logger.warn(
-      `rejecting sync-response from non-established channel ${fromChannelId}`,
-    )
-    return
-  }
-
-  const peerState = model.peers.get(channel.peerId)
-  if (!peerState) {
-    logger.warn(
-      `rejecting sync-response: peer state not found for ${channel.peerId}`,
-    )
-    return
-  }
+  const { channel, model, logger } = context
 
   let docState = model.documents.get(message.docId)
   const commands: Command[] = []

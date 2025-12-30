@@ -196,10 +196,10 @@ describe("Synchronizer - Echo Prevention", () => {
 
     // The key check: our version compared to peer awareness should be 0 (equal)
     // If it's 1 (we're ahead), that would trigger an echo
-    const peerAwarenessVersion = peerAwareness?.lastKnownVersion
-    if (!peerAwarenessVersion) {
-      throw new Error("Peer awareness version should exist")
+    if (!peerAwareness || peerAwareness.awareness !== "has-doc") {
+      throw new Error("Peer awareness should be 'has-doc'")
     }
+    const peerAwarenessVersion = peerAwareness.lastKnownVersion
     const comparison = ourVersionAfterImport.compare(peerAwarenessVersion)
 
     // This should be 0 (equal) - if it's 1, we'd send an echo
