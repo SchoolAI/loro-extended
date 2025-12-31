@@ -33,8 +33,10 @@ async function buildApp() {
 
 await buildApp()
 
+const port = 5173
+
 Bun.serve<BunWsData>({
-  port: 3000,
+  port,
   async fetch(req, server) {
     const url = new URL(req.url)
 
@@ -75,4 +77,4 @@ Bun.serve<BunWsData>({
   },
 })
 
-console.log("🚀 Server running at http://localhost:3000")
+console.log(`🚀 Server running at http://localhost:${port}`)
