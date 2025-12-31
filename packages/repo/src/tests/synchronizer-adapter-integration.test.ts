@@ -91,7 +91,7 @@ describe("Synchronizer - Adapter Integration", () => {
     const channel1 = adapter1.simulateChannelAdded("channel-1")
     const channel2 = adapter2.simulateChannelAdded("channel-2")
 
-    expect(multiSync.getChannel(channel1.channelId)).toBeDefined()
-    expect(multiSync.getChannel(channel2.channelId)).toBeDefined()
+    expect(multiSync.model.channels.get(channel1.channelId)).toBeDefined()
+    expect(multiSync.model.channels.get(channel2.channelId)).toBeDefined()
   })
 })

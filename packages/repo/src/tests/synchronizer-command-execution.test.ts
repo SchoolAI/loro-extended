@@ -151,7 +151,7 @@ describe("Synchronizer - Command Execution", () => {
     })
 
     // Channel should be in established state
-    const updatedChannel = synchronizer.getChannel(channel.channelId)
+    const updatedChannel = synchronizer.model.channels.get(channel.channelId)
     expect(updatedChannel && isEstablished(updatedChannel)).toBe(true)
   })
 

@@ -114,7 +114,7 @@ describe("Multi-channel peer scenarios", () => {
       })
 
       // Verify peer state exists with one channel
-      const establishedSseChannel = synchronizer.getChannel(
+      const establishedSseChannel = synchronizer.model.channels.get(
         sseChannel.channelId,
       )
       expect(establishedSseChannel?.type).toBe("established")
@@ -133,7 +133,7 @@ describe("Multi-channel peer scenarios", () => {
       })
 
       // Verify peer now has two channels
-      const establishedWebrtcChannel = synchronizer.getChannel(
+      const establishedWebrtcChannel = synchronizer.model.channels.get(
         webrtcChannel.channelId,
       )
       expect(establishedWebrtcChannel?.type).toBe("established")
@@ -160,7 +160,7 @@ describe("Multi-channel peer scenarios", () => {
       await new Promise(resolve => setTimeout(resolve, 10))
 
       // The WebRTC channel should still be active
-      const webrtcChannelAfterRemoval = synchronizer.getChannel(
+      const webrtcChannelAfterRemoval = synchronizer.model.channels.get(
         webrtcChannel.channelId,
       )
       expect(webrtcChannelAfterRemoval).toBeDefined()
@@ -207,7 +207,7 @@ describe("Multi-channel peer scenarios", () => {
       await new Promise(resolve => setTimeout(resolve, 10))
 
       // Channel should be gone
-      expect(synchronizer.getChannel(sseChannel.channelId)).toBeUndefined()
+      expect(synchronizer.model.channels.get(sseChannel.channelId)).toBeUndefined()
 
       // Peer's ephemeral data should be cleaned up
       // (We can't directly check this, but the channel removal should have triggered cleanup)

@@ -81,7 +81,7 @@ describe("Synchronizer - Channel Management", () => {
     await mockAdapter.waitForStart()
     const channel = mockAdapter.simulateChannelAdded("test-channel")
 
-    const retrievedChannel = synchronizer.getChannel(channel.channelId)
+    const retrievedChannel = synchronizer.model.channels.get(channel.channelId)
     expect(retrievedChannel).toBeDefined()
     expect(retrievedChannel?.channelId).toBe(channel.channelId)
   })
@@ -89,16 +89,16 @@ describe("Synchronizer - Channel Management", () => {
   it("should handle channel removal", async () => {
     await mockAdapter.waitForStart()
     const channel = mockAdapter.simulateChannelAdded("test-channel")
-    expect(synchronizer.getChannel(channel.channelId)).toBeDefined()
+    expect(synchronizer.model.channels.get(channel.channelId)).toBeDefined()
 
     mockAdapter.simulateChannelRemoved(channel.channelId)
-    expect(synchronizer.getChannel(channel.channelId)).toBeUndefined()
+    expect(synchronizer.model.channels.get(channel.channelId)).toBeUndefined()
     // Channel stop is called during removal
     expect(vi.mocked(channel.stop)).toHaveBeenCalled()
   })
 
   it("should return undefined for non-existent channel", () => {
-    const channel = synchronizer.getChannel(999)
+    const channel = synchronizer.model.channels.get(999 as ChannelId)
     expect(channel).toBeUndefined()
   })
 
@@ -123,7 +123,7 @@ describe("Synchronizer - Channel Management", () => {
     })
 
     // Get the established channel and simulate the peer subscribing
-    const updatedChannel = synchronizer.getChannel(channel.channelId)
+    const updatedChannel = synchronizer.model.channels.get(channel.channelId)
     expect(updatedChannel?.type).toBe("established")
 
     // Now simulate sync-requests which will add subscriptions (now sent as batch)

@@ -76,14 +76,14 @@ describe("Synchronizer - Reset Functionality", () => {
 
     // Verify initial state
     expect(synchronizer.getDocumentState(docId)).toBeDefined()
-    expect(synchronizer.getChannel(channel.channelId)).toBeDefined()
+    expect(synchronizer.model.channels.get(channel.channelId)).toBeDefined()
 
     // Reset (now async)
     await synchronizer.reset()
 
     // State should be reset
     expect(synchronizer.getDocumentState(docId)).toBeUndefined()
-    expect(synchronizer.getChannel(channel.channelId)).toBeUndefined()
+    expect(synchronizer.model.channels.get(channel.channelId)).toBeUndefined()
     expect(mockAdapter.channels.size).toBe(0)
   })
 })

@@ -16,13 +16,16 @@ import type {
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
 import type { Middleware } from "./middleware.js"
-import { type MiddlewareContext, runMiddleware } from "./middleware.js"
 import {
   createPermissions,
-  type DocContext,
   type Permissions,
 } from "./permissions.js"
+import { EphemeralStoreManager } from "./synchronizer/ephemeral-store-manager.js"
+import { HeartbeatManager } from "./synchronizer/heartbeat-manager.js"
+import { MiddlewareProcessor } from "./synchronizer/middleware-processor.js"
+import { OutboundBatcher } from "./synchronizer/outbound-batcher.js"
 import { getReadyStates } from "./synchronizer/state-helpers.js"
+import { WorkQueue } from "./synchronizer/work-queue.js"
 import {
   type Command,
   createSynchronizerUpdate,
@@ -88,42 +91,26 @@ export class Synchronizer {
 
   readonly updateFn: SynchronizerUpdate
 
-  // Unified work queue for all deferred execution
-  // Prevents recursion when adapters deliver messages synchronously
-  // (e.g., BridgeAdapter, StorageAdapter)
-  #workQueue: Array<() => void> = []
-  #isProcessing = false
-
-  // Batching buffer for outbound messages (separate concern from work queue)
-  // Messages are aggregated by channel and flushed at quiescence
-  #outboundBuffer: Map<ChannelId, BatchableMsg[]> = new Map()
+  // Extracted modules
+  readonly #workQueue: WorkQueue
+  readonly #outboundBatcher: OutboundBatcher
+  readonly #ephemeralManager: EphemeralStoreManager
+  readonly #heartbeatManager: HeartbeatManager
+  readonly #middlewareProcessor: MiddlewareProcessor
 
   /**
    * Per-doc namespaced ephemeral stores (unified model).
-   *
-   * Structure: Map<DocId, Map<Namespace, EphemeralStore>>
-   *
-   * Each document can have multiple named ephemeral stores.
-   * This supports both internal stores (declared via ephemeralShapes)
-   * and external stores (registered via addEphemeral).
+   * Internal getter used by command execution.
    */
-  readonly docNamespacedStores = new Map<DocId, Map<string, EphemeralStore>>()
-
-  /**
-   * External store subscriptions for cleanup.
-   * Maps store to its unsubscribe function.
-   */
-  readonly #externalStoreSubscriptions = new Map<EphemeralStore, () => void>()
+  get docNamespacedStores(): Map<DocId, Map<string, EphemeralStore>> {
+    return this.#ephemeralManager.stores
+  }
 
   readonly emitter = new Emittery<SynchronizerEvents>()
 
   readonly readyStates = new Map<DocId, ReadyState[]>()
 
   model: SynchronizerModel
-
-  heartbeat: ReturnType<typeof setInterval> | undefined
-
-  #middleware: Middleware[]
 
   constructor({
     identity,
@@ -137,7 +124,6 @@ export class Synchronizer {
     this.logger = logger.getChild("synchronizer")
 
     this.identity = identity
-    this.#middleware = middleware
 
     this.logger.debug("new Synchronizer: {identity}", {
       identity: this.identity,
@@ -153,6 +139,39 @@ export class Synchronizer {
     // trigger channelAdded which needs the model
     const [initialModel, initialCommand] = programInit(this.identity)
     this.model = initialModel
+
+    // Initialize extracted modules
+    this.#outboundBatcher = new OutboundBatcher()
+
+    this.#workQueue = new WorkQueue(() => {
+      // Called at quiescence - flush outbound messages and emit ready state changes
+      this.#outboundBatcher.flush(envelope => this.adapters.send(envelope))
+      this.#emitReadyStateChanges()
+    })
+
+    this.#ephemeralManager = new EphemeralStoreManager(
+      this.identity,
+      (docId, namespace) => {
+        // Route through dispatch for TEA compliance
+        this.#dispatch({
+          type: "synchronizer/ephemeral-local-change",
+          docId,
+          namespace,
+        })
+      },
+      this.logger,
+    )
+
+    this.#heartbeatManager = new HeartbeatManager(HEARTBEAT_INTERVAL, () => {
+      this.#dispatch({ type: "synchronizer/heartbeat" })
+    })
+
+    // Initialize middleware processor with a getter function for model access
+    this.#middlewareProcessor = new MiddlewareProcessor(
+      middleware,
+      () => this.model,
+      this.logger,
+    )
 
     // Create adapter context for dynamic adapter initialization
     const adapterContext = {
@@ -184,63 +203,26 @@ export class Synchronizer {
     // Start all adapters now that everything is initialized
     this.adapters.startAll()
 
-    this.startHeartbeat()
+    this.#heartbeatManager.start()
   }
 
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // PUBLIC API - Heartbeat Management
+  // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
   startHeartbeat() {
-    this.heartbeat = setInterval(() => {
-      this.#dispatch({ type: "synchronizer/heartbeat" })
-    }, HEARTBEAT_INTERVAL)
+    this.#heartbeatManager.start()
   }
 
   stopHeartbeat() {
-    clearInterval(this.heartbeat)
-    this.heartbeat = undefined
+    this.#heartbeatManager.stop()
   }
 
   /**
    * Get the number of middleware configured (for debugging).
    */
   get middlewareCount(): number {
-    return this.#middleware.length
-  }
-
-  /**
-   * Enqueue work to be processed.
-   * Work items are processed iteratively to prevent stack overflow from
-   * synchronous adapters (e.g., BridgeAdapter, StorageAdapter).
-   */
-  #enqueue(work: () => void): void {
-    this.#workQueue.push(work)
-    this.#processUntilQuiescent()
-  }
-
-  /**
-   * Process all queued work until quiescence, then flush outbound messages.
-   * Uses a guard flag to prevent recursive processing.
-   */
-  #processUntilQuiescent(): void {
-    if (this.#isProcessing) return
-
-    this.#isProcessing = true
-    try {
-      let work = this.#workQueue.shift()
-      while (work) {
-        work()
-        work = this.#workQueue.shift()
-      }
-      // Quiescent: flush outbound buffer
-      this.#flushOutbound()
-      // Emit ready state changes after flush
-      this.#emitReadyStateChanges()
-    } finally {
-      this.#isProcessing = false
-    }
-
-    // If flush generated new work (via synchronous adapter replies), process it
-    if (this.#workQueue.length > 0) {
-      this.#processUntilQuiescent()
-    }
+    return this.#middlewareProcessor.count
   }
 
   /**
@@ -258,7 +240,7 @@ export class Synchronizer {
    * @param message - The message received on the channel
    */
   channelReceive(channelId: ChannelId, message: ChannelMsg): void {
-    this.#enqueue(() => this.#channelReceiveInternal(channelId, message))
+    this.#workQueue.enqueue(() => this.#channelReceiveInternal(channelId, message))
   }
 
   /**
@@ -271,24 +253,20 @@ export class Synchronizer {
       messageType: message.type,
     })
 
-    // Look up the current channel from the model
-    // This ensures we have the latest state (e.g., established vs connected)
-    const channel = this.model.channels.get(channelId)
-
     // Handle channel/batch messages by running middleware on each message individually
     // This ensures size-limiting middleware can reject individual messages in a batch
     if (message.type === "channel/batch") {
-      this.#handleBatchMessage(channelId, message.messages, channel)
+      this.#handleBatchMessage(channelId, message.messages)
       return
     }
 
     // Run middleware if configured
-    if (this.#middleware.length > 0 && channel) {
-      this.#runMiddlewareAndDispatch(channelId, message, channel)
+    if (this.#middlewareProcessor.hasMiddleware) {
+      this.#runMiddlewareAndDispatch(channelId, message)
       return
     }
 
-    // No middleware or no peer context - dispatch immediately
+    // No middleware - dispatch immediately
     this.#dispatch({
       type: "synchronizer/channel-receive-message",
       envelope: {
@@ -305,9 +283,8 @@ export class Synchronizer {
   #handleBatchMessage(
     channelId: ChannelId,
     messages: BatchableMsg[],
-    channel: Channel | undefined,
   ): void {
-    if (this.#middleware.length === 0 || !channel) {
+    if (!this.#middlewareProcessor.hasMiddleware) {
       // No middleware - dispatch the batch directly
       this.#dispatch({
         type: "synchronizer/channel-receive-message",
@@ -319,72 +296,44 @@ export class Synchronizer {
       return
     }
 
-    // Run middleware on each message individually
-    const peerContext = this.#buildPeerContextFromChannel(channel)
-    if (!peerContext) {
-      // No peer context - dispatch the batch directly
-      this.#dispatch({
-        type: "synchronizer/channel-receive-message",
-        envelope: {
-          fromChannelId: channelId,
-          message: { type: "channel/batch", messages },
-        },
-      })
-      return
-    }
-
-    // Process each message through middleware
-    const middlewarePromises = messages.map(async msg => {
-      const { docId, transmission } = this.#extractContextFromMessage(msg)
-
-      let docContext: DocContext | undefined
-      if (docId) {
-        const doc = this.model.documents.get(docId)
-        if (doc) {
-          docContext = { id: docId, doc: doc.doc }
-        }
-      }
-
-      const middlewareCtx: MiddlewareContext = {
-        message: msg,
-        peer: peerContext,
-        document: docContext,
-        transmission,
-      }
-
-      const result = await runMiddleware(
-        this.#middleware,
-        middlewareCtx,
-        this.logger,
-      )
-      return { msg, allowed: result.allow }
-    })
-
-    // Wait for all middleware checks and dispatch allowed messages
-    void Promise.all(middlewarePromises).then(results => {
-      const allowedMessages = results.filter(r => r.allowed).map(r => r.msg)
-
-      if (allowedMessages.length === 0) {
+    // Process batch through middleware
+    void this.#middlewareProcessor.processBatch(channelId, messages).then(result => {
+      if (result.type === "rejected") {
         // All messages rejected
         return
       }
 
-      if (allowedMessages.length === 1) {
+      if (result.type === "no-middleware") {
+        // No middleware - dispatch the batch directly
+        this.#dispatch({
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: channelId,
+            message: { type: "channel/batch", messages },
+          },
+        })
+        return
+      }
+
+      if (result.type === "allowed") {
         // Single message - dispatch directly
         this.#dispatch({
           type: "synchronizer/channel-receive-message",
           envelope: {
             fromChannelId: channelId,
-            message: allowedMessages[0],
+            message: result.message,
           },
         })
-      } else {
+        return
+      }
+
+      if (result.type === "allowed-batch") {
         // Multiple messages - dispatch as batch
         this.#dispatch({
           type: "synchronizer/channel-receive-message",
           envelope: {
             fromChannelId: channelId,
-            message: { type: "channel/batch", messages: allowedMessages },
+            message: { type: "channel/batch", messages: result.messages },
           },
         })
       }
@@ -397,123 +346,19 @@ export class Synchronizer {
   #runMiddlewareAndDispatch(
     channelId: ChannelId,
     message: ChannelMsg,
-    channel: Channel,
   ): void {
-    const peerContext = this.#buildPeerContextFromChannel(channel)
-
-    if (peerContext) {
-      // Extract document and transmission context from message
-      const { docId, transmission } = this.#extractContextFromMessage(message)
-
-      // Look up document if we have a docId
-      let docContext: DocContext | undefined
-
-      if (docId) {
-        const doc = this.model.documents.get(docId)
-
-        if (doc) {
-          docContext = { id: docId, doc: doc.doc }
-        }
+    void this.#middlewareProcessor.processMessage(channelId, message).then(result => {
+      if (result.type === "allowed" || result.type === "no-middleware") {
+        this.#dispatch({
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: channelId,
+            message,
+          },
+        })
       }
-
-      const middlewareCtx: MiddlewareContext = {
-        message,
-        peer: peerContext,
-        document: docContext,
-        transmission,
-      }
-
-      // Run middleware asynchronously but handle the result
-      // This allows async middleware while keeping the callback signature sync
-      void runMiddleware(this.#middleware, middlewareCtx, this.logger).then(
-        result => {
-          if (result.allow) {
-            this.#dispatch({
-              type: "synchronizer/channel-receive-message",
-              envelope: {
-                fromChannelId: channelId,
-                message,
-              },
-            })
-          }
-          // If !result.allow, message is dropped (middleware rejected it)
-        },
-      )
-      return
-    }
-
-    // No peer context - dispatch immediately
-    this.#dispatch({
-      type: "synchronizer/channel-receive-message",
-      envelope: {
-        fromChannelId: channelId,
-        message,
-      },
+      // If result.type === "rejected", message is dropped (middleware rejected it)
     })
-  }
-
-  /**
-   * Build peer context from a channel for middleware.
-   * Returns undefined if channel is not established or peer state not found.
-   */
-  #buildPeerContextFromChannel(channel: Channel) {
-    if (!isEstablishedFn(channel)) {
-      return undefined
-    }
-
-    const peerState = this.model.peers.get(channel.peerId)
-    if (!peerState) {
-      return undefined
-    }
-
-    return {
-      peerId: peerState.identity.peerId,
-      peerName: peerState.identity.name,
-      peerType: peerState.identity.type,
-      channelId: channel.channelId,
-      channelKind: channel.kind,
-    }
-  }
-
-  /**
-   * Extract document and transmission context from a channel message.
-   * Used to provide full context to middleware.
-   */
-  #extractContextFromMessage(message: ChannelMsg): {
-    docId?: DocId
-    transmission?: { type: "snapshot" | "update"; sizeBytes: number }
-  } {
-    // Handle messages with docId field
-    if ("docId" in message && typeof message.docId === "string") {
-      const docId = message.docId as DocId
-
-      // Handle sync-response and update messages with transmission data
-      if (
-        (message.type === "channel/sync-response" ||
-          message.type === "channel/update") &&
-        "transmission" in message
-      ) {
-        const t = message.transmission
-        if (
-          (t.type === "snapshot" || t.type === "update") &&
-          "data" in t &&
-          t.data instanceof Uint8Array
-        ) {
-          return {
-            docId,
-            transmission: { type: t.type, sizeBytes: t.data.length },
-          }
-        }
-      }
-
-      return { docId }
-    }
-
-    // Handle sync-request (has docs array, not single docId)
-    // For middleware, we don't provide document context for multi-doc messages
-    // Middleware can inspect message.docs directly if needed
-
-    return {}
   }
 
   // Helper functions for adapter callbacks
@@ -554,28 +399,7 @@ export class Synchronizer {
    * @returns The ephemeral store for this namespace
    */
   getOrCreateNamespacedStore(docId: DocId, namespace: string): EphemeralStore {
-    let namespaceStores = this.docNamespacedStores.get(docId)
-    if (!namespaceStores) {
-      namespaceStores = new Map()
-      this.docNamespacedStores.set(docId, namespaceStores)
-    }
-
-    let store = namespaceStores.get(namespace)
-    if (!store) {
-      // Create a new TimerlessEphemeralStore for internal stores
-      store = new TimerlessEphemeralStore()
-      namespaceStores.set(namespace, store)
-
-      // Subscribe to changes and broadcast
-      this.#subscribeToNamespacedStore(docId, namespace, store)
-
-      this.logger.debug(
-        "Created namespaced store {namespace} for doc {docId}",
-        { namespace, docId },
-      )
-    }
-
-    return store
+    return this.#ephemeralManager.getOrCreate(docId, namespace)
   }
 
   /**
@@ -591,27 +415,7 @@ export class Synchronizer {
     namespace: string,
     store: EphemeralStore,
   ): void {
-    let namespaceStores = this.docNamespacedStores.get(docId)
-    if (!namespaceStores) {
-      namespaceStores = new Map()
-      this.docNamespacedStores.set(docId, namespaceStores)
-    }
-
-    if (namespaceStores.has(namespace)) {
-      throw new Error(
-        `Ephemeral store "${namespace}" already exists for doc "${docId}"`,
-      )
-    }
-
-    namespaceStores.set(namespace, store)
-
-    // Subscribe to changes and broadcast
-    this.#subscribeToNamespacedStore(docId, namespace, store)
-
-    this.logger.debug("Registered external store {namespace} for doc {docId}", {
-      namespace,
-      docId,
-    })
+    this.#ephemeralManager.registerExternal(docId, namespace, store)
   }
 
   /**
@@ -625,7 +429,7 @@ export class Synchronizer {
     docId: DocId,
     namespace: string,
   ): EphemeralStore | undefined {
-    return this.docNamespacedStores.get(docId)?.get(namespace)
+    return this.#ephemeralManager.get(docId, namespace)
   }
 
   /**
@@ -653,74 +457,6 @@ export class Synchronizer {
       docId,
       namespace,
     })
-  }
-
-  /**
-   * Subscribe to a namespaced store and set up broadcasting.
-   *
-   * Uses the EphemeralStore.subscribe() callback's `by` field to filter:
-   * - `by: 'local'` → broadcast (change was made via `set()`)
-   * - `by: 'import'` → don't broadcast (change came from network via `apply()`)
-   *
-   * This works for both internal TypedEphemeral stores AND external stores
-   * (like loro-prosemirror) because they all use the same EphemeralStore API.
-   *
-   * Routes through dispatch for TEA compliance and message aggregation.
-   */
-  #subscribeToNamespacedStore(
-    docId: DocId,
-    namespace: string,
-    store: EphemeralStore,
-  ): void {
-    const unsub = store.subscribe(event => {
-      // Only broadcast local changes (not imported data from network)
-      if (event.by === "local") {
-        // Route through dispatch for TEA compliance
-        this.#dispatch({
-          type: "synchronizer/ephemeral-local-change",
-          docId,
-          namespace,
-        })
-      }
-    })
-
-    // Store the unsubscribe function for cleanup
-    this.#externalStoreSubscriptions.set(store, unsub)
-  }
-
-  /**
-   * Encode all namespaced stores for a document.
-   * Returns an array of { docId, peerId, data, namespace } for each store with data.
-   *
-   * All stores are namespaced.
-   */
-  #encodeAllPeerStores(
-    docId: DocId,
-  ): { docId: DocId; peerId: PeerID; data: Uint8Array; namespace: string }[] {
-    const result: {
-      docId: DocId
-      peerId: PeerID
-      data: Uint8Array
-      namespace: string
-    }[] = []
-
-    // Encode all namespaced stores
-    const namespaceStores = this.docNamespacedStores.get(docId)
-    if (namespaceStores) {
-      for (const [namespace, store] of namespaceStores) {
-        // Touch the store to update timestamps before encoding
-        if (store instanceof TimerlessEphemeralStore) {
-          store.touch()
-        }
-        const data = store.encodeAll()
-        if (data.length > 0) {
-          // For namespaced stores, we use our own peerId since we're the source
-          result.push({ docId, peerId: this.identity.peerId, data, namespace })
-        }
-      }
-    }
-
-    return result
   }
 
   // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -781,10 +517,6 @@ export class Synchronizer {
     return state
   }
 
-  getChannel(channelId: ChannelId): Channel | undefined {
-    return this.model.channels.get(channelId)
-  }
-
   /**
    * Get docIds that a channel's peer has subscribed to
    */
@@ -800,13 +532,6 @@ export class Synchronizer {
     }
 
     return Array.from(peerState.subscriptions)
-  }
-
-  /**
-   * Get peer state by peerId
-   */
-  public getPeerState(peerId: PeerID): PeerState | undefined {
-    return this.model.peers.get(peerId)
   }
 
   /**
@@ -885,12 +610,12 @@ export class Synchronizer {
    * 2. Batching outbound messages until quiescence
    */
   #dispatch(message: SynchronizerMessage) {
-    if (this.#isProcessing) {
+    if (this.#workQueue.isProcessing) {
       // Already inside work queue - execute inline
       this.#dispatchInternal(message)
     } else {
       // Not processing - enqueue and process
-      this.#enqueue(() => this.#dispatchInternal(message))
+      this.#workQueue.enqueue(() => this.#dispatchInternal(message))
     }
   }
 
@@ -1241,7 +966,7 @@ export class Synchronizer {
 
             if (channelIds.length > 0 && storesToBroadcast.length > 0) {
               // Build the ephemeral deletion message
-              const message: ChannelMsgEphemeral = {
+              const ephemeralMessage: ChannelMsgEphemeral = {
                 type: "channel/ephemeral",
                 docId,
                 hopsRemaining: 0,
@@ -1254,7 +979,7 @@ export class Synchronizer {
 
               // Queue for each channel (deferred send will aggregate)
               for (const channelId of channelIds) {
-                this.#queueSend(channelId, message)
+                this.#queueSend(channelId, ephemeralMessage)
               }
             }
 
@@ -1311,38 +1036,23 @@ export class Synchronizer {
    * Messages are aggregated by channel and flushed at quiescence.
    */
   #queueSend(channelId: ChannelId, message: BatchableMsg): void {
-    const queue = this.#outboundBuffer.get(channelId) ?? []
-    queue.push(message)
-    this.#outboundBuffer.set(channelId, queue)
+    this.#outboundBatcher.queue(channelId, message)
   }
 
   /**
-   * Flush all buffered outbound messages, aggregating by channel.
-   * Single messages are sent directly; multiple messages are wrapped in a batch.
-   *
-   * All channels are batched uniformly - the unified work queue handles
-   * reentrancy from synchronous adapters (e.g., StorageAdapter, BridgeAdapter).
+   * Encode all namespaced stores for a document.
+   * Returns an array of { docId, peerId, data, namespace } for each store with data.
    */
-  #flushOutbound(): void {
-    // Snapshot and clear to handle reentrancy safely
-    // (synchronous adapter replies will queue to a fresh buffer)
-    const toSend = new Map(this.#outboundBuffer)
-    this.#outboundBuffer.clear()
-
-    for (const [channelId, messages] of toSend) {
-      if (messages.length === 0) continue
-
-      if (messages.length === 1) {
-        // Single message - send directly without batch wrapper
-        this.adapters.send({ toChannelIds: [channelId], message: messages[0] })
-      } else {
-        // Multiple messages - wrap in batch
-        this.adapters.send({
-          toChannelIds: [channelId],
-          message: { type: "channel/batch", messages },
-        })
-      }
-    }
+  #encodeAllPeerStores(
+    docId: DocId,
+  ): { docId: DocId; peerId: PeerID; data: Uint8Array; namespace: string }[] {
+    const encoded = this.#ephemeralManager.encodeAll(docId)
+    return encoded.map(e => ({
+      docId,
+      peerId: e.peerId,
+      data: e.data,
+      namespace: e.namespace!,
+    }))
   }
 
   /**
