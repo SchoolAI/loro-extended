@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: test utilities */
 
+import Emittery from "emittery"
 import { LoroDoc, type PeerID } from "loro-crdt"
 import { vi } from "vitest"
 import type {
@@ -16,6 +17,7 @@ import {
   type SynchronizerModel,
 } from "../synchronizer-program.js"
 import type { ChannelId, DocId, PeerDocumentAwareness } from "../types.js"
+import type { CommandContext } from "./command-executor.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // MICROTASK FLUSHING UTILITIES
@@ -296,4 +298,135 @@ export function findAllMessages(
     }
   }
   return results
+}
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// COMMAND HANDLER TEST UTILITIES
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+/**
+ * Creates a mock logger for testing command handlers.
+ * All methods are vi.fn() mocks that can be inspected.
+ */
+export function createMockLogger() {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+    getChild: vi.fn(() => createMockLogger()),
+  }
+}
+
+/**
+ * Creates a mock AdapterManager for testing command handlers.
+ */
+export function createMockAdapterManager() {
+  return {
+    adapters: [],
+    sendEstablishmentMessage: vi.fn(() => 0),
+    sendEstablishedMessage: vi.fn(() => 0),
+    getChannel: vi.fn(() => undefined),
+    getAllChannels: vi.fn(() => []),
+  }
+}
+
+/**
+ * Creates a mock EphemeralStoreManager for testing command handlers.
+ */
+export function createMockEphemeralStoreManager() {
+  return {
+    getStore: vi.fn(() => undefined),
+    getOrCreateStore: vi.fn(() => ({
+      apply: vi.fn(),
+      encodeAll: vi.fn(() => new Uint8Array(0)),
+      getAllStates: vi.fn(() => ({})),
+      delete: vi.fn(),
+      touch: vi.fn(),
+    })),
+    removeStore: vi.fn(),
+    getAllStores: vi.fn(() => new Map()),
+  }
+}
+
+/**
+ * Creates a mock OutboundBatcher for testing command handlers.
+ */
+export function createMockOutboundBatcher() {
+  return {
+    queue: vi.fn(),
+    flush: vi.fn(),
+    clear: vi.fn(),
+    getPendingCount: vi.fn(() => 0),
+  }
+}
+
+/**
+ * Creates a mock EphemeralStore for testing command handlers.
+ */
+export function createMockEphemeralStore() {
+  return {
+    apply: vi.fn(),
+    encodeAll: vi.fn(() => new Uint8Array([1, 2, 3])),
+    getAllStates: vi.fn(() => ({})),
+    delete: vi.fn(),
+    touch: vi.fn(),
+    set: vi.fn(),
+    get: vi.fn(),
+  }
+}
+
+/**
+ * Creates a mock CommandContext for testing command handlers in isolation.
+ *
+ * This allows testing individual command handlers without needing the full
+ * Synchronizer infrastructure. All dependencies are mocked with vi.fn().
+ *
+ * @param overrides - Partial context to override default mocks
+ * @returns A complete CommandContext with all methods mocked
+ *
+ * @example
+ * ```typescript
+ * const ctx = createMockCommandContext({
+ *   getOrCreateNamespacedStore: vi.fn(() => mockStore),
+ * })
+ *
+ * handleApplyEphemeral(command, ctx)
+ *
+ * expect(ctx.getOrCreateNamespacedStore).toHaveBeenCalledWith("doc-1", "presence")
+ * ```
+ */
+export function createMockCommandContext(
+  overrides: Partial<CommandContext> = {},
+): CommandContext {
+  const mockChannel = createMockChannel()
+  const model = createModelWithChannel(mockChannel)
+
+  return {
+    model,
+    adapters: createMockAdapterManager() as any,
+    ephemeralManager: createMockEphemeralStoreManager() as any,
+    outboundBatcher: createMockOutboundBatcher() as any,
+    emitter: new Emittery(),
+    identity: { peerId: "test-peer" as PeerID, name: "test", type: "user" },
+    logger: createMockLogger() as any,
+    dispatch: vi.fn(),
+    executeCommand: vi.fn(),
+    validateChannelForSend: vi.fn(() => true),
+    queueSend: vi.fn(),
+    getNamespacedStore: vi.fn(() => undefined),
+    getOrCreateNamespacedStore: vi.fn(() => createMockEphemeralStore() as any),
+    encodeAllPeerStores: vi.fn(() => []),
+    buildSyncResponseMessage: vi.fn(() => undefined),
+    buildSyncRequestMessage: vi.fn(() => ({
+      type: "channel/sync-request" as const,
+      docId: "test-doc",
+      requesterDocVersion: createVersionVector(),
+      bidirectional: false,
+    })),
+    docNamespacedStores: new Map(),
+    ...overrides,
+  }
 }

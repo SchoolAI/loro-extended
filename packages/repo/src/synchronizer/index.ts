@@ -1,3 +1,9 @@
+// Command execution infrastructure
+
+export type { CommandContext, CommandHandler } from "./command-executor.js"
+export { CommandExecutor } from "./command-executor.js"
+export { commandHandlers } from "./command-handlers/index.js"
+
 // Channel message handlers (channel/*)
 
 // Synchronizer message handlers (synchronizer/*)

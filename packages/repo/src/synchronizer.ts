@@ -8,7 +8,6 @@ import type {
   BatchableMsg,
   Channel,
   ChannelMsg,
-  ChannelMsgEphemeral,
   ChannelMsgSyncRequest,
   ChannelMsgSyncResponse,
   ConnectedChannel,
@@ -16,10 +15,13 @@ import type {
 } from "./channel.js"
 import { isEstablished as isEstablishedFn } from "./channel.js"
 import type { Middleware } from "./middleware.js"
+import { createPermissions, type Permissions } from "./permissions.js"
 import {
-  createPermissions,
-  type Permissions,
-} from "./permissions.js"
+  type CommandContext,
+  CommandExecutor,
+  type SynchronizerEvents,
+} from "./synchronizer/command-executor.js"
+import { commandHandlers } from "./synchronizer/command-handlers/index.js"
 import { EphemeralStoreManager } from "./synchronizer/ephemeral-store-manager.js"
 import { HeartbeatManager } from "./synchronizer/heartbeat-manager.js"
 import { MiddlewareProcessor } from "./synchronizer/middleware-processor.js"
@@ -43,30 +45,13 @@ import type {
   ReadyState,
 } from "./types.js"
 import { equal } from "./utils/equal.js"
-import { getEstablishedChannelsForDoc } from "./utils/get-established-channels-for-doc.js"
-import { TimerlessEphemeralStore } from "./utils/timerless-ephemeral-store.js"
 
 export type HandleUpdateFn = (patches: Patch[]) => void
 
 // Initiate a synchronizer/heartbeat every N milliseconds; used primarily for ephemeral stores
 const HEARTBEAT_INTERVAL = 10000
 
-// The events that the Synchronizer can emit
-type SynchronizerEvents = {
-  "ready-state-changed": {
-    docId: string
-    readyStates: ReadyState[]
-  }
-  "ephemeral-change": {
-    docId: string
-    /** Whether this change originated locally or from a remote peer */
-    source: "local" | "remote"
-    /** Which keys changed (for local changes) */
-    keys?: string[]
-    /** Which peer's data changed (for remote changes) */
-    peerId?: string
-  }
-}
+// SynchronizerEvents is imported from command-executor.ts to avoid circular dependency
 
 type SynchronizerParams = {
   identity: PeerIdentityDetails
@@ -97,6 +82,7 @@ export class Synchronizer {
   readonly #ephemeralManager: EphemeralStoreManager
   readonly #heartbeatManager: HeartbeatManager
   readonly #middlewareProcessor: MiddlewareProcessor
+  readonly #commandExecutor: CommandExecutor
 
   /**
    * Per-doc namespaced ephemeral stores (unified model).
@@ -173,6 +159,11 @@ export class Synchronizer {
       this.logger,
     )
 
+    // Initialize command executor with handler registry
+    this.#commandExecutor = new CommandExecutor(commandHandlers, () =>
+      this.#buildCommandContext(),
+    )
+
     // Create adapter context for dynamic adapter initialization
     const adapterContext = {
       identity: this.identity,
@@ -240,7 +231,9 @@ export class Synchronizer {
    * @param message - The message received on the channel
    */
   channelReceive(channelId: ChannelId, message: ChannelMsg): void {
-    this.#workQueue.enqueue(() => this.#channelReceiveInternal(channelId, message))
+    this.#workQueue.enqueue(() =>
+      this.#channelReceiveInternal(channelId, message),
+    )
   }
 
   /**
@@ -280,10 +273,7 @@ export class Synchronizer {
    * Handle a batch message by running middleware on each message individually.
    * Messages that pass middleware are collected and dispatched together.
    */
-  #handleBatchMessage(
-    channelId: ChannelId,
-    messages: BatchableMsg[],
-  ): void {
+  #handleBatchMessage(channelId: ChannelId, messages: BatchableMsg[]): void {
     if (!this.#middlewareProcessor.hasMiddleware) {
       // No middleware - dispatch the batch directly
       this.#dispatch({
@@ -297,68 +287,69 @@ export class Synchronizer {
     }
 
     // Process batch through middleware
-    void this.#middlewareProcessor.processBatch(channelId, messages).then(result => {
-      if (result.type === "rejected") {
-        // All messages rejected
-        return
-      }
+    void this.#middlewareProcessor
+      .processBatch(channelId, messages)
+      .then(result => {
+        if (result.type === "rejected") {
+          // All messages rejected
+          return
+        }
 
-      if (result.type === "no-middleware") {
-        // No middleware - dispatch the batch directly
-        this.#dispatch({
-          type: "synchronizer/channel-receive-message",
-          envelope: {
-            fromChannelId: channelId,
-            message: { type: "channel/batch", messages },
-          },
-        })
-        return
-      }
+        if (result.type === "no-middleware") {
+          // No middleware - dispatch the batch directly
+          this.#dispatch({
+            type: "synchronizer/channel-receive-message",
+            envelope: {
+              fromChannelId: channelId,
+              message: { type: "channel/batch", messages },
+            },
+          })
+          return
+        }
 
-      if (result.type === "allowed") {
-        // Single message - dispatch directly
-        this.#dispatch({
-          type: "synchronizer/channel-receive-message",
-          envelope: {
-            fromChannelId: channelId,
-            message: result.message,
-          },
-        })
-        return
-      }
+        if (result.type === "allowed") {
+          // Single message - dispatch directly
+          this.#dispatch({
+            type: "synchronizer/channel-receive-message",
+            envelope: {
+              fromChannelId: channelId,
+              message: result.message,
+            },
+          })
+          return
+        }
 
-      if (result.type === "allowed-batch") {
-        // Multiple messages - dispatch as batch
-        this.#dispatch({
-          type: "synchronizer/channel-receive-message",
-          envelope: {
-            fromChannelId: channelId,
-            message: { type: "channel/batch", messages: result.messages },
-          },
-        })
-      }
-    })
+        if (result.type === "allowed-batch") {
+          // Multiple messages - dispatch as batch
+          this.#dispatch({
+            type: "synchronizer/channel-receive-message",
+            envelope: {
+              fromChannelId: channelId,
+              message: { type: "channel/batch", messages: result.messages },
+            },
+          })
+        }
+      })
   }
 
   /**
    * Run middleware on a single message and dispatch if allowed.
    */
-  #runMiddlewareAndDispatch(
-    channelId: ChannelId,
-    message: ChannelMsg,
-  ): void {
-    void this.#middlewareProcessor.processMessage(channelId, message).then(result => {
-      if (result.type === "allowed" || result.type === "no-middleware") {
-        this.#dispatch({
-          type: "synchronizer/channel-receive-message",
-          envelope: {
-            fromChannelId: channelId,
-            message,
-          },
-        })
-      }
-      // If result.type === "rejected", message is dropped (middleware rejected it)
-    })
+  #runMiddlewareAndDispatch(channelId: ChannelId, message: ChannelMsg): void {
+    void this.#middlewareProcessor
+      .processMessage(channelId, message)
+      .then(result => {
+        if (result.type === "allowed" || result.type === "no-middleware") {
+          this.#dispatch({
+            type: "synchronizer/channel-receive-message",
+            envelope: {
+              fromChannelId: channelId,
+              message,
+            },
+          })
+        }
+        // If result.type === "rejected", message is dropped (middleware rejected it)
+      })
   }
 
   // Helper functions for adapter callbacks
@@ -678,336 +669,63 @@ export class Synchronizer {
     }
   }
 
+  /**
+   * Execute a command using the command handler registry.
+   * Delegates to the CommandExecutor which looks up the appropriate handler.
+   */
   #executeCommand(command: Command) {
-    switch (command.type) {
-      case "cmd/stop-channel": {
-        // Time to de-initialize a channel
-        command.channel.stop()
-        break
-      }
+    this.#commandExecutor.execute(command)
+  }
 
-      case "cmd/send-establishment-message": {
-        // Send establishment messages (these can be sent to non-established channels)
-        this.logger.debug(
-          "executing cmd/send-establishment-message: {messageType}",
-          {
-            messageType: command.envelope.message.type,
-            toChannelIds: command.envelope.toChannelIds,
-            totalAdapters: this.adapters.adapters.length,
-            adapterChannelCounts: this.adapters.adapters.map(a => ({
-              adapterType: a.adapterType,
-              channelCount: a.channels.size,
-            })),
-          },
-        )
+  /**
+   * Build the command context for command handlers.
+   * This provides all dependencies handlers need to execute.
+   */
+  #buildCommandContext(): CommandContext {
+    return {
+      // Model access (read-only snapshot)
+      model: this.model,
 
-        const sentCount = this.adapters.sendEstablishmentMessage(
-          command.envelope,
-        )
+      // Services
+      adapters: this.adapters,
+      ephemeralManager: this.#ephemeralManager,
+      outboundBatcher: this.#outboundBatcher,
+      emitter: this.emitter,
 
-        this.logger.debug(
-          "cmd/send-establishment-message result: sent {sentCount}/{expectedCount}",
-          {
-            sentCount,
-            expectedCount: command.envelope.toChannelIds.length,
-          },
-        )
+      // Identity
+      identity: this.identity,
 
-        if (sentCount < command.envelope.toChannelIds.length) {
-          this.logger.warn(
-            "cmd/send-establishment-message could not deliver {messageType} to all {expectedCount} channels",
-            {
-              messageType: command.envelope.message.type,
-              expectedCount: command.envelope.toChannelIds.length,
-              channelIds: command.envelope.toChannelIds,
-            },
-          )
-        }
+      // Utilities
+      logger: this.logger,
+      dispatch: msg => this.#dispatch(msg),
+      executeCommand: cmd => this.#executeCommand(cmd),
 
-        break
-      }
-
-      case "cmd/send-message": {
-        // Queue messages for deferred send (aggregated at end of dispatch)
-        for (const channelId of command.envelope.toChannelIds) {
-          if (!this.#validateChannelForSend(channelId)) continue
-
-          // Flatten nested batches
-          if (command.envelope.message.type === "channel/batch") {
-            for (const msg of command.envelope.message.messages) {
-              this.#queueSend(channelId, msg)
-            }
-          } else {
-            this.#queueSend(channelId, command.envelope.message as BatchableMsg)
-          }
-        }
-        break
-      }
-
-      case "cmd/send-sync-response": {
-        this.#executeSendSyncResponse(
-          command.docId,
-          command.requesterDocVersion,
-          command.toChannelId,
-          command.includeEphemeral,
-        )
-        break
-      }
-
-      case "cmd/send-sync-request": {
-        this.#executeSendSyncRequest(
-          command.toChannelId,
-          command.docs,
-          command.bidirectional,
-          command.includeEphemeral,
-        )
-        break
-      }
-
-      case "cmd/subscribe-doc": {
-        this.#executeSubscribeDoc(command.docId)
-        break
-      }
-
-      case "cmd/import-doc-data": {
-        this.#executeImportDocData(
-          command.docId,
-          command.data,
-          command.fromPeerId,
-        )
-        break
-      }
-
-      case "cmd/emit-ephemeral-change": {
-        this.emitter.emit("ephemeral-change", {
-          docId: command.docId,
-          source: "local",
-        })
-        break
-      }
-
-      case "cmd/apply-ephemeral": {
-        const docId = command.docId
-
-        // All ephemeral messages must have a namespace
-        for (const storeData of command.stores) {
-          const { peerId, data, namespace } = storeData
-
-          if (!namespace) {
-            this.logger.warn(
-              "cmd/apply-ephemeral: received message without namespace from {peerId} in {docId}, ignoring",
-              { peerId, docId },
-            )
-            continue
-          }
-
-          if (data.length === 0) {
-            // Empty data - could indicate deletion, but for namespaced stores
-            // we don't delete the whole store, just let the data expire
-            this.logger.debug(
-              "cmd/apply-ephemeral: received empty data for namespace {namespace} from {peerId} in {docId}",
-              { namespace, peerId, docId },
-            )
-          } else {
-            // Get or create the namespaced store and apply the data
-            const store = this.getOrCreateNamespacedStore(docId, namespace)
-            store.apply(data)
-
-            this.logger.trace(
-              "cmd/apply-ephemeral: applied {dataLength} bytes to namespace {namespace} from {peerId} in {docId}",
-              { namespace, peerId, docId, dataLength: data.length },
-            )
-          }
-
-          void this.emitter.emit("ephemeral-change", {
-            docId,
-            source: "remote",
-            peerId,
-          })
-        }
-        break
-      }
-
-      case "cmd/broadcast-ephemeral-batch": {
-        // Macro command: expands into multiple cmd/broadcast-ephemeral-namespace commands.
-        // Each sub-command queues messages via #queueSend(); the deferred send layer
-        // aggregates them into a single channel/batch message at flush time.
-        const subCommands: Command[] = []
-
-        for (const docId of command.docIds) {
-          const namespaceStores = this.docNamespacedStores.get(docId)
-
-          if (!namespaceStores || namespaceStores.size === 0) {
-            continue
-          }
-
-          // Touch all stores before encoding (for heartbeat timestamp refresh)
-          for (const store of namespaceStores.values()) {
-            if (store instanceof TimerlessEphemeralStore) {
-              store.touch()
-            }
-          }
-
-          // Create a command for each namespace
-          for (const namespace of namespaceStores.keys()) {
-            subCommands.push({
-              type: "cmd/broadcast-ephemeral-namespace",
-              docId,
-              namespace,
-              hopsRemaining: command.hopsRemaining,
-              toChannelIds: [command.toChannelId],
-            })
-          }
-        }
-
-        if (subCommands.length === 0) {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral-batch: skipping (no stores to broadcast)",
-          )
-          break
-        }
-
-        // Execute all sub-commands; each queues messages via #queueSend()
-        // The deferred send layer aggregates them at flush time
-        for (const cmd of subCommands) {
-          this.#executeCommand(cmd)
-        }
-
-        this.logger.trace(
-          "cmd/broadcast-ephemeral-batch: expanded into {cmdCount} namespace broadcasts for channel {channelId}",
-          {
-            cmdCount: subCommands.length,
-            channelId: command.toChannelId,
-          },
-        )
-        break
-      }
-
-      case "cmd/broadcast-ephemeral-namespace": {
-        // Broadcast a single namespace's ephemeral data for a document
-        const { docId, namespace, hopsRemaining, toChannelIds } = command
-        const store = this.getNamespacedStore(docId, namespace)
-
-        if (!store) {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (store not found)",
-            () => ({ docId, namespace }),
-          )
-          break
-        }
-
-        const data = store.encodeAll()
-        if (data.length === 0) {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (no data)",
-            () => ({ docId, namespace }),
-          )
-          break
-        }
-
-        if (toChannelIds.length === 0) {
-          this.logger.debug(
-            "cmd/broadcast-ephemeral-namespace: skipping for {docId}/{namespace} (no channels)",
-            () => ({ docId, namespace }),
-          )
-          break
-        }
-
-        // Build the ephemeral message
-        const message: ChannelMsgEphemeral = {
-          type: "channel/ephemeral",
+      // Helper functions
+      validateChannelForSend: channelId =>
+        this.#validateChannelForSend(channelId),
+      queueSend: (channelId, message) => this.#queueSend(channelId, message),
+      getNamespacedStore: (docId, namespace) =>
+        this.getNamespacedStore(docId, namespace),
+      getOrCreateNamespacedStore: (docId, namespace) =>
+        this.getOrCreateNamespacedStore(docId, namespace),
+      encodeAllPeerStores: docId => this.#encodeAllPeerStores(docId),
+      buildSyncResponseMessage: (
+        docId,
+        requesterDocVersion,
+        toChannelId,
+        includeEphemeral,
+      ) =>
+        this.#buildSyncResponseMessage(
           docId,
-          hopsRemaining,
-          stores: [
-            {
-              peerId: this.identity.peerId,
-              data,
-              namespace,
-            },
-          ],
-        }
+          requesterDocVersion,
+          toChannelId,
+          includeEphemeral,
+        ),
+      buildSyncRequestMessage: (doc, bidirectional, includeEphemeral) =>
+        this.#buildSyncRequestMessage(doc, bidirectional, includeEphemeral),
 
-        // Queue for each channel (deferred send will aggregate)
-        for (const channelId of toChannelIds) {
-          this.#queueSend(channelId, message)
-        }
-
-        this.logger.trace(
-          "cmd/broadcast-ephemeral-namespace: queued {namespace} for {docId} to {channelCount} channels",
-          { namespace, docId, channelCount: toChannelIds.length },
-        )
-        break
-      }
-
-      case "cmd/remove-ephemeral-peer": {
-        // Remove the peer's data from all documents' namespaced stores
-        for (const [docId, namespaceStores] of this.docNamespacedStores) {
-          let peerDataRemoved = false
-          const storesToBroadcast: { namespace: string }[] = []
-
-          // Check ALL namespaces for this peer's data
-          for (const [namespace, store] of namespaceStores) {
-            const allStates = store.getAllStates()
-            if (allStates[command.peerId] !== undefined) {
-              // Delete the peer's key from this store
-              store.delete(command.peerId)
-              peerDataRemoved = true
-              storesToBroadcast.push({ namespace })
-            }
-          }
-
-          if (peerDataRemoved) {
-            // Broadcast deletion to other peers using the utility function
-            const channelIds = getEstablishedChannelsForDoc(
-              this.model.channels,
-              this.model.peers,
-              docId,
-            )
-
-            if (channelIds.length > 0 && storesToBroadcast.length > 0) {
-              // Build the ephemeral deletion message
-              const ephemeralMessage: ChannelMsgEphemeral = {
-                type: "channel/ephemeral",
-                docId,
-                hopsRemaining: 0,
-                stores: storesToBroadcast.map(s => ({
-                  peerId: command.peerId,
-                  data: new Uint8Array(0), // Empty data signals deletion
-                  namespace: s.namespace,
-                })),
-              }
-
-              // Queue for each channel (deferred send will aggregate)
-              for (const channelId of channelIds) {
-                this.#queueSend(channelId, ephemeralMessage)
-              }
-            }
-
-            // Emit change event so UI updates immediately
-            // This is "remote" because we're removing a remote peer's data
-            this.emitter.emit("ephemeral-change", {
-              docId,
-              source: "remote",
-              peerId: command.peerId,
-            })
-          }
-        }
-        break
-      }
-
-      // (utility): A command that sends a dispatch back into the program message loop
-      case "cmd/dispatch": {
-        this.#dispatch(command.dispatch)
-        break
-      }
-
-      // (utility): A command that executes a batch of commands
-      case "cmd/batch": {
-        for (const cmd of command.commands) {
-          this.#executeCommand(cmd)
-        }
-        break
-      }
+      // Access to docNamespacedStores
+      docNamespacedStores: this.docNamespacedStores,
     }
   }
 
@@ -1051,7 +769,7 @@ export class Synchronizer {
       docId,
       peerId: e.peerId,
       data: e.data,
-      namespace: e.namespace!,
+      namespace: e.namespace,
     }))
   }
 
@@ -1188,23 +906,6 @@ export class Synchronizer {
     return syncResponseMessage
   }
 
-  #executeSendSyncResponse(
-    docId: DocId,
-    requesterDocVersion: VersionVector,
-    toChannelId: ChannelId,
-    includeEphemeral?: boolean,
-  ) {
-    const message = this.#buildSyncResponseMessage(
-      docId,
-      requesterDocVersion,
-      toChannelId,
-      includeEphemeral,
-    )
-    if (message) {
-      this.#queueSend(toChannelId, message)
-    }
-  }
-
   /**
    * Build a single sync-request message for a document.
    */
@@ -1242,83 +943,6 @@ export class Synchronizer {
     }
 
     return result
-  }
-
-  #executeSendSyncRequest(
-    toChannelId: ChannelId,
-    docs: { docId: DocId; requesterDocVersion: VersionVector }[],
-    bidirectional: boolean,
-    includeEphemeral?: boolean,
-  ) {
-    // Validate channel exists
-    const channel = this.model.channels.get(toChannelId)
-    if (!channel) {
-      this.logger.warn(
-        "can't send sync-request, channel {toChannelId} doesn't exist",
-        { toChannelId },
-      )
-      return
-    }
-
-    // Queue each sync-request message individually
-    // The deferred send layer will aggregate them into a batch at flush time
-    for (const doc of docs) {
-      const message = this.#buildSyncRequestMessage(
-        doc,
-        bidirectional,
-        includeEphemeral,
-      )
-      this.#queueSend(toChannelId, message)
-    }
-  }
-
-  #executeSubscribeDoc(docId: DocId) {
-    const docState = this.model.documents.get(docId)
-    if (!docState) {
-      this.logger.warn("can't get doc-state, doc {docId} not found", { docId })
-      return
-    }
-
-    /**
-     * Subscribe to local changes, to be handled by local-doc-change.
-     *
-     * NOTE: Remote (imported) changes are handled explicitly in handle-sync-response.
-     */
-    docState.doc.subscribeLocalUpdates(() => {
-      this.#dispatch({
-        type: "synchronizer/local-doc-change",
-        docId,
-      })
-    })
-    // For "import" events, we don't dispatch local-doc-change here.
-    // The import is triggered by cmd/import-doc-data, which is followed by
-    // a cmd/dispatch for doc-change with proper peer awareness already set.
-  }
-
-  #executeImportDocData(docId: DocId, data: Uint8Array, fromPeerId: PeerID) {
-    const docState = this.model.documents.get(docId)
-    if (!docState) {
-      this.logger.warn("can't import doc data, doc {docId} not found", {
-        docId,
-      })
-      return
-    }
-
-    // Import the document data
-    // Note: doc.subscribe() only fires for "local" events, so import won't trigger it
-    docState.doc.import(data)
-
-    // After import, dispatch a message to:
-    // 1. Update peer awareness to our CURRENT version (prevents echo)
-    // 2. Trigger doc-change for multi-hop propagation to OTHER peers
-    //
-    // We pass fromPeerId so the doc-change handler knows to skip this peer
-    // (they just sent us this data, so they already have it)
-    this.#dispatch({
-      type: "synchronizer/doc-imported",
-      docId,
-      fromPeerId,
-    })
   }
 
   /**
