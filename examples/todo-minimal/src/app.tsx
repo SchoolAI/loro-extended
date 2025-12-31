@@ -44,13 +44,9 @@ function App() {
       <form
         onSubmit={e => {
           e.preventDefault()
-          const input = e.currentTarget.elements.namedItem(
-            "text",
-          ) as HTMLInputElement
-          if (input.value.trim()) {
-            add(input.value.trim())
-            input.value = ""
-          }
+          const value = new FormData(e.currentTarget).get("text")
+          const text = String(value).trim()
+          if (text) add(text), e.currentTarget.reset()
         }}
       >
         <input name="text" type="text" placeholder="What needs to be done?" />
@@ -80,7 +76,7 @@ function App() {
 
 // Bootstrap - connect to WebSocket and render
 const wsAdapter = new WsClientNetworkAdapter({
-  url: () => `ws://${location.host}/ws`,
+  url: `ws://${location.host}/ws`,
 })
 
 createRoot(document.getElementById("root")).render(

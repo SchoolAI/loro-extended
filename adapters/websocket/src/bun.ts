@@ -88,3 +88,47 @@ export function wrapBunWebSocket(ws: ServerWebSocket<BunWsData>): WsSocket {
     },
   }
 }
+
+/**
+ * Create Bun WebSocket handlers that integrate with WsServerNetworkAdapter.
+ *
+ * This helper eliminates boilerplate by providing pre-configured handlers
+ * for open, message, and close events.
+ *
+ * @example
+ * ```typescript
+ * import { WsServerNetworkAdapter } from "@loro-extended/adapter-websocket/server"
+ * import { createBunWebSocketHandlers, type BunWsData } from "@loro-extended/adapter-websocket/bun"
+ *
+ * const wsAdapter = new WsServerNetworkAdapter()
+ *
+ * Bun.serve<BunWsData>({
+ *   fetch(req, server) { ... },
+ *   websocket: createBunWebSocketHandlers(wsAdapter),
+ * })
+ * ```
+ */
+export function createBunWebSocketHandlers(wsAdapter: {
+  handleConnection: (opts: { socket: WsSocket }) => { start: () => void }
+}) {
+  return {
+    open(ws: ServerWebSocket<BunWsData>) {
+      wsAdapter.handleConnection({ socket: wrapBunWebSocket(ws) }).start()
+    },
+    message(
+      ws: ServerWebSocket<BunWsData>,
+      msg: string | ArrayBuffer | Buffer,
+    ) {
+      const data =
+        msg instanceof ArrayBuffer
+          ? new Uint8Array(msg)
+          : Buffer.isBuffer(msg)
+            ? new Uint8Array(msg)
+            : msg
+      ws.data.handlers.onMessage?.(data)
+    },
+    close(ws: ServerWebSocket<BunWsData>, code: number, reason: string) {
+      ws.data.handlers.onClose?.(code, reason)
+    },
+  }
+}

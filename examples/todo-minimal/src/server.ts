@@ -1,6 +1,6 @@
 import {
   type BunWsData,
-  wrapBunWebSocket,
+  createBunWebSocketHandlers,
 } from "@loro-extended/adapter-websocket/bun"
 import { WsServerNetworkAdapter } from "@loro-extended/adapter-websocket/server"
 import { Repo } from "@loro-extended/repo"
@@ -8,73 +8,30 @@ import { Repo } from "@loro-extended/repo"
 const wsAdapter = new WsServerNetworkAdapter()
 new Repo({ adapters: [wsAdapter] })
 
-// Build the app to disk on startup
-async function buildApp() {
-  console.log("Building client...")
-
-  const result = await Bun.build({
-    entrypoints: ["./src/app.tsx"],
-    outdir: "./dist",
-  })
-
-  if (!result.success) {
-    console.error("Build failed:")
-    for (const log of result.logs) {
-      console.error(log)
-    }
-    throw new Error("Build failed")
-  }
-
-  console.log(
-    "Build complete:",
-    result.outputs.map(o => o.path),
-  )
-}
-
-await buildApp()
-
-const port = 5173
+// Build the app using HTML entrypoint - Bun auto-discovers and bundles JS/CSS
+const result = await Bun.build({
+  entrypoints: ["./public/index.html"],
+  outdir: "./dist",
+})
+if (!result.success) throw new AggregateError(result.logs, "Build failed")
 
 Bun.serve<BunWsData>({
-  port,
+  port: 5173,
   async fetch(req, server) {
     const url = new URL(req.url)
 
     if (url.pathname === "/ws") {
-      return server.upgrade(req, { data: { handlers: {} } })
-        ? undefined
-        : new Response("Upgrade failed", { status: 400 })
+      if (server.upgrade(req, { data: { handlers: {} } })) return
+      return new Response("Upgrade failed", { status: 400 })
     }
 
-    if (url.pathname === "/favicon.ico") {
-      return new Response(null, { status: 204 })
-    }
-
-    // Serve index.html for root
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      return new Response(Bun.file("index.html"))
-    }
-
-    // Serve static files from dist/
-    const file = Bun.file(`./dist${url.pathname}`)
-    if (await file.exists()) {
-      return new Response(file)
-    }
-
-    return new Response("Not found", { status: 404 })
+    const pathname = url.pathname === "/" ? "/index.html" : url.pathname
+    const file = Bun.file(`./dist${pathname}`)
+    return (await file.exists())
+      ? new Response(file)
+      : new Response("Not found", { status: 404 })
   },
-  websocket: {
-    open(ws) {
-      wsAdapter.handleConnection({ socket: wrapBunWebSocket(ws) }).start()
-    },
-    message(ws, msg) {
-      const data = msg instanceof ArrayBuffer ? new Uint8Array(msg) : msg
-      ws.data.handlers.onMessage(data)
-    },
-    close(ws, code, reason) {
-      ws.data.handlers.onClose(code, reason)
-    },
-  },
+  websocket: createBunWebSocketHandlers(wsAdapter),
 })
 
-console.log(`🚀 Server running at http://localhost:${port}`)
+console.log(`🚀 Server running at http://localhost:5173`)
