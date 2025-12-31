@@ -5,7 +5,7 @@ import * as path from "node:path"
 let serverProcess: ChildProcess | null = null
 
 export async function cleanDatabase(): Promise<void> {
-  const dbPath = path.join(process.cwd(), "loro-todo-websocket-app.db")
+  const dbPath = path.join(process.cwd(), "todo-vite.db")
   try {
     await fs.rm(dbPath, { recursive: true, force: true })
   } catch (_error: unknown) {
@@ -18,14 +18,13 @@ export async function startServer(cleanDb = false): Promise<void> {
     await cleanDatabase()
   }
 
-  serverProcess = spawn("pnpm", ["dev:server"], {
+  serverProcess = spawn("pnpm", ["dev"], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: "5170" },
     stdio: "pipe",
   })
 
   // Wait for server to be ready
-  await waitForServer("http://localhost:5170/ws")
+  await waitForServer("http://localhost:5173")
 }
 
 export async function stopServer(): Promise<void> {

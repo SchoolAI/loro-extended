@@ -6,13 +6,15 @@ export default defineConfig({
   workers: 1, // Single worker to avoid port conflicts
   reporter: "list",
 
+  // Clean database before running tests
+  globalSetup: "./tests/e2e/fixtures/global-setup.ts",
+
   use: {
-    baseURL: "http://localhost:8002",
+    baseURL: "http://localhost:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    // Add these for proper session isolation:
-    storageState: { cookies: [], origins: [] }, // Start with empty storage state
+    storageState: { cookies: [], origins: [] },
     ignoreHTTPSErrors: true,
     javaScriptEnabled: true,
   },
@@ -24,18 +26,10 @@ export default defineConfig({
     },
   ],
 
-  webServer: [
-    {
-      command: "pnpm dev:client",
-      port: 8002,
-      timeout: 120 * 1000,
-      reuseExistingServer: true, // Add this to prevent server restarts
-    },
-    {
-      command: "pnpm dev:server",
-      port: 8003,
-      timeout: 120 * 1000,
-      reuseExistingServer: true, // Add this to prevent server restarts
-    },
-  ],
+  webServer: {
+    command: "pnpm dev",
+    port: 5173,
+    timeout: 120 * 1000,
+    reuseExistingServer: false, // Start fresh server with clean database
+  },
 })

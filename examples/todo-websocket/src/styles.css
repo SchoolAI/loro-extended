@@ -1,0 +1,68 @@
+/* Minimal styles for the collaborative todo example */
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+form input[type="text"] {
+  flex: 1;
+  padding: 8px;
+}
+
+form button {
+  padding: 8px 16px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  gap: 12px;
+}
+
+li span {
+  flex: 1;
+}
+
+li span.done {
+  text-decoration: line-through;
+  color: #888;
+}
+
+li button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #888;
+}
+
+li button:hover {
+  color: #c00;
+}
+
+.hint {
+  color: #888;
+  font-size: 12px;
+  margin-top: 20px;
+}

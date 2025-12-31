@@ -1,60 +1,31 @@
 import { expect, test } from "@playwright/test"
-import {
-  createTodo,
-  generateTestDocumentId,
-  waitForRepoState,
-} from "./fixtures/test-helpers"
+import { createTodo, waitForTodosReady } from "./fixtures/test-helpers"
 
 test.describe("Storage Persistence", () => {
   // Note: These tests assume the dev server is already running via playwright.config.ts
 
-  // TODO(duane): Remove skip once IndexedDB is revisited / updated
-  test.skip("should persist client state in IndexedDB", async ({ page }) => {
-    const testDocId = generateTestDocumentId()
-    await page.goto(`/#${testDocId}`)
-    await waitForRepoState(page, "connected")
-
-    // Create a todo
-    await createTodo(page, "Client Persistence Test")
-
-    // Reload page (without server restart)
-    await page.reload()
-    await waitForRepoState(page, "connected")
-
-    // Verify todos still present (loaded from IndexedDB)
-    await expect(
-      page.locator('.todo-item:has-text("Client Persistence Test")'),
-    ).toBeVisible()
-  })
-
   test("should sync persisted data between clients", async ({ browser }) => {
-    // Use the same document ID for both clients to test sync
-    const testDocId = generateTestDocumentId()
+    // Create both pages upfront
+    const [page1, page2] = await Promise.all([
+      browser.newPage(),
+      browser.newPage(),
+    ])
 
-    // First client creates a todo
-    const page1 = await browser.newPage()
-    await page1.goto(`/#${testDocId}`)
-    await waitForRepoState(page1, "connected")
+    // First client connects and creates a todo
+    await page1.goto("/")
+    await waitForTodosReady(page1)
 
-    // Create a unique todo
     const todoText = `Persist Test ${Date.now()}`
     await createTodo(page1, todoText)
 
-    // Wait a bit for server to persist
-    await page1.waitForTimeout(1000)
-
-    // Second client should see the todo (loaded from server)
-    const page2 = await browser.newPage()
-    await page2.goto(`/#${testDocId}`)
-    await waitForRepoState(page2, "connected")
+    // Second client connects - should see the todo via sync
+    await page2.goto("/")
+    await waitForTodosReady(page2)
 
     // Should see the todo created by first client
-    await expect(
-      page2.locator(`.todo-item:has-text("${todoText}")`),
-    ).toBeVisible({ timeout: 10000 })
+    await expect(page2.locator(`li:has-text("${todoText}")`)).toBeVisible()
 
     // Clean up
-    await page1.close()
-    await page2.close()
+    await Promise.all([page1.close(), page2.close()])
   })
 })

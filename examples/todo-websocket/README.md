@@ -1,138 +1,90 @@
-# Loro Todo App (WebSocket)
+# Collaborative Todo with Vite
 
-A simple todo application demonstrating real-time synchronization using `@loro-extended/repo` with WebSocket transport.
+A collaborative todo app using **Node.js + Vite** instead of Bun. Same functionality as `todo-minimal`, but with Vite's hot module reloading for a better development experience.
 
-This example is identical to the `todo` example, but uses WebSocket instead of Server-Sent Events (SSE) for real-time communication.
+## Quick Start
 
-## Features
+```bash
+# From the loro-extended root
+pnpm install
 
-- Real-time synchronization across multiple clients via WebSocket
-- Persistent storage using LevelDB
-- Automatic reconnection with exponential backoff
-- Conflict-free collaborative editing using Loro CRDTs
+# Start the server
+cd examples/todo-vite
+pnpm dev
+```
+
+Open http://localhost:5173 in two browser tabs and watch todos sync in real-time!
+
+## What's Here
+
+```
+todo-vite/
+├── src/
+│   ├── app.tsx      # React app with schema (same as todo-minimal)
+│   ├── server.ts    # Node.js server with Vite middleware + ws
+│   └── styles.css   # Minimal styling
+├── index.html       # Vite entry point
+├── vite.config.ts   # Vite configuration
+└── package.json
+```
 
 ## Architecture
 
+This example uses a single Node.js server that:
+
+1. **Vite middleware mode** - Serves and bundles the React frontend with HMR
+2. **WebSocket server** - Uses the `ws` library for loro-extended sync
+3. **Same frontend** - Identical React code to `todo-minimal`
+
 ```
-┌─────────────────┐     WebSocket      ┌─────────────────┐
-│  React Client   │◄──────────────────►│  Express Server │
-│                 │                    │                 │
-│  WsClient       │                    │  WsServer       │
-│  NetworkAdapter │                    │  NetworkAdapter │
-└─────────────────┘                    └────────┬────────┘
-                                                │
-                                                ▼
-                                       ┌─────────────────┐
-                                       │    LevelDB      │
-                                       │    Storage      │
-                                       └─────────────────┘
+┌─────────────────────────────────────────┐
+│           Node.js HTTP Server           │
+├─────────────────────────────────────────┤
+│  /ws path → WebSocket (ws library)      │
+│  /* paths → Vite middleware (HMR)       │
+└─────────────────────────────────────────┘
 ```
 
-## Running the Example
-
-1. Install dependencies from the repository root:
-
-   ```bash
-   pnpm install
-   ```
-
-2. Build the workspace packages:
-
-   ```bash
-   pnpm build
-   ```
-
-3. Start the development server:
-
-   ```bash
-   cd examples/todo-websocket
-   pnpm dev
-   ```
-
-4. Open http://localhost:5173 in multiple browser windows to see real-time sync in action.
-
-## Key Differences from SSE Example
-
-### Client (`src/main.tsx`)
-
-Uses `WsClientNetworkAdapter` instead of `SseClientNetworkAdapter`:
+## Server Code
 
 ```typescript
-import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client";
+import http from "node:http"
+import { createServer as createViteServer } from "vite"
+import { WebSocketServer } from "ws"
+import { WsServerNetworkAdapter, wrapWsSocket } from "@loro-extended/adapter-websocket/server"
+import { Repo } from "@loro-extended/repo"
 
-const wsAdapter = new WsClientNetworkAdapter({
-  url: (peerId) => `/ws?peerId=${peerId}`,
-  reconnect: { enabled: true },
-});
+// Create loro-extended repo
+const wsAdapter = new WsServerNetworkAdapter()
+new Repo({ adapters: [wsAdapter] })
+
+// Create HTTP server with Vite middleware
+const httpServer = http.createServer()
+const vite = await createViteServer({
+  server: { middlewareMode: { server: httpServer } }
+})
+httpServer.on("request", vite.middlewares)
+
+// Create WebSocket server
+const wss = new WebSocketServer({ server: httpServer, path: "/ws" })
+wss.on("connection", ws => {
+  wsAdapter.handleConnection({ socket: wrapWsSocket(ws) }).start()
+})
+
+httpServer.listen(5173)
 ```
 
-### Server (`src/server/server.ts`)
+## Comparison with todo-minimal
 
-Uses `WsServerNetworkAdapter` with the `ws` library:
+| Aspect | todo-minimal | todo-vite |
+|--------|--------------|-----------|
+| Runtime | Bun | Node.js |
+| Bundler | Bun.build | Vite |
+| WebSocket | Bun.serve | ws library |
+| Dev experience | Manual restart | Vite HMR |
+| Run command | `bun --hot src/server.ts` | `tsx src/server.ts` |
 
-```typescript
-import { WebSocketServer } from "ws";
-import {
-  WsServerNetworkAdapter,
-  wrapWsSocket,
-} from "@loro-extended/adapter-websocket/server";
+## Requirements
 
-const wsAdapter = new WsServerNetworkAdapter();
-const wss = new WebSocketServer({ server, path: "/ws" });
-
-wss.on("connection", (ws, req) => {
-  const url = new URL(req.url!, `http://${req.headers.host}`);
-  const peerId = url.searchParams.get("peerId");
-
-  const { start } = wsAdapter.handleConnection({
-    socket: wrapWsSocket(ws),
-    peerId: peerId as PeerID | undefined,
-  });
-  start();
-});
-```
-
-### Vite Config (`vite.config.ts`)
-
-Configures WebSocket proxy instead of SSE:
-
-```typescript
-server: {
-  proxy: {
-    "/ws": {
-      target: "ws://localhost:5170",
-      ws: true,
-    },
-  },
-}
-```
-
-## WebSocket vs SSE
-
-| Feature         | WebSocket         | SSE                  |
-| --------------- | ----------------- | -------------------- |
-| Direction       | Bidirectional     | Server → Client only |
-| Protocol        | Binary or text    | Text only            |
-| Connection      | Single persistent | HTTP long-polling    |
-| Reconnection    | Manual            | Automatic            |
-| Browser Support | All modern        | All modern           |
-
-WebSocket is generally preferred when:
-
-- You need bidirectional communication
-- You want lower latency
-- You're sending binary data
-
-SSE is simpler when:
-
-- You only need server-to-client updates
-- You want automatic reconnection
-- You prefer HTTP-based infrastructure
-
-## Scripts
-
-- `pnpm dev` - Start both client and server in development mode
-- `pnpm dev:client` - Start only the Vite dev server
-- `pnpm dev:server` - Start only the Express server
-- `pnpm build:all` - Build both client and server
-- `pnpm test:e2e` - Run end-to-end tests
+- Node.js 18+ (for native fetch and ES modules)
+- pnpm (for workspace dependencies)
