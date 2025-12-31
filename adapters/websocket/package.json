@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-websocket",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Native WebSocket network adapter for @loro-extended/repo - directly transmits ChannelMsg types without protocol translation",
   "author": "Duane Johnson",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "example-postgres",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Example using PostgreSQL storage adapter with @loro-extended/repo",
   "type": "module",

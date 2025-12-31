@@ -1,5 +1,44 @@
 # @loro-extended/adapter-websocket
 
+## 3.0.0
+
+### Major Changes
+
+- a5df157: Replaced the Loro Protocol-based WebSocket adapter with a native loro-extended protocol adapter.
+
+  **Breaking Changes:**
+
+  - `@loro-extended/adapter-websocket` now uses a native wire format (MessagePack) instead of the Loro Syncing Protocol
+  - The old Loro Protocol adapter is now available as `@loro-extended/adapter-websocket-compat`
+
+  **New Native Adapter (`@loro-extended/adapter-websocket`):**
+
+  - Directly transmits `ChannelMsg` types without protocol translation
+  - Full support for all loro-extended message types (batch, directory, delete, new-doc)
+  - Fixes hub-spoke synchronization issues caused by dropped `channel/batch` messages
+  - Simpler implementation with better debugging
+
+  **Compat Adapter (`@loro-extended/adapter-websocket-compat`):**
+
+  - Moved from `@loro-extended/adapter-websocket`
+  - Use this for interoperability with Loro Protocol servers
+
+  **Migration:**
+
+  - If you need Loro Protocol compatibility, change imports from `@loro-extended/adapter-websocket` to `@loro-extended/adapter-websocket-compat`
+  - Otherwise, no changes needed - the API is compatible
+
+### Patch Changes
+
+- Updated dependencies [d893fe9]
+- Updated dependencies [786b8b1]
+- Updated dependencies [8061a20]
+- Updated dependencies [cf064fa]
+- Updated dependencies [1b2a3a4]
+- Updated dependencies [702871b]
+- Updated dependencies [27cdfb7]
+  - @loro-extended/repo@3.0.0
+
 ## 2.0.0
 
 ### Minor Changes

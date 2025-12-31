@@ -1,5 +1,26 @@
 # example-bumper-cars
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [d893fe9]
+- Updated dependencies [7d6aab4]
+- Updated dependencies [786b8b1]
+- Updated dependencies [8061a20]
+- Updated dependencies [3f6caf5]
+- Updated dependencies [a5df157]
+- Updated dependencies [cf064fa]
+- Updated dependencies [1b2a3a4]
+- Updated dependencies [702871b]
+- Updated dependencies [27cdfb7]
+- Updated dependencies [57ebdfb]
+  - @loro-extended/repo@3.0.0
+  - @loro-extended/adapter-websocket@3.0.0
+  - @loro-extended/adapter-leveldb@3.0.0
+  - @loro-extended/react@3.0.0
+  - @loro-extended/change@3.0.0
+
 ## 0.1.8
 
 ### Patch Changes

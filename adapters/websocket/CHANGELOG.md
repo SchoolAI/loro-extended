@@ -1,0 +1,70 @@
+# @loro-extended/adapter-websocket
+
+## 3.0.0
+
+### Major Changes
+
+- a5df157: Replaced the Loro Protocol-based WebSocket adapter with a native loro-extended protocol adapter.
+
+  **Breaking Changes:**
+
+  - `@loro-extended/adapter-websocket` now uses a native wire format (MessagePack) instead of the Loro Syncing Protocol
+  - The old Loro Protocol adapter is now available as `@loro-extended/adapter-websocket-compat`
+
+  **New Native Adapter (`@loro-extended/adapter-websocket`):**
+
+  - Directly transmits `ChannelMsg` types without protocol translation
+  - Full support for all loro-extended message types (batch, directory, delete, new-doc)
+  - Fixes hub-spoke synchronization issues caused by dropped `channel/batch` messages
+  - Simpler implementation with better debugging
+
+  **Compat Adapter (`@loro-extended/adapter-websocket-compat`):**
+
+  - Moved from `@loro-extended/adapter-websocket`
+  - Use this for interoperability with Loro Protocol servers
+
+  **Migration:**
+
+  - If you need Loro Protocol compatibility, change imports from `@loro-extended/adapter-websocket` to `@loro-extended/adapter-websocket-compat`
+  - Otherwise, no changes needed - the API is compatible
+
+### Minor Changes
+
+- 7d6aab4: Add `wrapBunWebSocket` helper function for Bun runtime support. This provides a new `/bun` export that wraps Bun's `ServerWebSocket` to match the `WsSocket` interface expected by `WsServerNetworkAdapter`.
+- 57ebdfb: Replace MessagePack with tiny-cbor for wire format encoding. Uses CBOR (RFC 8949) which provides a smaller library footprint (~1KB gzipped) while maintaining compact binary encoding. Also allows bun to package without .cjs complication.
+
+### Patch Changes
+
+- d893fe9: Add synchronous receive queue to Synchronizer for recursion prevention
+
+  The Synchronizer now uses a receive queue to handle incoming messages iteratively,
+  preventing infinite recursion when adapters deliver messages synchronously.
+
+  **Key changes:**
+
+  - Synchronizer.channelReceive() now queues messages and processes them iteratively
+  - Removed queueMicrotask() from BridgeAdapter.deliverMessage() - now synchronous
+  - Removed queueMicrotask() from StorageAdapter.reply() - now synchronous
+  - Removed queueMicrotask() from WsConnection.handleProtocolMessage() and simulateHandshake()
+  - Removed queueMicrotask() from WsClientNetworkAdapter.handleProtocolMessage()
+  - Updated test-utils.ts documentation to explain flushMicrotasks() is rarely needed
+
+  **Benefits:**
+
+  - Single location for recursion prevention (Synchronizer, not scattered across adapters)
+  - Works for all adapters automatically (BridgeAdapter, StorageAdapter, WebSocket, future adapters)
+  - Simpler tests - no async utilities needed for basic message handling
+  - Completely synchronous message processing within a single dispatch cycle
+
+- 3f6caf5: Fix "Unsupported data type" error when decoding WebSocket messages in Bun
+
+  The `decodeFrame` function now normalizes `Buffer` subclasses to plain `Uint8Array` before passing to the CBOR decoder. This fixes compatibility with Bun's WebSocket implementation which may return `Buffer` instances instead of plain `Uint8Array`.
+
+- Updated dependencies [d893fe9]
+- Updated dependencies [786b8b1]
+- Updated dependencies [8061a20]
+- Updated dependencies [cf064fa]
+- Updated dependencies [1b2a3a4]
+- Updated dependencies [702871b]
+- Updated dependencies [27cdfb7]
+  - @loro-extended/repo@3.0.0

@@ -1,5 +1,222 @@
 # @loro-extended/repo
 
+## 3.0.0
+
+### Major Changes
+
+- 702871b: **BREAKING CHANGE**: Replace `rules` API with `permissions` and `middleware`
+
+  The `rules` configuration option has been replaced with a new two-layer architecture:
+
+  ### Migration Guide
+
+  **Before:**
+
+  ```typescript
+  const repo = new Repo({
+    rules: {
+      canReveal: (ctx) => ctx.docId.startsWith("public/"),
+      canUpdate: (ctx) => ctx.peerType !== "bot",
+      canCreate: (ctx) => ctx.peerType === "user",
+      canDelete: (ctx) => ctx.peerType === "service",
+    },
+  });
+  ```
+
+  **After:**
+
+  ```typescript
+  const repo = new Repo({
+    permissions: {
+      visibility: (doc, peer) => doc.id.startsWith("public/"),
+      mutability: (doc, peer) => peer.peerType !== "bot",
+      creation: (docId, peer) => peer.peerType === "user",
+      deletion: (doc, peer) => peer.peerType === "service",
+    },
+  });
+  ```
+
+  ### Key Changes
+
+  1. **Renamed options:**
+
+     - `rules` → `permissions`
+     - `canReveal` → `visibility`
+     - `canUpdate` → `mutability`
+     - `canCreate` → `creation`
+     - `canDelete` → `deletion`
+
+  2. **New function signature:**
+
+     - Old: `(ctx: RuleContext) => boolean`
+     - New: `(doc: DocContext, peer: PeerContext) => boolean`
+     - Document and peer context are now separate parameters
+
+  3. **Removed `canBeginSync`:**
+
+     - This rule was never implemented and has been removed
+
+  4. **New middleware layer:**
+     - For async operations (external auth, rate limiting, audit logging)
+     - See `docs/middleware.md` for details
+
+  ### New Features
+
+  - **Middleware support**: Async operations like external auth services, rate limiting, and audit logging
+  - **Cleaner API**: Separated document and peer context for better ergonomics
+  - **Deletion now enforced**: The `deletion` permission is now actually checked (was never implemented before)
+
+### Minor Changes
+
+- 786b8b1: ### Added `channel/batch` message type for transport optimization
+
+  Introduced a new `channel/batch` message type that wraps multiple channel messages into a single network transmission. This enables:
+
+  - **Uniform message structure**: All message types now have a single `docId` subject (refactored `ChannelMsgSyncRequest` from multi-doc to single-doc format)
+  - **Heartbeat efficiency**: Reduced heartbeat messages from O(docs × peers) to O(peers) by batching ephemeral messages per peer
+  - **Generic batching**: Any `BatchableMsg` can be wrapped in a `channel/batch` for transport optimization
+
+  ### Rate limiter behavior with batched messages
+
+  The rate limiter operates at the **network packet level** - a `channel/batch` message counts as one rate limit hit, preserving atomic all-or-nothing behavior. This means:
+
+  - A batch of 10 sync-requests counts as 1 message for rate limiting purposes
+  - If a batch is rate-limited, all messages in the batch are rejected together
+  - This matches the previous behavior where a multi-doc sync-request was atomic
+
+  ### New types
+
+  - `BatchableMsg` - Union of message types that can be batched
+  - `ChannelMsgBatch` - Wrapper type for batched messages
+  - `SyncRequestDoc` - Type for docs array used by `cmd/send-sync-request`
+
+  ### New command
+
+  - `cmd/broadcast-ephemeral-batch` - Sends multiple docs' ephemeral data in one batched message per peer
+
+- cf064fa: Improve Repo DevX with optional identity, optional adapters, and dynamic adapter management
+
+  ### New Features
+
+  - **Optional Identity**: `identity` parameter is now optional with sensible defaults
+
+    - `peerId` auto-generated if not provided
+    - `name` is now optional (undefined is fine)
+    - `type` defaults to "user"
+
+  - **Optional Adapters**: `adapters` parameter is now optional (defaults to empty array)
+
+  - **Dynamic Adapter Management**: Add and remove adapters at runtime
+
+    - `repo.addAdapter(adapter)` - Add an adapter (idempotent)
+    - `repo.removeAdapter(adapterId)` - Remove an adapter (idempotent)
+    - `repo.hasAdapter(adapterId)` - Check if adapter exists
+    - `repo.getAdapter(adapterId)` - Get adapter by ID
+    - `repo.adapters` - Get all current adapters
+
+  - **Adapter IDs**: Each adapter now has a unique `adapterId`
+    - Auto-generated as `{adapterType}-{uuid}` if not provided
+    - Can be explicitly set via constructor parameter
+
+  ### API Examples
+
+  ```typescript
+  // Minimal - all defaults
+  const repo = new Repo();
+
+  // Just adapters
+  const repo = new Repo({ adapters: [storageAdapter] });
+
+  // Partial identity
+  const repo = new Repo({
+    identity: { type: "service" },
+  });
+
+  // Add adapters dynamically
+  await repo.addAdapter(networkAdapter);
+
+  // Remove when done
+  await repo.removeAdapter(networkAdapter.adapterId);
+  ```
+
+  ### Breaking Changes
+
+  None - all changes are backwards compatible.
+
+- 1b2a3a4: Enhanced RuleContext with full peer identity information
+
+  ### Changes
+
+  The `RuleContext` type now includes complete peer identity information for more robust permission rules:
+
+  - **`peerId`** (new): Unique peer identifier - use this for reliable identity checks
+  - **`peerType`** (new): `"user" | "bot" | "service"` - use for role-based permissions
+  - **`peerName`** (changed): Now optional (`string | undefined`) - human-readable label only
+
+  ### Migration
+
+  If your rules use `peerName`, consider migrating to `peerId` or `peerType`:
+
+  ```typescript
+  // Before (fragile - relies on name which is now optional)
+  canUpdate: (ctx) => ctx.peerName === "admin";
+
+  // After (robust - uses unique identifier or type)
+  canUpdate: (ctx) => ctx.peerId === "admin-123" || ctx.peerType === "service";
+  ```
+
+  ### Breaking Changes
+
+  - `RuleContext.peerName` is now `string | undefined` instead of `string`
+  - Rules that depend on `peerName` should check for undefined or migrate to `peerId`/`peerType`
+
+### Patch Changes
+
+- d893fe9: Add synchronous receive queue to Synchronizer for recursion prevention
+
+  The Synchronizer now uses a receive queue to handle incoming messages iteratively,
+  preventing infinite recursion when adapters deliver messages synchronously.
+
+  **Key changes:**
+
+  - Synchronizer.channelReceive() now queues messages and processes them iteratively
+  - Removed queueMicrotask() from BridgeAdapter.deliverMessage() - now synchronous
+  - Removed queueMicrotask() from StorageAdapter.reply() - now synchronous
+  - Removed queueMicrotask() from WsConnection.handleProtocolMessage() and simulateHandshake()
+  - Removed queueMicrotask() from WsClientNetworkAdapter.handleProtocolMessage()
+  - Updated test-utils.ts documentation to explain flushMicrotasks() is rarely needed
+
+  **Benefits:**
+
+  - Single location for recursion prevention (Synchronizer, not scattered across adapters)
+  - Works for all adapters automatically (BridgeAdapter, StorageAdapter, WebSocket, future adapters)
+  - Simpler tests - no async utilities needed for basic message handling
+  - Completely synchronous message processing within a single dispatch cycle
+
+- 8061a20: Add unit tests for all command handlers in synchronizer
+
+  - Add `createMockCommandContext()` and related mock factories to test-utils.ts for isolated handler testing
+  - Create 14 co-located test files with 81 tests covering all command handlers
+  - Tests cover edge cases like empty data, missing stores, invalid channels, and multi-doc scenarios
+  - Fix circular type dependency: export `SynchronizerEvents` from command-executor.ts and import in synchronizer.ts
+  - Remove unnecessary non-null assertion in `#encodeAllPeerStores`
+
+- 27cdfb7: Refactor: Extract focused modules from Synchronizer
+
+  Decomposed the monolithic Synchronizer class into focused, testable modules:
+
+  - `WorkQueue` - Unified work queue for deferred execution
+  - `OutboundBatcher` - Batches outbound messages by channel
+  - `EphemeralStoreManager` - Manages namespaced ephemeral stores
+  - `HeartbeatManager` - Manages periodic heartbeat
+  - `MiddlewareProcessor` - Handles middleware execution
+
+  The Synchronizer now implements `MiddlewareContextProvider` interface for clean abstraction.
+
+  This is an internal refactor with no public API changes.
+
+  - @loro-extended/change@3.0.0
+
 ## 2.0.0
 
 ### Major Changes
