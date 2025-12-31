@@ -594,6 +594,73 @@ describe("Wire Format", () => {
     })
   })
 
+  describe("Buffer subclass handling (Bun/Node.js compatibility)", () => {
+    /**
+     * This test verifies that decodeFrame can handle Buffer input,
+     * which is a subclass of Uint8Array used by Bun and Node.js.
+     *
+     * The @levischuck/tiny-cbor library performs strict prototype checks
+     * and only accepts plain Uint8Array or DataView, not subclasses.
+     * This caused "Unsupported data type" errors in Bun WebSocket handlers.
+     *
+     * @see https://github.com/loro-dev/loro-extended/issues/XXX
+     */
+    it("should decode frames passed as Buffer (Uint8Array subclass)", () => {
+      const msg: ChannelMsgEstablishRequest = {
+        type: "channel/establish-request",
+        identity: {
+          peerId: "peer-1" as PeerID,
+          name: "Test",
+          type: "user",
+        },
+      }
+
+      // Encode the message to get a valid frame
+      const frame = encodeFrame(msg)
+
+      // Convert to Buffer (simulates what Bun's WebSocket returns)
+      // Buffer is a subclass of Uint8Array in Node.js/Bun
+      const bufferFrame = Buffer.from(frame)
+
+      // Verify it's actually a Buffer (subclass of Uint8Array)
+      expect(bufferFrame).toBeInstanceOf(Buffer)
+      expect(bufferFrame).toBeInstanceOf(Uint8Array)
+      expect(bufferFrame.constructor).not.toBe(Uint8Array)
+
+      // This should work but currently fails with "Unsupported data type"
+      // because tiny-cbor checks prototype === Uint8Array.prototype
+      const decoded = decodeFrame(bufferFrame)
+      expect(decoded).toHaveLength(1)
+      expect(decoded[0]).toEqual(msg)
+    })
+
+    it("should decode batch frames passed as Buffer", () => {
+      const version = createVersion()
+      const msgs: ChannelMsgSyncRequest[] = [
+        {
+          type: "channel/sync-request",
+          docId: "doc-1",
+          requesterDocVersion: version,
+          bidirectional: true,
+        },
+        {
+          type: "channel/sync-request",
+          docId: "doc-2",
+          requesterDocVersion: version,
+          bidirectional: false,
+        },
+      ]
+
+      const frame = encodeBatchFrame(msgs)
+      const bufferFrame = Buffer.from(frame)
+
+      const decoded = decodeFrame(bufferFrame)
+      expect(decoded).toHaveLength(2)
+      expect(decoded[0].type).toBe("channel/sync-request")
+      expect(decoded[1].type).toBe("channel/sync-request")
+    })
+  })
+
   describe("All message types coverage (parameterized)", () => {
     it.each([
       [

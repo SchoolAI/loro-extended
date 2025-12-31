@@ -534,15 +534,42 @@ export function encodeBatchFrame(msgs: ChannelMsg[]): Uint8Array {
 }
 
 /**
+ * Normalize a Uint8Array subclass (like Buffer) to a plain Uint8Array.
+ *
+ * The @levischuck/tiny-cbor library performs strict prototype checks and
+ * only accepts plain Uint8Array or DataView, not subclasses like Buffer.
+ * This function ensures compatibility with Bun and Node.js WebSocket
+ * implementations that may return Buffer instances.
+ */
+function normalizeUint8Array(data: Uint8Array): Uint8Array {
+  // If it's already a plain Uint8Array, return as-is
+  if (data.constructor === Uint8Array) {
+    return data
+  }
+  // Otherwise, create a new plain Uint8Array from the data
+  return new Uint8Array(data)
+}
+
+/**
  * Decode a binary frame to ChannelMsg(s).
  * Returns an array because the frame might be a batch.
+ *
+ * Note: This function normalizes the input to handle Buffer subclasses
+ * from Bun/Node.js WebSocket implementations.
  */
 export function decodeFrame(frame: Uint8Array): ChannelMsg[] {
-  if (frame.length < 4) {
+  // Normalize input to plain Uint8Array (handles Buffer subclass from Bun/Node)
+  const normalizedFrame = normalizeUint8Array(frame)
+
+  if (normalizedFrame.length < 4) {
     throw new Error("Frame too short: missing header")
   }
 
-  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength)
+  const view = new DataView(
+    normalizedFrame.buffer,
+    normalizedFrame.byteOffset,
+    normalizedFrame.byteLength,
+  )
 
   const version = view.getUint8(0)
   if (version !== WIRE_VERSION) {
@@ -552,13 +579,13 @@ export function decodeFrame(frame: Uint8Array): ChannelMsg[] {
   const flags = view.getUint8(1)
   const payloadLength = view.getUint16(2, false) // big-endian
 
-  if (frame.length < 4 + payloadLength) {
+  if (normalizedFrame.length < 4 + payloadLength) {
     throw new Error(
-      `Frame truncated: expected ${4 + payloadLength} bytes, got ${frame.length}`,
+      `Frame truncated: expected ${4 + payloadLength} bytes, got ${normalizedFrame.length}`,
     )
   }
 
-  const payload = frame.slice(4, 4 + payloadLength)
+  const payload = normalizedFrame.slice(4, 4 + payloadLength)
   const decoded = decodeCBOR(payload)
 
   if (flags & WireFlags.BATCH) {
