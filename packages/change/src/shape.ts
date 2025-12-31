@@ -7,6 +7,7 @@ import type {
   LoroMovableList,
   LoroText,
   LoroTree,
+  TreeID,
   Value,
 } from "loro-crdt"
 
@@ -16,6 +17,9 @@ import type { MovableListRef } from "./typed-refs/movable-list.js"
 import type { RecordRef } from "./typed-refs/record.js"
 import type { StructRef } from "./typed-refs/struct.js"
 import type { TextRef } from "./typed-refs/text.js"
+
+// Note: TreeRef is not imported here to avoid circular dependency.
+// The TreeContainerShape uses a placeholder type that gets resolved at runtime.
 
 export interface Shape<Plain, Mutable, Placeholder = Plain> {
   readonly _type: string
@@ -59,11 +63,48 @@ export interface CounterContainerShape
   extends Shape<number, CounterRef, number> {
   readonly _type: "counter"
 }
-export interface TreeContainerShape<NestedShape = ContainerOrValueShape>
-  extends Shape<any, any, never[]> {
+/**
+ * JSON representation of a tree node with typed data.
+ * Used for serialization (toJSON) of tree structures.
+ */
+export type TreeNodeJSON<DataShape extends StructContainerShape> = {
+  id: TreeID
+  parent: TreeID | null
+  index: number
+  fractionalIndex: string
+  data: DataShape["_plain"]
+  children: TreeNodeJSON<DataShape>[]
+}
+
+/**
+ * Container shape for tree (forest) structures.
+ * Each node in the tree has typed metadata stored in a LoroMap.
+ *
+ * Note: The Mutable type (second generic parameter) is `any` here to avoid
+ * circular dependency with TreeRef. The actual type is resolved at runtime
+ * and through the InferMutableType helper.
+ *
+ * @example
+ * ```typescript
+ * const StateNodeDataShape = Shape.struct({
+ *   name: Shape.text(),
+ *   facts: Shape.record(Shape.plain.any()),
+ * })
+ *
+ * const Schema = Shape.doc({
+ *   states: Shape.tree(StateNodeDataShape),
+ * })
+ * ```
+ */
+export interface TreeContainerShape<
+  DataShape extends StructContainerShape = StructContainerShape,
+> extends Shape<TreeNodeJSON<DataShape>[], any, never[]> {
   readonly _type: "tree"
-  // TODO(duane): What does a tree contain? One type, or many?
-  readonly shape: NestedShape
+  /**
+   * The shape of each node's data (metadata).
+   * This is a StructContainerShape that defines the typed properties on node.data.
+   */
+  readonly shape: DataShape
 }
 
 // Container schemas using interfaces for recursive references
@@ -469,12 +510,32 @@ export const Shape = {
     })
   },
 
-  tree: <T extends MapContainerShape | StructContainerShape>(
-    shape: T,
-  ): TreeContainerShape => ({
+  /**
+   * Creates a tree container shape for hierarchical data structures.
+   * Each node in the tree has typed metadata defined by the data shape.
+   *
+   * @example
+   * ```typescript
+   * const StateNodeDataShape = Shape.struct({
+   *   name: Shape.text(),
+   *   facts: Shape.record(Shape.plain.any()),
+   * })
+   *
+   * const Schema = Shape.doc({
+   *   states: Shape.tree(StateNodeDataShape),
+   * })
+   *
+   * doc.$.change(draft => {
+   *   const root = draft.states.createNode({ name: "idle", facts: {} })
+   *   const child = root.createNode({ name: "running", facts: {} })
+   *   child.data.name = "active"
+   * })
+   * ```
+   */
+  tree: <T extends StructContainerShape>(shape: T): TreeContainerShape<T> => ({
     _type: "tree" as const,
     shape,
-    _plain: {} as any,
+    _plain: [] as any,
     _mutable: {} as any,
     _placeholder: [] as never[],
   }),

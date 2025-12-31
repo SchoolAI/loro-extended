@@ -570,7 +570,7 @@ const schema = Shape.doc({
 - `Shape.movableList(itemSchema)` - Collaborative reorderable lists
 - `Shape.struct(shape)` - Collaborative structs with fixed keys (uses LoroMap internally)
 - `Shape.record(valueSchema)` - Collaborative key-value maps with dynamic string keys
-- `Shape.tree(shape)` - Collaborative hierarchical tree structures (Note: incomplete implementation)
+- `Shape.tree(dataShape)` - Collaborative hierarchical tree structures with typed node metadata
 - `Shape.any()` - Escape hatch for untyped containers (see [Untyped Integration](#untyped-integration-with-external-libraries))
 
 #### Value Types
@@ -787,6 +787,121 @@ draft.metadata.values();
 // Access nested values
 const value = draft.metadata.get("key");
 ```
+
+### Tree Operations
+
+Trees are hierarchical structures where each node has typed metadata. Perfect for state machines, file systems, org charts, and nested data.
+
+```typescript
+// Define node data shape
+const StateNodeDataShape = Shape.struct({
+  name: Shape.text(),
+  facts: Shape.record(Shape.plain.any()),
+  rules: Shape.list(
+    Shape.plain.struct({
+      name: Shape.plain.string(),
+      rego: Shape.plain.string(),
+      description: Shape.plain.string().nullable(),
+    })
+  ),
+});
+
+const schema = Shape.doc({
+  states: Shape.tree(StateNodeDataShape),
+});
+
+const doc = createTypedDoc(schema);
+
+change(doc, (draft) => {
+  // Create root nodes
+  const idle = draft.states.createNode();
+  idle.data.name.insert(0, "idle");
+
+  const running = draft.states.createNode();
+  running.data.name.insert(0, "running");
+
+  // Create child nodes
+  const processing = idle.createNode();
+  processing.data.name.insert(0, "processing");
+
+  // Access typed node data
+  processing.data.rules.push({
+    name: "validate",
+    rego: "package validate",
+    description: null,
+  });
+
+  // Navigate the tree
+  const parent = processing.parent(); // Returns idle node
+  const children = idle.children(); // Returns [processing]
+
+  // Move nodes between parents
+  processing.move(running); // Move to different parent
+  processing.move(); // Move to root (no parent)
+
+  // Query the tree
+  const roots = draft.states.roots(); // All root nodes
+  const allNodes = draft.states.nodes(); // All nodes (flat)
+  const node = draft.states.getNodeByID(idle.id); // Find by ID
+  const exists = draft.states.has(idle.id); // Check existence
+
+  // Delete nodes (and all descendants)
+  draft.states.delete(running);
+
+  // Enable fractional indexing for ordering
+  draft.states.enableFractionalIndex(8);
+  const index = idle.index(); // Position among siblings
+  const fractionalIndex = idle.fractionalIndex(); // Fractional index string
+});
+
+// Serialize to JSON (nested structure)
+const json = doc.toJSON();
+// {
+//   states: [{
+//     id: "0@123",
+//     parent: null,
+//     index: 0,
+//     fractionalIndex: "80",
+//     data: { name: "idle", facts: {}, rules: [] },
+//     children: [...]
+//   }]
+// }
+
+// Get flat array representation
+change(doc, (draft) => {
+  const flatArray = draft.states.toArray();
+  // [{ id, parent, index, fractionalIndex, data }, ...]
+});
+```
+
+**Tree Node Properties:**
+
+- `node.id` - Unique TreeID for the node
+- `node.data` - Typed StructRef for node metadata (access like `node.data.name`)
+- `node.parent()` - Get parent node (or undefined for roots)
+- `node.children()` - Get child nodes in order
+- `node.index()` - Position among siblings
+- `node.fractionalIndex()` - Fractional index string for ordering
+- `node.isDeleted()` - Check if node has been deleted
+
+**Tree Node Methods:**
+
+- `node.createNode(initialData?, index?)` - Create child node
+- `node.move(newParent?, index?)` - Move to new parent (undefined = root)
+- `node.moveAfter(sibling)` - Move after sibling
+- `node.moveBefore(sibling)` - Move before sibling
+
+**TreeRef Methods:**
+
+- `tree.createNode(initialData?)` - Create root node
+- `tree.roots()` - Get all root nodes
+- `tree.nodes()` - Get all nodes (flat)
+- `tree.getNodeByID(id)` - Find node by TreeID
+- `tree.has(id)` - Check if node exists
+- `tree.delete(target)` - Delete node and descendants
+- `tree.enableFractionalIndex(jitter?)` - Enable ordering
+- `tree.toJSON()` - Nested JSON structure
+- `tree.toArray()` - Flat array representation
 
 ### JSON Serialization and Snapshots
 

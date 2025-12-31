@@ -1,9 +1,12 @@
-import type { Value } from "loro-crdt"
+import type { TreeID, Value } from "loro-crdt"
 import { deriveShapePlaceholder } from "./derive-placeholder.js"
 import type {
   ContainerShape,
   DiscriminatedUnionValueShape,
   DocShape,
+  StructContainerShape,
+  TreeContainerShape,
+  TreeNodeJSON,
   ValueShape,
 } from "./shape.js"
 import { isObjectValue } from "./utils/type-guards.js"
@@ -110,8 +113,14 @@ export function mergeValue<Shape extends ContainerShape | ValueShape>(
 
       return result
     }
-    case "tree":
-      return crdtValue !== undefined ? crdtValue : (placeholderValue ?? [])
+    case "tree": {
+      if (crdtValue === undefined) {
+        return placeholderValue ?? []
+      }
+      // Transform Loro's native tree format to our typed format
+      const treeShape = shape as TreeContainerShape
+      return transformTreeNodes(crdtValue as any[], treeShape.shape) as any
+    }
     case "record": {
       if (!isObjectValue(crdtValue) && crdtValue !== undefined) {
         throw new Error("record crdt must be object")
@@ -205,4 +214,54 @@ function mergeDiscriminatedUnion(
     placeholderDiscriminant === discriminantValue ? placeholderValue : undefined
 
   return mergeValue(variantShape, crdtValue, effectivePlaceholderValue as Value)
+}
+
+/**
+ * Loro's native tree node format from toJSON()
+ */
+interface LoroTreeNodeJSON {
+  id: string
+  parent: string | null
+  index: number
+  fractional_index: string
+  meta: Record<string, Value>
+  children: LoroTreeNodeJSON[]
+}
+
+/**
+ * Transforms Loro's native tree format to our typed TreeNodeJSON format.
+ * - Renames `meta` to `data`
+ * - Renames `fractional_index` to `fractionalIndex`
+ * - Applies placeholder merging to node data
+ */
+function transformTreeNodes<DataShape extends StructContainerShape>(
+  nodes: LoroTreeNodeJSON[],
+  dataShape: DataShape,
+): TreeNodeJSON<DataShape>[] {
+  const dataPlaceholder = deriveShapePlaceholder(dataShape) as Value
+
+  return nodes.map(node => transformTreeNode(node, dataShape, dataPlaceholder))
+}
+
+/**
+ * Transforms a single tree node and its children recursively.
+ */
+function transformTreeNode<DataShape extends StructContainerShape>(
+  node: LoroTreeNodeJSON,
+  dataShape: DataShape,
+  dataPlaceholder: Value,
+): TreeNodeJSON<DataShape> {
+  // Merge the node's meta (data) with the placeholder
+  const mergedData = mergeValue(dataShape, node.meta, dataPlaceholder)
+
+  return {
+    id: node.id as TreeID,
+    parent: node.parent as TreeID | null,
+    index: node.index,
+    fractionalIndex: node.fractional_index,
+    data: mergedData as DataShape["_plain"],
+    children: node.children.map(child =>
+      transformTreeNode(child, dataShape, dataPlaceholder),
+    ),
+  }
 }

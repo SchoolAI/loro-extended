@@ -17,7 +17,7 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import type { TypedRef, TypedRefParams } from "./base.js"
 import { CounterRef } from "./counter.js"
 import { ListRef } from "./list.js"
 import { MovableListRef } from "./movable-list.js"
@@ -77,8 +77,22 @@ export function unwrapReadonlyPrimitive(
 }
 
 /**
+ * Type guard to check if a value has an absorbPlainValues method.
+ */
+function hasAbsorbPlainValues(
+  value: unknown,
+): value is { absorbPlainValues(): void } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "absorbPlainValues" in value &&
+    typeof (value as any).absorbPlainValues === "function"
+  )
+}
+
+/**
  * Absorbs cached plain values back into a LoroMap container.
- * For TypedRef entries, recursively calls absorbPlainValues().
+ * For TypedRef entries (or any object with absorbPlainValues), recursively calls absorbPlainValues().
  * For plain Value entries, sets them directly on the container.
  */
 export function absorbCachedPlainValues(
@@ -88,8 +102,8 @@ export function absorbCachedPlainValues(
   let container: LoroMap | undefined
 
   for (const [key, ref] of cache.entries()) {
-    if (ref instanceof TypedRef) {
-      // Contains a TypedRef, not a plain Value: keep recursing
+    if (hasAbsorbPlainValues(ref)) {
+      // Contains a TypedRef or TreeRef, not a plain Value: keep recursing
       ref.absorbPlainValues()
     } else {
       // Plain value!
@@ -128,7 +142,7 @@ export function createContainerTypedRef<T extends ContainerShape>(
 // Implementation
 export function createContainerTypedRef(
   params: TypedRefParams<ContainerShape>,
-): TypedRef<ContainerShape> {
+): TypedRef<ContainerShape> | TreeRef<StructContainerShape> {
   switch (params.shape._type) {
     case "counter":
       return new CounterRef(params as TypedRefParams<CounterContainerShape>)
@@ -151,8 +165,17 @@ export function createContainerTypedRef(
       )
     case "text":
       return new TextRef(params as TypedRefParams<TextContainerShape>)
-    case "tree":
-      return new TreeRef(params as TypedRefParams<TreeContainerShape>)
+    case "tree": {
+      const treeShape = params.shape as TreeContainerShape
+      return new TreeRef({
+        shape: treeShape,
+        placeholder: params.placeholder as never[],
+        getContainer: params.getContainer as () => LoroTree,
+        readonly: params.readonly,
+        autoCommit: params.autoCommit,
+        getDoc: params.getDoc,
+      })
+    }
     default:
       throw new Error(
         `Unknown container type: ${(params.shape as ContainerShape)._type}`,
