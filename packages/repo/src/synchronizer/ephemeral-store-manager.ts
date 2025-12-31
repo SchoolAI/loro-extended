@@ -105,7 +105,11 @@ export class EphemeralStoreManager {
    * @param store - The external EphemeralStore to register
    * @throws Error if a store with this namespace already exists
    */
-  registerExternal(docId: DocId, namespace: string, store: EphemeralStore): void {
+  registerExternal(
+    docId: DocId,
+    namespace: string,
+    store: EphemeralStore,
+  ): void {
     let namespaceStores = this.stores.get(docId)
     if (!namespaceStores) {
       namespaceStores = new Map()
@@ -123,10 +127,13 @@ export class EphemeralStoreManager {
     // Subscribe to changes and broadcast
     this.#subscribeToStore(docId, namespace, store)
 
-    this.#logger.debug("Registered external store {namespace} for doc {docId}", {
-      namespace,
-      docId,
-    })
+    this.#logger.debug(
+      "Registered external store {namespace} for doc {docId}",
+      {
+        namespace,
+        docId,
+      },
+    )
   }
 
   /**
@@ -275,7 +282,11 @@ export class EphemeralStoreManager {
    * - `by: 'local'` → broadcast (change was made via `set()`)
    * - `by: 'import'` → don't broadcast (change came from network via `apply()`)
    */
-  #subscribeToStore(docId: DocId, namespace: string, store: EphemeralStore): void {
+  #subscribeToStore(
+    docId: DocId,
+    namespace: string,
+    store: EphemeralStore,
+  ): void {
     const unsub = store.subscribe(event => {
       // Only broadcast local changes (not imported data from network)
       if (event.by === "local") {

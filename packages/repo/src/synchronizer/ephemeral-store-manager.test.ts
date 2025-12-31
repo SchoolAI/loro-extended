@@ -17,7 +17,11 @@ describe("EphemeralStoreManager", () => {
   describe("getOrCreate", () => {
     it("should create a new store for a new namespace", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store = manager.getOrCreate("doc-1", "presence")
 
@@ -27,7 +31,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should return existing store for same namespace", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store1 = manager.getOrCreate("doc-1", "presence")
       const store2 = manager.getOrCreate("doc-1", "presence")
@@ -37,7 +45,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should create separate stores for different namespaces", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const presenceStore = manager.getOrCreate("doc-1", "presence")
       const cursorStore = manager.getOrCreate("doc-1", "cursors")
@@ -47,7 +59,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should create separate stores for different documents", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store1 = manager.getOrCreate("doc-1", "presence")
       const store2 = manager.getOrCreate("doc-2", "presence")
@@ -57,7 +73,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should call onLocalChange when store data changes locally", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store = manager.getOrCreate("doc-1", "presence")
       store.set("cursor", { x: 10, y: 20 })
@@ -69,7 +89,11 @@ describe("EphemeralStoreManager", () => {
   describe("registerExternal", () => {
     it("should register an external store", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
       const externalStore = new EphemeralStore(10000)
 
       manager.registerExternal("doc-1", "prosemirror", externalStore)
@@ -79,7 +103,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should throw if namespace already exists", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.getOrCreate("doc-1", "presence")
 
@@ -90,7 +118,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should call onLocalChange when external store changes locally", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
       const externalStore = new EphemeralStore(10000)
 
       manager.registerExternal("doc-1", "prosemirror", externalStore)
@@ -103,14 +135,22 @@ describe("EphemeralStoreManager", () => {
   describe("get", () => {
     it("should return undefined for non-existent store", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       expect(manager.get("doc-1", "presence")).toBeUndefined()
     })
 
     it("should return existing store", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store = manager.getOrCreate("doc-1", "presence")
 
@@ -121,7 +161,11 @@ describe("EphemeralStoreManager", () => {
   describe("encodeAll", () => {
     it("should return empty array for non-existent document", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const encoded = manager.encodeAll("doc-1")
 
@@ -130,7 +174,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should encode stores - even empty stores may have minimal data", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.getOrCreate("doc-1", "presence")
 
@@ -144,7 +192,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should encode stores with data", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store = manager.getOrCreate("doc-1", "presence")
       store.set("cursor", { x: 10, y: 20 })
@@ -160,7 +212,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should encode multiple namespaces", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const presenceStore = manager.getOrCreate("doc-1", "presence")
       presenceStore.set("status", "online")
@@ -180,7 +236,11 @@ describe("EphemeralStoreManager", () => {
   describe("applyRemote", () => {
     it("should apply remote data to existing store", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       // Create a store and set some data
       const sourceStore = new TimerlessEphemeralStore()
@@ -197,13 +257,17 @@ describe("EphemeralStoreManager", () => {
       // Verify data was applied
       const store = manager.get("doc-1", "presence")
       expect(store).toBeDefined()
-      const states = store!.getAllStates()
+      const states = store?.getAllStates()
       expect(states["2"]).toBeUndefined() // Data is keyed by the source store's internal ID
     })
 
     it("should create store if it does not exist", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const sourceStore = new TimerlessEphemeralStore()
       sourceStore.set("cursor", { x: 100, y: 200 })
@@ -220,7 +284,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should ignore empty data", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.applyRemote("doc-1", {
         peerId: "2" as PeerID,
@@ -234,7 +302,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should ignore data without namespace", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.applyRemote("doc-1", {
         peerId: "2" as PeerID,
@@ -250,7 +322,11 @@ describe("EphemeralStoreManager", () => {
   describe("removePeer", () => {
     it("should remove peer data from all stores when peer ID matches", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       // Create stores with data
       const store1 = manager.getOrCreate("doc-1", "presence")
@@ -279,7 +355,11 @@ describe("EphemeralStoreManager", () => {
 
     it("should return empty array if peer has no data", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.getOrCreate("doc-1", "presence")
 
@@ -292,14 +372,22 @@ describe("EphemeralStoreManager", () => {
   describe("getNamespaces", () => {
     it("should return empty array for non-existent document", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       expect(manager.getNamespaces("doc-1")).toEqual([])
     })
 
     it("should return all namespaces for a document", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       manager.getOrCreate("doc-1", "presence")
       manager.getOrCreate("doc-1", "cursors")
@@ -317,7 +405,11 @@ describe("EphemeralStoreManager", () => {
   describe("unsubscribeAll", () => {
     it("should unsubscribe from all stores", () => {
       const onLocalChange = vi.fn()
-      const manager = new EphemeralStoreManager(testIdentity, onLocalChange, logger)
+      const manager = new EphemeralStoreManager(
+        testIdentity,
+        onLocalChange,
+        logger,
+      )
 
       const store = manager.getOrCreate("doc-1", "presence")
 

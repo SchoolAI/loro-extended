@@ -207,7 +207,9 @@ describe("Multi-channel peer scenarios", () => {
       await new Promise(resolve => setTimeout(resolve, 10))
 
       // Channel should be gone
-      expect(synchronizer.model.channels.get(sseChannel.channelId)).toBeUndefined()
+      expect(
+        synchronizer.model.channels.get(sseChannel.channelId),
+      ).toBeUndefined()
 
       // Peer's ephemeral data should be cleaned up
       // (We can't directly check this, but the channel removal should have triggered cleanup)

@@ -1,21 +1,31 @@
 import { getLogger } from "@logtape/logtape"
 import { LoroDoc, type PeerID } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import type { BatchableMsg, Channel, ChannelMsg, EstablishedChannel } from "../channel.js"
+import type {
+  BatchableMsg,
+  Channel,
+  ChannelMsg,
+  EstablishedChannel,
+} from "../channel.js"
 import type { Middleware, MiddlewareResult } from "../middleware.js"
 import type { ChannelId, DocId, DocState, PeerState } from "../types.js"
-import { MiddlewareProcessor, type ModelAccessor } from "./middleware-processor.js"
+import {
+  MiddlewareProcessor,
+  type ModelAccessor,
+} from "./middleware-processor.js"
 
 const logger = getLogger(["test"])
 
 // Helper to create a mock model accessor
 // Use `null` to explicitly indicate "no channel/peer/doc" (empty map)
 // Use `undefined` or omit to use defaults
-function createMockModelAccessor(overrides: {
-  channel?: Channel | null
-  peerState?: PeerState | null
-  docState?: DocState | null
-} = {}): ModelAccessor {
+function createMockModelAccessor(
+  overrides: {
+    channel?: Channel | null
+    peerState?: PeerState | null
+    docState?: DocState | null
+  } = {},
+): ModelAccessor {
   const defaultPeerState: PeerState = {
     identity: {
       peerId: "1" as PeerID,
@@ -47,7 +57,8 @@ function createMockModelAccessor(overrides: {
   // Use null to explicitly indicate "no channel" (empty map)
   // Use undefined or omit to use defaults
   const channel = "channel" in overrides ? overrides.channel : defaultChannel
-  const peerState = "peerState" in overrides ? overrides.peerState : defaultPeerState
+  const peerState =
+    "peerState" in overrides ? overrides.peerState : defaultPeerState
   const docState = "docState" in overrides ? overrides.docState : defaultDoc
 
   const channels = new Map<ChannelId, Channel>()
@@ -165,7 +176,12 @@ describe("MiddlewareProcessor", () => {
     })
 
     it("should return rejected when middleware rejects", async () => {
-      const middleware = [createMiddleware("test", () => ({ allow: false, reason: "test rejection" }))]
+      const middleware = [
+        createMiddleware("test", () => ({
+          allow: false,
+          reason: "test rejection",
+        })),
+      ]
       const model = createMockModelAccessor()
       const processor = new MiddlewareProcessor(middleware, () => model, logger)
       const message: ChannelMsg = { type: "channel/directory-request" }
@@ -223,7 +239,9 @@ describe("MiddlewareProcessor", () => {
     })
 
     it("should return rejected when all messages rejected", async () => {
-      const middleware = [createMiddleware("rejecter", () => ({ allow: false }))]
+      const middleware = [
+        createMiddleware("rejecter", () => ({ allow: false })),
+      ]
       const model = createMockModelAccessor()
       const processor = new MiddlewareProcessor(middleware, () => model, logger)
       const messages: BatchableMsg[] = [
@@ -325,7 +343,9 @@ describe("MiddlewareProcessor", () => {
       await processor.processMessage(1 as ChannelId, message)
 
       expect(capturedContext).toBeDefined()
-      expect((capturedContext as { document?: { id: string } }).document?.id).toBe("doc-1")
+      expect(
+        (capturedContext as { document?: { id: string } }).document?.id,
+      ).toBe("doc-1")
     })
 
     it("should extract transmission info from sync-response", async () => {
@@ -351,7 +371,9 @@ describe("MiddlewareProcessor", () => {
       await processor.processMessage(1 as ChannelId, message)
 
       expect(capturedContext).toBeDefined()
-      const ctx = capturedContext as { transmission?: { type: string; sizeBytes: number } }
+      const ctx = capturedContext as {
+        transmission?: { type: string; sizeBytes: number }
+      }
       expect(ctx.transmission?.type).toBe("snapshot")
       expect(ctx.transmission?.sizeBytes).toBe(100)
     })
@@ -371,7 +393,9 @@ describe("MiddlewareProcessor", () => {
       await processor.processMessage(1 as ChannelId, message)
 
       expect(capturedContext).toBeDefined()
-      const ctx = capturedContext as { peer: { peerId: string; peerName: string } }
+      const ctx = capturedContext as {
+        peer: { peerId: string; peerName: string }
+      }
       expect(ctx.peer.peerId).toBe("1")
       expect(ctx.peer.peerName).toBe("test-peer")
     })

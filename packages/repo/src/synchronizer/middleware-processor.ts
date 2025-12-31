@@ -2,7 +2,7 @@ import type { Logger } from "@logtape/logtape"
 import type { PeerID } from "loro-crdt"
 import type { BatchableMsg, Channel, ChannelMsg } from "../channel.js"
 import { isEstablished } from "../channel.js"
-import type { Middleware, MiddlewareContext, MiddlewareResult } from "../middleware.js"
+import type { Middleware, MiddlewareContext } from "../middleware.js"
 import { runMiddleware } from "../middleware.js"
 import type { DocContext, PeerContext } from "../permissions.js"
 import type { ChannelId, DocId, DocState, PeerState } from "../types.js"
@@ -103,8 +103,16 @@ export class MiddlewareProcessor {
       return { type: "no-middleware" }
     }
 
-    const middlewareCtx = this.#buildMiddlewareContext(model, message, peerContext)
-    const result = await runMiddleware(this.#middleware, middlewareCtx, this.#logger)
+    const middlewareCtx = this.#buildMiddlewareContext(
+      model,
+      message,
+      peerContext,
+    )
+    const result = await runMiddleware(
+      this.#middleware,
+      middlewareCtx,
+      this.#logger,
+    )
 
     if (result.allow) {
       return { type: "allowed", message }
@@ -142,8 +150,16 @@ export class MiddlewareProcessor {
     // Process each message through middleware
     const results = await Promise.all(
       messages.map(async msg => {
-        const middlewareCtx = this.#buildMiddlewareContext(model, msg, peerContext)
-        const result = await runMiddleware(this.#middleware, middlewareCtx, this.#logger)
+        const middlewareCtx = this.#buildMiddlewareContext(
+          model,
+          msg,
+          peerContext,
+        )
+        const result = await runMiddleware(
+          this.#middleware,
+          middlewareCtx,
+          this.#logger,
+        )
         return { msg, allowed: result.allow }
       }),
     )
@@ -165,7 +181,10 @@ export class MiddlewareProcessor {
    * Build peer context from a channel for middleware.
    * Returns undefined if channel is not established or peer state not found.
    */
-  #buildPeerContextFromChannel(model: ModelAccessor, channel: Channel): PeerContext | undefined {
+  #buildPeerContextFromChannel(
+    model: ModelAccessor,
+    channel: Channel,
+  ): PeerContext | undefined {
     if (!isEstablished(channel)) {
       return undefined
     }

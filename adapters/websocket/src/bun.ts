@@ -8,7 +8,7 @@
  */
 
 import type { ServerWebSocket } from "bun"
-import type { WsSocket, WsReadyState } from "./handler/types.js"
+import type { WsReadyState, WsSocket } from "./handler/types.js"
 
 /**
  * Data structure stored in ws.data for handler callbacks.

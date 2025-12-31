@@ -14,7 +14,7 @@
  * └─────────────────────────────────────────────────────────────┘
  */
 
-import { decodeCBOR, encodeCBOR, type CBORType } from "@levischuck/tiny-cbor"
+import { type CBORType, decodeCBOR, encodeCBOR } from "@levischuck/tiny-cbor"
 import type {
   BatchableMsg,
   ChannelMsg,
