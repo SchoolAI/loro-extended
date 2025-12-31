@@ -1,6 +1,7 @@
 node_modules
 .roo/
 impl/
+plans/
 **/dist
 **/*.db
 playwright-report
