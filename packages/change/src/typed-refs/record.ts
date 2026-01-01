@@ -96,42 +96,39 @@ export class RecordRef<
    * This is the method used for write operations.
    */
   getOrCreateRef(key: string): any {
-    let ref = this.refCache.get(key)
-    if (!ref) {
-      const shape = this.shape.shape
-      if (isContainerShape(shape)) {
-        ref = createContainerTypedRef(
-          this.getTypedRefParams(key, shape as ContainerShape),
-        )
-        // Cache container refs
-        this.refCache.set(key, ref)
-      } else {
-        // For value shapes, first try to get the value from the container
-        const containerValue = this.container.get(key)
-        if (containerValue !== undefined) {
-          ref = containerValue as Value
-        } else {
-          // Only fall back to placeholder if the container doesn't have the value
-          const placeholder = (this.placeholder as any)?.[key]
-          if (placeholder === undefined) {
-            // If it's a value type and not in container or placeholder,
-            // fallback to the default value from the shape
-            ref = (shape as any)._plain
-          } else {
-            ref = placeholder as Value
-          }
-        }
-        // Only cache primitive values if NOT readonly
-        if (ref !== undefined && !this.readonly) {
-          this.refCache.set(key, ref)
-        }
+    const shape = this.shape.shape
+
+    // For value shapes, ALWAYS read from the container to avoid stale cache issues.
+    // Value shapes should not be cached because the underlying container can be
+    // modified by other RecordRef instances (e.g., drafts created by change()).
+    if (isValueShape(shape)) {
+      const containerValue = this.container.get(key)
+      if (containerValue !== undefined) {
+        return containerValue
       }
+      // Fall back to placeholder if the container doesn't have the value
+      const placeholder = (this.placeholder as any)?.[key]
+      if (placeholder !== undefined) {
+        return placeholder
+      }
+      // Fall back to the default value from the shape
+      return (shape as any)._plain
     }
 
-    if (this.readonly && isContainerShape(this.shape.shape)) {
+    // For container shapes, we can safely cache the ref since it's a handle
+    // to the underlying Loro container, not a value copy.
+    let ref = this.refCache.get(key)
+    if (!ref) {
+      ref = createContainerTypedRef(
+        this.getTypedRefParams(key, shape as ContainerShape),
+      )
+      this.refCache.set(key, ref)
+    }
+
+    if (this.readonly) {
       return unwrapReadonlyPrimitive(
         ref as TypedRef<any>,
-        this.shape.shape as ContainerShape,
+        shape as ContainerShape,
       )
     }
 
