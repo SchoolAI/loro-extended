@@ -10,6 +10,18 @@
  * 2. **Add to peer's subscriptions** - Peer has subscribed to this document
  * 3. **Update peer awareness** - Track that peer has this document
  *
+ * ## Storage-First Sync (for network requests)
+ *
+ * When a network peer requests a document we don't have, we first check with
+ * all storage adapters before responding. This prevents the race condition where
+ * we respond "unavailable" before storage has loaded the document.
+ *
+ * Flow for network request when doc doesn't exist:
+ * 1. Create doc with pendingStorageChannels set
+ * 2. Queue the network request in pendingNetworkRequests
+ * 3. Send sync-request to all storage adapters
+ * 4. When all storage responds, process queued network requests
+ *
  * ## Subscription Model
  *
  * When a peer sends sync-request, they're implicitly subscribing to future updates:
@@ -55,10 +67,12 @@
  * @see handle-local-doc-change.ts - How we send updates to subscribed peers
  */
 
+import { VersionVector } from "loro-crdt"
 import type { ChannelMsgSyncRequest } from "../../channel.js"
 import type { Command } from "../../synchronizer-program.js"
 import { createDocState } from "../../types.js"
 import { getEstablishedChannelsForDoc } from "../../utils/get-established-channels-for-doc.js"
+import { getStorageChannelIds } from "../../utils/get-storage-channel-ids.js"
 import {
   addPeerSubscription,
   setPeerDocumentAwareness,
@@ -85,11 +99,16 @@ export function handleSyncRequest(
   } = message
   const commands: (Command | undefined)[] = []
 
-  // ALWAYS track subscription and awareness
-  // The peer is explicitly telling us they want this document and what version they have
+  // ALWAYS track subscription
+  // The peer is explicitly telling us they want this document
   // This ensures that if we get the document later, we know to send it to them
   addPeerSubscription(peerState, docId)
-  setPeerDocumentAwareness(peerState, docId, "has-doc", requesterDocVersion)
+
+  // Set awareness to "has-doc-unknown-version" (maps to "aware" state)
+  // We know the peer is interested in this doc, but we don't know if they have data
+  // to give us yet. The requesterDocVersion is what they HAVE, not what they're offering.
+  // We'll upgrade to "has-doc" when we receive their sync-response.
+  setPeerDocumentAwareness(peerState, docId, "has-doc-unknown-version")
 
   let docState = model.documents.get(docId)
 
@@ -98,7 +117,7 @@ export function handleSyncRequest(
     {
       peerId: channel.peerId,
       docId,
-      awareness: "has-doc",
+      awareness: "has-doc-unknown-version",
     },
   )
 
@@ -115,21 +134,7 @@ export function handleSyncRequest(
       channelKind: channel.kind,
     }
 
-    if (permissions.creation(docId, peerContext)) {
-      logger.debug(
-        "sync-request: creating new document ({docId}) from peer request",
-        {
-          docId,
-          peerId: channel.peerId,
-        },
-      )
-      docState = createDocState({ docId })
-      model.documents.set(docId, docState)
-      commands.push({
-        type: "cmd/subscribe-doc",
-        docId,
-      })
-    } else {
+    if (!permissions.creation(docId, peerContext)) {
       logger.warn(
         "sync-request: peer {peerId} not allowed to create document {docId}, ignoring request",
         {
@@ -140,6 +145,94 @@ export function handleSyncRequest(
       // Can't create the document, return early
       return
     }
+
+    // Check if this is a network request and we have storage adapters
+    // If so, we need to consult storage before responding
+    const storageChannelIds = getStorageChannelIds(model.channels)
+    const isNetworkRequest = channel.kind === "network"
+
+    if (isNetworkRequest && storageChannelIds.length > 0) {
+      // Storage-first sync: queue the network request and ask storage first
+      logger.debug(
+        "sync-request: network request for unknown doc {docId}, consulting {count} storage adapter(s) first",
+        {
+          docId,
+          count: storageChannelIds.length,
+          peerId: channel.peerId,
+        },
+      )
+
+      // Create doc with pending storage state
+      docState = createDocState({ docId })
+      docState.pendingStorageChannels = new Set(storageChannelIds)
+      docState.pendingNetworkRequests = [
+        { channelId: fromChannelId, requesterDocVersion },
+      ]
+      model.documents.set(docId, docState)
+
+      // Subscribe to the doc for future updates
+      commands.push({
+        type: "cmd/subscribe-doc",
+        docId,
+      })
+
+      // Ask all storage adapters if they have this document
+      // Use empty version to get full snapshot if they have it
+      for (const storageChannelId of storageChannelIds) {
+        commands.push({
+          type: "cmd/send-sync-request",
+          toChannelId: storageChannelId,
+          docs: [{ docId, requesterDocVersion: new VersionVector(null) }],
+          bidirectional: false, // We don't need storage to request back
+        })
+      }
+
+      // Don't respond to network yet - wait for storage
+      return batchAsNeeded(...commands)
+    }
+
+    // No storage adapters or this is a storage request - create doc and respond immediately
+    logger.debug(
+      "sync-request: creating new document ({docId}) from peer request",
+      {
+        docId,
+        peerId: channel.peerId,
+      },
+    )
+    docState = createDocState({ docId })
+    model.documents.set(docId, docState)
+    commands.push({
+      type: "cmd/subscribe-doc",
+      docId,
+    })
+  }
+
+  // Check if this doc is waiting for storage and this is another network request
+  // If so, queue this request too
+  if (
+    docState.pendingStorageChannels &&
+    docState.pendingStorageChannels.size > 0 &&
+    channel.kind === "network"
+  ) {
+    logger.debug(
+      "sync-request: doc {docId} is waiting for storage, queueing network request from {peerId}",
+      {
+        docId,
+        peerId: channel.peerId,
+      },
+    )
+
+    // Add to pending requests
+    if (!docState.pendingNetworkRequests) {
+      docState.pendingNetworkRequests = []
+    }
+    docState.pendingNetworkRequests.push({
+      channelId: fromChannelId,
+      requesterDocVersion,
+    })
+
+    // Don't respond yet - wait for storage
+    return
   }
 
   // Apply incoming ephemeral data from the requester if provided

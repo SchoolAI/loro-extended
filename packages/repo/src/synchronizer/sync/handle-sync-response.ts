@@ -22,6 +22,12 @@
  *    - We requested but peer doesn't have it (yet)
  *    - Important: Keep subscription for future updates
  *
+ * ## Storage-First Sync
+ *
+ * When a storage adapter responds, we check if there are pending network requests
+ * waiting for this storage response. If all storage adapters have responded,
+ * we process the pending network requests.
+ *
  * ## Permission Checking
  *
  * Before applying snapshot/update data, we check `canUpdate` permission:
@@ -48,6 +54,7 @@
  *   |    up-to-date/unavailable]|  2. Apply data (if any)
  *   |                           |  3. Update peer awareness
  *   |                           |  4. Emit ready-state-changed
+ *   |                           |  5. Process pending network requests (if storage)
  * ```
  *
  * @see docs/discovery-and-sync-architecture.md - Sync Data Transfer
@@ -65,7 +72,7 @@ export function handleSyncResponse(
   message: ChannelMsgSyncResponse,
   context: EstablishedHandlerContext,
 ): Command | undefined {
-  const { channel, model, logger } = context
+  const { channel, model, fromChannelId, logger } = context
 
   let docState = model.documents.get(message.docId)
   const commands: Command[] = []
@@ -118,6 +125,53 @@ export function handleSyncResponse(
         namespace: ep.namespace,
       })),
     })
+  }
+
+  // Storage-first sync: Check if this is a storage response we were waiting for
+  if (docState?.pendingStorageChannels?.has(fromChannelId)) {
+    // Remove this storage channel from the pending set
+    docState.pendingStorageChannels.delete(fromChannelId)
+
+    logger.debug(
+      "sync-response: storage channel {channelId} responded for {docId}, {remaining} storage channel(s) remaining",
+      {
+        channelId: fromChannelId,
+        docId: message.docId,
+        remaining: docState.pendingStorageChannels.size,
+      },
+    )
+
+    // If all storage channels have responded, process pending network requests
+    if (docState.pendingStorageChannels.size === 0) {
+      const pendingRequests = docState.pendingNetworkRequests ?? []
+
+      if (pendingRequests.length > 0) {
+        logger.debug(
+          "sync-response: all storage responded for {docId}, processing {count} pending network request(s)",
+          {
+            docId: message.docId,
+            count: pendingRequests.length,
+          },
+        )
+
+        // Send sync-response to all pending network requests
+        for (const req of pendingRequests) {
+          commands.push({
+            type: "cmd/send-sync-response",
+            toChannelId: req.channelId,
+            docId: message.docId,
+            requesterDocVersion: req.requesterDocVersion,
+            includeEphemeral: true,
+          })
+        }
+
+        // Clear the pending requests
+        docState.pendingNetworkRequests = []
+      }
+
+      // Clear the pending storage channels set
+      docState.pendingStorageChannels = undefined
+    }
   }
 
   return batchAsNeeded(...commands)

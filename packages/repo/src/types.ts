@@ -70,14 +70,40 @@ export type PeerState = {
   channels: Set<ChannelId>
 }
 
+/**
+ * Pending network request waiting for storage to be consulted.
+ */
+export type PendingNetworkRequest = {
+  channelId: ChannelId
+  requesterDocVersion: VersionVector
+}
+
 export type DocState = {
   doc: LoroDoc
   docId: DocId
+
+  /**
+   * Storage channels we're waiting to hear from before responding to network requests.
+   * When this set becomes empty, we process pendingNetworkRequests.
+   *
+   * - undefined or empty: No pending storage check
+   * - non-empty: Waiting for these storage channels to respond
+   */
+  pendingStorageChannels?: Set<ChannelId>
+
+  /**
+   * Network sync-requests waiting for storage to be consulted.
+   * When all storage channels have responded (pendingStorageChannels is empty),
+   * we send sync-responses to all of these.
+   */
+  pendingNetworkRequests?: PendingNetworkRequest[]
 }
 
 export function createDocState({ docId }: { docId: DocId }): DocState {
   return {
     doc: new LoroDoc(),
     docId,
+    // pendingStorageChannels and pendingNetworkRequests are undefined by default
+    // They're only set when a network request arrives for an unknown doc with storage adapters
   }
 }

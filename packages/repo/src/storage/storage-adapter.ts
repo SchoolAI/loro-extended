@@ -1,9 +1,4 @@
-import {
-  decodeImportBlobMeta,
-  LoroDoc,
-  type PeerID,
-  VersionVector,
-} from "loro-crdt"
+import { LoroDoc, type PeerID, type VersionVector } from "loro-crdt"
 import { Adapter } from "../adapter/adapter.js"
 import type {
   BatchableMsg,
@@ -157,8 +152,14 @@ export abstract class StorageAdapter extends Adapter<void> {
   /**
    * Automatically respond to establishment requests.
    * Storage has no concept of "connection establishment" - it's always ready.
-   * We immediately respond with our identity so the channel becomes established,
-   * then send sync-requests for all documents we have stored.
+   * We immediately respond with our identity so the channel becomes established.
+   *
+   * NOTE: We intentionally do NOT call requestStoredDocuments() here.
+   * Storage is lazy-loaded - documents are loaded on-demand when network clients
+   * request them via the storage-first sync mechanism. This approach:
+   * - Scales to millions of documents
+   * - Reduces startup time
+   * - Avoids race conditions with eager loading
    */
   private async handleEstablishRequest(): Promise<void> {
     this.logger.debug("handleEstablishRequest: responding with identity")
@@ -173,12 +174,8 @@ export abstract class StorageAdapter extends Adapter<void> {
       },
     })
 
-    // After establishment, send sync-request for all documents we have stored
-    // This triggers the bidirectional sync flow:
-    // 1. We send sync-request with our stored docIds
-    // 2. Repo creates documents and sends reciprocal sync-request
-    // 3. We respond with stored data via handleSyncRequest
-    await this.requestStoredDocuments()
+    // Storage is now lazy - documents are loaded on-demand via handleSyncRequest
+    // when network clients request them. No eager loading needed.
   }
 
   /**
@@ -466,132 +463,6 @@ export abstract class StorageAdapter extends Adapter<void> {
     }
     // Deliver synchronously - the Synchronizer's receive queue prevents recursion
     this.storageChannel.onReceive(msg)
-  }
-
-  /**
-   * Send sync-request for all documents stored in this adapter.
-   * This is called after channel establishment to enable document discovery.
-   * The bidirectional flag ensures the Repo sends a reciprocal sync-request.
-   *
-   * IMPORTANT: We send the actual stored version (not empty version) to prevent
-   * the Repo from sending back data we already have. This avoids creating
-   * duplicate chunks on page refresh.
-   *
-   * OPTIMIZATION: We use decodeImportBlobMeta() to extract version vectors from
-   * chunks WITHOUT full reconstruction. This avoids doubling memory usage.
-   */
-  private async requestStoredDocuments(): Promise<void> {
-    try {
-      // Load all chunks to discover stored documents
-      const chunks = await this.loadRange([])
-
-      // Single-pass: extract version vectors and group by docId
-      // Using decodeImportBlobMeta() avoids full document reconstruction
-      const docVersions = new Map<
-        DocId,
-        { versionMap: Map<PeerID, number>; hasError: boolean }
-      >()
-
-      for (const chunk of chunks) {
-        const docId = chunk.key[0]
-
-        let docInfo = docVersions.get(docId)
-        if (!docInfo) {
-          docInfo = { versionMap: new Map(), hasError: false }
-          docVersions.set(docId, docInfo)
-        }
-
-        // Skip if we already had an error with this doc
-        if (docInfo.hasError) continue
-
-        try {
-          // Extract version from chunk metadata WITHOUT full import
-          const metadata = decodeImportBlobMeta(chunk.data, false)
-          const chunkVersion = metadata.partialEndVersionVector.toJSON()
-
-          // Merge this chunk's version into the doc's version (take max per peer)
-          for (const [peer, counter] of chunkVersion.entries()) {
-            const existing = docInfo.versionMap.get(peer) ?? 0
-            if (counter > existing) {
-              docInfo.versionMap.set(peer, counter)
-            }
-          }
-        } catch (error) {
-          // If we can't decode metadata, mark this doc as having an error
-          // We'll use empty version as fallback
-          this.logger.warn(
-            "requestStoredDocuments: failed to decode chunk metadata for {docId}",
-            { docId, error },
-          )
-          docInfo.hasError = true
-        }
-      }
-
-      const docIds = Array.from(docVersions.keys())
-
-      this.logger.debug(
-        "requestStoredDocuments: extracted versions from {count} chunks for {docCount} docs",
-        {
-          count: chunks.length,
-          docCount: docIds.length,
-          docIds,
-        },
-      )
-
-      if (docIds.length > 0) {
-        // Build the docs array with extracted versions
-        const docs: Array<{
-          docId: DocId
-          requesterDocVersion: VersionVector
-        }> = []
-
-        for (const [docId, docInfo] of docVersions) {
-          let version: VersionVector
-
-          if (!docInfo.hasError && docInfo.versionMap.size > 0) {
-            // Create VersionVector directly from the merged Map
-            version = new VersionVector(docInfo.versionMap)
-
-            this.logger.debug(
-              "requestStoredDocuments: extracted version for {docId} with {peerCount} peers",
-              {
-                docId,
-                peerCount: docInfo.versionMap.size,
-                version: Object.fromEntries(docInfo.versionMap),
-              },
-            )
-          } else {
-            // Use empty version as fallback
-            version = new VersionVector(null)
-            this.logger.debug(
-              "requestStoredDocuments: using empty version for {docId} (error or no chunks)",
-              { docId },
-            )
-          }
-
-          docs.push({
-            docId,
-            requesterDocVersion: version,
-          })
-        }
-
-        this.logger.debug(
-          "requestStoredDocuments: sending sync-request with extracted versions",
-          {
-            docIds,
-            bidirectional: true,
-          },
-        )
-
-        // Send sync-request with bidirectional=true; this tells the Repo to send
-        // a reciprocal sync-request back to us
-        this.replyWithSyncRequest(docs, true)
-      } else {
-        this.logger.debug("requestStoredDocuments: no stored documents found")
-      }
-    } catch (error) {
-      this.logger.error("failed to request stored documents", { error })
-    }
   }
 
   /**

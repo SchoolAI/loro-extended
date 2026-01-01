@@ -158,7 +158,7 @@ describe("StorageAdapter", () => {
       })
     })
 
-    it("sends sync-request for stored documents after establishment", async () => {
+    it("does NOT send sync-request for stored documents after establishment (lazy loading)", async () => {
       // Pre-populate storage with documents
       const doc1 = new LoroDoc()
       doc1.getText("text").insert(0, "Doc 1")
@@ -182,26 +182,10 @@ describe("StorageAdapter", () => {
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      // Should receive establish-response followed by sync-request (batched for multiple docs)
-      expect(receivedMessages.length).toBe(2)
+      // With lazy loading, should ONLY receive establish-response
+      // No sync-request for stored documents - they're loaded on-demand
+      expect(receivedMessages.length).toBe(1)
       expect(receivedMessages[0].type).toBe("channel/establish-response")
-      expect(receivedMessages[1].type).toBe("channel/batch")
-
-      // Verify batch contains sync-requests for both stored documents
-      const batchMsg = receivedMessages[1]
-      if (batchMsg.type === "channel/batch") {
-        expect(batchMsg.messages).toHaveLength(2)
-        const docIds = batchMsg.messages.map(m =>
-          m.type === "channel/sync-request" ? m.docId : null,
-        )
-        expect(docIds).toContain("doc1")
-        expect(docIds).toContain("doc2")
-        // Check bidirectional on first message
-        const firstMsg = batchMsg.messages[0]
-        if (firstMsg.type === "channel/sync-request") {
-          expect(firstMsg.bidirectional).toBe(true)
-        }
-      }
     })
 
     it("does not send sync-request when storage is empty", async () => {
@@ -216,36 +200,6 @@ describe("StorageAdapter", () => {
       // Should only receive establish-response, no sync-request
       expect(receivedMessages).toHaveLength(1)
       expect(receivedMessages[0].type).toBe("channel/establish-response")
-    })
-
-    it("sends sync-request with unique docIds when documents have multiple chunks", async () => {
-      // Simulate a document with multiple update chunks
-      await adapter.save(["doc1", "update", "1"], new Uint8Array([1]))
-      await adapter.save(["doc1", "update", "2"], new Uint8Array([2]))
-      await adapter.save(["doc1", "update", "3"], new Uint8Array([3]))
-      await adapter.save(["doc2", "update", "1"], new Uint8Array([4]))
-
-      const channel = await initializeAdapter()
-
-      await channel.send({
-        type: "channel/establish-request",
-        identity: { peerId: "123", name: "test-peer", type: "user" },
-      })
-
-      // Should receive establish-response followed by batch (for multiple docs)
-      expect(receivedMessages.length).toBe(2)
-      expect(receivedMessages[1].type).toBe("channel/batch")
-
-      // Verify batch contains unique docIds (not one per chunk)
-      const batchMsg = receivedMessages[1]
-      if (batchMsg.type === "channel/batch") {
-        expect(batchMsg.messages).toHaveLength(2) // Not 4!
-        const docIds = batchMsg.messages.map(m =>
-          m.type === "channel/sync-request" ? m.docId : null,
-        )
-        expect(docIds).toContain("doc1")
-        expect(docIds).toContain("doc2")
-      }
     })
   })
 
@@ -622,15 +576,11 @@ describe("StorageAdapter", () => {
   })
 
   describe("Page Refresh / Reconnection Behavior", () => {
-    it("sends sync-request with correct stored version (not empty)", async () => {
-      // This test verifies the FIX for the duplicate chunks bug.
-      //
-      // The fix ensures that when the storage adapter sends a sync-request
-      // after page refresh, it includes the ACTUAL stored version (not empty).
-      // This allows the Repo to respond with "up-to-date" instead of sending
-      // redundant data.
+    it("loads documents on-demand when requested (lazy loading)", async () => {
+      // With lazy loading, storage doesn't send sync-requests on establishment.
+      // Instead, documents are loaded when the Repo sends a sync-request.
 
-      // Step 1: Create initial document and save it (simulating first page load)
+      // Step 1: Create initial document and save it
       const doc = new LoroDoc()
       doc.getText("text").insert(0, "Hello World")
       const snapshot = doc.export({ mode: "snapshot" })
@@ -640,60 +590,36 @@ describe("StorageAdapter", () => {
       const chunksBeforeRefresh = await adapter.loadRange(["test-doc"])
       expect(chunksBeforeRefresh).toHaveLength(1)
 
-      // Step 2: Simulate page refresh - establish channel and trigger sync
+      // Step 2: Establish channel
       const channel = await initializeAdapter()
 
-      // Send establish-request (this triggers requestStoredDocuments)
       await channel.send({
         type: "channel/establish-request",
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      // The storage adapter should have sent a sync-request for "test-doc"
-      const syncRequest = receivedMessages.find(
-        m => m.type === "channel/sync-request",
-      )
-      expect(syncRequest).toBeDefined()
-      expect(syncRequest?.type).toBe("channel/sync-request")
+      // With lazy loading, storage does NOT send sync-request on establishment
+      expect(receivedMessages).toHaveLength(1)
+      expect(receivedMessages[0].type).toBe("channel/establish-response")
 
-      // Step 3: VERIFY THE FIX - the sync-request should contain the stored version
-      // NOT an empty version!
-      if (syncRequest?.type === "channel/sync-request") {
-        // Single-doc format now
-        expect(syncRequest.docId).toBe("test-doc")
-
-        // The requesterDocVersion should match the stored document's version
-        // (not be empty)
-        const requestedVersion = syncRequest.requesterDocVersion
-        const storedVersion = doc.oplogVersion()
-
-        // Verify the version is NOT empty
-        expect(requestedVersion.length()).toBeGreaterThan(0)
-
-        // Verify the version matches what's stored
-        // The comparison should be 0 (equal) or -1 (stored is subset of requested)
-        const comparison = requestedVersion.compare(storedVersion)
-        expect(comparison).toBe(0) // Versions should be equal
-      }
-
-      // Step 4: Simulate Repo responding with "up-to-date" (correct behavior)
-      // When the Repo receives a sync-request with the correct version,
-      // it responds with "up-to-date" instead of sending data
+      // Step 3: Repo sends sync-request for the document (on-demand loading)
+      receivedMessages.length = 0
       await channel.send({
-        type: "channel/sync-response",
+        type: "channel/sync-request",
         docId: "test-doc",
-        transmission: {
-          type: "up-to-date",
-          version: doc.oplogVersion(),
-        },
+        requesterDocVersion: new LoroDoc().oplogVersion(), // Empty version
+        bidirectional: false,
       })
 
-      // Step 5: Verify no new chunks were created
-      const chunksAfterRefresh = await adapter.loadRange(["test-doc"])
-      expect(chunksAfterRefresh).toHaveLength(1)
+      // Storage should respond with the document data
+      expect(receivedMessages.length).toBe(2) // sync-response + reciprocal sync-request
+      expect(receivedMessages[0].type).toBe("channel/sync-response")
+      if (receivedMessages[0].type === "channel/sync-response") {
+        expect(receivedMessages[0].transmission.type).toBe("update")
+      }
     })
 
-    it("should only save NEW data when storage is behind", async () => {
+    it("should only save NEW data when Repo sends updates", async () => {
       // This tests the correct behavior: only save when there's actually new data
 
       // Step 1: Create initial document and save it
@@ -704,7 +630,7 @@ describe("StorageAdapter", () => {
 
       const initialSaveCount = adapter.saveCalls.length
 
-      // Step 2: Simulate page refresh
+      // Step 2: Establish channel
       const channel = await initializeAdapter()
 
       await channel.send({
@@ -712,7 +638,7 @@ describe("StorageAdapter", () => {
         identity: { peerId: "123", name: "test-peer", type: "user" },
       })
 
-      // Step 3: Simulate Repo having NEW data (document was modified elsewhere)
+      // Step 3: Simulate Repo sending NEW data (document was modified)
       doc.getText("text").insert(5, " World")
       const newUpdate = doc.export({
         mode: "update",

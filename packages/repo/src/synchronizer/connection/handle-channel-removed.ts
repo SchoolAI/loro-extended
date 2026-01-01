@@ -11,6 +11,7 @@
  * 2. **Update peer state** - Mark peer as disconnected, remove channel reference
  * 3. **Remove from model** - Delete channel from synchronizer state
  * 4. **Clean document state** - Remove channel-specific document metadata
+ * 5. **Handle storage-first sync** - Process pending requests if storage disconnects
  *
  * ## Peer State Preservation
  *
@@ -28,9 +29,16 @@
  * We remove channel-specific state from all documents:
  * - Loading states (found/not-found)
  * - Peer subscriptions
+ * - Pending storage channels (for storage-first sync)
  * - Any other channel-specific metadata
  *
  * This ensures clean state and prevents memory leaks.
+ *
+ * ## Storage-First Sync Cleanup
+ *
+ * If a storage channel is removed while documents are waiting for its response:
+ * - Remove the channel from pendingStorageChannels
+ * - If no more storage channels pending, process pending network requests
  *
  * ## Channel Types
  *
@@ -103,7 +111,77 @@ export function handleChannelRemoved(
     }
   }
 
-  // Step 3: Remove the channel from our model
+  // Step 3: Handle storage-first sync cleanup
+  // If this channel was a storage channel that documents were waiting for,
+  // we need to remove it from pendingStorageChannels and potentially process
+  // pending network requests
+  const removedChannelId = msg.channel.channelId
+  for (const [docId, docState] of model.documents) {
+    if (docState.pendingStorageChannels?.has(removedChannelId)) {
+      // Remove this storage channel from pending set
+      docState.pendingStorageChannels.delete(removedChannelId)
+
+      logger.debug(
+        "channel-removed: removed storage channel {channelId} from pending set for {docId}, {remaining} remaining",
+        {
+          channelId: removedChannelId,
+          docId,
+          remaining: docState.pendingStorageChannels.size,
+        },
+      )
+
+      // If no more storage channels pending, process pending network requests
+      if (docState.pendingStorageChannels.size === 0) {
+        const pendingRequests = docState.pendingNetworkRequests ?? []
+
+        if (pendingRequests.length > 0) {
+          logger.debug(
+            "channel-removed: all storage responded for {docId}, processing {count} pending network request(s)",
+            {
+              docId,
+              count: pendingRequests.length,
+            },
+          )
+
+          // Send sync-response to all pending network requests
+          for (const req of pendingRequests) {
+            commands.push({
+              type: "cmd/send-sync-response",
+              toChannelId: req.channelId,
+              docId,
+              requesterDocVersion: req.requesterDocVersion,
+              includeEphemeral: true,
+            })
+          }
+
+          // Clear the pending requests
+          docState.pendingNetworkRequests = []
+        }
+
+        // Clear the pending storage channels set
+        docState.pendingStorageChannels = undefined
+      }
+    }
+
+    // Also clean up pending network requests from this channel if it was a network channel
+    if (docState.pendingNetworkRequests) {
+      const originalLength = docState.pendingNetworkRequests.length
+      docState.pendingNetworkRequests = docState.pendingNetworkRequests.filter(
+        req => req.channelId !== removedChannelId,
+      )
+      if (docState.pendingNetworkRequests.length < originalLength) {
+        logger.debug(
+          "channel-removed: removed pending network request from {docId} for disconnected channel {channelId}",
+          {
+            docId,
+            channelId: removedChannelId,
+          },
+        )
+      }
+    }
+  }
+
+  // Step 4: Remove the channel from our model
   model.channels.delete(msg.channel.channelId)
 
   return batchAsNeeded(...commands)
