@@ -309,6 +309,11 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   /**
    * Handle the "ready" signal from the server.
    * This creates the channel and starts the establishment handshake.
+   *
+   * The "ready" signal is a transport-level indicator that the server's
+   * WebSocket handler is ready. After receiving it, we create our channel
+   * and send a real establish-request. The server will respond with a real
+   * establish-response containing its actual identity.
    */
   private handleServerReady(): void {
     if (this.serverReady) {
@@ -326,19 +331,11 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     }
 
     this.serverChannel = this.addChannel()
-    this.establishChannel(this.serverChannel.channelId)
 
-    // Simulate handshake completion so Synchronizer starts syncing
-    // We use a placeholder peerId for the server
-    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-    this.serverChannel.onReceive({
-      type: "channel/establish-response",
-      identity: {
-        peerId: "server" as PeerID,
-        name: "server",
-        type: "service",
-      },
-    })
+    // Send real establish-request over the wire
+    // The server will respond with establish-response containing its actual identity
+    // which will be processed by the Synchronizer's handle-establish-response handler
+    this.establishChannel(this.serverChannel.channelId)
   }
 
   /**

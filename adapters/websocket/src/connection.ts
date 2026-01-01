@@ -126,29 +126,4 @@ export class WsConnection {
   close(code?: number, reason?: string): void {
     this.socket.close(code, reason)
   }
-
-  /**
-   * Simulate the establishment handshake to satisfy loro-extended's requirements.
-   *
-   * Delivers messages synchronously. The Synchronizer's receive queue handles
-   * recursion prevention by queuing messages and processing them iteratively.
-   *
-   * @param remotePeerId The peer ID of the remote peer
-   */
-  simulateHandshake(remotePeerId: PeerID): void {
-    if (!this.channel) return
-
-    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-    // 1. We tell Synchronizer that the remote peer wants to establish
-    this.channel.onReceive({
-      type: "channel/establish-request",
-      identity: { peerId: remotePeerId, name: "peer", type: "user" },
-    })
-
-    // 2. We tell Synchronizer that the remote peer accepted our establishment
-    this.channel.onReceive({
-      type: "channel/establish-response",
-      identity: { peerId: remotePeerId, name: "peer", type: "user" },
-    })
-  }
 }

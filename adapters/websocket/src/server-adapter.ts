@@ -142,14 +142,15 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
       connection,
       start: () => {
         connection.start()
-        // Trigger establishment handshake
-        this.establishChannel(channel.channelId)
-
-        // Simulate handshake completion so Synchronizer starts syncing
-        connection.simulateHandshake(peerId)
 
         // Send ready signal to client so it knows the server is ready
+        // This is a transport-level signal, separate from protocol-level establishment
         connection.sendReady()
+
+        // Trigger establishment handshake - sends real establish-request over the wire
+        // The client will respond with establish-response, which will be processed
+        // by the Synchronizer's handle-establish-response handler
+        this.establishChannel(channel.channelId)
       },
     }
   }
