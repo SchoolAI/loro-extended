@@ -5,8 +5,34 @@
 
 import type { ContainerShape, DocShape, Shape } from "./shape.js"
 
+// Helper type for depth counting in ExpandDeep
+type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+/**
+ * Expands a type to a reasonable depth for IDE display.
+ * Stops at depth 4 to avoid infinite recursion with self-referential types
+ * like tree nodes that have `children: TreeNodeJSON[]`.
+ *
+ * @example
+ * ```typescript
+ * // Without expansion, hover shows: TreeNodeJSON<StructContainerShape<...>>
+ * // With expansion, hover shows the actual structure:
+ * // { id: string; parent: string | null; data: { name: string; ... }; children: ... }
+ * ```
+ */
+type ExpandDeep<T, Depth extends number = 4> = Depth extends 0
+  ? T
+  : T extends (...args: any[]) => any
+    ? T
+    : T extends object
+      ? T extends infer O
+        ? { [K in keyof O]: ExpandDeep<O[K], Prev[Depth]> }
+        : never
+      : T
+
 /**
  * Infers the plain (JSON-serializable) type from any Shape.
+ * The result is fully expanded for better IDE hover display.
  *
  * This is the recommended way to extract types from shapes.
  * Works with DocShape, ContainerShape, and ValueShape.
@@ -34,7 +60,16 @@ import type { ContainerShape, DocShape, Shape } from "./shape.js"
  * // Result: { name: string; cursor: { x: number; y: number } }
  * ```
  */
-export type Infer<T> = T extends Shape<infer P, any, any> ? P : never
+export type Infer<T> = T extends Shape<infer P, any, any>
+  ? ExpandDeep<P>
+  : never
+
+/**
+ * Infers the plain (JSON-serializable) type from any Shape without expansion.
+ * Use this if you prefer to see type alias names (like TreeNodeJSON) in hover displays,
+ * or if you need slightly faster type checking on very large schemas.
+ */
+export type InferRaw<T> = T extends Shape<infer P, any, any> ? P : never
 
 /**
  * Infers the mutable type from any Shape.

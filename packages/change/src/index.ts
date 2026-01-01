@@ -61,6 +61,8 @@ export type {
   Infer,
   InferMutableType,
   InferPlaceholderType,
+  // InferRaw<T> preserves type alias names (like TreeNodeJSON) in hover displays
+  InferRaw,
   Mutable,
 } from "./types.js"
 // Utility exports
