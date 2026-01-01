@@ -24,6 +24,7 @@ export function getReadyStates(
       state: "absent",
       docId,
       identity: { ...model.identity },
+      channels: [], // Local repo has no channels
     })
   } else {
     if (myDoc.doc.opCount() > 0) {
@@ -81,10 +82,24 @@ export function getReadyStates(
         channels,
       })
     } else if (awareness.awareness === "no-doc") {
+      // Build channels list for absent state too
+      const channels: ReadyStateChannelMeta[] = []
+      for (const channelId of peer.channels) {
+        const channel = model.channels.get(channelId)
+        if (!channel) continue
+
+        channels.push({
+          kind: channel.kind,
+          state: channel.type,
+          adapterType: channel.adapterType,
+        })
+      }
+
       readyStates.push({
         state: "absent",
         docId,
         identity: { ...peer.identity },
+        channels,
       })
     } else {
       throw new Error("invalid awareness state")

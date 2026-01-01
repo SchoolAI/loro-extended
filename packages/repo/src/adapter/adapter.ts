@@ -3,6 +3,7 @@ import type {
   AddressedEnvelope,
   Channel,
   ChannelId,
+  ChannelKind,
   ChannelMsg,
   ConnectedChannel,
   GeneratedChannel,
@@ -72,6 +73,15 @@ type AdapterLifecycleState =
   | AdapterLifecycleStoppedState
 
 export abstract class Adapter<G> {
+  /**
+   * The kind of channels this adapter creates.
+   * Default is "network". StorageAdapter overrides this to "storage".
+   *
+   * This is a first-class property of the adapter, not just the channels,
+   * allowing code to check adapter capabilities before channels are created.
+   */
+  readonly kind: ChannelKind = "network"
+
   readonly adapterType: AdapterType
   /**
    * Unique identifier for this adapter instance.
@@ -97,7 +107,7 @@ export abstract class Adapter<G> {
     // Use a placeholder logger until _initialize() provides the real one
     // This logger won't output anything unless LogTape is configured at the root level
     this.logger = getLogger().getChild("adapter").with({ adapterType })
-    this.channels = new ChannelDirectory(this.generate.bind(this))
+    this.channels = new ChannelDirectory(this._generate.bind(this))
   }
 
   // ============================================================================
@@ -175,8 +185,27 @@ export abstract class Adapter<G> {
   /**
    * Generate a GeneratedChannel for the given context.
    * The returned channel must be ready to use immediately.
+   *
+   * Note: Subclasses should return only `send` and `stop` functions.
+   * The `kind` and `adapterType` will be overwritten by the adapter's
+   * properties in _generate(), so specifying them is optional.
    */
   protected abstract generate(context: G): GeneratedChannel
+
+  /**
+   * Internal method that ensures channel metadata comes from the adapter.
+   * This is what ChannelDirectory calls to create channels.
+   */
+  private _generate(context: G): GeneratedChannel {
+    const generated = this.generate(context)
+    // Override kind and adapterType with adapter's values
+    // This ensures consistency even if subclass specifies different values
+    return {
+      ...generated,
+      kind: this.kind,
+      adapterType: this.adapterType,
+    }
+  }
 
   /**
    * Start the adapter. Create initial channels here.

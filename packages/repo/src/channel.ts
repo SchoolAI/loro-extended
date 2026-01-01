@@ -347,6 +347,13 @@ export type ChannelActions = {
   stop: () => void
 }
 
+/**
+ * The minimal return type for adapter's generateActions() method.
+ * Adapters only need to provide send/stop - the adapter base class
+ * adds kind and adapterType automatically.
+ */
+export type GeneratedChannelActions = ChannelActions
+
 export type ChannelKind = "storage" | "network" | "other"
 
 export type ReceiveFn = (msg: ChannelMsg) => void

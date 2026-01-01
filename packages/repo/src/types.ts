@@ -43,6 +43,7 @@ type ReadyStateLoaded = ReadyStateBase & {
 
 type ReadyStateAbsent = ReadyStateBase & {
   state: "absent"
+  channels: ReadyStateChannelMeta[]
 }
 
 export type ReadyState = ReadyStateAware | ReadyStateLoaded | ReadyStateAbsent

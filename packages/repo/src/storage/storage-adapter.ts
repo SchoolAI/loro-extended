@@ -46,6 +46,12 @@ export type Chunk = {
  * messages itself.
  */
 export abstract class StorageAdapter extends Adapter<void> {
+  /**
+   * Storage adapters always create storage channels.
+   * This overrides the default "network" kind from the base Adapter class.
+   */
+  override readonly kind = "storage" as const
+
   protected storageChannel?: ConnectedChannel
   private lastTimestamp = 0
   private counter = 0
@@ -54,11 +60,12 @@ export abstract class StorageAdapter extends Adapter<void> {
   private readonly storagePeerId: PeerID = generatePeerId()
 
   /**
-   * The Adapter superclass requires that we be able to generate a channel
+   * Generate channel actions for storage operations.
+   * The kind and adapterType are automatically added by the base class.
    */
   protected generate(): GeneratedChannel {
     return {
-      kind: "storage",
+      kind: this.kind,
       adapterType: this.adapterType,
       send: this.handleChannelMessage.bind(this),
       stop: () => {},

@@ -19,11 +19,69 @@ import type { EphemeralStore, Listener, LoroDoc, Value } from "loro-crdt"
 import type { Synchronizer } from "./synchronizer.js"
 import type { DocId, ReadyState } from "./types.js"
 import { equal } from "./utils/equal.js"
+import { withTimeout } from "./utils/with-timeout.js"
 
 /**
  * Custom predicate for determining readiness.
  */
 export type ReadinessCheck = (readyStates: ReadyState[]) => boolean
+
+/**
+ * Options for waitForSync().
+ */
+export type WaitForSyncOptions = {
+  /**
+   * The kind of channel to wait for.
+   * @default "network"
+   */
+  kind?: "network" | "storage"
+
+  /**
+   * Timeout in milliseconds. Set to 0 to disable timeout.
+   * @default 30000
+   */
+  timeout?: number
+
+  /**
+   * Optional AbortSignal for cancellation.
+   * If aborted, the promise rejects with an AbortError.
+   */
+  signal?: AbortSignal
+}
+
+/**
+ * Error thrown when waitForSync() times out.
+ */
+export class SyncTimeoutError extends Error {
+  constructor(
+    public readonly kind: "network" | "storage",
+    public readonly timeoutMs: number,
+    public readonly docId: string,
+    public readonly lastSeenStates?: ReadyState[],
+  ) {
+    super(
+      `waitForSync({ kind: '${kind}' }) timed out after ${timeoutMs}ms for document '${docId}'. ` +
+        `No ${kind} peer completed sync within the timeout period.`,
+    )
+    this.name = "SyncTimeoutError"
+  }
+}
+
+/**
+ * Error thrown when waitForSync() is called but no adapters of the requested kind exist.
+ */
+export class NoAdaptersError extends Error {
+  constructor(
+    public readonly kind: "network" | "storage",
+    public readonly docId: string,
+  ) {
+    super(
+      `waitForSync({ kind: '${kind}' }) called for document '${docId}' but no ${kind} adapters are configured. ` +
+        `Add a ${kind} adapter to the Repo before calling waitForSync().`,
+    )
+    this.name = "NoAdaptersError"
+  }
+}
 
 /**
  * Shape for ephemeral store declarations.
@@ -599,6 +657,10 @@ export class Handle<
 
   /**
    * Convenience method: wait for storage to load.
+   *
+   * @deprecated Use `waitForSync({ kind: 'storage' })` instead.
+   * This method only resolves when storage has data (state="loaded"),
+   * but hangs forever if storage confirms it doesn't have the document.
    */
   async waitForStorage(): Promise<Handle<D, E>> {
     return this.waitUntilReady(readyStates =>
@@ -610,6 +672,10 @@ export class Handle<
 
   /**
    * Convenience method: wait for any network source to provide the document.
+   *
+   * @deprecated Use `waitForSync({ kind: 'network' })` instead.
+   * This method only resolves when a network peer has data (state="loaded"),
+   * but hangs forever if the peer confirms it doesn't have the document.
    */
   async waitForNetwork(): Promise<Handle<D, E>> {
     return this.waitUntilReady(readyStates =>
@@ -617,6 +683,92 @@ export class Handle<
         s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
       ),
     )
+  }
+
+  /**
+   * Wait for sync to complete with a peer of the specified kind.
+   *
+   * Resolves when we've completed the sync handshake with a peer:
+   * - Received document data (peer state = "loaded")
+   * - Peer confirmed it doesn't have the document (peer state = "absent")
+   *
+   * This enables the common "initializeIfEmpty" pattern:
+   * ```typescript
+   * await handle.waitForSync()
+   * if (handle.loroDoc.opCount() === 0) {
+   *   // Server doesn't have it, safe to initialize
+   *   initializeDocument(handle)
+   * }
+   * ```
+   *
+   * @param options - Configuration options
+   * @param options.kind - The kind of channel to wait for ("network" or "storage"). Default: "network"
+   * @param options.timeout - Timeout in milliseconds. Set to 0 to disable. Default: 30000
+   * @param options.signal - Optional AbortSignal for cancellation
+   * @throws {NoAdaptersError} If no adapters of the requested kind are configured
+   * @throws {SyncTimeoutError} If the timeout is reached before sync completes
+   * @throws {DOMException} If the signal is aborted (name: "AbortError")
+   */
+  async waitForSync(options?: WaitForSyncOptions): Promise<Handle<D, E>> {
+    const kind = options?.kind ?? "network"
+    const timeout = options?.timeout ?? 30_000
+    const signal = options?.signal
+
+    // Check if any adapters of the requested kind are configured
+    // This uses the adapter's `kind` property, not channels, to avoid
+    // race conditions during startup when channels may not exist yet.
+    const hasAdapterOfKind = this.synchronizer.adapters.adapters.some(
+      adapter => adapter.kind === kind,
+    )
+
+    if (!hasAdapterOfKind) {
+      throw new NoAdaptersError(kind, this.docId)
+    }
+
+    // Create the predicate that checks for sync completion
+    const predicate = this.createSyncPredicate(kind)
+
+    // Wait for sync with timeout and abort support
+    const syncPromise = this.synchronizer.waitUntilReady(this.docId, predicate)
+
+    await withTimeout(syncPromise, {
+      timeoutMs: timeout,
+      signal,
+      createTimeoutError: () =>
+        new SyncTimeoutError(
+          kind,
+          timeout,
+          this.docId,
+          this.synchronizer.readyStates.get(this.docId),
+        ),
+    })
+
+    return this
+  }
+
+  /**
+   * Creates a predicate for checking sync completion with a peer of the specified kind.
+   */
+  private createSyncPredicate(
+    kind: "network" | "storage",
+  ): (readyStates: ReadyState[]) => boolean {
+    return (readyStates: ReadyState[]): boolean =>
+      readyStates.some(s => {
+        // Must be a remote peer (not ourselves)
+        if (s.identity.peerId === this.peerId) {
+          return false
+        }
+
+        // Must have a channel of the requested kind
+        const hasChannelOfRequestedKind = s.channels.some(c => c.kind === kind)
+        if (!hasChannelOfRequestedKind) {
+          return false
+        }
+
+        // Accept both "loaded" (has data) and "absent" (confirmed no data)
+        // "aware" means we know they exist but haven't completed sync yet
+        return s.state === "loaded" || s.state === "absent"
+      })
   }
 }
 
