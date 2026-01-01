@@ -106,7 +106,18 @@ export class WsConnection {
     if (text === "ping") {
       this.socket.send("pong")
     }
-    // Ignore "pong" responses
+    // Ignore "pong" and "ready" responses
+  }
+
+  /**
+   * Send a "ready" signal to the client.
+   * This tells the client that the server is ready to receive messages.
+   */
+  sendReady(): void {
+    if (this.socket.readyState !== "open") {
+      return
+    }
+    this.socket.send("ready")
   }
 
   /**

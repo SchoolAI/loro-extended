@@ -84,6 +84,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private WebSocketImpl: typeof globalThis.WebSocket
   private isConnecting = false
   private shouldReconnect = true
+  private serverReady = false
   public connectionState: ConnectionState = "disconnected"
   private listeners = new Set<(state: ConnectionState) => void>()
 
@@ -240,26 +241,12 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       // Start keepalive
       this.startKeepalive()
 
-      // Create channel if not exists
-      if (this.serverChannel) {
-        this.removeChannel(this.serverChannel.channelId)
-        this.serverChannel = undefined
-      }
+      // Reset server ready flag - we'll wait for the "ready" signal
+      this.serverReady = false
 
-      this.serverChannel = this.addChannel()
-      this.establishChannel(this.serverChannel.channelId)
-
-      // Simulate handshake completion so Synchronizer starts syncing
-      // We use a placeholder peerId for the server
-      // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-      this.serverChannel.onReceive({
-        type: "channel/establish-response",
-        identity: {
-          peerId: "server" as PeerID,
-          name: "server",
-          type: "service",
-        },
-      })
+      // Note: Channel creation is deferred until we receive the "ready" signal
+      // from the server. This ensures the server is fully set up before we
+      // start sending messages.
     } catch (error) {
       this.isConnecting = false
       this.logger.error(
@@ -287,6 +274,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       this.removeChannel(this.serverChannel.channelId)
       this.serverChannel = undefined
     }
+    this.serverReady = false
     this.setConnectionState("disconnected")
   }
 
@@ -296,8 +284,11 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private handleMessage(event: MessageEvent): void {
     const data = event.data
 
-    // Handle text messages (keepalive)
+    // Handle text messages (keepalive and ready signal)
     if (typeof data === "string") {
+      if (data === "ready") {
+        this.handleServerReady()
+      }
       // Ignore pong responses
       return
     }
@@ -313,6 +304,41 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         this.logger.error("Failed to decode message", { error })
       }
     }
+  }
+
+  /**
+   * Handle the "ready" signal from the server.
+   * This creates the channel and starts the establishment handshake.
+   */
+  private handleServerReady(): void {
+    if (this.serverReady) {
+      // Already received ready signal, ignore duplicate
+      return
+    }
+
+    this.serverReady = true
+    this.logger.debug("Received ready signal from server")
+
+    // Create channel if not exists
+    if (this.serverChannel) {
+      this.removeChannel(this.serverChannel.channelId)
+      this.serverChannel = undefined
+    }
+
+    this.serverChannel = this.addChannel()
+    this.establishChannel(this.serverChannel.channelId)
+
+    // Simulate handshake completion so Synchronizer starts syncing
+    // We use a placeholder peerId for the server
+    // Deliver synchronously - the Synchronizer's receive queue prevents recursion
+    this.serverChannel.onReceive({
+      type: "channel/establish-response",
+      identity: {
+        peerId: "server" as PeerID,
+        name: "server",
+        type: "service",
+      },
+    })
   }
 
   /**
@@ -341,6 +367,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     )
 
     this.stopKeepalive()
+    this.serverReady = false
 
     if (this.serverChannel) {
       this.removeChannel(this.serverChannel.channelId)

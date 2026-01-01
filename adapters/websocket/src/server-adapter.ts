@@ -147,6 +147,9 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
 
         // Simulate handshake completion so Synchronizer starts syncing
         connection.simulateHandshake(peerId)
+
+        // Send ready signal to client so it knows the server is ready
+        connection.sendReady()
       },
     }
   }
