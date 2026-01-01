@@ -31,9 +31,8 @@ describe("handle-sync-response", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -60,10 +59,10 @@ describe("handle-sync-response", () => {
 
     // Should update peer awareness
     const peerState = newModel.peers.get(peerId)
-    const awareness = peerState?.documentAwareness.get(docId)
-    expect(awareness?.awareness).toBe("has-doc")
-    // With discriminated union, lastKnownVersion is guaranteed when awareness === "has-doc"
-    if (awareness?.awareness === "has-doc") {
+    const awareness = peerState?.docSyncStates.get(docId)
+    expect(awareness?.status).toBe("synced")
+    // With discriminated union, lastKnownVersion is guaranteed when awareness === "synced"
+    if (awareness?.status === "synced") {
       expect(awareness.lastKnownVersion).toBeDefined()
     }
   })
@@ -75,9 +74,8 @@ describe("handle-sync-response", () => {
     const initialModel = createModelWithChannel(channel)
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -115,7 +113,7 @@ describe("handle-sync-response", () => {
     // It's updated after import via cmd/import-doc-data -> synchronizer/doc-imported
     // This is intentional to prevent echo loops
     const peerState = newModel.peers.get(peerId)
-    const awareness = peerState?.documentAwareness.get(docId)
+    const awareness = peerState?.docSyncStates.get(docId)
     expect(awareness).toBeUndefined()
 
     // Should return cmd/import-doc-data (no longer batched with broadcast-ephemeral)
@@ -138,9 +136,8 @@ describe("handle-sync-response", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -166,8 +163,8 @@ describe("handle-sync-response", () => {
 
     // Should update peer awareness to no-doc
     const peerState = newModel.peers.get(peerId)
-    const awareness = peerState?.documentAwareness.get(docId)
-    expect(awareness?.awareness).toBe("no-doc")
+    const awareness = peerState?.docSyncStates.get(docId)
+    expect(awareness?.status).toBe("absent")
   })
 
   it("should reject from non-established channel (no doc)", () => {
@@ -233,9 +230,8 @@ describe("handle-sync-response", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -271,7 +267,7 @@ describe("handle-sync-response", () => {
     // Peer awareness should NOT be updated in the handler
     // It will be updated after import via synchronizer/doc-imported
     const peerState = newModel.peers.get(peerId)
-    const awareness = peerState?.documentAwareness.get(docId)
+    const awareness = peerState?.docSyncStates.get(docId)
     expect(awareness).toBeUndefined()
 
     // Should return cmd/import-doc-data (no longer batched with broadcast-ephemeral)
@@ -300,9 +296,8 @@ describe("handle-sync-response", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -379,9 +374,8 @@ describe("handle-sync-response", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

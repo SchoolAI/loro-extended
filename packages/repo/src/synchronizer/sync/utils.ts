@@ -26,7 +26,7 @@ export function applySyncTransmission(
       setPeerDocumentAwareness(
         peerState,
         message.docId,
-        "has-doc",
+        "synced",
         message.transmission.version,
       )
 
@@ -86,7 +86,7 @@ export function applySyncTransmission(
       // - Particularly important for storage adapters that request before persisting
 
       // Update peer awareness - peer explicitly doesn't have this doc
-      setPeerDocumentAwareness(peerState, message.docId, "no-doc")
+      setPeerDocumentAwareness(peerState, message.docId, "absent")
       break
     }
   }

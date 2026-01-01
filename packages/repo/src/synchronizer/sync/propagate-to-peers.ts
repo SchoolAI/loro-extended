@@ -19,7 +19,7 @@
  *    - Peer can then decide whether to request the document
  *    - Respects peer autonomy (no forced sync)
  *
- * 3. **If peer awareness is "no-doc"**:
+ * 3. **If peer awareness is "absent"**:
  *    - Send nothing (peer explicitly doesn't have/want this doc)
  *
  * @see docs/discovery-and-sync-architecture.md - Pattern 2: Local Document Changes
@@ -148,7 +148,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
   const commands: Command[] = []
 
   const peerState = model.peers.get(channel.peerId)
-  const peerAwareness = peerState?.documentAwareness.get(docId)
+  const peerAwareness = peerState?.docSyncStates.get(docId)
   const isSubscribed = peerState?.subscriptions.has(docId)
 
   // Check if we're allowed to reveal this document to this channel
@@ -180,7 +180,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     channelId: channel.channelId,
     peerId: channel.peerId,
     isSubscribed,
-    awareness: peerAwareness?.awareness,
+    awareness: peerAwareness?.status,
     hasPeerState: !!peerState,
   })
 
@@ -190,10 +190,10 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     // CASE 1: Peer has explicitly requested this document
 
     // Check if peer needs this update
-    // If peer has "no-doc" awareness but is subscribed, they want it but don't have it.
+    // If peer has "absent" awareness but is subscribed, they want it but don't have it.
     // We should send a snapshot.
     let shouldSync = false
-    if (peerAwareness?.awareness === "no-doc") {
+    if (peerAwareness?.status === "absent") {
       shouldSync = true
     } else {
       shouldSync = shouldSyncWithPeer(docState, peerAwareness)
@@ -201,9 +201,9 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
 
     if (shouldSync) {
       // Export update specifically for this peer based on their version
-      // With discriminated union, lastKnownVersion only exists when awareness === "has-doc"
+      // With discriminated union, lastKnownVersion only exists when awareness === "synced"
       const theirVersion =
-        peerAwareness?.awareness === "has-doc"
+        peerAwareness?.status === "synced"
           ? peerAwareness.lastKnownVersion
           : undefined
 
@@ -213,7 +213,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
       if (
         !theirVersion ||
         theirVersion.length() === 0 ||
-        peerAwareness?.awareness === "no-doc"
+        peerAwareness?.status === "absent"
       ) {
         // Peer has no version or explicitly no doc - send snapshot
         const data = docState.doc.export({ mode: "snapshot" })
@@ -252,7 +252,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
       })
 
       // Update peer's known version after sending
-      setPeerDocumentAwareness(peerState, docId, "has-doc", ourVersion)
+      setPeerDocumentAwareness(peerState, docId, "synced", ourVersion)
     } else {
       logger.debug(
         `${logPrefix}: skipping sync-response for {docId} to {channelId} - peer is up-to-date`,
@@ -261,7 +261,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
           docId,
           ourVersion: ourVersion.toJSON(),
           theirVersion:
-            peerAwareness?.awareness === "has-doc"
+            peerAwareness?.status === "synced"
               ? peerAwareness.lastKnownVersion.toJSON()
               : undefined,
         },
@@ -269,9 +269,9 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
     }
   } else if (
     !peerAwareness ||
-    peerAwareness.awareness === "unknown" ||
-    peerAwareness.awareness === "has-doc-unknown-version" ||
-    (peerAwareness.awareness === "has-doc" &&
+    peerAwareness.status === "unknown" ||
+    peerAwareness.status === "pending" ||
+    (peerAwareness.status === "synced" &&
       shouldSyncWithPeer(docState, peerAwareness))
   ) {
     // CASE 2: Peer doesn't know about this document yet OR they have it but are behind
@@ -281,7 +281,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
       {
         channelId: channel.channelId,
         docId,
-        reason: !peerAwareness ? "no-awareness" : peerAwareness.awareness,
+        reason: !peerAwareness ? "no-awareness" : peerAwareness.status,
         shouldSync: peerAwareness
           ? shouldSyncWithPeer(docState, peerAwareness)
           : "N/A",
@@ -299,7 +299,7 @@ function propagateToPeer(options: PropagateToSinglePeerOptions): Command[] {
       },
     })
   }
-  // CASE 3: peerAwareness === "no-doc"
+  // CASE 3: peerAwareness === "absent"
   // Peer explicitly doesn't have this document - send nothing
 
   return commands

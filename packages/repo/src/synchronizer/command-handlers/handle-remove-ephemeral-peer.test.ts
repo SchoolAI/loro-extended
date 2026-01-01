@@ -64,9 +64,8 @@ describe("handleRemoveEphemeralPeer", () => {
     ctx.model.channels.set(channel.channelId, channel)
     ctx.model.peers.set(peerId, {
       identity: { peerId, name: "other", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(["doc-1"]),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -220,9 +219,8 @@ describe("handleRemoveEphemeralPeer", () => {
     ctx.model.channels.set(channel.channelId, channel)
     ctx.model.peers.set(peerId, {
       identity: { peerId, name: "other", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(["doc-1"]),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

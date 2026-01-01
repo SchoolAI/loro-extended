@@ -46,9 +46,8 @@ describe("handle-channel-removed", () => {
     // Add peer state with this channel
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

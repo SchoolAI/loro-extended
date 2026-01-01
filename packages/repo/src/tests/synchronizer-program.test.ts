@@ -83,9 +83,8 @@ describe("Synchronizer Program - Integration Tests", () => {
       const initialModel = createModelWithChannel(channel)
       initialModel.peers.set(peerId, {
         identity: { peerId, name: "test-peer", type: "user" },
-        documentAwareness: new Map(),
+        docSyncStates: new Map(),
         subscriptions: new Set(),
-        lastSeen: new Date(),
         channels: new Set([channel.channelId]),
       })
 
@@ -217,9 +216,8 @@ describe("Synchronizer Program - Integration Tests", () => {
       // Add peer state with subscription
       initialModel.peers.set(peerId, {
         identity: { peerId, name: "test-peer", type: "user" },
-        documentAwareness: new Map(),
+        docSyncStates: new Map(),
         subscriptions: new Set([docId]),
-        lastSeen: new Date(),
         channels: new Set([channel.channelId]),
       })
 
@@ -246,11 +244,11 @@ describe("Synchronizer Program - Integration Tests", () => {
 
       // Verify peer awareness was updated correctly
       const peerState = newModel.peers.get(peerId)
-      const awareness = peerState?.documentAwareness.get(docId)
+      const awareness = peerState?.docSyncStates.get(docId)
 
-      expect(awareness?.awareness).toBe("has-doc")
-      // With discriminated union, lastKnownVersion is guaranteed when awareness === "has-doc"
-      if (awareness?.awareness === "has-doc") {
+      expect(awareness?.status).toBe("synced")
+      // With discriminated union, lastKnownVersion is guaranteed when awareness === "synced"
+      if (awareness?.status === "synced") {
         expect(awareness.lastKnownVersion).toBeDefined()
       }
     })

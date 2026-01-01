@@ -26,47 +26,31 @@ export type ReadyStateChannelMeta = ChannelMeta & {
   state: "established" | "connected"
 }
 
-type ReadyStateBase = {
+export type ReadyState = {
   docId: DocId
   identity: PeerIdentityDetails
-}
-
-type ReadyStateAware = ReadyStateBase & {
-  state: "aware"
   channels: ReadyStateChannelMeta[]
+  status: "pending" | "synced" | "absent"
 }
-
-type ReadyStateLoaded = ReadyStateBase & {
-  state: "loaded"
-  channels: ReadyStateChannelMeta[]
-}
-
-type ReadyStateAbsent = ReadyStateBase & {
-  state: "absent"
-  channels: ReadyStateChannelMeta[]
-}
-
-export type ReadyState = ReadyStateAware | ReadyStateLoaded | ReadyStateAbsent
 
 /**
  * Discriminated union for peer document awareness.
  * - "unknown": We don't know if the peer has this document
- * - "no-doc": Peer explicitly doesn't have this document
- * - "has-doc-unknown-version": Peer has this document but we don't know their version yet
+ * - "absent": Peer explicitly doesn't have this document
+ * - "pending": Peer has this document but we don't know their version yet
  *   (e.g., they announced via new-doc but we haven't synced yet)
- * - "has-doc": Peer has this document with a known version
+ * - "synced": Peer has this document with a known version
  */
-export type PeerDocumentAwareness =
-  | { awareness: "unknown"; lastUpdated: Date }
-  | { awareness: "no-doc"; lastUpdated: Date }
-  | { awareness: "has-doc-unknown-version"; lastUpdated: Date }
-  | { awareness: "has-doc"; lastKnownVersion: VersionVector; lastUpdated: Date }
+export type PeerDocSyncState =
+  | { status: "unknown"; lastUpdated: Date }
+  | { status: "absent"; lastUpdated: Date }
+  | { status: "pending"; lastUpdated: Date }
+  | { status: "synced"; lastKnownVersion: VersionVector; lastUpdated: Date }
 
 export type PeerState = {
   identity: PeerIdentityDetails
-  documentAwareness: Map<DocId, PeerDocumentAwareness>
+  docSyncStates: Map<DocId, PeerDocSyncState>
   subscriptions: Set<DocId>
-  lastSeen: Date
   channels: Set<ChannelId>
 }
 

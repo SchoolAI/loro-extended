@@ -16,7 +16,7 @@ import {
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "../synchronizer-program.js"
-import type { ChannelId, DocId, PeerDocumentAwareness } from "../types.js"
+import type { ChannelId, DocId, PeerDocSyncState } from "../types.js"
 import type { CommandContext } from "./command-executor.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -152,23 +152,23 @@ export function createModelWithKnownPeer(
   peerId: PeerID,
   docAwareness: Map<
     string,
-    { awareness: "has-doc" | "no-doc"; version?: any }
+    { awareness: "synced" | "absent"; version?: any }
   > = new Map(),
 ): SynchronizerModel {
   const model = createModelWithChannel(channel)
 
-  const documentAwareness = new Map<DocId, PeerDocumentAwareness>()
+  const documentAwareness = new Map<DocId, PeerDocSyncState>()
   for (const [docId, { awareness, version }] of docAwareness.entries()) {
     const lastUpdated = new Date()
-    if (awareness === "has-doc") {
+    if (awareness === "synced") {
       documentAwareness.set(docId, {
-        awareness: "has-doc",
+        status: "synced",
         lastKnownVersion: version,
         lastUpdated,
       })
     } else {
       documentAwareness.set(docId, {
-        awareness: "no-doc",
+        status: "absent",
         lastUpdated,
       })
     }
@@ -176,9 +176,8 @@ export function createModelWithKnownPeer(
 
   model.peers.set(peerId, {
     identity: { peerId, name: "known-peer", type: "user" },
-    documentAwareness,
+    docSyncStates: documentAwareness,
     subscriptions: new Set(),
-    lastSeen: new Date(Date.now() - 60000),
     channels: new Set(),
   })
 

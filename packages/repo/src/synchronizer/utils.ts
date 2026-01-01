@@ -47,8 +47,8 @@ export function filterAllowedDocs(
 
   for (const [docId, docState] of documents) {
     // Check if peer already has the document
-    const peerAwareness = peerState?.documentAwareness.get(docId)
-    const peerHasDoc = peerAwareness?.awareness === "has-doc"
+    const peerAwareness = peerState?.docSyncStates.get(docId)
+    const peerHasDoc = peerAwareness?.status === "synced"
 
     if (peerHasDoc) {
       // Peer already knows about it, so we allow it regardless of visibility
@@ -80,7 +80,7 @@ export function getChangedDocsToSync(
   const docsToSync: SyncRequestDoc[] = []
 
   for (const [docId, docState] of documents.entries()) {
-    const peerAwareness = peerState.documentAwareness.get(docId)
+    const peerAwareness = peerState.docSyncStates.get(docId)
 
     if (!peerAwareness) {
       // We have a new document created since last connection that
@@ -89,7 +89,7 @@ export function getChangedDocsToSync(
         docId,
         requesterDocVersion: docState.doc.version(),
       })
-    } else if (peerAwareness.awareness === "has-doc") {
+    } else if (peerAwareness.status === "synced") {
       // Peer had this document - check if our version is ahead
       if (shouldSyncWithPeer(docState, peerAwareness)) {
         docsToSync.push({
@@ -99,7 +99,7 @@ export function getChangedDocsToSync(
         })
       }
     } else {
-      // Skip if peerAwareness.awareness === "no-doc" (they don't have it)
+      // Skip if peerAwareness.awareness === "absent" (they don't have it)
     }
   }
 

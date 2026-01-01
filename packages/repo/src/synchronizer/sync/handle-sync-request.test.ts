@@ -32,9 +32,8 @@ describe("handle-sync-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -104,9 +103,8 @@ describe("handle-sync-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -155,9 +153,8 @@ describe("handle-sync-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -221,9 +218,8 @@ describe("handle-sync-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -300,16 +296,14 @@ describe("handle-sync-request", () => {
     // Add peer states - both subscribed to the doc
     initialModel.peers.set(peerId1, {
       identity: { peerId: peerId1, name: "peer-1", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set([docId]),
-      lastSeen: new Date(),
       channels: new Set([channel1.channelId]),
     })
     initialModel.peers.set(peerId2, {
       identity: { peerId: peerId2, name: "peer-2", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set([docId]),
-      lastSeen: new Date(),
       channels: new Set([channel2.channelId]),
     })
 
@@ -381,9 +375,8 @@ describe("handle-sync-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

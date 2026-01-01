@@ -89,9 +89,6 @@ export function handleChannelRemoved(
       // Remove this channel from peer's channel set
       peerState.channels.delete(channel.channelId)
 
-      // Update last seen timestamp
-      peerState.lastSeen = new Date()
-
       // If this was the last channel for this peer, we should remove their ephemeral data
       // This prevents "ghost" cursors/presence from lingering until timeout
       if (peerState.channels.size === 0) {
@@ -102,7 +99,7 @@ export function handleChannelRemoved(
       }
 
       // Track which documents may be affected by this channel removal
-      for (const docId of peerState.documentAwareness.keys()) {
+      for (const docId of peerState.docSyncStates.keys()) {
         affectedDocIds.add(docId)
       }
 

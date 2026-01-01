@@ -29,9 +29,8 @@ describe("handle-directory-request", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

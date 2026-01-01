@@ -29,9 +29,8 @@ describe("handle-new-doc", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -52,15 +51,11 @@ describe("handle-new-doc", () => {
     expect(newModel.documents.has("doc-1")).toBe(true)
     expect(newModel.documents.has("doc-2")).toBe(true)
 
-    // Peer awareness should be updated to "has-doc-unknown-version"
+    // Peer awareness should be updated to "pending"
     // (we know they have it, but we don't know their version yet - we'll learn it when we sync)
     const peerState = newModel.peers.get(peerId)
-    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe(
-      "has-doc-unknown-version",
-    )
-    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe(
-      "has-doc-unknown-version",
-    )
+    expect(peerState?.docSyncStates.get("doc-1")?.status).toBe("pending")
+    expect(peerState?.docSyncStates.get("doc-2")?.status).toBe("pending")
   })
 
   it("should update peer awareness", () => {
@@ -71,9 +66,8 @@ describe("handle-new-doc", () => {
     // Add peer state with no document awareness
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -90,18 +84,14 @@ describe("handle-new-doc", () => {
 
     const [newModel, _command] = update(message, initialModel)
 
-    // Peer awareness should be updated to "has-doc-unknown-version"
+    // Peer awareness should be updated to "pending"
     const peerState = newModel.peers.get(peerId)
     expect(peerState).toBeDefined()
-    expect(peerState?.documentAwareness.get("doc-1")?.awareness).toBe(
-      "has-doc-unknown-version",
+    expect(peerState?.docSyncStates.get("doc-1")?.status).toBe("pending")
+    expect(peerState?.docSyncStates.get("doc-2")?.status).toBe("pending")
+    expect(peerState?.docSyncStates.get("doc-1")?.lastUpdated).toBeInstanceOf(
+      Date,
     )
-    expect(peerState?.documentAwareness.get("doc-2")?.awareness).toBe(
-      "has-doc-unknown-version",
-    )
-    expect(
-      peerState?.documentAwareness.get("doc-1")?.lastUpdated,
-    ).toBeInstanceOf(Date)
   })
 
   it("should reject from non-established channel", () => {
@@ -132,9 +122,8 @@ describe("handle-new-doc", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 
@@ -155,14 +144,10 @@ describe("handle-new-doc", () => {
 
     const [newModel, _command] = update(message, initialModel)
 
-    // Both documents should have peer awareness (has-doc-unknown-version)
+    // Both documents should have peer awareness (pending)
     const peerState = newModel.peers.get(peerId)
-    expect(peerState?.documentAwareness.get("existing-doc")?.awareness).toBe(
-      "has-doc-unknown-version",
-    )
-    expect(peerState?.documentAwareness.get("new-doc")?.awareness).toBe(
-      "has-doc-unknown-version",
-    )
+    expect(peerState?.docSyncStates.get("existing-doc")?.status).toBe("pending")
+    expect(peerState?.docSyncStates.get("new-doc")?.status).toBe("pending")
 
     // New document should be created
     expect(newModel.documents.has("new-doc")).toBe(true)
@@ -176,9 +161,8 @@ describe("handle-new-doc", () => {
     // Add peer state
     initialModel.peers.set(peerId, {
       identity: { peerId, name: "test-peer", type: "user" },
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set([channel.channelId]),
     })
 

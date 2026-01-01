@@ -96,7 +96,7 @@ export function handleDirectoryResponse(
     // Note: Subscription NOT set yet - they haven't requested from us
     // That will be set when they send sync-request
     // We don't know their actual version yet - we'll learn it when we sync
-    setPeerDocumentAwareness(peerState, docId, "has-doc-unknown-version")
+    setPeerDocumentAwareness(peerState, docId, "pending")
 
     // Since peer has the doc, send our ephemeral state
     commands.push({
@@ -109,7 +109,7 @@ export function handleDirectoryResponse(
     logger.debug("directory-response: updated peer awareness", {
       peerId: channel.peerId,
       docId,
-      awareness: "has-doc-unknown-version",
+      awareness: "pending",
     })
 
     // Add sync-request to actually load the document data

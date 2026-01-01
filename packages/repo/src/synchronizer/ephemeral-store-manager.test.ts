@@ -258,7 +258,7 @@ describe("EphemeralStoreManager", () => {
       const store = manager.get("doc-1", "presence")
       expect(store).toBeDefined()
       const states = store?.getAllStates()
-      expect(states["2"]).toBeUndefined() // Data is keyed by the source store's internal ID
+      expect(states?.["2"]).toBeUndefined() // Data is keyed by the source store's internal ID
     })
 
     it("should create store if it does not exist", () => {

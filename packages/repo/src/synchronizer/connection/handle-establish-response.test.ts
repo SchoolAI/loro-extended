@@ -94,7 +94,7 @@ describe("handle-establish-response", () => {
         channel,
         "known-peer" as PeerID,
         new Map([
-          ["doc-1", { awareness: "has-doc", version: createVersionVector() }],
+          ["doc-1", { awareness: "synced", version: createVersionVector() }],
         ]),
       )
       model.documents.set("doc-1", createDocState({ docId: "doc-1" }))
@@ -124,7 +124,7 @@ describe("handle-establish-response", () => {
       const model = createModelWithKnownPeer(
         channel,
         "known-peer" as PeerID,
-        new Map([["doc-1", { awareness: "has-doc", version: oldVersion }]]),
+        new Map([["doc-1", { awareness: "synced", version: oldVersion }]]),
       )
       model.documents.set("doc-1", doc)
 
@@ -152,7 +152,7 @@ describe("handle-establish-response", () => {
       const model = createModelWithKnownPeer(
         channel,
         "known-peer" as PeerID,
-        new Map([["doc-1", { awareness: "has-doc", version: currentVersion }]]),
+        new Map([["doc-1", { awareness: "synced", version: currentVersion }]]),
       )
       model.documents.set("doc-1", doc)
 
@@ -172,7 +172,7 @@ describe("handle-establish-response", () => {
       const model = createModelWithKnownPeer(
         channel,
         "known-peer" as PeerID,
-        new Map([["doc-1", { awareness: "no-doc" }]]),
+        new Map([["doc-1", { awareness: "absent" }]]),
       )
       model.documents.set("doc-1", createDocState({ docId: "doc-1" }))
 
@@ -207,8 +207,8 @@ describe("handle-establish-response", () => {
         channel,
         "known-peer" as PeerID,
         new Map([
-          ["doc-1", { awareness: "has-doc", version: doc1Version }],
-          ["doc-2", { awareness: "has-doc", version: doc2OldVersion }],
+          ["doc-1", { awareness: "synced", version: doc1Version }],
+          ["doc-2", { awareness: "synced", version: doc2OldVersion }],
         ]),
       )
       model.documents.set("doc-1", doc1)

@@ -32,9 +32,8 @@ function createMockModelAccessor(
       name: "test-peer",
       type: "user",
     },
-    documentAwareness: new Map(),
+    docSyncStates: new Map(),
     subscriptions: new Set(),
-    lastSeen: new Date(),
     channels: new Set([1 as ChannelId]),
   }
 

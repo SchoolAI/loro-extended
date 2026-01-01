@@ -665,7 +665,8 @@ export class Handle<
   async waitForStorage(): Promise<Handle<D, E>> {
     return this.waitUntilReady(readyStates =>
       readyStates.some(
-        s => s.state === "loaded" && s.channels.some(c => c.kind === "storage"),
+        s =>
+          s.status === "synced" && s.channels.some(c => c.kind === "storage"),
       ),
     )
   }
@@ -680,7 +681,8 @@ export class Handle<
   async waitForNetwork(): Promise<Handle<D, E>> {
     return this.waitUntilReady(readyStates =>
       readyStates.some(
-        s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
+        s =>
+          s.status === "synced" && s.channels.some(c => c.kind === "network"),
       ),
     )
   }
@@ -767,7 +769,7 @@ export class Handle<
 
         // Accept both "loaded" (has data) and "absent" (confirmed no data)
         // "aware" means we know they exist but haven't completed sync yet
-        return s.state === "loaded" || s.state === "absent"
+        return s.status === "synced" || s.status === "absent"
       })
   }
 }

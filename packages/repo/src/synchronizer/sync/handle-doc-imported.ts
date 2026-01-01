@@ -67,7 +67,7 @@ export function handleDocImported(
   // everything we have (since we just imported their data)
   const sourcePeerState = model.peers.get(fromPeerId)
   if (sourcePeerState) {
-    setPeerDocumentAwareness(sourcePeerState, docId, "has-doc", ourVersion)
+    setPeerDocumentAwareness(sourcePeerState, docId, "synced", ourVersion)
     logger.trace(
       "doc-imported: updated peer awareness for {peerId} to our version",
       {

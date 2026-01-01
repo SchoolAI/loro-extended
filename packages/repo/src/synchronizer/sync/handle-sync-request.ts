@@ -104,11 +104,11 @@ export function handleSyncRequest(
   // This ensures that if we get the document later, we know to send it to them
   addPeerSubscription(peerState, docId)
 
-  // Set awareness to "has-doc-unknown-version" (maps to "aware" state)
+  // Set awareness to "pending" (maps to "aware" state)
   // We know the peer is interested in this doc, but we don't know if they have data
   // to give us yet. The requesterDocVersion is what they HAVE, not what they're offering.
-  // We'll upgrade to "has-doc" when we receive their sync-response.
-  setPeerDocumentAwareness(peerState, docId, "has-doc-unknown-version")
+  // We'll upgrade to "synced" when we receive their sync-response.
+  setPeerDocumentAwareness(peerState, docId, "pending")
 
   let docState = model.documents.get(docId)
 
@@ -117,7 +117,7 @@ export function handleSyncRequest(
     {
       peerId: channel.peerId,
       docId,
-      awareness: "has-doc-unknown-version",
+      awareness: "pending",
     },
   )
 

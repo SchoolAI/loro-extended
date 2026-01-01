@@ -192,11 +192,11 @@ describe("Synchronizer - Echo Prevention", () => {
     // The peer awareness should be updated to our current version (after import)
     // NOT the version the peer sent (which might be different if we had local changes)
     const peerState = synchronizer.model.peers.get("3" as PeerID)
-    const peerAwareness = peerState?.documentAwareness.get(docId)
+    const peerAwareness = peerState?.docSyncStates.get(docId)
 
     // The key check: our version compared to peer awareness should be 0 (equal)
     // If it's 1 (we're ahead), that would trigger an echo
-    if (!peerAwareness || peerAwareness.awareness !== "has-doc") {
+    if (!peerAwareness || peerAwareness.status !== "synced") {
       throw new Error("Peer awareness should be 'has-doc'")
     }
     const peerAwarenessVersion = peerAwareness.lastKnownVersion

@@ -147,7 +147,7 @@ describe("Synchronizer - Event Emission", () => {
 
     // Start waiting for ready state
     const waitPromise = synchronizer.waitUntilReady(docId, readyStates =>
-      readyStates.some(state => state.state === "loaded"),
+      readyStates.some(state => state.status === "synced"),
     )
 
     // Simulate sync response that satisfies the predicate
@@ -189,7 +189,7 @@ describe("Synchronizer - Event Emission", () => {
     expect(deleteEvent?.readyStates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          state: "absent",
+          status: "absent",
           docId,
         }),
       ]),
@@ -276,7 +276,7 @@ describe("Synchronizer - Event Emission", () => {
       rs => rs.identity.peerId === peerId,
     )
     // After disconnect, peer may still exist but with no channels
-    if (peerAfterDisconnect && peerAfterDisconnect.state !== "absent") {
+    if (peerAfterDisconnect && peerAfterDisconnect.status !== "absent") {
       expect(peerAfterDisconnect.channels).toHaveLength(0)
     }
   })
@@ -309,11 +309,11 @@ describe("Synchronizer - Event Emission", () => {
 
     // Should have emitted ready-state-changed
     expect(createEvent).toBeDefined()
-    // Our state should be "aware" (empty document)
+    // Our state should be "pending" (empty document)
     const ourState = createEvent?.readyStates.find(
       rs => rs.identity.peerId === synchronizer.identity.peerId,
     )
-    expect(ourState?.state).toBe("aware")
+    expect(ourState?.status).toBe("pending")
   })
 
   it("should emit ready-state-changed when document transitions from aware to loaded", async () => {
@@ -331,7 +331,7 @@ describe("Synchronizer - Event Emission", () => {
     let ourState = readyStates.find(
       rs => rs.identity.peerId === synchronizer.identity.peerId,
     )
-    expect(ourState?.state).toBe("aware")
+    expect(ourState?.status).toBe("pending")
 
     // Set up promise to wait for the event BEFORE making changes
     const eventPromise = new Promise<{ docId: string; readyStates: any[] }>(
@@ -339,7 +339,7 @@ describe("Synchronizer - Event Emission", () => {
         synchronizer.emitter.on("ready-state-changed", event => {
           if (
             event.docId === docId &&
-            event.readyStates.some(rs => rs.state === "loaded")
+            event.readyStates.some(rs => rs.status === "synced")
           ) {
             resolve(event)
           }
@@ -367,14 +367,14 @@ describe("Synchronizer - Event Emission", () => {
     ourState = loadedEvent?.readyStates.find(
       rs => rs.identity.peerId === synchronizer.identity.peerId,
     )
-    expect(ourState?.state).toBe("loaded")
+    expect(ourState?.status).toBe("synced")
 
     // Verify via getReadyStates as well
     readyStates = synchronizer.getReadyStates(docId)
     ourState = readyStates.find(
       rs => rs.identity.peerId === synchronizer.identity.peerId,
     )
-    expect(ourState?.state).toBe("loaded")
+    expect(ourState?.status).toBe("synced")
   })
 
   it("should NOT emit ready-state-changed when state has not changed", async () => {

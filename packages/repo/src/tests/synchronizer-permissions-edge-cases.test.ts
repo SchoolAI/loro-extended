@@ -44,18 +44,17 @@ describe("Synchronizer Permissions Edge Cases", () => {
 
     repoA.synchronizer.model.peers.set(peerIdB, {
       identity: { peerId: peerIdB, name: "repoB", type: "user" },
-      documentAwareness: new Map([
+      docSyncStates: new Map([
         [
           docId,
           {
-            awareness: "has-doc",
+            status: "synced",
             lastKnownVersion: createVersionVector(),
             lastUpdated: new Date(),
           },
         ],
       ]),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set(),
     })
 

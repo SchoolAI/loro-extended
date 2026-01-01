@@ -21,7 +21,7 @@ export function getReadyStates(
   const myDoc = model.documents.get(docId)
   if (!myDoc) {
     readyStates.push({
-      state: "absent",
+      status: "absent",
       docId,
       identity: { ...model.identity },
       channels: [], // Local repo has no channels
@@ -29,14 +29,14 @@ export function getReadyStates(
   } else {
     if (myDoc.doc.opCount() > 0) {
       readyStates.push({
-        state: "loaded",
+        status: "synced",
         docId,
         identity: { ...model.identity },
         channels: [],
       })
     } else {
       readyStates.push({
-        state: "aware",
+        status: "pending",
         docId,
         identity: { ...model.identity },
         channels: [],
@@ -48,16 +48,13 @@ export function getReadyStates(
    * 2. Include ready state of document in all other repos (peers)
    */
   for (const peer of model.peers.values()) {
-    const awareness = peer.documentAwareness.get(docId)
+    const awareness = peer.docSyncStates.get(docId)
 
-    if (!awareness || awareness.awareness === "unknown") {
+    if (!awareness || awareness.status === "unknown") {
       continue
     }
 
-    if (
-      awareness.awareness === "has-doc" ||
-      awareness.awareness === "has-doc-unknown-version"
-    ) {
+    if (awareness.status === "synced" || awareness.status === "pending") {
       const channels: ReadyStateChannelMeta[] = []
 
       for (const channelId of peer.channels) {
@@ -71,17 +68,16 @@ export function getReadyStates(
         })
       }
 
-      // "has-doc" means we know their version (loaded)
-      // "has-doc-unknown-version" means they have it but we don't know their version yet (aware)
-      const state =
-        awareness.awareness === "has-doc-unknown-version" ? "aware" : "loaded"
+      // "synced" means we know their version (loaded)
+      // "pending" means they have it but we don't know their version yet (aware)
+      const status = awareness.status === "pending" ? "pending" : "synced"
       readyStates.push({
-        state,
+        status,
         docId,
         identity: { ...peer.identity },
         channels,
       })
-    } else if (awareness.awareness === "no-doc") {
+    } else if (awareness.status === "absent") {
       // Build channels list for absent state too
       const channels: ReadyStateChannelMeta[] = []
       for (const channelId of peer.channels) {
@@ -96,7 +92,7 @@ export function getReadyStates(
       }
 
       readyStates.push({
-        state: "absent",
+        status: "absent",
         docId,
         identity: { ...peer.identity },
         channels,

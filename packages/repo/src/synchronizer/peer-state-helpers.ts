@@ -5,7 +5,7 @@ import type {
   ChannelId,
   DocId,
   DocState,
-  PeerDocumentAwareness,
+  PeerDocSyncState,
   PeerID,
   PeerIdentityDetails,
   PeerState,
@@ -25,14 +25,11 @@ export function ensurePeerState(
   if (!peerState) {
     peerState = {
       identity,
-      documentAwareness: new Map(),
+      docSyncStates: new Map(),
       subscriptions: new Set(),
-      lastSeen: new Date(),
       channels: new Set(),
     }
     model.peers.set(peerId, peerState)
-  } else {
-    peerState.lastSeen = new Date()
   }
 
   // Track this channel for the peer
@@ -74,33 +71,33 @@ export function hasPeerSubscription(
 export function setPeerDocumentAwareness(
   peerState: PeerState,
   docId: DocId,
-  awareness: "unknown" | "no-doc" | "has-doc-unknown-version",
+  awareness: "unknown" | "absent" | "pending",
 ): void
 export function setPeerDocumentAwareness(
   peerState: PeerState,
   docId: DocId,
-  awareness: "has-doc",
+  awareness: "synced",
   version: VersionVector,
 ): void
 export function setPeerDocumentAwareness(
   peerState: PeerState,
   docId: DocId,
-  awareness: "unknown" | "has-doc" | "no-doc" | "has-doc-unknown-version",
+  awareness: "unknown" | "synced" | "absent" | "pending",
   version?: VersionVector,
 ): void {
   const lastUpdated = new Date()
-  if (awareness === "has-doc") {
+  if (awareness === "synced") {
     if (!version) {
       throw new Error("version is required when awareness is 'has-doc'")
     }
-    peerState.documentAwareness.set(docId, {
-      awareness,
+    peerState.docSyncStates.set(docId, {
+      status: awareness,
       lastKnownVersion: version,
       lastUpdated,
     })
   } else {
-    peerState.documentAwareness.set(docId, {
-      awareness,
+    peerState.docSyncStates.set(docId, {
+      status: awareness,
       lastUpdated,
     })
   }
@@ -148,7 +145,7 @@ export function getChannelsForPeer(
  * Get all peers that have a document
  *
  * This utility function returns all peers that have explicitly indicated they
- * have a copy of the specified document (awareness === "has-doc" or "has-doc-unknown-version").
+ * have a copy of the specified document (awareness === "synced" or "pending").
  *
  * ## Use Cases
  *
@@ -173,11 +170,8 @@ export function getPeersWithDocument(
   docId: DocId,
 ): PeerState[] {
   return Array.from(model.peers.values()).filter(peer => {
-    const awareness = peer.documentAwareness.get(docId)
-    return (
-      awareness?.awareness === "has-doc" ||
-      awareness?.awareness === "has-doc-unknown-version"
-    )
+    const awareness = peer.docSyncStates.get(docId)
+    return awareness?.status === "synced" || awareness?.status === "pending"
   })
 }
 
@@ -186,14 +180,14 @@ export function getPeersWithDocument(
  */
 export function shouldSyncWithPeer(
   docState: DocState,
-  peerAwareness: PeerDocumentAwareness | undefined,
+  peerAwareness: PeerDocSyncState | undefined,
 ): boolean {
   if (!peerAwareness) return true // Unknown, should sync
-  if (peerAwareness.awareness === "unknown") return true // Unknown, should sync
-  if (peerAwareness.awareness === "no-doc") return false // They don't have it
-  if (peerAwareness.awareness === "has-doc-unknown-version") return true // They have it but we don't know their version, should sync
+  if (peerAwareness.status === "unknown") return true // Unknown, should sync
+  if (peerAwareness.status === "absent") return false // They don't have it
+  if (peerAwareness.status === "pending") return true // They have it but we don't know their version, should sync
 
-  // TypeScript now knows peerAwareness.awareness === "has-doc"
+  // TypeScript now knows peerAwareness.awareness === "synced"
   // so lastKnownVersion is guaranteed to exist
   const ourVersion = docState.doc.version()
   const theirVersion = peerAwareness.lastKnownVersion
