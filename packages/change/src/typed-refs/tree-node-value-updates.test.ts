@@ -25,20 +25,21 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       // Create a node with initial data
-      let nodeId: string
+      let nodeId: string | undefined
       change(doc, draft => {
         const node = draft.states.createNode({ name: "initial", value: 100 })
         nodeId = node.id
       })
+      if (!nodeId) throw new Error("nodeId should be defined")
 
       // Read the node data outside of change()
-      const node = doc.states.getNodeByID(nodeId!)
+      const node = doc.states.getNodeByID(nodeId)
       expect(node?.data.name).toBe("initial")
       expect(node?.data.value).toBe(100)
 
       // Update the node data in a new change()
       change(doc, draft => {
-        const draftNode = draft.states.getNodeByID(nodeId!)
+        const draftNode = draft.states.getNodeByID(nodeId)
         if (draftNode) {
           draftNode.data.name = "updated"
           draftNode.data.value = 999
@@ -62,18 +63,19 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const doc = createTypedDoc(Schema)
 
-      let nodeId: string
+      let nodeId: string | undefined
       change(doc, draft => {
         const node = draft.tree.createNode({ count: 0 })
         nodeId = node.id
       })
+      if (!nodeId) throw new Error("nodeId should be defined")
 
-      const node = doc.tree.getNodeByID(nodeId!)
+      const node = doc.tree.getNodeByID(nodeId)
 
       // Multiple updates
       for (let i = 1; i <= 5; i++) {
         change(doc, draft => {
-          const draftNode = draft.tree.getNodeByID(nodeId!)
+          const draftNode = draft.tree.getNodeByID(nodeId)
           if (draftNode) {
             draftNode.data.count = i
           }
@@ -93,17 +95,18 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const doc = createTypedDoc(Schema)
 
-      let nodeId: string
+      let nodeId: string | undefined
       change(doc, draft => {
         const node = draft.nodes.createNode({ active: true })
         nodeId = node.id
       })
+      if (!nodeId) throw new Error("nodeId should be defined")
 
-      const node = doc.nodes.getNodeByID(nodeId!)
+      const node = doc.nodes.getNodeByID(nodeId)
       expect(node?.data.active).toBe(true)
 
       change(doc, draft => {
-        const draftNode = draft.nodes.getNodeByID(nodeId!)
+        const draftNode = draft.nodes.getNodeByID(nodeId)
         if (draftNode) {
           draftNode.data.active = false
         }
@@ -126,20 +129,21 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const doc = createTypedDoc(Schema)
 
-      let nodeId: string
+      let nodeId: string | undefined
       change(doc, draft => {
         const node = draft.states.createNode({ name: "state1", facts: {} })
         node.data.facts.set("key1", "value1")
         nodeId = node.id
       })
+      if (!nodeId) throw new Error("nodeId should be defined")
 
-      const node = doc.states.getNodeByID(nodeId!)
+      const node = doc.states.getNodeByID(nodeId)
       expect(node?.data.name).toBe("state1")
       expect(node?.data.facts.get("key1")).toBe("value1")
 
       // Update both the plain value and the record
       change(doc, draft => {
-        const draftNode = draft.states.getNodeByID(nodeId!)
+        const draftNode = draft.states.getNodeByID(nodeId)
         if (draftNode) {
           draftNode.data.name = "state2"
           draftNode.data.facts.set("key1", "updated")
@@ -167,24 +171,26 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const doc = createTypedDoc(Schema)
 
-      let parentId: string
-      let childId: string
+      let parentId: string | undefined
+      let childId: string | undefined
       change(doc, draft => {
         const parent = draft.tree.createNode({ label: "parent" })
         const child = parent.createNode({ label: "child" })
         parentId = parent.id
         childId = child.id
       })
+      if (!parentId) throw new Error("parentId should be defined")
+      if (!childId) throw new Error("childId should be defined")
 
-      const parent = doc.tree.getNodeByID(parentId!)
-      const child = doc.tree.getNodeByID(childId!)
+      const parent = doc.tree.getNodeByID(parentId)
+      const child = doc.tree.getNodeByID(childId)
       expect(parent?.data.label).toBe("parent")
       expect(child?.data.label).toBe("child")
 
       // Update both nodes
       change(doc, draft => {
-        const draftParent = draft.tree.getNodeByID(parentId!)
-        const draftChild = draft.tree.getNodeByID(childId!)
+        const draftParent = draft.tree.getNodeByID(parentId)
+        const draftChild = draft.tree.getNodeByID(childId)
         if (draftParent) draftParent.data.label = "parent-updated"
         if (draftChild) draftChild.data.label = "child-updated"
       })
