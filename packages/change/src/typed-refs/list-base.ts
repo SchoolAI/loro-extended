@@ -152,12 +152,6 @@ export abstract class ListRefBase<
 
   // Get item for return values - returns MutableItem that can be mutated
   protected getMutableItem(index: number): any {
-    // Check if we already have a cached item for this index
-    let cachedItem = this.itemCache.get(index)
-    if (cachedItem) {
-      return cachedItem
-    }
-
     // Get the raw container item
     const containerItem = this.container.get(index)
     if (containerItem === undefined) {
@@ -165,6 +159,24 @@ export abstract class ListRefBase<
     }
 
     if (isValueShape(this.shape.shape)) {
+      // When autoCommit is true (direct access outside of change()), ALWAYS read fresh
+      // from container (NEVER cache). This ensures we always get the latest value
+      // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
+      //
+      // When autoCommit is false (inside change()), we cache value shapes so that
+      // mutations to found/filtered items persist back to the CRDT via absorbPlainValues()
+      if (this.autoCommit) {
+        return containerItem as MutableItem
+      }
+
+      // In batched mode (within change()), we need to cache value shapes
+      // so that mutations to found/filtered items persist back to the CRDT
+      // via absorbPlainValues() at the end of change()
+      let cachedItem = this.itemCache.get(index)
+      if (cachedItem) {
+        return cachedItem
+      }
+
       // For value shapes, we need to ensure mutations persist
       // The key insight: we must return the SAME object for the same index
       // so that mutations to filtered/found items persist back to the cache
@@ -176,28 +188,27 @@ export abstract class ListRefBase<
         // For primitives, just use the value directly
         cachedItem = containerItem
       }
-      // Only cache primitive values if NOT readonly
-      if (!this.readonly) {
-        this.itemCache.set(index, cachedItem)
-      }
+      this.itemCache.set(index, cachedItem)
       return cachedItem as MutableItem
-    } else {
-      // For container shapes, create a proper typed ref using the new pattern
+    }
+
+    // Container shapes: safe to cache (handles)
+    let cachedItem = this.itemCache.get(index)
+    if (!cachedItem) {
       cachedItem = createContainerTypedRef(
         this.getTypedRefParams(index, this.shape.shape as ContainerShape),
       )
-      // Cache container refs
       this.itemCache.set(index, cachedItem)
-
-      if (this.readonly) {
-        return unwrapReadonlyPrimitive(
-          cachedItem,
-          this.shape.shape as ContainerShape,
-        )
-      }
-
-      return cachedItem as MutableItem
     }
+
+    if (this.readonly) {
+      return unwrapReadonlyPrimitive(
+        cachedItem,
+        this.shape.shape as ContainerShape,
+      )
+    }
+
+    return cachedItem as MutableItem
   }
 
   // Array-like methods for better developer experience

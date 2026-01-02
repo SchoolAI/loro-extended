@@ -7,7 +7,7 @@ import type {
   ValueShape,
 } from "../shape.js"
 import type { Infer } from "../types.js"
-import { isContainerShape, isValueShape } from "../utils/type-guards.js"
+import { isValueShape } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
 import {
   absorbCachedPlainValues,
@@ -76,17 +76,38 @@ export class StructRef<
     key: string,
     shape: Shape,
   ): any {
-    let ref = this.propertyCache.get(key)
-    if (!ref) {
-      if (isContainerShape(shape)) {
-        ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
-        // We cache container refs even in readonly mode because they are just handles
-        this.propertyCache.set(key, ref)
-      } else {
-        // For value shapes, first try to get the value from the container
+    if (isValueShape(shape)) {
+      // When autoCommit is true (direct access outside of change()), ALWAYS read fresh
+      // from container (NEVER cache). This ensures we always get the latest value
+      // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
+      //
+      // When autoCommit is false (inside change()), we cache value shapes so that
+      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
+      if (this.autoCommit) {
         const containerValue = this.container.get(key)
         if (containerValue !== undefined) {
-          ref = containerValue as Value
+          return containerValue
+        }
+        // Only fall back to placeholder if the container doesn't have the value
+        const placeholder = (this.placeholder as any)?.[key]
+        if (placeholder === undefined) {
+          throw new Error("placeholder required")
+        }
+        return placeholder
+      }
+
+      // In batched mode (within change()), we cache value shapes so that
+      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
+      let ref = this.propertyCache.get(key)
+      if (!ref) {
+        const containerValue = this.container.get(key)
+        if (containerValue !== undefined) {
+          // For objects, create a deep copy so mutations can be tracked
+          if (typeof containerValue === "object" && containerValue !== null) {
+            ref = JSON.parse(JSON.stringify(containerValue))
+          } else {
+            ref = containerValue as Value
+          }
         } else {
           // Only fall back to placeholder if the container doesn't have the value
           const placeholder = (this.placeholder as any)?.[key]
@@ -95,17 +116,20 @@ export class StructRef<
           }
           ref = placeholder as Value
         }
-
-        // In readonly mode, we DO NOT cache primitive values.
-        // This ensures we always get the latest value from the CRDT on next access.
-        if (!this.readonly) {
-          this.propertyCache.set(key, ref)
-        }
+        this.propertyCache.set(key, ref)
       }
-      if (ref === undefined) throw new Error("no container made")
+      return ref
     }
 
-    if (this.readonly && isContainerShape(shape)) {
+    // Container shapes: safe to cache (handles)
+    let ref = this.propertyCache.get(key)
+    if (!ref) {
+      ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
+      // We cache container refs even in readonly mode because they are just handles
+      this.propertyCache.set(key, ref)
+    }
+
+    if (this.readonly) {
       // In readonly mode, if the container doesn't exist, return the placeholder
       // This ensures we respect default values (e.g. counter: 1)
       const existing = this.container.get(key)
