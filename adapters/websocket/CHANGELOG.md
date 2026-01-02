@@ -1,5 +1,31 @@
 # @loro-extended/adapter-websocket
 
+## 4.0.0
+
+### Minor Changes
+
+- 92112e1: Add ready signal and use real establish protocol
+
+  **Ready Signal**
+
+  - Server sends "ready" text frame after WebSocket setup completes
+  - Client waits for "ready" before creating channel and sending messages
+  - Fixes intermittent connection failures on page refresh caused by race condition
+
+  **Real Establish Protocol**
+
+  - Remove `simulateHandshake()` which injected fake protocol messages
+  - Server and client now exchange real `establish-request`/`establish-response` messages
+  - Peer identities are properly exchanged over the wire (no more hardcoded "server" peerId)
+  - The Synchronizer's existing handlers process real protocol messages
+
+### Patch Changes
+
+- Updated dependencies [14b9193]
+- Updated dependencies [37cdd5e]
+- Updated dependencies [c3e5d1f]
+  - @loro-extended/repo@4.0.0
+
 ## 3.0.0
 
 ### Major Changes

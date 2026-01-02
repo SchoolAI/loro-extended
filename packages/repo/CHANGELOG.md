@@ -1,5 +1,157 @@
 # @loro-extended/repo
 
+## 4.0.0
+
+### Major Changes
+
+- 14b9193: BREAKING: Remove deprecated `waitForNetwork()` and `waitForStorage()` methods from Handle
+
+  These methods had a critical bug: they only resolved when a peer had data (`state === "loaded"`), but would hang forever if the peer confirmed it didn't have the document (`state === "absent"`).
+
+  **Migration:**
+
+  Replace:
+
+  ```typescript
+  await handle.waitForNetwork();
+  await handle.waitForStorage();
+  ```
+
+  With:
+
+  ```typescript
+  await handle.waitForSync({ kind: "network" }); // or just waitForSync() since network is default
+  await handle.waitForSync({ kind: "storage" });
+  ```
+
+  **Benefits of `waitForSync()`:**
+
+  - Resolves when peer has data OR confirms document doesn't exist
+  - Enables the "initializeIfEmpty" pattern correctly
+  - Has configurable timeout (default 30s, set to 0 to disable)
+  - Supports AbortSignal for cancellation
+  - Throws `NoAdaptersError` if no adapters of requested kind exist
+  - Throws `SyncTimeoutError` on timeout with diagnostic context
+
+### Minor Changes
+
+- 37cdd5e: Add storage-first sync coordination and remove eager loading
+
+  **Problem:**
+  When a server has both network (WebSocket) and storage (LevelDB) adapters, network sync-requests were answered BEFORE storage had loaded the document data. This caused clients to incorrectly believe documents were empty, leading to duplicate initialization (e.g., two root nodes in a tree).
+
+  **Solution: Storage-First Sync + Lazy Loading**
+
+  We implemented two complementary changes:
+
+  1. **Storage-First Sync**: Network sync-requests for unknown documents now wait for all storage adapters to be consulted before responding.
+
+  2. **Lazy Loading**: Removed eager loading from `StorageAdapter`. Documents are now loaded on-demand when network clients request them, rather than all at once on startup.
+
+  **Benefits of Lazy Loading:**
+
+  - Scales to millions of documents
+  - Reduces startup time
+  - Avoids race conditions with eager loading
+  - Memory efficient - only loads requested documents
+
+  **How Storage-First Sync Works:**
+
+  1. When a network request arrives for an unknown document with storage adapters present:
+
+     - Create the document with `pendingStorageChannels` tracking which storage adapters to wait for
+     - Queue the network request in `pendingNetworkRequests`
+     - Send sync-request to all storage adapters
+     - Don't respond to network yet
+
+  2. When storage responds:
+
+     - Remove from `pendingStorageChannels`
+     - If all storage has responded, process all queued network requests
+
+  3. When storage sends a bidirectional sync-request:
+     - Create the document with `pendingStorageChannels` tracking the storage channel
+     - Respond to storage immediately and send reciprocal sync-request
+     - Queue any network requests that arrive before storage responds with data
+
+  **Key Design Decisions:**
+
+  - No new protocol transmission types - single sync-response to network
+  - Wait for ALL storage adapters - any storage might have the document
+  - Fully synchronous - fits the TEA (The Elm Architecture) pattern
+  - Handles edge cases: storage disconnect, multiple network requests, etc.
+
+  **New Types:**
+
+  ```typescript
+  type DocState = {
+    // ... existing fields ...
+    pendingStorageChannels?: Set<ChannelId>;
+    pendingNetworkRequests?: PendingNetworkRequest[];
+  };
+  ```
+
+  **Files Changed:**
+
+  - `types.ts` - Added `pendingStorageChannels` and `pendingNetworkRequests` to DocState
+  - `storage-adapter.ts` - Removed `requestStoredDocuments()` call from `handleEstablishRequest()` (lazy loading)
+  - `handle-sync-request.ts` - Queue network requests when storage adapters exist; track pending state for bidirectional storage requests
+  - `handle-sync-response.ts` - Process pending requests when storage responds
+  - `handle-channel-removed.ts` - Clean up pending state on disconnect
+  - New utility: `get-storage-channel-ids.ts`
+  - New test file: `storage-first-sync.test.ts` (9 tests)
+
+- c3e5d1f: Add `waitForSync()` method with timeout and AbortSignal support
+
+  **New Features:**
+
+  - `handle.waitForSync()` - Wait for sync completion with network or storage peers
+  - Accepts both "loaded" (peer has data) and "absent" (peer confirmed no data) states
+  - Configurable timeout (default 30s, set to 0 to disable)
+  - AbortSignal support for cancellation
+  - Enriched error context in `SyncTimeoutError` and `NoAdaptersError`
+
+  **Breaking Changes:**
+
+  - None - `waitForNetwork()` and `waitForStorage()` are deprecated but still work
+
+  **Bug Fixes:**
+
+  - Fixed race condition where `waitForSync()` couldn't detect adapter kind before channels were created
+  - Added `kind` property to `Adapter` base class (default: "network")
+  - `StorageAdapter` now overrides `kind` to "storage"
+  - Added `channels` property to `ReadyStateAbsent` type for consistent channel checking
+
+  **Usage:**
+
+  ```typescript
+  // Wait for network sync (default)
+  await handle.waitForSync();
+
+  // Wait for storage sync
+  await handle.waitForSync({ kind: "storage" });
+
+  // Custom timeout
+  await handle.waitForSync({ timeout: 5000 });
+
+  // Cancellable
+  const controller = new AbortController();
+  await handle.waitForSync({ signal: controller.signal });
+
+  // initializeIfEmpty pattern now works correctly
+  await handle.waitForSync();
+  if (handle.loroDoc.opCount() === 0) {
+    initializeDocument(handle);
+  }
+  ```
+
+### Patch Changes
+
+- Updated dependencies [587efb3]
+- Updated dependencies [73f7b32]
+- Updated dependencies [64e81c1]
+  - @loro-extended/change@4.0.0
+
 ## 3.0.0
 
 ### Major Changes

@@ -1,5 +1,37 @@
 # @loro-extended/change
 
+## 4.0.0
+
+### Minor Changes
+
+- 64e81c1: Add typed TreeRef and TreeNodeRef for type-safe tree operations
+
+  - Add `TreeNodeRef` class wrapping `LoroTreeNode` with typed `data` property
+  - Rewrite `TreeRef` class with full typed API including `createNode()`, `roots()`, `nodes()`, `getNodeByID()`, `move()`, `delete()`, `toJSON()`, `toArray()`
+  - Add `TreeNodeJSON` type for serialized tree nodes with `data` and `fractionalIndex` properties
+  - Transform Loro's native tree format (`meta`/`fractional_index`) to typed format (`data`/`fractionalIndex`) in serialization
+  - Fix `isValueShape` to include "any" valueType
+
+### Patch Changes
+
+- 587efb3: Fix: Value shapes in RecordRef, StructRef, and ListRefBase now always read fresh from the container
+
+  Previously, value shapes were cached, causing stale values to be returned when the underlying container was modified by a different ref instance (e.g., drafts created by `change()`).
+
+  The fix ensures that:
+
+  - When `autoCommit` is true (direct access outside of `change()`), value shapes are always read fresh from the CRDT container
+  - When `autoCommit` is false (inside `change()`), value shapes are cached to support find-and-mutate patterns where mutations to found items persist back to the CRDT
+
+  This resolves issues where:
+
+  - `record.set("key", newValue)` appeared to have no effect after the first write
+  - `struct.property = newValue` returned the old value on subsequent reads
+  - `list.get(index)` returned stale values after delete/insert operations
+  - `delete()` operations appeared to not work
+
+- 73f7b32: Refactor: Add `batchedMutation` flag and remove dead `readonly` code from typed refs
+
 ## 3.0.0
 
 ## 2.0.0

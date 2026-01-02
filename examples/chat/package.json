@@ -1,7 +1,7 @@
 {
   "name": "example-chat",
   "private": true,
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "scripts": {
     "build:all": "pnpm build:client && pnpm build:server",
