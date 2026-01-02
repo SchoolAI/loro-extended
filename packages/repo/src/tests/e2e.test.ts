@@ -52,7 +52,7 @@ describe("Repo E2E", () => {
 
     // Repo 2 finds the document and waits for network sync
     const handle2 = repo2.get("the-doc-id", DocSchema)
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     expect(handle2.doc.toJSON().title).toBe("hello")
 
@@ -89,7 +89,7 @@ describe("Repo E2E", () => {
     await vi.advanceTimersByTimeAsync(100)
 
     const handle2 = repo2.get(handle1.docId, DocSchema)
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     // A change from a permitted peer should be applied
     handle2.change(draft => {
@@ -129,7 +129,7 @@ describe("Repo E2E", () => {
     await vi.advanceTimersByTimeAsync(100)
 
     const handle2 = repo2.get(handle1.docId, DocSchema)
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     await repo2.delete(handle1.docId)
 
@@ -217,7 +217,7 @@ describe("Repo E2E", () => {
 
       // B explicitly requests the document. It should succeed.
       const handleB = repoB.get(handleA.docId, DocSchema)
-      await handleB.waitForNetwork()
+      await handleB.waitForSync({ timeout: 0 })
 
       expect(handleB.doc.toJSON().title).toBe("hello")
     }, 500)

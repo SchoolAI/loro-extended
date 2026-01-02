@@ -147,7 +147,7 @@ describe("Repo", () => {
       })
 
       const handleB = repoB.get("test-doc", TestDocSchema)
-      await handleB.waitForNetwork()
+      await handleB.waitForSync({ timeout: 0 })
 
       expect(handleB.doc.toJSON().root.text).toBe("hello")
 

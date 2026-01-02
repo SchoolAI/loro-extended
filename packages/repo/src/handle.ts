@@ -656,38 +656,6 @@ export class Handle<
   }
 
   /**
-   * Convenience method: wait for storage to load.
-   *
-   * @deprecated Use `waitForSync({ kind: 'storage' })` instead.
-   * This method only resolves when storage has data (state="loaded"),
-   * but hangs forever if storage confirms it doesn't have the document.
-   */
-  async waitForStorage(): Promise<Handle<D, E>> {
-    return this.waitUntilReady(readyStates =>
-      readyStates.some(
-        s =>
-          s.status === "synced" && s.channels.some(c => c.kind === "storage"),
-      ),
-    )
-  }
-
-  /**
-   * Convenience method: wait for any network source to provide the document.
-   *
-   * @deprecated Use `waitForSync({ kind: 'network' })` instead.
-   * This method only resolves when a network peer has data (state="loaded"),
-   * but hangs forever if the peer confirms it doesn't have the document.
-   */
-  async waitForNetwork(): Promise<Handle<D, E>> {
-    return this.waitUntilReady(readyStates =>
-      readyStates.some(
-        s =>
-          s.status === "synced" && s.channels.some(c => c.kind === "network"),
-      ),
-    )
-  }
-
-  /**
    * Wait for sync to complete with a peer of the specified kind.
    *
    * Resolves when we've completed the sync handshake with a peer:

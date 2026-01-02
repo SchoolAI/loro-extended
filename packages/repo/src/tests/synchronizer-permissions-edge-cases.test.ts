@@ -72,7 +72,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     expect(repoB.has(docId)).toBe(true)
 
     const handleB = repoB.get(docId, DocSchema)
-    await handleB.waitForNetwork()
+    await handleB.waitForSync({ timeout: 0 })
     expect(handleB.doc.toJSON().title).toBe("secret")
   })
 })

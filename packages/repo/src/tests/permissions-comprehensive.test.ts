@@ -100,7 +100,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Get handle in repo2 and wait for sync
       const handle2 = repo2.get("test-doc", DocSchema)
-      await handle2.waitForNetwork()
+      await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
       handle2.change(draft => {
@@ -137,7 +137,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Get handle in repo2 and wait for sync
       const handle2 = repo2.get("test-doc", DocSchema)
-      await handle2.waitForNetwork()
+      await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
       handle2.change(draft => {
@@ -225,7 +225,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Get handle in repo2 and wait for sync
       const handle2 = repo2.get("doc-to-delete", DocSchema)
-      await handle2.waitForNetwork()
+      await handle2.waitForSync({ timeout: 0 })
 
       // repo2 deletes the document
       await repo2.delete("doc-to-delete")
@@ -260,7 +260,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Get handle in repo2 and wait for sync
       const handle2 = repo2.get("doc-to-delete", DocSchema)
-      await handle2.waitForNetwork()
+      await handle2.waitForSync({ timeout: 0 })
 
       // repo2 tries to delete the document
       await repo2.delete("doc-to-delete")

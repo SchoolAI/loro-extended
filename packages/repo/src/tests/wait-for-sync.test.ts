@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DelayedNetworkAdapter } from "../adapter/delayed-network-adapter.js"
 import { NoAdaptersError, SyncTimeoutError } from "../handle.js"
 import { Repo } from "../repo.js"
+import { InMemoryStorageAdapter } from "../storage/in-memory-storage-adapter.js"
 
 const DocSchema = Shape.doc({
   title: Shape.text(),
@@ -415,72 +416,93 @@ describe("waitForSync", () => {
     })
   })
 
-  describe("deprecated methods", () => {
-    it("waitForNetwork should still work for loaded state", async () => {
-      // Create a server repo with a document that has data
-      const serverRepo = new Repo({
-        identity: { name: "server", type: "service" },
-      })
-      const serverHandle = serverRepo.get("test-doc", DocSchema)
-      serverHandle.change(draft => {
-        draft.title.insert(0, "Server Data")
-      })
-      const serverSnapshot = serverHandle.loroDoc.export({ mode: "snapshot" })
-
-      // Create client with delayed network adapter
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
-      const clientRepo = new Repo({
+  describe("storage sync", () => {
+    it("should resolve waitForSync({ kind: 'storage' }) when storage is empty", async () => {
+      // Create repo with empty storage adapter
+      const storage = new InMemoryStorageAdapter()
+      const repo = new Repo({
         identity: { name: "client", type: "user" },
-        adapters: [adapter],
+        adapters: [storage],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      // Get a document that doesn't exist in storage
+      const handle = repo.get("nonexistent-doc", DocSchema)
 
-      // Track when waitForNetwork resolves
-      let waitResolved = false
-      const waitPromise = clientHandle.waitForNetwork().then(() => {
-        waitResolved = true
+      // waitForSync should resolve (not hang) because storage confirms "absent"
+      await handle.waitForSync({ kind: "storage", timeout: 0 })
+
+      // Document should be empty (storage had nothing)
+      expect(handle.loroDoc.opCount()).toBe(0)
+
+      // Cleanup
+      repo.synchronizer.stopHeartbeat()
+    })
+
+    it("should resolve waitForSync({ kind: 'storage' }) when storage has data", async () => {
+      // First, create a repo and save some data to storage
+      const storage1 = new InMemoryStorageAdapter()
+      const repo1 = new Repo({
+        identity: { name: "writer", type: "user" },
+        adapters: [storage1],
       })
 
-      // Deliver the sync-response from the server
-      const deliveryPromise = adapter.deliverSyncResponse(
-        "test-doc",
-        serverSnapshot,
-      )
-      await vi.advanceTimersByTimeAsync(100)
-      await deliveryPromise
+      const handle1 = repo1.get("existing-doc", DocSchema)
+      handle1.change(draft => {
+        draft.title.insert(0, "Stored Data")
+        draft.count.increment(100)
+      })
 
+      // Wait for storage to persist
       await vi.runAllTimersAsync()
-      await waitPromise
 
-      expect(waitResolved).toBe(true)
-    }, 1000)
+      // Now create a new repo with the same storage data
+      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
+      const repo2 = new Repo({
+        identity: { name: "reader", type: "user" },
+        adapters: [storage2],
+      })
 
-    it("waitForNetwork should NOT resolve for absent state (known limitation)", async () => {
-      // This test documents the known limitation of the deprecated method
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
-      const clientRepo = new Repo({
+      const handle2 = repo2.get("existing-doc", DocSchema)
+
+      // waitForSync should resolve when storage sends the data
+      await handle2.waitForSync({ kind: "storage", timeout: 0 })
+
+      // Document should have the stored data
+      expect(handle2.doc.toJSON().title).toBe("Stored Data")
+      expect(handle2.doc.toJSON().count).toBe(100)
+
+      // Cleanup
+      repo1.synchronizer.stopHeartbeat()
+      repo2.synchronizer.stopHeartbeat()
+    })
+
+    it("should enable initializeIfEmpty pattern with storage", async () => {
+      // Create repo with empty storage adapter
+      const storage = new InMemoryStorageAdapter()
+      const repo = new Repo({
         identity: { name: "client", type: "user" },
-        adapters: [adapter],
+        adapters: [storage],
       })
 
-      const clientHandle = clientRepo.get("nonexistent-doc", DocSchema)
+      const handle = repo.get("new-doc", DocSchema)
 
-      let waitResolved = false
-      clientHandle.waitForNetwork().then(() => {
-        waitResolved = true
-      })
+      // The app's initialization pattern
+      await handle.waitForSync({ kind: "storage", timeout: 0 })
 
-      // Server responds that it doesn't have the document
-      const deliveryPromise = adapter.deliverUnavailable("nonexistent-doc")
-      await vi.advanceTimersByTimeAsync(100)
-      await deliveryPromise
+      // Storage confirmed it doesn't have the document, safe to initialize
+      if (handle.loroDoc.opCount() === 0) {
+        handle.change(draft => {
+          draft.title.insert(0, "Default Title")
+          draft.count.increment(1)
+        })
+      }
 
-      await vi.advanceTimersByTimeAsync(200)
+      // Document should have the default data
+      expect(handle.doc.toJSON().title).toBe("Default Title")
+      expect(handle.doc.toJSON().count).toBe(1)
 
-      // The deprecated method does NOT resolve for absent state
-      // This is the bug that waitForSync fixes
-      expect(waitResolved).toBe(false)
-    }, 500)
+      // Cleanup
+      repo.synchronizer.stopHeartbeat()
+    })
   })
 })

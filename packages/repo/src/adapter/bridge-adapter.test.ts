@@ -47,7 +47,7 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle2 = repo2.get(docId, DocSchema)
 
     // Wait for sync
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     // Verify
     expect(handle2.doc.toJSON().title).toBe("value")
@@ -116,7 +116,7 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Get the same document in repo2
     const handle2 = repo2.get(docId, DocSchema)
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     // Verify the document was synchronized
     expect(handle2.doc.toJSON().title).toBe("Hello from repo1")
@@ -161,7 +161,7 @@ describe("BridgeAdapter Integration Tests", () => {
       draft.count.increment(100)
     })
 
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     // Verify repo1 received repo2's changes
     expect(handle1.doc.toJSON().title).toBe("from-repo1")
@@ -216,7 +216,7 @@ describe("BridgeAdapter Integration Tests", () => {
       draft.count.increment(20)
     })
 
-    await handle2.waitForNetwork()
+    await handle2.waitForSync({ timeout: 0 })
 
     // Both repos should have the merged counter value (10 + 20 = 30)
     expect(handle1.doc.toJSON().count).toBe(30)
@@ -261,9 +261,9 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle2C = repo2.get("doc-c", DocSchema)
 
     await Promise.all([
-      handle2A.waitForNetwork(),
-      handle2B.waitForNetwork(),
-      handle2C.waitForNetwork(),
+      handle2A.waitForSync({ timeout: 0 }),
+      handle2B.waitForSync({ timeout: 0 }),
+      handle2C.waitForSync({ timeout: 0 }),
     ])
 
     // Verify all documents synchronized correctly
@@ -352,7 +352,10 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle2 = repo2.get(docId, DocSchema)
     const handle3 = repo3.get(docId, DocSchema)
 
-    await Promise.all([handle2.waitForNetwork(), handle3.waitForNetwork()])
+    await Promise.all([
+      handle2.waitForSync({ timeout: 0 }),
+      handle3.waitForSync({ timeout: 0 }),
+    ])
 
     expect(handle2.doc.toJSON().title).toBe("repo1")
     expect(handle3.doc.toJSON().title).toBe("repo1")
@@ -362,7 +365,10 @@ describe("BridgeAdapter Integration Tests", () => {
       draft.count.increment(200)
     })
 
-    await Promise.all([handle1.waitForNetwork(), handle3.waitForNetwork()])
+    await Promise.all([
+      handle1.waitForSync({ timeout: 0 }),
+      handle3.waitForSync({ timeout: 0 }),
+    ])
 
     // Both repo1 and repo3 should receive the change
     expect(handle1.doc.toJSON().count).toBe(200)
