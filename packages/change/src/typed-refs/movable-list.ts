@@ -20,13 +20,11 @@ export class MovableListRef<
   }
 
   move(from: number, to: number): void {
-    this.assertMutable()
     this.container.move(from, to)
     this.commitIfAuto()
   }
 
   set(index: number, item: Exclude<Item, Container>) {
-    this.assertMutable()
     const result = this.container.set(index, item)
     this.commitIfAuto()
     return result

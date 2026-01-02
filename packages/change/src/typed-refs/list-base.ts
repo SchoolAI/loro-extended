@@ -14,7 +14,7 @@ import {
   isValueShape,
 } from "../utils/type-guards.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import { createContainerTypedRef, unwrapReadonlyPrimitive } from "./utils.js"
+import { createContainerTypedRef } from "./utils.js"
 
 // Shared logic for list operations
 export abstract class ListRefBase<
@@ -98,8 +98,8 @@ export abstract class ListRefBase<
         }
         return containerItem
       },
-      readonly: this.readonly,
       autoCommit: this._params.autoCommit,
+      batchedMutation: this.batchedMutation,
       getDoc: this._params.getDoc,
     }
   }
@@ -159,13 +159,13 @@ export abstract class ListRefBase<
     }
 
     if (isValueShape(this.shape.shape)) {
-      // When autoCommit is true (direct access outside of change()), ALWAYS read fresh
+      // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
       // from container (NEVER cache). This ensures we always get the latest value
       // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
       //
-      // When autoCommit is false (inside change()), we cache value shapes so that
+      // When in batchedMutation mode (inside change()), we cache value shapes so that
       // mutations to found/filtered items persist back to the CRDT via absorbPlainValues()
-      if (this.autoCommit) {
+      if (!this.batchedMutation) {
         return containerItem as MutableItem
       }
 
@@ -199,13 +199,6 @@ export abstract class ListRefBase<
         this.getTypedRefParams(index, this.shape.shape as ContainerShape),
       )
       this.itemCache.set(index, cachedItem)
-    }
-
-    if (this.readonly) {
-      return unwrapReadonlyPrimitive(
-        cachedItem,
-        this.shape.shape as ContainerShape,
-      )
     }
 
     return cachedItem as MutableItem
@@ -312,7 +305,6 @@ export abstract class ListRefBase<
   }
 
   insert(index: number, item: Item): void {
-    this.assertMutable()
     // Update cache indices before performing the insert operation
     this.updateCacheForInsert(index)
     this.insertWithConversion(index, item)
@@ -320,7 +312,6 @@ export abstract class ListRefBase<
   }
 
   delete(index: number, len: number): void {
-    this.assertMutable()
     // Update cache indices before performing the delete operation
     this.updateCacheForDelete(index, len)
     this.container.delete(index, len)
@@ -328,20 +319,17 @@ export abstract class ListRefBase<
   }
 
   push(item: Item): void {
-    this.assertMutable()
     this.pushWithConversion(item)
     this.commitIfAuto()
   }
 
   pushContainer(container: Container): Container {
-    this.assertMutable()
     const result = this.container.pushContainer(container)
     this.commitIfAuto()
     return result
   }
 
   insertContainer(index: number, container: Container): Container {
-    this.assertMutable()
     const result = this.container.insertContainer(index, container)
     this.commitIfAuto()
     return result

@@ -15,8 +15,8 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
   node: LoroTreeNode
   dataShape: DataShape
   treeRef: TreeRefLike<DataShape>
-  readonly?: boolean
   autoCommit?: boolean
+  batchedMutation?: boolean
   getDoc?: () => LoroDoc
 }
 
@@ -36,16 +36,16 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   private _dataShape: DataShape
   private _treeRef: TreeRefLike<DataShape>
   private _dataRef?: StructRef<DataShape["shapes"]>
-  private _readonly: boolean
   private _autoCommit: boolean
+  private _batchedMutation: boolean
   private _getDoc?: () => LoroDoc
 
   constructor(params: TreeNodeRefParams<DataShape>) {
     this._node = params.node
     this._dataShape = params.dataShape
     this._treeRef = params.treeRef
-    this._readonly = params.readonly ?? false
     this._autoCommit = params.autoCommit ?? false
+    this._batchedMutation = params.batchedMutation ?? false
     this._getDoc = params.getDoc
   }
 
@@ -89,8 +89,8 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
           },
           placeholder: placeholder as any,
           getContainer: () => dataContainer,
-          readonly: this._readonly,
           autoCommit: this._autoCommit,
+          batchedMutation: this._batchedMutation,
           getDoc: this._getDoc,
         }
 
@@ -113,7 +113,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
     initialData?: Partial<Infer<DataShape>>,
     index?: number,
   ): TreeNodeRef<DataShape> {
-    this.assertMutable()
     // Create child node - Loro's createNode on a tree node creates a child
     const loroNode = (this._node as any).createNode(index)
     const nodeRef = this._treeRef.getOrCreateNodeRef(loroNode)
@@ -155,7 +154,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
    * @param index - Optional position among siblings
    */
   move(newParent?: TreeNodeRef<DataShape>, index?: number): void {
-    this.assertMutable()
     // node.move takes a LoroTreeNode or undefined, not an ID
     const parentNode = newParent?._node
     ;(this._node as any).move?.(parentNode, index)
@@ -166,7 +164,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
    * Move this node to be after the given sibling.
    */
   moveAfter(sibling: TreeNodeRef<DataShape>): void {
-    this.assertMutable()
     this._node.moveAfter(sibling._node)
     this.commitIfAuto()
   }
@@ -175,7 +172,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
    * Move this node to be before the given sibling.
    */
   moveBefore(sibling: TreeNodeRef<DataShape>): void {
-    this.assertMutable()
     this._node.moveBefore(sibling._node)
     this.commitIfAuto()
   }
@@ -229,12 +225,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
       fractionalIndex: this.fractionalIndex() ?? "",
       data: this.data.toJSON() as Infer<DataShape>,
       children: children.map(child => child.toJSON()),
-    }
-  }
-
-  private assertMutable(): void {
-    if (this._readonly) {
-      throw new Error("Cannot modify readonly ref")
     }
   }
 

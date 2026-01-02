@@ -2,11 +2,7 @@ import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
 import { TypedRef, type TypedRefParams } from "./base.js"
-import {
-  createContainerTypedRef,
-  serializeRefToJSON,
-  unwrapReadonlyPrimitive,
-} from "./utils.js"
+import { createContainerTypedRef, serializeRefToJSON } from "./utils.js"
 
 const containerGetter = {
   counter: "getCounter",
@@ -30,6 +26,7 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     _params: Omit<TypedRefParams<Shape>, "getContainer" | "getDoc"> & {
       doc: LoroDoc
       autoCommit?: boolean
+      batchedMutation?: boolean
     },
   ) {
     super({
@@ -64,8 +61,8 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
       shape,
       placeholder: this.requiredPlaceholder[key],
       getContainer: () => getter(key),
-      readonly: this.readonly,
       autoCommit: this._params.autoCommit,
+      batchedMutation: this.batchedMutation,
       getDoc: () => this._doc,
     }
   }
@@ -74,26 +71,11 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     key: string,
     shape: ContainerShape,
   ): TypedRef<ContainerShape> | number | string {
-    if (
-      this.readonly &&
-      (shape._type === "counter" || shape._type === "text")
-    ) {
-      // Check if the container exists in the doc without creating it
-      const shallow = this._doc.getShallowValue()
-      if (!shallow[key]) {
-        return this.requiredPlaceholder[key] as any
-      }
-    }
-
     let ref = this.propertyCache.get(key)
 
     if (!ref) {
       ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
       this.propertyCache.set(key, ref)
-    }
-
-    if (this.readonly) {
-      return unwrapReadonlyPrimitive(ref, shape)
     }
 
     return ref

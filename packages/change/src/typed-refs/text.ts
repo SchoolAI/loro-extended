@@ -17,14 +17,12 @@ export class TextRef extends TypedRef<TextContainerShape> {
 
   // Text methods
   insert(index: number, content: string): void {
-    this.assertMutable()
     this._materialized = true
     this.container.insert(index, content)
     this.commitIfAuto()
   }
 
   delete(index: number, len: number): void {
-    this.assertMutable()
     this._materialized = true
     this.container.delete(index, len)
     this.commitIfAuto()
@@ -60,21 +58,18 @@ export class TextRef extends TypedRef<TextContainerShape> {
   }
 
   update(text: string): void {
-    this.assertMutable()
     this._materialized = true
     this.container.update(text)
     this.commitIfAuto()
   }
 
   mark(range: { start: number; end: number }, key: string, value: any): void {
-    this.assertMutable()
     this._materialized = true
     this.container.mark(range, key, value)
     this.commitIfAuto()
   }
 
   unmark(range: { start: number; end: number }, key: string): void {
-    this.assertMutable()
     this._materialized = true
     this.container.unmark(range, key)
     this.commitIfAuto()
@@ -85,7 +80,6 @@ export class TextRef extends TypedRef<TextContainerShape> {
   }
 
   applyDelta(delta: any[]): void {
-    this.assertMutable()
     this._materialized = true
     this.container.applyDelta(delta)
     this.commitIfAuto()

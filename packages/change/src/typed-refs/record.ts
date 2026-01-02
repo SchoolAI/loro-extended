@@ -1,6 +1,5 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
-import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -16,7 +15,6 @@ import {
   createContainerTypedRef,
   hasContainerConstructor,
   serializeRefToJSON,
-  unwrapReadonlyPrimitive,
 } from "./utils.js"
 
 // Record typed ref
@@ -67,8 +65,8 @@ export class RecordRef<
       placeholder,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
-      readonly: this.readonly,
       autoCommit: this._params.autoCommit,
+      batchedMutation: this.batchedMutation,
       getDoc: this._params.getDoc,
     }
   }
@@ -98,21 +96,52 @@ export class RecordRef<
   getOrCreateRef(key: string): any {
     const shape = this.shape.shape
 
-    // For value shapes, ALWAYS read from the container to avoid stale cache issues.
-    // Value shapes should not be cached because the underlying container can be
-    // modified by other RecordRef instances (e.g., drafts created by change()).
     if (isValueShape(shape)) {
-      const containerValue = this.container.get(key)
-      if (containerValue !== undefined) {
-        return containerValue
+      // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
+      // from container (NEVER cache). This ensures we always get the latest value
+      // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
+      //
+      // When in batchedMutation mode (inside change()), we cache value shapes so that
+      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
+      if (!this.batchedMutation) {
+        const containerValue = this.container.get(key)
+        if (containerValue !== undefined) {
+          return containerValue
+        }
+        // Fall back to placeholder if the container doesn't have the value
+        const placeholder = (this.placeholder as any)?.[key]
+        if (placeholder !== undefined) {
+          return placeholder
+        }
+        // Fall back to the default value from the shape
+        return (shape as any)._plain
       }
-      // Fall back to placeholder if the container doesn't have the value
-      const placeholder = (this.placeholder as any)?.[key]
-      if (placeholder !== undefined) {
-        return placeholder
+
+      // In batched mode (within change()), we cache value shapes so that
+      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
+      let ref = this.refCache.get(key)
+      if (!ref) {
+        const containerValue = this.container.get(key)
+        if (containerValue !== undefined) {
+          // For objects, create a deep copy so mutations can be tracked
+          if (typeof containerValue === "object" && containerValue !== null) {
+            ref = JSON.parse(JSON.stringify(containerValue))
+          } else {
+            ref = containerValue as Value
+          }
+        } else {
+          // Fall back to placeholder if the container doesn't have the value
+          const placeholder = (this.placeholder as any)?.[key]
+          if (placeholder !== undefined) {
+            ref = placeholder as Value
+          } else {
+            // Fall back to the default value from the shape
+            ref = (shape as any)._plain
+          }
+        }
+        this.refCache.set(key, ref)
       }
-      // Fall back to the default value from the shape
-      return (shape as any)._plain
+      return ref
     }
 
     // For container shapes, we can safely cache the ref since it's a handle
@@ -125,13 +154,6 @@ export class RecordRef<
       this.refCache.set(key, ref)
     }
 
-    if (this.readonly) {
-      return unwrapReadonlyPrimitive(
-        ref as TypedRef<any>,
-        shape as ContainerShape,
-      )
-    }
-
     return ref as any
   }
 
@@ -140,7 +162,6 @@ export class RecordRef<
   }
 
   set(key: string, value: any): void {
-    this.assertMutable()
     if (isValueShape(this.shape.shape)) {
       this.container.set(key, value)
       this.refCache.set(key, value)
@@ -160,14 +181,12 @@ export class RecordRef<
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    this.assertMutable()
     const result = this.container.setContainer(key, container)
     this.commitIfAuto()
     return result
   }
 
   delete(key: string): void {
-    this.assertMutable()
     this.container.delete(key)
     this.refCache.delete(key)
     this.commitIfAuto()
@@ -190,25 +209,6 @@ export class RecordRef<
   }
 
   toJSON(): Record<string, Infer<NestedShape>> {
-    // Fast path: readonly mode
-    if (this.readonly) {
-      const nativeJson = this.container.toJSON() as Record<string, any>
-      // For records, we need to overlay placeholders for each entry's nested shape
-      const result: Record<string, Infer<NestedShape>> = {}
-      for (const key of Object.keys(nativeJson)) {
-        // For records, the placeholder is always {}, so we need to derive
-        // the placeholder for the nested shape on the fly
-        const nestedPlaceholderValue = deriveShapePlaceholder(this.shape.shape)
-
-        result[key] = mergeValue(
-          this.shape.shape,
-          nativeJson[key],
-          nestedPlaceholderValue as Value,
-        ) as Infer<NestedShape>
-      }
-      return result
-    }
-
     return serializeRefToJSON(this, this.keys()) as Record<
       string,
       Infer<NestedShape>

@@ -130,6 +130,7 @@ class TypedDocInternal<Shape extends DocShape> {
       placeholder: this.placeholder as any,
       doc: this.doc,
       autoCommit: false,
+      batchedMutation: true, // Enable value shape caching for find-and-mutate patterns
     })
     fn(draft as unknown as Mutable<Shape>)
     draft.absorbPlainValues()

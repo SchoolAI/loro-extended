@@ -16,14 +16,12 @@ export class CounterRef extends TypedRef<CounterContainerShape> {
   }
 
   increment(value: number = 1): void {
-    this.assertMutable()
     this._materialized = true
     this.container.increment(value)
     this.commitIfAuto()
   }
 
   decrement(value: number = 1): void {
-    this.assertMutable()
     this._materialized = true
     this.container.decrement(value)
     this.commitIfAuto()

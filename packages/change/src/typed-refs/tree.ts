@@ -14,8 +14,8 @@ export interface TreeRefParams<DataShape extends StructContainerShape> {
   shape: TreeContainerShape<DataShape>
   placeholder?: never[]
   getContainer: () => LoroTree
-  readonly?: boolean
   autoCommit?: boolean
+  batchedMutation?: boolean
   getDoc?: () => LoroDoc
 }
 
@@ -61,25 +61,16 @@ export class TreeRef<DataShape extends StructContainerShape> {
     return this.shape.shape
   }
 
-  protected get readonly(): boolean {
-    return !!this._params.readonly
-  }
-
   protected get autoCommit(): boolean {
     return !!this._params.autoCommit
   }
 
-  protected get doc(): LoroDoc | undefined {
-    return this._params.getDoc?.()
+  protected get batchedMutation(): boolean {
+    return !!this._params.batchedMutation
   }
 
-  /**
-   * Throws an error if this ref is in readonly mode.
-   */
-  protected assertMutable(): void {
-    if (this.readonly) {
-      throw new Error("Cannot modify readonly ref")
-    }
+  protected get doc(): LoroDoc | undefined {
+    return this._params.getDoc?.()
   }
 
   /**
@@ -113,8 +104,8 @@ export class TreeRef<DataShape extends StructContainerShape> {
         node,
         dataShape: this.dataShape,
         treeRef: this,
-        readonly: this.readonly,
         autoCommit: this.autoCommit,
+        batchedMutation: this.batchedMutation,
         getDoc: this._params.getDoc,
       })
       this.nodeCache.set(id, nodeRef)
@@ -129,7 +120,6 @@ export class TreeRef<DataShape extends StructContainerShape> {
    * @returns The created TreeNodeRef
    */
   createNode(initialData?: Partial<Infer<DataShape>>): TreeNodeRef<DataShape> {
-    this.assertMutable()
     const loroNode = this.container.createNode()
     const nodeRef = this.getOrCreateNodeRef(loroNode)
 
@@ -196,7 +186,6 @@ export class TreeRef<DataShape extends StructContainerShape> {
    * @param target - The TreeID or TreeNodeRef to delete
    */
   delete(target: TreeID | TreeNodeRef<DataShape>): void {
-    this.assertMutable()
     const id = typeof target === "string" ? target : target.id
     this.container.delete(id)
     // Remove from cache

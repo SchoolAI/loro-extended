@@ -1,5 +1,4 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
-import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -16,7 +15,6 @@ import {
   createContainerTypedRef,
   hasContainerConstructor,
   serializeRefToJSON,
-  unwrapReadonlyPrimitive,
 } from "./utils.js"
 
 /**
@@ -66,8 +64,8 @@ export class StructRef<
       placeholder,
       getContainer: () =>
         this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
-      readonly: this.readonly,
       autoCommit: this._params.autoCommit,
+      batchedMutation: this.batchedMutation,
       getDoc: this._params.getDoc,
     }
   }
@@ -77,13 +75,13 @@ export class StructRef<
     shape: Shape,
   ): any {
     if (isValueShape(shape)) {
-      // When autoCommit is true (direct access outside of change()), ALWAYS read fresh
+      // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
       // from container (NEVER cache). This ensures we always get the latest value
       // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
       //
-      // When autoCommit is false (inside change()), we cache value shapes so that
+      // When in batchedMutation mode (inside change()), we cache value shapes so that
       // mutations to nested objects persist back to the CRDT via absorbPlainValues()
-      if (this.autoCommit) {
+      if (!this.batchedMutation) {
         const containerValue = this.container.get(key)
         if (containerValue !== undefined) {
           return containerValue
@@ -125,19 +123,7 @@ export class StructRef<
     let ref = this.propertyCache.get(key)
     if (!ref) {
       ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
-      // We cache container refs even in readonly mode because they are just handles
       this.propertyCache.set(key, ref)
-    }
-
-    if (this.readonly) {
-      // In readonly mode, if the container doesn't exist, return the placeholder
-      // This ensures we respect default values (e.g. counter: 1)
-      const existing = this.container.get(key)
-      if (existing === undefined) {
-        return (this.placeholder as any)?.[key]
-      }
-
-      return unwrapReadonlyPrimitive(ref as TypedRef<any>, shape)
     }
 
     return ref as Shape extends ContainerShape ? TypedRef<Shape> : Value
@@ -149,7 +135,6 @@ export class StructRef<
       Object.defineProperty(this, key, {
         get: () => this.getOrCreateRef(key, shape),
         set: value => {
-          this.assertMutable()
           if (isValueShape(shape)) {
             this.container.set(key, value)
             this.propertyCache.set(key, value)
@@ -170,17 +155,6 @@ export class StructRef<
   }
 
   toJSON(): Infer<StructContainerShape<NestedShapes>> {
-    // Fast path: readonly mode
-    if (this.readonly) {
-      const nativeJson = this.container.toJSON() as Value
-      // Overlay placeholders for missing properties
-      return mergeValue(
-        this.shape,
-        nativeJson,
-        this.placeholder as Value,
-      ) as Infer<StructContainerShape<NestedShapes>>
-    }
-
     return serializeRefToJSON(
       this as any,
       Object.keys(this.shape.shapes),
@@ -193,20 +167,17 @@ export class StructRef<
   }
 
   set(key: string, value: Value): void {
-    this.assertMutable()
     this.container.set(key, value)
     this.commitIfAuto()
   }
 
   setContainer<C extends Container>(key: string, container: C): C {
-    this.assertMutable()
     const result = this.container.setContainer(key, container)
     this.commitIfAuto()
     return result
   }
 
   delete(key: string): void {
-    this.assertMutable()
     this.container.delete(key)
     this.commitIfAuto()
   }

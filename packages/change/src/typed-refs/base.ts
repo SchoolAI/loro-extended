@@ -6,9 +6,9 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
   placeholder?: Infer<Shape>
   getContainer: () => ShapeToContainer<Shape>
-  readonly?: boolean // DEPRECATED - remove in future
-  autoCommit?: boolean // NEW: auto-commit after mutations
-  getDoc?: () => LoroDoc // NEW: needed for auto-commit
+  autoCommit?: boolean // Auto-commit after mutations
+  batchedMutation?: boolean // True when inside change() block - enables value shape caching for find-and-mutate patterns
+  getDoc?: () => LoroDoc // Needed for auto-commit
 }
 
 // Base class for all typed refs
@@ -33,12 +33,12 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
     return this._params.placeholder
   }
 
-  protected get readonly(): boolean {
-    return !!this._params.readonly
-  }
-
   protected get autoCommit(): boolean {
     return !!this._params.autoCommit
+  }
+
+  protected get batchedMutation(): boolean {
+    return !!this._params.batchedMutation
   }
 
   protected get doc(): LoroDoc | undefined {
@@ -52,17 +52,6 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   protected commitIfAuto(): void {
     if (this.autoCommit && this.doc) {
       this.doc.commit()
-    }
-  }
-
-  /**
-   * Throws an error if this ref is in readonly mode.
-   * Call this at the start of any mutating method.
-   * @deprecated Mutations are always allowed now; this will be removed.
-   */
-  protected assertMutable(): void {
-    if (this.readonly) {
-      throw new Error("Cannot modify readonly ref")
     }
   }
 
