@@ -1,9 +1,12 @@
 /**
  * Tests for the WebSocket "ready signal" pattern.
  *
- * These tests verify that the client waits for the server's "ready" signal
- * before creating its channel. This prevents a race condition where the client
- * might send messages before the server is fully set up.
+ * These tests verify that:
+ * 1. The client waits for the server's "ready" signal before creating its channel
+ * 2. The server does NOT send binary messages before the client sends establish-request
+ *
+ * This prevents a race condition where binary messages could arrive before
+ * the client has processed "ready" and created its channel.
  */
 
 import { Repo, validatePeerId } from "@loro-extended/repo"
@@ -176,6 +179,99 @@ describe("WebSocket Ready Signal", () => {
       expect((clientAdapter as any).serverChannel).toBeDefined()
       expect((clientAdapter as any).serverReady).toBe(true)
       expect(clientAdapter.connectionState).toBe("connected")
+
+      // Cleanup
+      await clientAdapter.onStop()
+    })
+  })
+
+  describe("Server does not send binary before client establish-request", () => {
+    it("should not send binary messages until client sends establish-request", async () => {
+      // This test verifies that the server does NOT send binary messages
+      // (like establish-request) before the client has sent its establish-request.
+      //
+      // This is critical because if the server sends binary before the client
+      // has processed "ready" and created its channel, the message would be dropped.
+
+      let clientAdapter: WsClientNetworkAdapter | undefined
+      const serverBinaryMessages: Uint8Array[] = []
+      let clientEstablishRequestSent = false
+
+      // Setup server with message tracking
+      wss.on("connection", (ws: WsWebSocket, req) => {
+        if (!req.url) throw new Error("request URL is required")
+        const url = new URL(req.url, `http://localhost:${port}`)
+        const peerId = url.searchParams.get("peerId")
+        if (!peerId) throw new Error("peerId is required")
+        validatePeerId(peerId)
+
+        // Track all binary messages sent by the server
+        const originalSend = ws.send.bind(ws)
+        ws.send = (data: any, ...args: any[]) => {
+          if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+            // This is a binary message from server
+            if (!clientEstablishRequestSent) {
+              serverBinaryMessages.push(
+                data instanceof Uint8Array ? data : new Uint8Array(data),
+              )
+            }
+          }
+          return originalSend(data, ...args)
+        }
+
+        // Track when client sends establish-request
+        ws.on("message", (data: Buffer | ArrayBuffer | string) => {
+          if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
+            // Binary message from client - this is the establish-request
+            clientEstablishRequestSent = true
+          }
+        })
+
+        const { start } = serverAdapter.handleConnection({
+          socket: wrapWsSocket(ws),
+          peerId,
+        })
+        start()
+      })
+
+      // Create server repo
+      const _serverRepo = new Repo({
+        identity: { peerId: "1000", name: "server", type: "service" },
+        adapters: [serverAdapter],
+      })
+
+      // Create client adapter
+      clientAdapter = new WsClientNetworkAdapter({
+        url: `ws://localhost:${port}?peerId=2000`,
+        reconnect: { enabled: false },
+        WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
+      })
+
+      // Create client repo
+      const _clientRepo = new Repo({
+        identity: { peerId: "2000", name: "client", type: "user" },
+        adapters: [clientAdapter],
+      })
+
+      // Wait for connection to be fully established
+      await new Promise<void>(resolve => {
+        const check = () => {
+          if (
+            clientAdapter?.isConnected &&
+            (clientAdapter as any).serverReady
+          ) {
+            // Give time for any messages to be exchanged
+            setTimeout(resolve, 200)
+          } else {
+            setTimeout(check, 10)
+          }
+        }
+        check()
+      })
+
+      // Verify: server should NOT have sent any binary messages before
+      // the client sent its establish-request
+      expect(serverBinaryMessages.length).toBe(0)
 
       // Cleanup
       await clientAdapter.onStop()

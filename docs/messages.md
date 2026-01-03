@@ -85,9 +85,33 @@ The synchronizer executes the channel start command:
 - Stores the `receive` function for routing incoming POST messages to `/sync` (receive direction)
 - The `send()` method writes to SSE response stream (send direction)
 
-When connection opens, the adapter dispatches `synchronizer/establish-channel` message.
+When connection opens, the **client** adapter dispatches `synchronizer/establish-channel` message.
 
 ### Phase 2: Peer Establishment
+
+**Important**: Only the **initiating side** (typically the client) should call `establishChannel()`. The responding side's channel gets established when it receives the `establish-request` message. This prevents race conditions where both sides might send messages before the other is ready.
+
+#### Channel Establishment Flow
+
+A channel transitions from `connected` to `established` state when it receives either:
+- `establish-request` → handled by [`handleEstablishRequest`](../packages/repo/src/synchronizer/connection/handle-establish-request.ts)
+- `establish-response` → handled by [`handleEstablishResponse`](../packages/repo/src/synchronizer/connection/handle-establish-response.ts)
+
+```
+Client                              Server
+  |                                   |
+  |  (creates channel)                |  (creates channel)
+  |  type: "connected"                |  type: "connected"
+  |                                   |
+  |-- establish-request ------------->|
+  |                                   |  Server channel → "established"
+  |                                   |  (via handleEstablishRequest)
+  |<------------ establish-response --|
+  |  Client channel → "established"   |
+  |  (via handleEstablishResponse)    |
+```
+
+For **peer-to-peer** adapters (like WebRTC) where there's no client/server distinction, either peer can initiate the handshake.
 
 #### 5. Establish Request (Client → Server)
 

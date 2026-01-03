@@ -159,10 +159,17 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
       connection,
       start: () => {
         connection.start()
-        // Trigger establishment handshake
-        this.establishChannel(channel.channelId)
 
-        // Simulate handshake completion so Synchronizer starts syncing
+        // NOTE: We do NOT call establishChannel() here.
+        // The client will send establish-request after connecting.
+        // Our channel gets established when we receive that request
+        // (handled by handle-establish-request.ts).
+
+        // Simulate handshake completion so Synchronizer starts syncing.
+        // This is needed because the Loro Syncing Protocol doesn't have
+        // a peer-level handshake - it goes straight to document sync.
+        // The simulateHandshake injects fake establish-request/response
+        // messages to satisfy loro-extended's channel establishment requirements.
         connection.simulateHandshake(peerId)
       },
     }

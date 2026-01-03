@@ -147,10 +147,14 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
         // This is a transport-level signal, separate from protocol-level establishment
         connection.sendReady()
 
-        // Trigger establishment handshake - sends real establish-request over the wire
-        // The client will respond with establish-response, which will be processed
-        // by the Synchronizer's handle-establish-response handler
-        this.establishChannel(channel.channelId)
+        // NOTE: We do NOT call establishChannel() here.
+        // The client will send establish-request after receiving "ready".
+        // Our channel gets established when we receive that request
+        // (handled by handle-establish-request.ts).
+        //
+        // This prevents a race condition where our binary establish-request
+        // could arrive before the client has processed "ready" and created
+        // its channel.
       },
     }
   }
