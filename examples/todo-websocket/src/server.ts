@@ -49,7 +49,7 @@ new WebSocketServer({ server: httpServer, path: "/ws" }).on(
 )
 
 // 6. Start listening
-const port = 5173
+const port = Number(process.env.PORT) || 5173
 httpServer.listen(port, () => {
   console.log(`🚀 Server running at http://localhost:${port}`)
 })

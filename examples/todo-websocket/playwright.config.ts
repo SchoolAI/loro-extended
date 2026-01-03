@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test"
 
+const port = Number(process.env.PORT) || 5173
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false, // Run tests sequentially for database consistency
@@ -10,7 +12,7 @@ export default defineConfig({
   globalSetup: "./tests/e2e/fixtures/global-setup.ts",
 
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: `http://localhost:${port}`,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -27,8 +29,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "pnpm dev",
-    port: 5173,
+    command: `PORT=${port} pnpm dev`,
+    port,
     timeout: 120 * 1000,
     reuseExistingServer: false, // Start fresh server with clean database
   },
