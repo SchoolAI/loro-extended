@@ -7,7 +7,7 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
-    external: ["@loro-extended/repo"],
+    external: ["@loro-extended/repo", "loro-crdt"],
   },
   {
     entry: ["src/server.ts"],
@@ -15,7 +15,7 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
-    external: ["@loro-extended/repo"],
+    external: ["@loro-extended/repo", "loro-crdt"],
   },
   {
     entry: ["src/bun.ts"],
@@ -23,6 +23,6 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     format: "esm",
-    external: ["@loro-extended/repo", "bun"],
+    external: ["@loro-extended/repo", "loro-crdt", "bun"],
   },
 ])

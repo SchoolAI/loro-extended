@@ -28,8 +28,7 @@
   },
   "dependencies": {
     "@loro-extended/hooks-core": "workspace:^",
-    "@loro-extended/repo": "workspace:^",
-    "loro-crdt": "^1.10.3"
+    "@loro-extended/repo": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",
@@ -41,6 +40,7 @@
     "vitest": "^3.2.4"
   },
   "peerDependencies": {
+    "loro-crdt": "^1.10.3",
     "react": ">=18"
   },
   "peerDependenciesMeta": {

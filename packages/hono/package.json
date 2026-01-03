@@ -27,15 +27,15 @@
   },
   "dependencies": {
     "@loro-extended/hooks-core": "workspace:^",
-    "@loro-extended/repo": "workspace:^",
-    "loro-crdt": "^1.10.3"
+    "@loro-extended/repo": "workspace:^"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"
   },
   "peerDependencies": {
-    "hono": ">=4"
+    "hono": ">=4",
+    "loro-crdt": "^1.10.3"
   },
   "peerDependenciesMeta": {
     "@loro-extended/change": {

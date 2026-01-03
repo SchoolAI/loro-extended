@@ -26,12 +26,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@loro-extended/repo": "workspace:^",
-    "loro-crdt": "^1.10.3"
+    "@loro-extended/repo": "workspace:^"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.3"
   },
   "peerDependenciesMeta": {
     "@loro-extended/change": {

@@ -26,13 +26,13 @@
     "test": "vitest",
     "typecheck": "tsc --noEmit --skipLibCheck"
   },
-  "dependencies": {
-    "loro-crdt": "^1.10.3"
-  },
   "devDependencies": {
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.3"
   }
 }

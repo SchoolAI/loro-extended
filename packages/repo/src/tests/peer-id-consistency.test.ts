@@ -7,8 +7,8 @@
  * for consistency, debugging, and compatibility with external tools.
  */
 
-import { describe, expect, it } from "vitest"
 import { Shape } from "@loro-extended/change"
+import { describe, expect, it } from "vitest"
 import { Repo } from "../repo.js"
 
 describe("LoroDoc PeerID consistency", () => {

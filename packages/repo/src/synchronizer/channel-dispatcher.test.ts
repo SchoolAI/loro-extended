@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest"
 import type { ChannelMsgBatch } from "../channel.js"
 import { createPermissions } from "../permissions.js"
 import { channelDispatcher } from "./channel-dispatcher.js"
-import { createDocState } from "./test-utils.js"
 import {
+  createDocState,
   createEstablishedChannel,
   createModelWithKnownPeer,
 } from "./test-utils.js"

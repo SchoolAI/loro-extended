@@ -4,6 +4,7 @@ import type { PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
 import { createPermissions } from "../permissions.js"
 import {
+  createDocState,
   createEstablishedChannel,
   createMockChannel,
   createModelWithChannel,
@@ -15,7 +16,6 @@ import {
   init as programInit,
   type SynchronizerMessage,
 } from "../synchronizer-program.js"
-import { createDocState } from "../synchronizer/test-utils.js"
 
 describe("Synchronizer Program - Integration Tests", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

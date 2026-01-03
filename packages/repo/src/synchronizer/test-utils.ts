@@ -17,8 +17,8 @@ import {
   type SynchronizerModel,
 } from "../synchronizer-program.js"
 import {
-  createDocState as createDocStateImpl,
   type ChannelId,
+  createDocState as createDocStateImpl,
   type DocId,
   type PeerDocSyncState,
 } from "../types.js"
