@@ -17,7 +17,7 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
   treeRef: TreeRefLike<DataShape>
   autoCommit?: boolean
   batchedMutation?: boolean
-  getDoc?: () => LoroDoc
+  getDoc: () => LoroDoc
 }
 
 /**
@@ -38,7 +38,7 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   private _dataRef?: StructRef<DataShape["shapes"]>
   private _autoCommit: boolean
   private _batchedMutation: boolean
-  private _getDoc?: () => LoroDoc
+  private _getDoc: () => LoroDoc
 
   constructor(params: TreeNodeRefParams<DataShape>) {
     this._node = params.node
@@ -229,7 +229,7 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   }
 
   private commitIfAuto(): void {
-    if (this._autoCommit && this._getDoc) {
+    if (this._autoCommit) {
       this._getDoc().commit()
     }
   }

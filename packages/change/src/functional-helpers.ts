@@ -86,18 +86,18 @@ export function getLoroDoc<Shape extends DocShape>(
 ): LoroDoc
 export function getLoroDoc<Shape extends ContainerShape>(
   ref: TypedRef<Shape>,
-): LoroDoc | undefined
+): LoroDoc
 export function getLoroDoc<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape>,
-): LoroDoc | undefined
+): LoroDoc
 export function getLoroDoc(
   docOrRef: TypedDoc<any> | TypedRef<any> | TreeRef<any>,
-): LoroDoc | undefined {
-  // Check if it's a TypedDoc (has $.loroDoc directly)
+): LoroDoc {
+  // Check if it's a TypedDoc or TypedRef (has $.loroDoc directly)
   if ("$" in docOrRef && "loroDoc" in (docOrRef as any).$) {
     return (docOrRef as any).$.loroDoc
   }
-  return undefined
+  throw new Error("Invalid argument: expected TypedDoc or TypedRef")
 }
 
 /**

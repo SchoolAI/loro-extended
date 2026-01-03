@@ -1,53 +1,12 @@
-import type {
-  LoroDoc,
-  LoroTree,
-  LoroTreeNode,
-  Subscription,
-  TreeID,
-} from "loro-crdt"
+import type { LoroTree, LoroTreeNode, TreeID } from "loro-crdt"
 import type {
   StructContainerShape,
   TreeContainerShape,
   TreeNodeJSON,
 } from "../shape.js"
-import type { Infer } from "../types.js"
+import type { Infer, InferRaw } from "../types.js"
+import { TypedRef, type TypedRefParams } from "./base.js"
 import { TreeNodeRef } from "./tree-node.js"
-
-/**
- * Parameters for creating a TreeRef.
- */
-export interface TreeRefParams<DataShape extends StructContainerShape> {
-  shape: TreeContainerShape<DataShape>
-  placeholder?: never[]
-  getContainer: () => LoroTree
-  autoCommit?: boolean
-  batchedMutation?: boolean
-  getDoc?: () => LoroDoc
-}
-
-/**
- * Meta-operations namespace for TreeRef.
- * Provides access to underlying Loro primitives.
- */
-export interface TreeRefMetaNamespace {
-  /**
-   * Access the underlying LoroDoc.
-   * Returns undefined if the ref was created outside of a doc context.
-   */
-  readonly loroDoc: LoroDoc | undefined
-
-  /**
-   * Access the underlying LoroTree container.
-   */
-  readonly loroContainer: LoroTree
-
-  /**
-   * Subscribe to tree-level changes.
-   * @param callback - Function called when the tree changes
-   * @returns Unsubscribe function
-   */
-  subscribe(callback: (event: unknown) => void): Subscription
-}
 
 /**
  * Typed ref for tree (forest) containers.
@@ -67,83 +26,20 @@ export interface TreeRefMetaNamespace {
  * })
  * ```
  */
-export class TreeRef<DataShape extends StructContainerShape> {
+export class TreeRef<
+  DataShape extends StructContainerShape,
+> extends TypedRef<TreeContainerShape<DataShape>> {
   private nodeCache = new Map<TreeID, TreeNodeRef<DataShape>>()
-  private _cachedContainer?: LoroTree
-  protected _params: TreeRefParams<DataShape>
-  private _$?: TreeRefMetaNamespace
 
-  constructor(params: TreeRefParams<DataShape>) {
-    this._params = params
+  constructor(params: TypedRefParams<TreeContainerShape<DataShape>>) {
+    super(params)
   }
 
   /**
-   * Meta-operations namespace for accessing underlying Loro primitives.
-   *
-   * @example
-   * ```typescript
-   * // Access the underlying LoroDoc
-   * treeRef.$.loroDoc?.subscribe((event) => console.log("Doc changed"))
-   *
-   * // Access the underlying LoroTree container
-   * treeRef.$.loroContainer  // LoroTree
-   *
-   * // Subscribe to tree-level changes
-   * treeRef.$.subscribe((event) => console.log("Tree changed"))
-   * ```
+   * Get the data shape for tree nodes.
    */
-  get $(): TreeRefMetaNamespace {
-    if (!this._$) {
-      const self = this
-      this._$ = {
-        get loroDoc(): LoroDoc | undefined {
-          return self._params.getDoc?.()
-        },
-        get loroContainer(): LoroTree {
-          return self.container
-        },
-        subscribe(callback: (event: unknown) => void): Subscription {
-          return self.container.subscribe(callback)
-        },
-      }
-    }
-    return this._$
-  }
-
-  protected get shape(): TreeContainerShape<DataShape> {
-    return this._params.shape
-  }
-
-  protected get container(): LoroTree {
-    if (!this._cachedContainer) {
-      this._cachedContainer = this._params.getContainer()
-    }
-    return this._cachedContainer
-  }
-
   protected get dataShape(): DataShape {
     return this.shape.shape
-  }
-
-  protected get autoCommit(): boolean {
-    return !!this._params.autoCommit
-  }
-
-  protected get batchedMutation(): boolean {
-    return !!this._params.batchedMutation
-  }
-
-  protected get doc(): LoroDoc | undefined {
-    return this._params.getDoc?.()
-  }
-
-  /**
-   * Commits changes if autoCommit is enabled.
-   */
-  protected commitIfAuto(): void {
-    if (this.autoCommit && this.doc) {
-      this.doc.commit()
-    }
   }
 
   /**
@@ -154,6 +50,18 @@ export class TreeRef<DataShape extends StructContainerShape> {
     for (const nodeRef of this.nodeCache.values()) {
       nodeRef.absorbPlainValues()
     }
+  }
+
+  /**
+   * Serialize the tree to a nested JSON structure.
+   * Each node includes its data and children recursively.
+   */
+  toJSON(): Infer<TreeContainerShape<DataShape>> {
+    // Use Loro's native toJSON which returns nested structure
+    const nativeJson = this.container.toJSON() as any[]
+    return this.transformNativeJson(nativeJson) as Infer<
+      TreeContainerShape<DataShape>
+    >
   }
 
   /**
@@ -264,16 +172,6 @@ export class TreeRef<DataShape extends StructContainerShape> {
    */
   enableFractionalIndex(jitter = 0): void {
     this.container.enableFractionalIndex(jitter)
-  }
-
-  /**
-   * Serialize the tree to a nested JSON structure.
-   * Each node includes its data and children recursively.
-   */
-  toJSON(): TreeNodeJSON<DataShape>[] {
-    // Use Loro's native toJSON which returns nested structure
-    const nativeJson = this.container.toJSON() as any[]
-    return this.transformNativeJson(nativeJson)
   }
 
   /**

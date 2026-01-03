@@ -8,7 +8,7 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   getContainer: () => ShapeToContainer<Shape>
   autoCommit?: boolean // Auto-commit after mutations
   batchedMutation?: boolean // True when inside change() block - enables value shape caching for find-and-mutate patterns
-  getDoc?: () => LoroDoc // Needed for auto-commit
+  getDoc: () => LoroDoc // Needed for auto-commit
 }
 
 /**
@@ -18,9 +18,8 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
 export interface RefMetaNamespace<Shape extends DocShape | ContainerShape> {
   /**
    * Access the underlying LoroDoc.
-   * Returns undefined if the ref was created outside of a doc context.
    */
-  readonly loroDoc: LoroDoc | undefined
+  readonly loroDoc: LoroDoc
 
   /**
    * Access the underlying Loro container (correctly typed).
@@ -56,7 +55,7 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
    * @example
    * ```typescript
    * // Access the underlying LoroDoc
-   * textRef.$.loroDoc?.subscribe((event) => console.log("Doc changed"))
+   * textRef.$.loroDoc.subscribe((event) => console.log("Doc changed"))
    *
    * // Access the underlying Loro container (correctly typed)
    * textRef.$.loroContainer  // LoroText
@@ -69,8 +68,8 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
     if (!this._$) {
       const self = this
       this._$ = {
-        get loroDoc(): LoroDoc | undefined {
-          return self._params.getDoc?.()
+        get loroDoc(): LoroDoc {
+          return self._params.getDoc()
         },
         get loroContainer(): ShapeToContainer<Shape> {
           return self.container
@@ -100,8 +99,8 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
     return !!this._params.batchedMutation
   }
 
-  protected get doc(): LoroDoc | undefined {
-    return this._params.getDoc?.()
+  protected get doc(): LoroDoc {
+    return this._params.getDoc()
   }
 
   /**
@@ -109,7 +108,7 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
    * Call this after any mutation operation.
    */
   protected commitIfAuto(): void {
-    if (this.autoCommit && this.doc) {
+    if (this.autoCommit) {
       this.doc.commit()
     }
   }
