@@ -15,7 +15,7 @@ import {
   init as programInit,
   type SynchronizerMessage,
 } from "../synchronizer-program.js"
-import { createDocState } from "../types.js"
+import { createDocState } from "../synchronizer/test-utils.js"
 
 describe("Synchronizer Program - Integration Tests", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>

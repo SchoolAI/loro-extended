@@ -5,8 +5,8 @@ import {
   createSynchronizerUpdate,
   type SynchronizerMessage,
 } from "../../synchronizer-program.js"
-import { createDocState } from "../../types.js"
 import {
+  createDocState,
   createEstablishedChannel,
   createModelWithChannel,
   expectCommand,

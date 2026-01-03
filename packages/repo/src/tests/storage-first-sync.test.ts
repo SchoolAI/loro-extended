@@ -35,9 +35,9 @@ describe("Storage-First Sync", () => {
   beforeEach(() => {
     sentMessages.length = 0
 
-    // Initialize synchronizer
+    // Initialize synchronizer with a valid numeric PeerID
     const [initialModel] = init({
-      peerId: "server" as PeerID,
+      peerId: "9999999999" as PeerID,
       name: "server",
       type: "service",
     })

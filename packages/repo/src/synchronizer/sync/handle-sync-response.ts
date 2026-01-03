@@ -92,7 +92,10 @@ export function handleSyncResponse(
         docId: message.docId,
         peerId: channel.peerId,
       })
-      docState = createDocState({ docId: message.docId })
+      docState = createDocState({
+        docId: message.docId,
+        peerId: model.identity.peerId,
+      })
       model.documents.set(message.docId, docState)
       commands.push({
         type: "cmd/subscribe-doc",

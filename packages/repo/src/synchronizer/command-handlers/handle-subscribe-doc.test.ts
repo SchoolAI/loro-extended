@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import type { Command } from "../../synchronizer-program.js"
-import { createDocState } from "../../types.js"
-import { createMockCommandContext } from "../test-utils.js"
+import { createDocState, createMockCommandContext } from "../test-utils.js"
 import { handleSubscribeDoc } from "./handle-subscribe-doc.js"
 
 type SubscribeDocCommand = Extract<Command, { type: "cmd/subscribe-doc" }>

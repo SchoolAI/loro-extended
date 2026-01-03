@@ -163,7 +163,7 @@ export function handleSyncRequest(
       )
 
       // Create doc with pending storage state
-      docState = createDocState({ docId })
+      docState = createDocState({ docId, peerId: model.identity.peerId })
       docState.pendingStorageChannels = new Set(storageChannelIds)
       docState.pendingNetworkRequests = [
         { channelId: fromChannelId, requesterDocVersion },
@@ -199,7 +199,7 @@ export function handleSyncRequest(
         peerId: channel.peerId,
       },
     )
-    docState = createDocState({ docId })
+    docState = createDocState({ docId, peerId: model.identity.peerId })
     model.documents.set(docId, docState)
     commands.push({
       type: "cmd/subscribe-doc",

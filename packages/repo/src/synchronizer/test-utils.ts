@@ -16,7 +16,12 @@ import {
   type SynchronizerMessage,
   type SynchronizerModel,
 } from "../synchronizer-program.js"
-import type { ChannelId, DocId, PeerDocSyncState } from "../types.js"
+import {
+  createDocState as createDocStateImpl,
+  type ChannelId,
+  type DocId,
+  type PeerDocSyncState,
+} from "../types.js"
 import type { CommandContext } from "./command-executor.js"
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -132,11 +137,29 @@ export function createEstablishedChannel(
 }
 
 /**
+ * Default test peer ID - must be a valid numeric string for LoroDoc.setPeerId()
+ */
+export const TEST_PEER_ID = "1234567890" as PeerID
+
+/**
+ * Creates a DocState for testing with the default TEST_PEER_ID.
+ *
+ * This is a convenience wrapper around createDocState that uses the test peer ID.
+ * Use this in tests instead of importing createDocState directly from types.ts.
+ *
+ * @param docId - The document ID
+ * @returns A DocState with the LoroDoc configured with TEST_PEER_ID
+ */
+export function createDocState({ docId }: { docId: DocId }) {
+  return createDocStateImpl({ docId, peerId: TEST_PEER_ID })
+}
+
+/**
  * Creates a synchronizer model with a channel already added
  */
 export function createModelWithChannel(channel: Channel): SynchronizerModel {
   const [model] = programInit({
-    peerId: "test-peer-id" as PeerID,
+    peerId: TEST_PEER_ID,
     name: "test-identity",
     type: "user",
   })
@@ -409,7 +432,7 @@ export function createMockCommandContext(
     ephemeralManager: createMockEphemeralStoreManager() as any,
     outboundBatcher: createMockOutboundBatcher() as any,
     emitter: new Emittery(),
-    identity: { peerId: "test-peer" as PeerID, name: "test", type: "user" },
+    identity: { peerId: TEST_PEER_ID, name: "test", type: "user" },
     logger: createMockLogger() as any,
     dispatch: vi.fn(),
     executeCommand: vi.fn(),

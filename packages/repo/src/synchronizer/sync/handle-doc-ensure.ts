@@ -83,8 +83,8 @@ export function handleDocEnsure(
     return
   }
 
-  // Create new document state
-  docState = createDocState({ docId })
+  // Create new document state with the local peer's ID
+  docState = createDocState({ docId, peerId: model.identity.peerId })
   model.documents.set(docId, docState)
 
   const commands: Command[] = []

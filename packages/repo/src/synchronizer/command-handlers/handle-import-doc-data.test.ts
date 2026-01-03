@@ -1,8 +1,7 @@
 import { LoroDoc, type PeerID } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import type { Command } from "../../synchronizer-program.js"
-import { createDocState } from "../../types.js"
-import { createMockCommandContext } from "../test-utils.js"
+import { createDocState, createMockCommandContext } from "../test-utils.js"
 import { handleImportDocData } from "./handle-import-doc-data.js"
 
 type ImportDocDataCommand = Extract<Command, { type: "cmd/import-doc-data" }>

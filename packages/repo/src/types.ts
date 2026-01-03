@@ -83,9 +83,29 @@ export type DocState = {
   pendingNetworkRequests?: PendingNetworkRequest[]
 }
 
-export function createDocState({ docId }: { docId: DocId }): DocState {
+/**
+ * Creates a new DocState with a LoroDoc configured with the given peerId.
+ *
+ * The peerId is required to ensure proper UndoManager behavior and change attribution.
+ * Each LoroDoc must have its peerId set to match the Repo's identity.peerId so that:
+ * 1. UndoManager correctly identifies which changes belong to the local peer
+ * 2. Changes are properly attributed in the oplog
+ * 3. External tools that rely on PeerID matching work correctly
+ *
+ * @param docId - The document ID
+ * @param peerId - The peer ID to set on the LoroDoc (must be a valid numeric string)
+ */
+export function createDocState({
+  docId,
+  peerId,
+}: {
+  docId: DocId
+  peerId: PeerID
+}): DocState {
+  const doc = new LoroDoc()
+  doc.setPeerId(peerId)
   return {
-    doc: new LoroDoc(),
+    doc,
     docId,
     // pendingStorageChannels and pendingNetworkRequests are undefined by default
     // They're only set when a network request arrives for an unknown doc with storage adapters

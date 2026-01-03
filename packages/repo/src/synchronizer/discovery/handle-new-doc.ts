@@ -85,7 +85,7 @@ export function handleNewDoc(
 
     // Create document state if we don't have it yet
     if (!docState) {
-      docState = createDocState({ docId })
+      docState = createDocState({ docId, peerId: model.identity.peerId })
       model.documents.set(docId, docState)
       commands.push({ type: "cmd/subscribe-doc", docId })
     }
