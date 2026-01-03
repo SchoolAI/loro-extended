@@ -524,15 +524,99 @@ const snapshot = doc.toJSON();
 // { title: "Hello", count: 5, ... }
 ```
 
-#### `getLoroDoc(doc)`
+#### `getLoroDoc(doc)` / `getLoroDoc(ref)`
 
-Access the underlying LoroDoc for advanced operations.
+Access the underlying LoroDoc from a TypedDoc or any typed ref.
 
 ```typescript
 import { getLoroDoc } from "@loro-extended/change";
 
+// From TypedDoc
 const loroDoc = getLoroDoc(doc);
 loroDoc.subscribe((event) => console.log("Changed:", event));
+
+// From any ref (TextRef, CounterRef, ListRef, etc.)
+const titleRef = doc.title;
+const loroDoc = getLoroDoc(titleRef);
+loroDoc?.subscribe((event) => console.log("Changed:", event));
+```
+
+#### `getLoroContainer(ref)`
+
+Access the underlying Loro container from a typed ref. Returns the correctly-typed container.
+
+```typescript
+import { getLoroContainer } from "@loro-extended/change";
+
+const titleRef = doc.title;
+const loroText = getLoroContainer(titleRef);  // LoroText
+
+const countRef = doc.count;
+const loroCounter = getLoroContainer(countRef);  // LoroCounter
+
+const itemsRef = doc.items;
+const loroList = getLoroContainer(itemsRef);  // LoroList
+
+// Subscribe to container-level changes
+loroText.subscribe((event) => console.log("Text changed:", event));
+```
+
+### Ref Meta-Operations ($ namespace)
+
+Just as `doc.$` provides meta-operations on TypedDoc, all typed refs have a `$` namespace for accessing the underlying Loro primitives:
+
+#### `ref.$.loroDoc`
+
+Access the underlying LoroDoc from any ref.
+
+```typescript
+const titleRef = doc.title;
+const loroDoc = titleRef.$.loroDoc;
+
+loroDoc?.subscribe((event) => console.log("Doc changed:", event));
+```
+
+#### `ref.$.loroContainer`
+
+Access the underlying Loro container. Returns the correctly-typed container.
+
+```typescript
+const titleRef = doc.title;
+titleRef.$.loroContainer  // LoroText
+
+const countRef = doc.count;
+countRef.$.loroContainer  // LoroCounter
+
+const itemsRef = doc.items;
+itemsRef.$.loroContainer  // LoroList
+```
+
+#### `ref.$.subscribe(callback)`
+
+Subscribe to changes on this specific container.
+
+```typescript
+const titleRef = doc.title;
+
+const unsubscribe = titleRef.$.subscribe((event) => {
+  console.log("Text changed:", event);
+});
+
+// Later: unsubscribe()
+```
+
+This enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document:
+
+```typescript
+function TextEditor({ textRef }: { textRef: TextRef }) {
+  useEffect(() => {
+    return textRef.$.subscribe((event) => {
+      // Handle text changes
+    });
+  }, [textRef]);
+  
+  return <div>...</div>;
+}
 ```
 
 ### $ Namespace (Escape Hatch)

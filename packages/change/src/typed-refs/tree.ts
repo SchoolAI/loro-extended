@@ -1,4 +1,10 @@
-import type { LoroDoc, LoroTree, LoroTreeNode, TreeID } from "loro-crdt"
+import type {
+  LoroDoc,
+  LoroTree,
+  LoroTreeNode,
+  Subscription,
+  TreeID,
+} from "loro-crdt"
 import type {
   StructContainerShape,
   TreeContainerShape,
@@ -17,6 +23,30 @@ export interface TreeRefParams<DataShape extends StructContainerShape> {
   autoCommit?: boolean
   batchedMutation?: boolean
   getDoc?: () => LoroDoc
+}
+
+/**
+ * Meta-operations namespace for TreeRef.
+ * Provides access to underlying Loro primitives.
+ */
+export interface TreeRefMetaNamespace {
+  /**
+   * Access the underlying LoroDoc.
+   * Returns undefined if the ref was created outside of a doc context.
+   */
+  readonly loroDoc: LoroDoc | undefined
+
+  /**
+   * Access the underlying LoroTree container.
+   */
+  readonly loroContainer: LoroTree
+
+  /**
+   * Subscribe to tree-level changes.
+   * @param callback - Function called when the tree changes
+   * @returns Unsubscribe function
+   */
+  subscribe(callback: (event: unknown) => void): Subscription
 }
 
 /**
@@ -41,9 +71,43 @@ export class TreeRef<DataShape extends StructContainerShape> {
   private nodeCache = new Map<TreeID, TreeNodeRef<DataShape>>()
   private _cachedContainer?: LoroTree
   protected _params: TreeRefParams<DataShape>
+  private _$?: TreeRefMetaNamespace
 
   constructor(params: TreeRefParams<DataShape>) {
     this._params = params
+  }
+
+  /**
+   * Meta-operations namespace for accessing underlying Loro primitives.
+   *
+   * @example
+   * ```typescript
+   * // Access the underlying LoroDoc
+   * treeRef.$.loroDoc?.subscribe((event) => console.log("Doc changed"))
+   *
+   * // Access the underlying LoroTree container
+   * treeRef.$.loroContainer  // LoroTree
+   *
+   * // Subscribe to tree-level changes
+   * treeRef.$.subscribe((event) => console.log("Tree changed"))
+   * ```
+   */
+  get $(): TreeRefMetaNamespace {
+    if (!this._$) {
+      const self = this
+      this._$ = {
+        get loroDoc(): LoroDoc | undefined {
+          return self._params.getDoc?.()
+        },
+        get loroContainer(): LoroTree {
+          return self.container
+        },
+        subscribe(callback: (event: unknown) => void): Subscription {
+          return self.container.subscribe(callback)
+        },
+      }
+    }
+    return this._$
   }
 
   protected get shape(): TreeContainerShape<DataShape> {

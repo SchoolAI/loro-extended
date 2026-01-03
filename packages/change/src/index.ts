@@ -5,7 +5,7 @@ export {
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
 // Functional helpers (recommended API)
-export { change, getLoroDoc } from "./functional-helpers.js"
+export { change, getLoroContainer, getLoroDoc } from "./functional-helpers.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"

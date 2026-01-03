@@ -1,6 +1,26 @@
-import type { LoroDoc } from "loro-crdt"
-import type { DocShape } from "./shape.js"
+import type {
+  LoroCounter,
+  LoroDoc,
+  LoroList,
+  LoroMap,
+  LoroMovableList,
+  LoroText,
+  LoroTree,
+} from "loro-crdt"
+import type {
+  ContainerShape,
+  CounterContainerShape,
+  DocShape,
+  ListContainerShape,
+  MovableListContainerShape,
+  RecordContainerShape,
+  ShapeToContainer,
+  StructContainerShape,
+  TextContainerShape,
+} from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
+import type { TypedRef } from "./typed-refs/base.js"
+import type { TreeRef } from "./typed-refs/tree.js"
 import type { Mutable } from "./types.js"
 
 /**
@@ -41,21 +61,85 @@ export function change<Shape extends DocShape>(
 
 /**
  * Access the underlying LoroDoc for advanced operations.
+ * Works on both TypedDoc and any typed ref (TextRef, CounterRef, ListRef, etc.).
  *
- * @param doc - The TypedDoc to unwrap
- * @returns The underlying LoroDoc instance
+ * @param docOrRef - The TypedDoc or typed ref to unwrap
+ * @returns The underlying LoroDoc instance (or undefined for refs created outside a doc context)
  *
  * @example
  * ```typescript
  * import { getLoroDoc } from "@loro-extended/change"
  *
+ * // From TypedDoc
  * const loroDoc = getLoroDoc(doc)
  * const version = loroDoc.version()
  * loroDoc.subscribe(() => console.log("changed"))
+ *
+ * // From any ref (TextRef, CounterRef, ListRef, etc.)
+ * const titleRef = doc.title
+ * const loroDoc = getLoroDoc(titleRef)
+ * loroDoc?.subscribe(() => console.log("changed"))
  * ```
  */
 export function getLoroDoc<Shape extends DocShape>(
   doc: TypedDoc<Shape>,
-): LoroDoc {
-  return doc.$.loroDoc
+): LoroDoc
+export function getLoroDoc<Shape extends ContainerShape>(
+  ref: TypedRef<Shape>,
+): LoroDoc | undefined
+export function getLoroDoc<DataShape extends StructContainerShape>(
+  ref: TreeRef<DataShape>,
+): LoroDoc | undefined
+export function getLoroDoc(
+  docOrRef: TypedDoc<any> | TypedRef<any> | TreeRef<any>,
+): LoroDoc | undefined {
+  // Check if it's a TypedDoc (has $.loroDoc directly)
+  if ("$" in docOrRef && "loroDoc" in (docOrRef as any).$) {
+    return (docOrRef as any).$.loroDoc
+  }
+  return undefined
+}
+
+/**
+ * Access the underlying Loro container from a typed ref.
+ * Returns the correctly-typed container based on the ref type.
+ *
+ * @param ref - The typed ref to unwrap
+ * @returns The underlying Loro container (LoroText, LoroCounter, LoroList, etc.)
+ *
+ * @example
+ * ```typescript
+ * import { getLoroContainer } from "@loro-extended/change"
+ *
+ * const titleRef = doc.title
+ * const loroText = getLoroContainer(titleRef)  // LoroText
+ *
+ * const countRef = doc.count
+ * const loroCounter = getLoroContainer(countRef)  // LoroCounter
+ *
+ * const itemsRef = doc.items
+ * const loroList = getLoroContainer(itemsRef)  // LoroList
+ *
+ * // Subscribe to container-level changes
+ * loroText.subscribe((event) => console.log("Text changed:", event))
+ * ```
+ */
+export function getLoroContainer(ref: TypedRef<TextContainerShape>): LoroText
+export function getLoroContainer(
+  ref: TypedRef<CounterContainerShape>,
+): LoroCounter
+export function getLoroContainer(ref: TypedRef<ListContainerShape>): LoroList
+export function getLoroContainer(
+  ref: TypedRef<MovableListContainerShape>,
+): LoroMovableList
+export function getLoroContainer(ref: TypedRef<RecordContainerShape>): LoroMap
+export function getLoroContainer(ref: TypedRef<StructContainerShape>): LoroMap
+export function getLoroContainer<DataShape extends StructContainerShape>(
+  ref: TreeRef<DataShape>,
+): LoroTree
+export function getLoroContainer<Shape extends ContainerShape>(
+  ref: TypedRef<Shape>,
+): ShapeToContainer<Shape>
+export function getLoroContainer(ref: TypedRef<any> | TreeRef<any>): unknown {
+  return ref.$.loroContainer
 }
