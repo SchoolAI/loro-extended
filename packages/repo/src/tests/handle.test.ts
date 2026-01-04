@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { loro, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
@@ -39,8 +39,8 @@ describe("Handle", () => {
 
       // doc should be a TypedDoc
       expect(handle.doc).toBeDefined()
-      expect(handle.doc.$).toBeDefined()
-      expect(handle.doc.$.loroDoc).toBeDefined()
+      expect(loro(handle.doc)).toBeDefined()
+      expect(loro(handle.doc).doc).toBeDefined()
 
       // Can use typed mutations
       handle.change(draft => {
@@ -78,14 +78,14 @@ describe("Handle", () => {
 
       // doc should still be a TypedDoc (with unknown types for the 'doc' field)
       expect(handle.doc).toBeDefined()
-      expect(handle.doc.$).toBeDefined()
-      expect(handle.doc.$.loroDoc).toBeDefined()
+      expect(loro(handle.doc)).toBeDefined()
+      expect(loro(handle.doc).doc).toBeDefined()
 
       // Can use raw LoroDoc access for the 'doc' container
-      handle.doc.$.loroDoc.getMap("doc").set("key", "value")
+      loro(handle.doc).doc.getMap("doc").set("key", "value")
 
       // Can read via loroDoc
-      const docMap = handle.doc.$.loroDoc.getMap("doc")
+      const docMap = loro(handle.doc).doc.getMap("doc")
       expect(docMap.get("key")).toBe("value")
     })
   })

@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { Shape, loro } from "@loro-extended/change"
 import { beforeEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { Handle } from "./handle.js"
@@ -72,7 +72,7 @@ describe("Repo", () => {
       expect(handle.doc).toBeDefined()
 
       // Access raw LoroDoc via escape hatch
-      const loroDoc = handle.doc.$.loroDoc
+      const loroDoc = loro(handle.doc).doc
       const map = loroDoc.getMap("doc")
       map.set("key", "value")
       expect(map.get("key")).toBe("value")

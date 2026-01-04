@@ -11,6 +11,7 @@ import {
   createTypedDoc,
   evaluatePath,
   hasWildcard,
+  loro,
   type PathBuilder,
   type PathSelector,
   type TypedDoc,
@@ -401,14 +402,14 @@ export class Handle<
    * ```
    */
   get loroDoc(): LoroDoc {
-    return this._doc.$.loroDoc
+    return loro(this._doc).doc
   }
 
   /**
    * Convenience method: change a set of mutations in a single commit.
    */
   change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {
-    return this._doc.$.change(fn)
+    return this._doc.change(fn)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -498,7 +499,7 @@ export class Handle<
     // A regular Listener takes 1 argument and has no second argument
     // A path selector function also takes 1 argument but MUST have a second argument (the listener)
     if (typeof listenerOrSelectorOrJsonpath === "function" && !pathListener) {
-      return this._doc.$.loroDoc.subscribe(
+      return loro(this._doc).doc.subscribe(
         listenerOrSelectorOrJsonpath as Listener,
       )
     }
@@ -506,7 +507,7 @@ export class Handle<
     // Case 2: Raw JSONPath string (escape hatch)
     if (typeof listenerOrSelectorOrJsonpath === "string") {
       const jsonpath = listenerOrSelectorOrJsonpath
-      const loroDoc = this._doc.$.loroDoc
+      const loroDoc = loro(this._doc).doc
 
       if (!pathListener) {
         throw new Error("JSONPath subscription requires a listener callback")
@@ -556,7 +557,7 @@ export class Handle<
       listener(newValue, prev)
     }
 
-    return this._doc.$.loroDoc.subscribeJsonpath(jsonpath, wrappedCallback)
+    return loro(this._doc).doc.subscribeJsonpath(jsonpath, wrappedCallback)
   }
 
   /**
@@ -572,7 +573,7 @@ export class Handle<
    * ```
    */
   jsonPath(path: string): unknown[] {
-    return this._doc.$.loroDoc.JSONPath(path)
+    return loro(this._doc).doc.JSONPath(path)
   }
 
   // ═══════════════════════════════════════════════════════════════
