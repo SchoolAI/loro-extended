@@ -20,7 +20,7 @@ import { TreeRefInternals } from "./tree-ref-internals.js"
  *   facts: Shape.record(Shape.plain.any()),
  * })
  *
- * doc.$.change(draft => {
+ * doc.change(draft => {
  *   const root = draft.states.createNode({ name: "idle", facts: {} })
  *   const child = root.createNode({ name: "running", facts: {} })
  *   child.data.name = "active"

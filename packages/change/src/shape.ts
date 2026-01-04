@@ -525,7 +525,7 @@ export const Shape = {
    *   states: Shape.tree(StateNodeDataShape),
    * })
    *
-   * doc.$.change(draft => {
+   * doc.change(draft => {
    *   const root = draft.states.createNode({ name: "idle", facts: {} })
    *   const child = root.createNode({ name: "running", facts: {} })
    *   child.data.name = "active"

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { createPathBuilder } from "./path-builder.js"
 import { compileToJsonPath, hasWildcard } from "./path-compiler.js"
-import { evaluatePathOnValue } from "./path-evaluator.js"
+import { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
 import { Shape } from "./shape.js"
+import { createTypedDoc } from "./typed-doc.js"
 
 describe("Path Selector DSL", () => {
   const docShape = Shape.doc({
@@ -317,6 +318,82 @@ describe("Path Selector DSL", () => {
         { type: "property" as const, key: "title" },
       ]
       expect(evaluatePathOnValue({ books: [] }, segments)).toEqual([])
+    })
+  })
+
+  describe("evaluatePath with TypedDoc", () => {
+    it("should evaluate path on a real TypedDoc", () => {
+      const doc = createTypedDoc(docShape)
+
+      // Add some data
+      doc.change(draft => {
+        draft.config.theme = "light"
+      })
+
+      const builder = createPathBuilder(docShape)
+      const selector = builder.config.theme
+
+      const result = evaluatePath(doc, selector)
+      expect(result).toBe("light")
+    })
+
+    it("should evaluate path with $each on list", () => {
+      const doc = createTypedDoc(docShape)
+
+      // Add some books
+      doc.change(draft => {
+        draft.books.push({ title: "First Book", price: 10, author: { name: "Author A" } })
+        draft.books.push({ title: "Second Book", price: 20, author: { name: "Author B" } })
+      })
+
+      const builder = createPathBuilder(docShape)
+      const selector = builder.books.$each.title
+
+      const result = evaluatePath(doc, selector)
+      expect(result).toEqual(["First Book", "Second Book"])
+    })
+
+    it("should evaluate path with $at on list", () => {
+      const doc = createTypedDoc(docShape)
+
+      // Add some books
+      doc.change(draft => {
+        draft.books.push({ title: "First Book", price: 10, author: { name: "Author A" } })
+        draft.books.push({ title: "Second Book", price: 20, author: { name: "Author B" } })
+      })
+
+      const builder = createPathBuilder(docShape)
+      const selector = builder.books.$at(1).title
+
+      const result = evaluatePath(doc, selector)
+      expect(result).toBe("Second Book")
+    })
+
+    it("should evaluate path with $key on record", () => {
+      const doc = createTypedDoc(docShape)
+
+      // Add some users
+      doc.change(draft => {
+        draft.users.set("alice", { name: "Alice Smith", score: 100 })
+        draft.users.set("bob", { name: "Bob Jones", score: 200 })
+      })
+
+      const builder = createPathBuilder(docShape)
+      const selector = builder.users.$key("alice").name
+
+      const result = evaluatePath(doc, selector)
+      expect(result).toBe("Alice Smith")
+    })
+
+    it("should return placeholder values for empty doc", () => {
+      const doc = createTypedDoc(docShape)
+
+      const builder = createPathBuilder(docShape)
+      const selector = builder.config.theme
+
+      // Should return the placeholder (empty string for plain.string())
+      const result = evaluatePath(doc, selector)
+      expect(result).toBe("")
     })
   })
 })

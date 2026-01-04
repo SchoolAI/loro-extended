@@ -27,7 +27,7 @@ export function evaluatePath<D extends DocShape, T>(
   doc: TypedDoc<D>,
   selector: PathSelector<T>,
 ): T {
-  const json = doc.$.toJSON()
+  const json = doc.toJSON()
   return evaluatePathOnValue(json, selector.__segments) as T
 }
 
