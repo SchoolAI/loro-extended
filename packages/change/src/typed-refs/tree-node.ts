@@ -3,7 +3,7 @@ import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import type { TypedRefParams } from "./base.js"
-import { StructRef } from "./struct.js"
+import { createStructRef, type StructRef } from "./struct.js"
 
 // Forward declaration to avoid circular import
 // TreeRef will be passed in via constructor params
@@ -94,7 +94,7 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
           getDoc: this._getDoc,
         }
 
-      this._dataRef = new StructRef(params)
+      this._dataRef = createStructRef(params)
     }
 
     return this._dataRef as StructRef<DataShape["shapes"]> & {

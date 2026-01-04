@@ -39,8 +39,8 @@ describe("JSON Patch Integration", () => {
 
       // First set some values
       change(typedDoc, draft => {
-        draft.config.set("theme", "dark")
-        draft.config.set("debug", false)
+        draft.config.theme = "dark"
+        draft.config.debug = false
       })
 
       const patch: JsonPatch = [{ op: "remove", path: "/config/debug" }]
@@ -63,8 +63,8 @@ describe("JSON Patch Integration", () => {
 
       // Set initial values
       change(typedDoc, draft => {
-        draft.settings.set("language", "fr")
-        draft.settings.set("volume", 75)
+        draft.settings.language = "fr"
+        draft.settings.volume = 75
       })
 
       const patch: JsonPatch = [
@@ -370,7 +370,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       change(typedDoc, draft => {
-        draft.config.set("version", "2.0.0")
+        draft.config.version = "2.0.0"
       })
 
       const patch: JsonPatch = [

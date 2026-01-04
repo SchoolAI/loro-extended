@@ -312,7 +312,7 @@ describe("CRDT Operations", () => {
   })
 
   describe("Map Operations", () => {
-    it("should handle set, get, and delete operations", () => {
+    it("should handle property assignment operations", () => {
       const schema = Shape.doc({
         metadata: Shape.struct({
           title: Shape.plain.string(),
@@ -324,14 +324,13 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.metadata.set("title", "Test Title")
-        draft.metadata.set("count", 42)
-        draft.metadata.set("enabled", true)
-        draft.metadata.delete("count")
+        draft.metadata.title = "Test Title"
+        draft.metadata.count = 42
+        draft.metadata.enabled = true
       }).toJSON()
 
       expect(result.metadata.title).toBe("Test Title")
-      expect(result.metadata.count).toBe(1) // Should fall back to empty state
+      expect(result.metadata.count).toBe(42)
       expect(result.metadata.enabled).toBe(true)
     })
 
@@ -346,15 +345,15 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.config.set("tags", ["tag1", "tag2", "tag3"])
-        draft.config.set("numbers", [1, 2, 3])
+        draft.config.tags = ["tag1", "tag2", "tag3"]
+        draft.config.numbers = [1, 2, 3]
       }).toJSON()
 
       expect(result.config.tags).toEqual(["tag1", "tag2", "tag3"])
       expect(result.config.numbers).toEqual([1, 2, 3])
     })
 
-    it("should provide map utility methods", () => {
+    it("should provide JavaScript-native object methods", () => {
       const schema = Shape.doc({
         testMap: Shape.struct({
           key1: Shape.plain.string(),
@@ -365,17 +364,16 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       change(typedDoc, draft => {
-        draft.testMap.set("key1", "value1")
-        draft.testMap.set("key2", 123)
+        draft.testMap.key1 = "value1"
+        draft.testMap.key2 = 123
 
-        expect(draft.testMap.get("key1")).toBe("value1")
-        expect(draft.testMap.has("key1")).toBe(true)
-        // Note: TypeScript enforces key constraints, so we can't test nonexistent keys
-        expect(draft.testMap.size).toBe(2)
-        expect(draft.testMap.keys()).toContain("key1")
-        expect(draft.testMap.keys()).toContain("key2")
-        expect(draft.testMap.values()).toContain("value1")
-        expect(draft.testMap.values()).toContain(123)
+        expect(draft.testMap.key1).toBe("value1")
+        expect("key1" in draft.testMap).toBe(true)
+        // Use Object.keys() instead of .keys()
+        expect(Object.keys(draft.testMap)).toContain("key1")
+        expect(Object.keys(draft.testMap)).toContain("key2")
+        expect(Object.values(draft.testMap)).toContain("value1")
+        expect(Object.values(draft.testMap)).toContain(123)
       })
     })
 
@@ -475,8 +473,8 @@ describe("Nested Operations", () => {
       const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "Nested Article")
         draft.article.metadata.views.increment(10)
-        draft.article.metadata.author.set("name", "John Doe")
-        draft.article.metadata.author.set("email", "john@example.com")
+        draft.article.metadata.author.name = "John Doe"
+        draft.article.metadata.author.email = "john@example.com"
       }).toJSON()
 
       expect(result.article.title).toBe("Nested Article")
@@ -498,8 +496,8 @@ describe("Nested Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.mixed.set("plainString", "Hello")
-        draft.mixed.set("plainArray", [1, 2, 3])
+        draft.mixed.plainString = "Hello"
+        draft.mixed.plainArray = [1, 2, 3]
         draft.mixed.loroText.insert(0, "Loro Text")
         draft.mixed.loroCounter.increment(5)
       }).toJSON()
@@ -706,7 +704,7 @@ describe("TypedLoroDoc", () => {
       const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "New Title")
         draft.article.metadata.views.increment(10)
-        draft.article.metadata.set("author", "John Doe")
+        draft.article.metadata.author = "John Doe"
       }).toJSON()
 
       expect(result.article.title).toBe("New Title")
@@ -731,8 +729,8 @@ describe("TypedLoroDoc", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.profile.set("name", "John Doe")
-        draft.profile.set("email", "john@example.com")
+        draft.profile.name = "John Doe"
+        draft.profile.email = "john@example.com"
       }).toJSON()
 
       expect(result.profile.name).toBe("John Doe")
@@ -756,14 +754,14 @@ describe("TypedLoroDoc", () => {
 
           // Should accept string value
           const result = change(typedDoc, draft => {
-            draft.profile.set("email", "test@example.com")
+            draft.profile.email = "test@example.com"
           }).toJSON()
 
           expect(result.profile.email).toBe("test@example.com")
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.profile.set("email", null)
+            draft.profile.email = null
           }).toJSON()
 
           expect(result2.profile.email).toBeNull()
@@ -781,7 +779,7 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().stats.age).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.stats.set("age", 25)
+            draft.stats.age = 25
           }).toJSON()
 
           expect(result.stats.age).toBe(25)
@@ -799,7 +797,7 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().settings.enabled).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.settings.set("enabled", true)
+            draft.settings.enabled = true
           }).toJSON()
 
           expect(result.settings.enabled).toBe(true)
@@ -817,14 +815,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.candidates).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.set("candidates", { a: "Alice", b: "Bob" })
+            draft.data.candidates = { a: "Alice", b: "Bob" }
           }).toJSON()
 
           expect(result.data.candidates).toEqual({ a: "Alice", b: "Bob" })
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.set("candidates", null)
+            draft.data.candidates = null
           }).toJSON()
 
           expect(result2.data.candidates).toBeNull()
@@ -842,14 +840,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.tags).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.set("tags", ["a", "b", "c"])
+            draft.data.tags = ["a", "b", "c"]
           }).toJSON()
 
           expect(result.data.tags).toEqual(["a", "b", "c"])
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.set("tags", null)
+            draft.data.tags = null
           }).toJSON()
 
           expect(result2.data.tags).toBeNull()
@@ -872,14 +870,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.point).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.set("point", { x: 10, y: 20 })
+            draft.data.point = { x: 10, y: 20 }
           }).toJSON()
 
           expect(result.data.point).toEqual({ x: 10, y: 20 })
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.set("point", null)
+            draft.data.point = null
           }).toJSON()
 
           expect(result2.data.point).toBeNull()
@@ -901,7 +899,7 @@ describe("TypedLoroDoc", () => {
 
           // Should still accept null
           const result = change(typedDoc, draft => {
-            draft.profile.set("name", null)
+            draft.profile.name = null
           }).toJSON()
 
           expect(result.profile.name).toBeNull()
@@ -934,12 +932,12 @@ describe("TypedLoroDoc", () => {
 
           // TypeScript should allow these assignments
           change(typedDoc, draft => {
-            draft.data.set("nullableString", "hello")
-            draft.data.set("nullableString", null)
-            draft.data.set("nullableNumber", 42)
-            draft.data.set("nullableNumber", null)
-            draft.data.set("nullableBoolean", true)
-            draft.data.set("nullableBoolean", null)
+            draft.data.nullableString = "hello"
+            draft.data.nullableString = null
+            draft.data.nullableNumber = 42
+            draft.data.nullableNumber = null
+            draft.data.nullableBoolean = true
+            draft.data.nullableBoolean = null
           })
 
           // Verify the types work correctly
@@ -980,10 +978,10 @@ describe("TypedLoroDoc", () => {
 
           // Both should accept same operations
           change(doc1, draft => {
-            draft.profile.set("email", "test@example.com")
+            draft.profile.email = "test@example.com"
           })
           change(doc2, draft => {
-            draft.profile.set("email", "test@example.com")
+            draft.profile.email = "test@example.com"
           })
 
           expect(doc1.toJSON()).toEqual(doc2.toJSON())
@@ -1207,7 +1205,7 @@ describe("Edge Cases and Error Handling", () => {
       // Multiple changes
       change(typedDoc, draft => {
         draft.title.insert(0, "First Title")
-        draft.metadata.set("author", "John Doe")
+        draft.metadata.author = "John Doe"
       })
 
       // Use toJSON() to get plain values for comparison
@@ -1219,7 +1217,7 @@ describe("Edge Cases and Error Handling", () => {
       // More changes
       change(typedDoc, draft => {
         draft.title.update("Updated Title")
-        draft.metadata.set("publishedAt", "2025-12-01")
+        draft.metadata.publishedAt = "2025-12-01"
       })
 
       result = typedDoc.toJSON()

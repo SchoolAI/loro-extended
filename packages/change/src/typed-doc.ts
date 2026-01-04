@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
-import { LoroDoc } from "loro-crdt"
+import { LoroDoc, type Subscription } from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import {
   type JsonPatch,
@@ -8,6 +8,7 @@ import {
   type JsonPatchOperation,
   normalizePath,
 } from "./json-patch.js"
+import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
 import { DocRef } from "./typed-refs/doc.js"
@@ -171,7 +172,6 @@ class TypedDocInternal<Shape extends DocShape> {
 /**
  * The proxied TypedDoc type that provides direct schema access.
  * Schema properties are accessed directly on the doc object.
- * Meta-operations are available via the $ namespace.
  *
  * @example
  * ```typescript
@@ -185,15 +185,44 @@ class TypedDocInternal<Shape extends DocShape> {
  * const snapshot = doc.toJSON();
  * const users = doc.users.toJSON();
  *
- * // Meta-operations via $ (escape hatch)
- * doc.$.change(draft => { ... });
- * doc.$.loroDoc;
+ * // Batched mutations via change()
+ * doc.change(draft => {
+ *   draft.count.increment(10);
+ *   draft.title.update("World");
+ * });
+ *
+ * // Access CRDT internals via loro()
+ * import { loro } from "@loro-extended/change";
+ * loro(doc).doc;  // LoroDoc
+ * loro(doc).subscribe(callback);
  * ```
  */
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
   /**
+   * The primary method of mutating typed documents.
+   * Batches multiple mutations into a single transaction.
+   * All changes commit together at the end.
+   *
+   * Use this for:
+   * - Find-and-mutate operations (required due to JS limitations)
+   * - Performance (fewer commits)
+   * - Atomic undo (all changes = one undo step)
+   *
+   * Returns the doc for chaining.
+   *
+   * @example
+   * ```typescript
+   * doc.change(draft => {
+   *   draft.count.increment(10);
+   *   draft.title.update("World");
+   * });
+   * ```
+   */
+  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
+
+  /**
    * Meta-operations namespace.
-   * Use for change(), loroDoc, etc.
+   * @deprecated Use `loro(doc)` instead for CRDT access, and `doc.change()` for mutations.
    */
   $: TypedDocMeta<Shape>
 
@@ -216,7 +245,7 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  *
  * @param shape - The document schema (with optional .placeholder() values)
  * @param existingDoc - Optional existing LoroDoc to wrap
- * @returns A proxied TypedDoc with direct schema access and $ namespace
+ * @returns A proxied TypedDoc with direct schema access
  *
  * @example
  * ```typescript
@@ -231,14 +260,19 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  * doc.count.increment(5);
  * doc.title.insert(0, "Hello");
  *
- * // Batched mutations are committed together via `change`
- * doc.$.change(draft => {
+ * // Batched mutations via change()
+ * doc.change(draft => {
  *   draft.count.increment(10);
  *   draft.title.update("World");
  * });
  *
  * // Get plain JSON
  * const snapshot = doc.toJSON();
+ *
+ * // Access CRDT internals via loro()
+ * import { loro } from "@loro-extended/change";
+ * loro(doc).doc;  // LoroDoc
+ * loro(doc).subscribe(callback);
  * ```
  */
 export function createTypedDoc<Shape extends DocShape>(
@@ -248,11 +282,51 @@ export function createTypedDoc<Shape extends DocShape>(
   const internal = new TypedDocInternal(shape, existingDoc || new LoroDoc())
   const meta = new TypedDocMeta(internal)
 
+  // Create the loro() namespace for this doc
+  const loroNamespace: LoroTypedDocRef = {
+    get doc(): LoroDoc {
+      return internal.loroDoc
+    },
+    get container(): LoroDoc {
+      return internal.loroDoc
+    },
+    subscribe(callback: (event: unknown) => void): Subscription {
+      return internal.loroDoc.subscribe(callback)
+    },
+    applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void {
+      internal.applyPatch(patch, pathPrefix)
+    },
+    get docShape(): DocShape {
+      return internal.docShape
+    },
+    get rawValue(): unknown {
+      return internal.rawValue
+    },
+  }
+
+  // Create the change() function that returns the proxy for chaining
+  const changeFunction = (
+    fn: (draft: Mutable<Shape>) => void,
+  ): TypedDoc<Shape> => {
+    internal.change(fn)
+    return proxy
+  }
+
   // Create a proxy that delegates schema properties to the DocRef
-  // and provides $ namespace for meta-operations
+  // and provides change() and $ namespace
   const proxy = new Proxy(internal.value as object, {
     get(target, prop, receiver) {
-      // $ namespace for meta-operations
+      // loro() access via well-known symbol
+      if (prop === LORO_SYMBOL) {
+        return loroNamespace
+      }
+
+      // change() method directly on doc
+      if (prop === "change") {
+        return changeFunction
+      }
+
+      // $ namespace for meta-operations (deprecated, kept for backward compatibility)
       if (prop === "$") {
         return meta
       }
@@ -267,8 +341,8 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     set(target, prop, value, receiver) {
-      // Don't allow setting $ namespace
-      if (prop === "$") {
+      // Don't allow setting $, change, or LORO_SYMBOL
+      if (prop === "$" || prop === LORO_SYMBOL || prop === "change") {
         return false
       }
 
@@ -278,11 +352,11 @@ export function createTypedDoc<Shape extends DocShape>(
 
     // Support 'in' operator
     has(target, prop) {
-      if (prop === "$") return true
+      if (prop === "$" || prop === LORO_SYMBOL || prop === "change") return true
       return Reflect.has(target, prop)
     },
 
-    // Support Object.keys() - don't include $ in enumeration
+    // Support Object.keys() - don't include $, change, or LORO_SYMBOL in enumeration
     ownKeys(target) {
       return Reflect.ownKeys(target)
     },
@@ -293,6 +367,20 @@ export function createTypedDoc<Shape extends DocShape>(
           configurable: true,
           enumerable: false,
           value: meta,
+        }
+      }
+      if (prop === "change") {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: changeFunction,
+        }
+      }
+      if (prop === LORO_SYMBOL) {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: loroNamespace,
         }
       }
       return Reflect.getOwnPropertyDescriptor(target, prop)

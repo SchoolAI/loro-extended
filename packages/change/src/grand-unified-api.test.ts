@@ -245,7 +245,7 @@ describe("Grand Unified API v3", () => {
       // Direct mutations on nested containers
       doc.article.title.insert(0, "My Article")
       doc.article.metadata.views.increment(100)
-      doc.article.metadata.set("author", "John Doe")
+      doc.article.metadata.author = "John Doe"
 
       const result = doc.toJSON()
       expect(result.article.title).toBe("My Article")

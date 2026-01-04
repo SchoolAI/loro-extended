@@ -26,7 +26,7 @@ describe("Overlay and Placeholder Handling", () => {
 
       // Set only the name, 'role' should default to 'guest'
       change(typedDoc, draft => {
-        draft.user.profile.set("name", "Alice")
+        draft.user.profile.name = "Alice"
       })
 
       const json = typedDoc.toJSON()

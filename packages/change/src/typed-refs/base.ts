@@ -1,4 +1,5 @@
 import type { LoroDoc, Subscription } from "loro-crdt"
+import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
 
@@ -14,15 +15,19 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
 /**
  * Meta-operations namespace for typed refs.
  * Provides access to underlying Loro primitives.
+ *
+ * @deprecated Use `loro(ref)` instead. The `$` namespace will be removed in a future version.
  */
 export interface RefMetaNamespace<Shape extends DocShape | ContainerShape> {
   /**
    * Access the underlying LoroDoc.
+   * @deprecated Use `loro(ref).doc` instead.
    */
   readonly loroDoc: LoroDoc
 
   /**
    * Access the underlying Loro container (correctly typed).
+   * @deprecated Use `loro(ref).container` instead.
    */
   readonly loroContainer: ShapeToContainer<Shape>
 
@@ -30,6 +35,7 @@ export interface RefMetaNamespace<Shape extends DocShape | ContainerShape> {
    * Subscribe to container-level changes.
    * @param callback - Function called when the container changes
    * @returns Unsubscribe function
+   * @deprecated Use `loro(ref).subscribe(callback)` instead.
    */
   subscribe(callback: (event: unknown) => void): Subscription
 }
@@ -38,6 +44,7 @@ export interface RefMetaNamespace<Shape extends DocShape | ContainerShape> {
 export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   protected _cachedContainer?: ShapeToContainer<Shape>
   private _$?: RefMetaNamespace<Shape>
+  private _loroNamespace?: LoroRefBase
 
   constructor(protected _params: TypedRefParams<Shape>) {}
 
@@ -52,16 +59,20 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   /**
    * Meta-operations namespace for accessing underlying Loro primitives.
    *
+   * @deprecated Use `loro(ref)` instead. The `$` namespace will be removed in a future version.
+   *
    * @example
    * ```typescript
-   * // Access the underlying LoroDoc
-   * textRef.$.loroDoc.subscribe((event) => console.log("Doc changed"))
+   * // OLD (deprecated):
+   * textRef.$.loroDoc
+   * textRef.$.loroContainer
+   * textRef.$.subscribe(callback)
    *
-   * // Access the underlying Loro container (correctly typed)
-   * textRef.$.loroContainer  // LoroText
-   *
-   * // Subscribe to container-level changes
-   * textRef.$.subscribe((event) => console.log("Text changed"))
+   * // NEW (recommended):
+   * import { loro } from "@loro-extended/change"
+   * loro(textRef).doc
+   * loro(textRef).container
+   * loro(textRef).subscribe(callback)
    * ```
    */
   get $(): RefMetaNamespace<Shape> {
@@ -81,6 +92,37 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
       }
     }
     return this._$
+  }
+
+  /**
+   * Access the loro() namespace via the well-known symbol.
+   * This is used by the loro() function to access CRDT internals.
+   * Subclasses can override createLoroNamespace() to add container-specific methods.
+   */
+  get [LORO_SYMBOL](): LoroRefBase {
+    if (!this._loroNamespace) {
+      this._loroNamespace = this.createLoroNamespace()
+    }
+    return this._loroNamespace
+  }
+
+  /**
+   * Creates the loro() namespace object.
+   * Subclasses can override this to add container-specific methods.
+   */
+  protected createLoroNamespace(): LoroRefBase {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self._params.getDoc()
+      },
+      get container(): unknown {
+        return self.container
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        return (self.container as any).subscribe(callback)
+      },
+    }
   }
 
   protected get shape(): Shape {

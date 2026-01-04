@@ -135,7 +135,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.set("playerLocationName", "Starting Village")
+        draft.meta.playerLocationName = "Starting Village"
       }).toJSON()
 
       expect(result.meta.playerLocationName).toBe("Starting Village")
@@ -145,11 +145,11 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       change(typedDoc, draft => {
-        draft.meta.set("playerLocationName", "Starting Village")
+        draft.meta.playerLocationName = "Starting Village"
       })
 
       const result = change(typedDoc, draft => {
-        draft.meta.set("playerLocationName", null)
+        draft.meta.playerLocationName = null
       }).toJSON()
 
       expect(result.meta.playerLocationName).toBeNull()
@@ -159,7 +159,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.set("worldMood", "rising-tensions")
+        draft.meta.worldMood = "rising-tensions"
       }).toJSON()
 
       expect(result.meta.worldMood).toBe("rising-tensions")
@@ -169,7 +169,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.set("currentAct", "confrontation")
+        draft.meta.currentAct = "confrontation"
       }).toJSON()
 
       expect(result.meta.currentAct).toBe("confrontation")
@@ -179,7 +179,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.set("flourish", "brief")
+        draft.meta.flourish = "brief"
       }).toJSON()
 
       expect(result.meta.flourish).toBe("brief")
@@ -700,7 +700,7 @@ describe("WorldStateSchema", () => {
         })
 
         // Update meta
-        draft.meta.set("playerLocationName", "Tavern")
+        draft.meta.playerLocationName = "Tavern"
       }).toJSON()
 
       expect(result.map.locations).toHaveLength(1)
@@ -721,7 +721,7 @@ describe("WorldStateSchema", () => {
           creationContext: "Init",
           items: [],
         })
-        draft.meta.set("playerLocationName", "Village")
+        draft.meta.playerLocationName = "Village"
       })
 
       // Second change: add character

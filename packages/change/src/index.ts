@@ -6,6 +6,18 @@ export {
 } from "./derive-placeholder.js"
 // Functional helpers (recommended API)
 export { change, getLoroContainer, getLoroDoc } from "./functional-helpers.js"
+// The loro() escape hatch for CRDT internals
+export {
+  LORO_SYMBOL,
+  type LoroCounterRef,
+  type LoroListRef,
+  type LoroMapRef,
+  type LoroRefBase,
+  type LoroTextRef,
+  type LoroTreeRef,
+  type LoroTypedDocRef,
+  loro,
+} from "./loro.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"

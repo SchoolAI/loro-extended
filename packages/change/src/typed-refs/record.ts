@@ -1,5 +1,12 @@
-import type { Container, LoroMap, Value } from "loro-crdt"
+import type {
+  Container,
+  LoroDoc,
+  LoroMap,
+  Subscription,
+  Value,
+} from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
+import type { LoroMapRef } from "../loro.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -30,6 +37,29 @@ export class RecordRef<
 
   protected get container(): LoroMap {
     return super.container as LoroMap
+  }
+
+  /**
+   * Override to add record-specific methods to the loro() namespace.
+   */
+  protected override createLoroNamespace(): LoroMapRef {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self._params.getDoc()
+      },
+      get container(): LoroMap {
+        return self.container
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        return self.container.subscribe(callback)
+      },
+      setContainer(key: string, container: Container): Container {
+        const result = self.container.setContainer(key, container)
+        self.commitIfAuto()
+        return result
+      },
+    }
   }
 
   absorbPlainValues() {

@@ -1,11 +1,11 @@
-import type { LoroTree, LoroTreeNode, TreeID } from "loro-crdt"
+import type { LoroTreeNode, TreeID } from "loro-crdt"
 import type {
   StructContainerShape,
   TreeContainerShape,
   TreeNodeJSON,
 } from "../shape.js"
-import type { Infer, InferRaw } from "../types.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import type { Infer } from "../types.js"
+import { TypedRef } from "./base.js"
 import { TreeNodeRef } from "./tree-node.js"
 
 /**
@@ -26,14 +26,10 @@ import { TreeNodeRef } from "./tree-node.js"
  * })
  * ```
  */
-export class TreeRef<
-  DataShape extends StructContainerShape,
-> extends TypedRef<TreeContainerShape<DataShape>> {
+export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
+  TreeContainerShape<DataShape>
+> {
   private nodeCache = new Map<TreeID, TreeNodeRef<DataShape>>()
-
-  constructor(params: TypedRefParams<TreeContainerShape<DataShape>>) {
-    super(params)
-  }
 
   /**
    * Get the data shape for tree nodes.

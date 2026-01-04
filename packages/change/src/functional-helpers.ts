@@ -7,7 +7,9 @@ import type {
   LoroText,
   LoroTree,
 } from "loro-crdt"
+import { loro } from "./loro.js"
 import type {
+  ContainerOrValueShape,
   ContainerShape,
   CounterContainerShape,
   DocShape,
@@ -20,6 +22,7 @@ import type {
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
 import type { TypedRef } from "./typed-refs/base.js"
+import type { StructRef } from "./typed-refs/struct.js"
 import type { TreeRef } from "./typed-refs/tree.js"
 import type { Mutable } from "./types.js"
 
@@ -56,7 +59,7 @@ export function change<Shape extends DocShape>(
   doc: TypedDoc<Shape>,
   fn: (draft: Mutable<Shape>) => void,
 ): TypedDoc<Shape> {
-  return doc.$.change(fn)
+  return doc.change(fn)
 }
 
 /**
@@ -93,11 +96,8 @@ export function getLoroDoc<DataShape extends StructContainerShape>(
 export function getLoroDoc(
   docOrRef: TypedDoc<any> | TypedRef<any> | TreeRef<any>,
 ): LoroDoc {
-  // Check if it's a TypedDoc or TypedRef (has $.loroDoc directly)
-  if ("$" in docOrRef && "loroDoc" in (docOrRef as any).$) {
-    return (docOrRef as any).$.loroDoc
-  }
-  throw new Error("Invalid argument: expected TypedDoc or TypedRef")
+  // Use loro() to access the underlying LoroDoc
+  return loro(docOrRef as any).doc
 }
 
 /**
@@ -134,12 +134,18 @@ export function getLoroContainer(
 ): LoroMovableList
 export function getLoroContainer(ref: TypedRef<RecordContainerShape>): LoroMap
 export function getLoroContainer(ref: TypedRef<StructContainerShape>): LoroMap
+export function getLoroContainer<
+  NestedShapes extends Record<string, ContainerOrValueShape>,
+>(ref: StructRef<NestedShapes>): LoroMap
 export function getLoroContainer<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape>,
 ): LoroTree
 export function getLoroContainer<Shape extends ContainerShape>(
   ref: TypedRef<Shape>,
 ): ShapeToContainer<Shape>
-export function getLoroContainer(ref: TypedRef<any> | TreeRef<any>): unknown {
-  return ref.$.loroContainer
+export function getLoroContainer(
+  ref: TypedRef<any> | TreeRef<any> | StructRef<any>,
+): unknown {
+  // Use loro() to access the underlying container
+  return loro(ref as any).container
 }

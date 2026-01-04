@@ -1,6 +1,13 @@
-import type { Container, LoroList, LoroMovableList } from "loro-crdt"
+import type {
+  Container,
+  LoroDoc,
+  LoroList,
+  LoroMovableList,
+  Subscription,
+} from "loro-crdt"
 import { convertInputToRef } from "../conversion.js"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
+import type { LoroListRef } from "../loro.js"
 import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
@@ -35,6 +42,34 @@ export abstract class ListRefBase<
     return super.shape as
       | ListContainerShape<NestedShape>
       | MovableListContainerShape<NestedShape>
+  }
+
+  /**
+   * Override to add list-specific methods to the loro() namespace.
+   */
+  protected override createLoroNamespace(): LoroListRef {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self._params.getDoc()
+      },
+      get container(): LoroList | LoroMovableList {
+        return self.container
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        return self.container.subscribe(callback)
+      },
+      pushContainer(container: Container): Container {
+        const result = self.container.pushContainer(container)
+        self.commitIfAuto()
+        return result
+      },
+      insertContainer(index: number, container: Container): Container {
+        const result = self.container.insertContainer(index, container)
+        self.commitIfAuto()
+        return result
+      },
+    }
   }
 
   absorbPlainValues() {

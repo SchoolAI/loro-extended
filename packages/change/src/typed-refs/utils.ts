@@ -27,7 +27,7 @@ import {
   recordProxyHandler,
 } from "./proxy-handlers.js"
 import { RecordRef } from "./record.js"
-import { StructRef } from "./struct.js"
+import { createStructRef } from "./struct.js"
 import { TextRef } from "./text.js"
 import { TreeRef } from "./tree.js"
 
@@ -152,7 +152,9 @@ export function createContainerTypedRef(
         listProxyHandler,
       )
     case "struct":
-      return new StructRef(params as TypedRefParams<StructContainerShape>)
+      return createStructRef(
+        params as TypedRefParams<StructContainerShape>,
+      ) as unknown as TypedRef<ContainerShape>
     case "movableList":
       return new Proxy(
         new MovableListRef(params as TypedRefParams<MovableListContainerShape>),
@@ -171,7 +173,6 @@ export function createContainerTypedRef(
         shape: treeShape,
         placeholder: params.placeholder as never[],
         getContainer: params.getContainer as () => LoroTree,
-        readonly: params.readonly,
         autoCommit: params.autoCommit,
         getDoc: params.getDoc,
       })
