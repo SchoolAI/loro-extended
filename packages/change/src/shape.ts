@@ -11,12 +11,12 @@ import type {
   Value,
 } from "loro-crdt"
 
-import type { CounterRef } from "./typed-refs/counter.js"
-import type { ListRef } from "./typed-refs/list.js"
-import type { MovableListRef } from "./typed-refs/movable-list.js"
-import type { RecordRef } from "./typed-refs/record.js"
-import type { StructRef } from "./typed-refs/struct.js"
-import type { TextRef } from "./typed-refs/text.js"
+import type { CounterRef } from "./typed-refs/counter-ref.js"
+import type { ListRef } from "./typed-refs/list-ref.js"
+import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
+import type { RecordRef } from "./typed-refs/record-ref.js"
+import type { StructRef } from "./typed-refs/struct-ref.js"
+import type { TextRef } from "./typed-refs/text-ref.js"
 
 // Note: TreeRef is not imported here to avoid circular dependency.
 // The TreeContainerShape uses a placeholder type that gets resolved at runtime.

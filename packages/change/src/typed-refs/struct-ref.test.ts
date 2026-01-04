@@ -123,9 +123,11 @@ describe("Struct value updates across change() calls", () => {
 
       // Update the struct's value properties
       change(doc, draft => {
-        const user = draft.users.getOrCreateRef("user1")
-        user.name = "Bob"
-        user.age = 25
+        const user = draft.users.get("user1")
+        if (user) {
+          user.name = "Bob"
+          user.age = 25
+        }
       })
       expect(doc.users.user1?.name).toBe("Bob") // FAILS: returns "Alice"
       expect(doc.users.user1?.age).toBe(25) // FAILS: returns 30

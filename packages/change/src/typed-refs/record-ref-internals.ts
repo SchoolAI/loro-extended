@@ -12,72 +12,32 @@ import type {
   ContainerShape,
   RecordContainerShape,
 } from "../shape.js"
-import type { Infer, InferMutableType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
-import { TypedRef, INTERNAL_SYMBOL, type RefInternals, TypedRefParams } from "./base.js"
+import { BaseRefInternals, type TypedRef, type TypedRefParams } from "./base.js"
 import {
   absorbCachedPlainValues,
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
   hasContainerConstructor,
-  serializeRefToJSON,
 } from "./utils.js"
 
-// Record typed ref
-export class RecordRef<
+/**
+ * Internal implementation for RecordRef.
+ * Contains all logic, state, and implementation details.
+ */
+export class RecordRefInternals<
   NestedShape extends ContainerOrValueShape,
-> extends TypedRef<any> {
-  [key: string]: InferMutableType<NestedShape> | undefined | any
+> extends BaseRefInternals<any> {
   private refCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
-  protected get shape(): RecordContainerShape<NestedShape> {
-    return super.shape as RecordContainerShape<NestedShape>
-  }
-
-  protected get container(): LoroMap {
-    return super.container as LoroMap
-  }
-
-  /**
-   * Override to add record-specific methods to the loro() namespace.
-   */
-  protected override createLoroNamespace(): LoroMapRef {
-    const self = this
-    return {
-      get doc(): LoroDoc {
-        return self._params.getDoc()
-      },
-      get container(): LoroMap {
-        return self.container
-      },
-      subscribe(callback: (event: unknown) => void): Subscription {
-        return self.container.subscribe(callback)
-      },
-      setContainer(key: string, container: Container): Container {
-        const result = self.container.setContainer(key, container)
-        self.commitIfAuto()
-        return result
-      },
-    }
-  }
-
-  [INTERNAL_SYMBOL]: RefInternals = {
-
-
-    absorbPlainValues: () => {
-    absorbCachedPlainValues(this.refCache, () => this.container)
-  },
-
-
-  }
-
-  getTypedRefParams<S extends ContainerShape>(
+  /** Get typed ref params for creating child refs at a key */
+  getTypedRefParams(
     key: string,
-    shape: S,
+    shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
     // First try to get placeholder from the Record's placeholder (if it has an entry for this key)
-    let placeholder = (this.placeholder as any)?.[key]
+    let placeholder = (this.getPlaceholder() as any)?.[key]
 
     // If no placeholder exists for this key, derive one from the schema's shape
     // This is critical for Records where the placeholder is always {} but nested
@@ -95,27 +55,29 @@ export class RecordRef<
     }
 
     const LoroContainer = containerConstructor[shape._type]
+    const container = this.getContainer() as LoroMap
 
     return {
       shape,
       placeholder,
       getContainer: () =>
-        this.container.getOrCreateContainer(key, new (LoroContainer as any)()),
-      autoCommit: this._params.autoCommit,
-      batchedMutation: this.batchedMutation,
-      getDoc: this._params.getDoc,
+        container.getOrCreateContainer(key, new (LoroContainer as any)()),
+      autoCommit: this.getAutoCommit(),
+      batchedMutation: this.getBatchedMutation(),
+      getDoc: () => this.getDoc(),
     }
   }
 
-  /**
-   * Gets an existing ref for a key, or returns undefined if the key doesn't exist.
-   * Used for reading operations where we want optional chaining to work.
-   */
-  getRef(key: string): any {
+  /** Get a ref for a key without creating (returns undefined for non-existent container keys) */
+  getRef(key: string): unknown {
+    const recordShape = this.getShape() as RecordContainerShape<NestedShape>
+    const shape = recordShape.shape
+    const container = this.getContainer() as LoroMap
+
     // For container shapes, check if the key exists first
     // This allows optional chaining (?.) to work correctly for non-existent keys
-    if (isContainerShape(this.shape.shape)) {
-      const existing = this.container.get(key)
+    if (isContainerShape(shape)) {
+      const existing = container.get(key)
       if (existing === undefined) {
         return undefined
       }
@@ -124,13 +86,11 @@ export class RecordRef<
     return this.getOrCreateRef(key)
   }
 
-  /**
-   * Gets or creates a ref for a key.
-   * Always creates the container if it doesn't exist.
-   * This is the method used for write operations.
-   */
-  getOrCreateRef(key: string): any {
-    const shape = this.shape.shape
+  /** Get or create a ref for a key (always creates for container shapes) */
+  getOrCreateRef(key: string): unknown {
+    const recordShape = this.getShape() as RecordContainerShape<NestedShape>
+    const shape = recordShape.shape
+    const container = this.getContainer() as LoroMap
 
     if (isValueShape(shape)) {
       // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
@@ -139,13 +99,13 @@ export class RecordRef<
       //
       // When in batchedMutation mode (inside change()), we cache value shapes so that
       // mutations to nested objects persist back to the CRDT via absorbPlainValues()
-      if (!this.batchedMutation) {
-        const containerValue = this.container.get(key)
+      if (!this.getBatchedMutation()) {
+        const containerValue = container.get(key)
         if (containerValue !== undefined) {
           return containerValue
         }
         // Fall back to placeholder if the container doesn't have the value
-        const placeholder = (this.placeholder as any)?.[key]
+        const placeholder = (this.getPlaceholder() as any)?.[key]
         if (placeholder !== undefined) {
           return placeholder
         }
@@ -157,7 +117,7 @@ export class RecordRef<
       // mutations to nested objects persist back to the CRDT via absorbPlainValues()
       let ref = this.refCache.get(key)
       if (!ref) {
-        const containerValue = this.container.get(key)
+        const containerValue = container.get(key)
         if (containerValue !== undefined) {
           // For objects, create a deep copy so mutations can be tracked
           if (typeof containerValue === "object" && containerValue !== null) {
@@ -167,7 +127,7 @@ export class RecordRef<
           }
         } else {
           // Fall back to placeholder if the container doesn't have the value
-          const placeholder = (this.placeholder as any)?.[key]
+          const placeholder = (this.getPlaceholder() as any)?.[key]
           if (placeholder !== undefined) {
             ref = placeholder as Value
           } else {
@@ -193,20 +153,21 @@ export class RecordRef<
     return ref as any
   }
 
-  get(key: string): InferMutableType<NestedShape> | undefined {
-    return this.getRef(key)
-  }
-
+  /** Set a value at a key */
   set(key: string, value: any): void {
-    if (isValueShape(this.shape.shape)) {
-      this.container.set(key, value)
+    const recordShape = this.getShape() as RecordContainerShape<NestedShape>
+    const shape = recordShape.shape
+    const container = this.getContainer() as LoroMap
+
+    if (isValueShape(shape)) {
+      container.set(key, value)
       this.refCache.set(key, value)
       this.commitIfAuto()
     } else {
       // For container shapes, try to assign the plain value
       // Use getOrCreateRef to ensure the container is created
       const ref = this.getOrCreateRef(key)
-      if (assignPlainValueToTypedRef(ref, value)) {
+      if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
         this.commitIfAuto()
         return
       }
@@ -216,38 +177,40 @@ export class RecordRef<
     }
   }
 
-  setContainer<C extends Container>(key: string, container: C): C {
-    const result = this.container.setContainer(key, container)
-    this.commitIfAuto()
-    return result
-  }
-
+  /** Delete a key */
   delete(key: string): void {
-    this.container.delete(key)
+    const container = this.getContainer() as LoroMap
+    container.delete(key)
     this.refCache.delete(key)
     this.commitIfAuto()
   }
 
-  has(key: string): boolean {
-    return this.container.get(key) !== undefined
+  /** Absorb mutated plain values back into Loro containers */
+  absorbPlainValues(): void {
+    absorbCachedPlainValues(this.refCache, () => this.getContainer() as LoroMap)
   }
 
-  keys(): string[] {
-    return this.container.keys()
-  }
-
-  values(): any[] {
-    return this.container.values()
-  }
-
-  get size(): number {
-    return this.container.size
-  }
-
-  toJSON(): Record<string, Infer<NestedShape>> {
-    return serializeRefToJSON(this, this.keys()) as Record<
-      string,
-      Infer<NestedShape>
-    >
+  /** Create the loro namespace for record */
+  protected override createLoroNamespace(): LoroMapRef {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self.getDoc()
+      },
+      get container(): LoroMap {
+        return self.getContainer() as LoroMap
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        return (self.getContainer() as LoroMap).subscribe(callback)
+      },
+      setContainer(key: string, container: Container): Container {
+        const result = (self.getContainer() as LoroMap).setContainer(
+          key,
+          container,
+        )
+        self.commitIfAuto()
+        return result
+      },
+    }
   }
 }

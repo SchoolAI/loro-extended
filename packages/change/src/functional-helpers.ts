@@ -22,8 +22,8 @@ import type {
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
 import type { TypedRef } from "./typed-refs/base.js"
-import type { StructRef } from "./typed-refs/struct.js"
-import type { TreeRef } from "./typed-refs/tree.js"
+import type { StructRef } from "./typed-refs/struct-ref.js"
+import type { TreeRef } from "./typed-refs/tree-ref.js"
 import type { Mutable } from "./types.js"
 
 /**

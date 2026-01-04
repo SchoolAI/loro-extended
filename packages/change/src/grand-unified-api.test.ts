@@ -179,9 +179,11 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schema)
 
       // Chain mutations after change
-      doc.change(draft => {
-        draft.count.increment(5)
-      }).count.increment(3)
+      doc
+        .change(draft => {
+          draft.count.increment(5)
+        })
+        .count.increment(3)
 
       expect(doc.toJSON().count).toBe(8)
     })

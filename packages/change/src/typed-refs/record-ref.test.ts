@@ -12,8 +12,9 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.scores.getOrCreateRef("alice").increment(10)
-        draft.scores.getOrCreateRef("bob").increment(5)
+        // Use get() to access container refs - it creates if not exists
+        draft.scores.get("alice")?.increment(10)
+        draft.scores.get("bob")?.increment(5)
       })
 
       expect(doc.toJSON().scores).toEqual({
@@ -22,7 +23,7 @@ describe("Record Types", () => {
       })
 
       change(doc, draft => {
-        draft.scores.getOrCreateRef("alice").increment(5)
+        draft.scores.get("alice")?.increment(5)
         draft.scores.delete("bob")
       })
 
@@ -39,8 +40,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.notes.getOrCreateRef("todo").insert(0, "Buy milk")
-        draft.notes.getOrCreateRef("reminders").insert(0, "Call mom")
+        draft.notes.get("todo")?.insert(0, "Buy milk")
+        draft.notes.get("reminders")?.insert(0, "Call mom")
       })
 
       expect(doc.toJSON().notes).toEqual({
@@ -57,12 +58,12 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        const groupA = draft.groups.getOrCreateRef("groupA")
-        groupA.push("alice")
-        groupA.push("bob")
+        const groupA = draft.groups.get("groupA")
+        groupA?.push("alice")
+        groupA?.push("bob")
 
-        const groupB = draft.groups.getOrCreateRef("groupB")
-        groupB.push("charlie")
+        const groupB = draft.groups.get("groupB")
+        groupB?.push("charlie")
       })
 
       expect(doc.toJSON().groups).toEqual({
@@ -171,13 +172,17 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        const alice = draft.users.getOrCreateRef("u1")
-        alice.name = "Alice"
-        alice.age = 30
+        const alice = draft.users.get("u1")
+        if (alice) {
+          alice.name = "Alice"
+          alice.age = 30
+        }
 
-        const bob = draft.users.getOrCreateRef("u2")
-        bob.name = "Bob"
-        bob.age = 25
+        const bob = draft.users.get("u2")
+        if (bob) {
+          bob.name = "Bob"
+          bob.age = 25
+        }
       })
 
       expect(doc.toJSON().users).toEqual({

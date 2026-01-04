@@ -1,9 +1,12 @@
-import type { LoroList } from "loro-crdt"
 import type { ContainerOrValueShape } from "../shape.js"
 import type { InferMutableType } from "../types.js"
-import { ListRefBase } from "./list-base.js"
+import type { TypedRefParams } from "./base.js"
+import { ListRefBase, ListRefBaseInternals } from "./list-ref-base.js"
+import { ListRefInternals } from "./list-ref-internals.js"
 
-// List typed ref
+/**
+ * List typed ref - thin facade that delegates to ListRefInternals.
+ */
 export class ListRef<
   NestedShape extends ContainerOrValueShape,
 > extends ListRefBase<NestedShape> {
@@ -12,13 +15,9 @@ export class ListRef<
   // TypeScript may require type assertions for plain value assignments.
   [index: number]: InferMutableType<NestedShape> | undefined
 
-  protected get container(): LoroList {
-    return super.container as LoroList
-  }
-
-  protected absorbValueAtIndex(index: number, value: any): void {
-    // LoroList doesn't have set method, need to delete and insert
-    this.container.delete(index, 1)
-    this.container.insert(index, value)
+  protected override createInternals(
+    params: TypedRefParams<any>,
+  ): ListRefInternals<NestedShape> {
+    return new ListRefInternals(params)
   }
 }

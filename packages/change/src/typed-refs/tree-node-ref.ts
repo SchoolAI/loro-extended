@@ -1,15 +1,12 @@
 import type { LoroDoc, LoroTreeNode, TreeID } from "loro-crdt"
-import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
-import { INTERNAL_SYMBOL, type RefInternals, type TypedRefParams } from "./base.js"
-import { createStructRef, type StructRef } from "./struct.js"
-
-// Forward declaration to avoid circular import
-// TreeRef will be passed in via constructor params
-interface TreeRefLike<DataShape extends StructContainerShape> {
-  getOrCreateNodeRef(node: LoroTreeNode): TreeNodeRef<DataShape>
-}
+import { INTERNAL_SYMBOL } from "./base.js"
+import type { StructRef } from "./struct-ref.js"
+import {
+  TreeNodeRefInternals,
+  type TreeRefLike,
+} from "./tree-node-ref-internals.js"
 
 export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
   node: LoroTreeNode
@@ -21,11 +18,11 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
 }
 
 /**
- * Typed ref for a single tree node.
+ * Typed ref for a single tree node - thin facade that delegates to TreeNodeRefInternals.
  * Provides type-safe access to node metadata via the `.data` property.
  *
  * **Note:** TreeNodeRef is not a subclass of TypedRef, but it implements
- * `[INTERNAL_SYMBOL]: RefInternals` for consistency with other refs.
+ * `[INTERNAL_SYMBOL]: RefInternalsBase` for consistency with other refs.
  * This allows internal code to call `absorbPlainValues()` uniformly
  * across all ref types during the `change()` commit phase.
  *
@@ -37,28 +34,17 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
  * ```
  */
 export class TreeNodeRef<DataShape extends StructContainerShape> {
-  private _node: LoroTreeNode
-  private _dataShape: DataShape
-  private _treeRef: TreeRefLike<DataShape>
-  private _dataRef?: StructRef<DataShape["shapes"]>
-  private _autoCommit: boolean
-  private _batchedMutation: boolean
-  private _getDoc: () => LoroDoc
+  [INTERNAL_SYMBOL]: TreeNodeRefInternals<DataShape>
 
   constructor(params: TreeNodeRefParams<DataShape>) {
-    this._node = params.node
-    this._dataShape = params.dataShape
-    this._treeRef = params.treeRef
-    this._autoCommit = params.autoCommit ?? false
-    this._batchedMutation = params.batchedMutation ?? false
-    this._getDoc = params.getDoc
+    this[INTERNAL_SYMBOL] = new TreeNodeRefInternals(params)
   }
 
   /**
    * The unique TreeID of this node.
    */
   get id(): TreeID {
-    return this._node.id
+    return this[INTERNAL_SYMBOL].getNode().id
   }
 
   /**
@@ -68,41 +54,9 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   get data(): StructRef<DataShape["shapes"]> & {
     [K in keyof DataShape["shapes"]]: DataShape["shapes"][K]["_mutable"]
   } {
-    if (!this._dataRef) {
-      // Get the node's data container (LoroMap)
-      // In Loro, node.data is accessed via the tree's getNodeByID
-      // The data is stored as a LoroMap associated with the node
-      const dataContainer = (this._node as any).data
-
-      if (!dataContainer) {
-        throw new Error(`Node ${this.id} has no data container`)
-      }
-
-      // Create placeholder from the data shape
-      const placeholder = deriveShapePlaceholder(
-        this._dataShape,
-      ) as Infer<DataShape>
-
-      const params: TypedRefParams<StructContainerShape<DataShape["shapes"]>> =
-        {
-          shape: {
-            _type: "struct" as const,
-            shapes: this._dataShape.shapes,
-            _plain: {} as any,
-            _mutable: {} as any,
-            _placeholder: {} as any,
-          },
-          placeholder: placeholder as any,
-          getContainer: () => dataContainer,
-          autoCommit: this._autoCommit,
-          batchedMutation: this._batchedMutation,
-          getDoc: this._getDoc,
-        }
-
-      this._dataRef = createStructRef(params)
-    }
-
-    return this._dataRef as StructRef<DataShape["shapes"]> & {
+    return this[INTERNAL_SYMBOL].getOrCreateDataRef() as StructRef<
+      DataShape["shapes"]
+    > & {
       [K in keyof DataShape["shapes"]]: DataShape["shapes"][K]["_mutable"]
     }
   }
@@ -118,9 +72,12 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
     initialData?: Partial<Infer<DataShape>>,
     index?: number,
   ): TreeNodeRef<DataShape> {
+    const node = this[INTERNAL_SYMBOL].getNode()
+    const treeRef = this[INTERNAL_SYMBOL].getTreeRef()
+
     // Create child node - Loro's createNode on a tree node creates a child
-    const loroNode = (this._node as any).createNode(index)
-    const nodeRef = this._treeRef.getOrCreateNodeRef(loroNode)
+    const loroNode = (node as any).createNode(index)
+    const nodeRef = treeRef.getOrCreateNodeRef(loroNode)
 
     // Initialize data if provided
     if (initialData) {
@@ -129,7 +86,7 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
       }
     }
 
-    this.commitIfAuto()
+    this[INTERNAL_SYMBOL].commitIfAuto()
     return nodeRef
   }
 
@@ -137,19 +94,23 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
    * Get the parent node, if any.
    */
   parent(): TreeNodeRef<DataShape> | undefined {
-    const parentNode = (this._node as any).parent?.()
+    const node = this[INTERNAL_SYMBOL].getNode()
+    const treeRef = this[INTERNAL_SYMBOL].getTreeRef()
+
+    const parentNode = (node as any).parent?.()
     if (!parentNode) return undefined
-    return this._treeRef.getOrCreateNodeRef(parentNode)
+    return treeRef.getOrCreateNodeRef(parentNode)
   }
 
   /**
    * Get all child nodes in order.
    */
   children(): TreeNodeRef<DataShape>[] {
-    const childNodes = (this._node as any).children?.() || []
-    return childNodes.map((node: LoroTreeNode) =>
-      this._treeRef.getOrCreateNodeRef(node),
-    )
+    const node = this[INTERNAL_SYMBOL].getNode()
+    const treeRef = this[INTERNAL_SYMBOL].getTreeRef()
+
+    const childNodes = (node as any).children?.() || []
+    return childNodes.map((n: LoroTreeNode) => treeRef.getOrCreateNodeRef(n))
   }
 
   /**
@@ -159,58 +120,60 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
    * @param index - Optional position among siblings
    */
   move(newParent?: TreeNodeRef<DataShape>, index?: number): void {
+    const node = this[INTERNAL_SYMBOL].getNode()
+
     // node.move takes a LoroTreeNode or undefined, not an ID
-    const parentNode = newParent?._node
-    ;(this._node as any).move?.(parentNode, index)
-    this.commitIfAuto()
+    const parentNode = newParent
+      ? newParent[INTERNAL_SYMBOL].getNode()
+      : undefined
+    ;(node as any).move?.(parentNode, index)
+    this[INTERNAL_SYMBOL].commitIfAuto()
   }
 
   /**
    * Move this node to be after the given sibling.
    */
   moveAfter(sibling: TreeNodeRef<DataShape>): void {
-    this._node.moveAfter(sibling._node)
-    this.commitIfAuto()
+    const node = this[INTERNAL_SYMBOL].getNode()
+    const siblingNode = sibling[INTERNAL_SYMBOL].getNode()
+
+    node.moveAfter(siblingNode)
+    this[INTERNAL_SYMBOL].commitIfAuto()
   }
 
   /**
    * Move this node to be before the given sibling.
    */
   moveBefore(sibling: TreeNodeRef<DataShape>): void {
-    this._node.moveBefore(sibling._node)
-    this.commitIfAuto()
+    const node = this[INTERNAL_SYMBOL].getNode()
+    const siblingNode = sibling[INTERNAL_SYMBOL].getNode()
+
+    node.moveBefore(siblingNode)
+    this[INTERNAL_SYMBOL].commitIfAuto()
   }
 
   /**
    * Get the index of this node among its siblings.
    */
   index(): number | undefined {
-    return this._node.index()
+    const node = this[INTERNAL_SYMBOL].getNode()
+    return node.index()
   }
 
   /**
    * Get the fractional index string for ordering.
    */
   fractionalIndex(): string | undefined {
-    return this._node.fractionalIndex()
+    const node = this[INTERNAL_SYMBOL].getNode()
+    return node.fractionalIndex()
   }
 
   /**
    * Check if this node has been deleted.
    */
   isDeleted(): boolean {
-    return this._node.isDeleted()
-  }
-
-  /**
-   * Internal methods accessed via INTERNAL_SYMBOL.
-   */
-  [INTERNAL_SYMBOL]: RefInternals = {
-    absorbPlainValues: () => {
-      if (this._dataRef) {
-        this._dataRef[INTERNAL_SYMBOL].absorbPlainValues()
-      }
-    },
+    const node = this[INTERNAL_SYMBOL].getNode()
+    return node.isDeleted()
   }
 
   /**
@@ -232,12 +195,6 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
       fractionalIndex: this.fractionalIndex() ?? "",
       data: this.data.toJSON() as Infer<DataShape>,
       children: children.map(child => child.toJSON()),
-    }
-  }
-
-  private commitIfAuto(): void {
-    if (this._autoCommit) {
-      this._getDoc().commit()
     }
   }
 }

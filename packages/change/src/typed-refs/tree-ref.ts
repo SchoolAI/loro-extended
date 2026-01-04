@@ -1,15 +1,16 @@
-import type { LoroTreeNode, TreeID } from "loro-crdt"
+import type { LoroTree, LoroTreeNode, TreeID } from "loro-crdt"
 import type {
   StructContainerShape,
   TreeContainerShape,
   TreeNodeJSON,
 } from "../shape.js"
 import type { Infer } from "../types.js"
-import { INTERNAL_SYMBOL, type RefInternals, TypedRef } from "./base.js"
-import { TreeNodeRef } from "./tree-node.js"
+import { INTERNAL_SYMBOL, TypedRef, type TypedRefParams } from "./base.js"
+import type { TreeNodeRef } from "./tree-node-ref.js"
+import { TreeRefInternals } from "./tree-ref-internals.js"
 
 /**
- * Typed ref for tree (forest) containers.
+ * Typed ref for tree (forest) containers - thin facade that delegates to TreeRefInternals.
  * Wraps LoroTree with type-safe access to node metadata.
  *
  * @example
@@ -29,25 +30,40 @@ import { TreeNodeRef } from "./tree-node.js"
 export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
   TreeContainerShape<DataShape>
 > {
-  private nodeCache = new Map<TreeID, TreeNodeRef<DataShape>>()
+  [INTERNAL_SYMBOL]: TreeRefInternals<DataShape>
+
+  constructor(params: TypedRefParams<TreeContainerShape<DataShape>>) {
+    super()
+    this[INTERNAL_SYMBOL] = new TreeRefInternals(params)
+    this[INTERNAL_SYMBOL].setTreeRef(this)
+  }
 
   /**
    * Get the data shape for tree nodes.
    */
-  protected get dataShape(): DataShape {
-    return this.shape.shape
+  private get dataShape(): DataShape {
+    return this[INTERNAL_SYMBOL].getDataShape()
   }
 
   /**
-   * Absorb plain values from all cached nodes.
-   * Called before committing changes to ensure all pending values are written.
+   * Get or create a node ref for a LoroTreeNode.
    */
-  [INTERNAL_SYMBOL]: RefInternals = {
-    absorbPlainValues: () => {
-      for (const nodeRef of this.nodeCache.values()) {
-        nodeRef[INTERNAL_SYMBOL].absorbPlainValues()
-      }
-    },
+  getOrCreateNodeRef(node: LoroTreeNode): TreeNodeRef<DataShape> {
+    return this[INTERNAL_SYMBOL].getOrCreateNodeRef(node)
+  }
+
+  /**
+   * Get a node by its ID.
+   */
+  getNodeByID(id: TreeID): TreeNodeRef<DataShape> | undefined {
+    return this[INTERNAL_SYMBOL].getNodeByID(id)
+  }
+
+  /**
+   * Delete a node from the tree.
+   */
+  delete(target: TreeID | TreeNodeRef<DataShape>): void {
+    this[INTERNAL_SYMBOL].delete(target)
   }
 
   /**
@@ -56,31 +72,11 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    */
   toJSON(): Infer<TreeContainerShape<DataShape>> {
     // Use Loro's native toJSON which returns nested structure
-    const nativeJson = this.container.toJSON() as any[]
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    const nativeJson = container.toJSON() as any[]
     return this.transformNativeJson(nativeJson) as Infer<
       TreeContainerShape<DataShape>
     >
-  }
-
-  /**
-   * Get or create a TreeNodeRef for the given LoroTreeNode.
-   * Uses caching to ensure the same TreeNodeRef is returned for the same node.
-   */
-  getOrCreateNodeRef(node: LoroTreeNode): TreeNodeRef<DataShape> {
-    const id = node.id
-    let nodeRef = this.nodeCache.get(id)
-    if (!nodeRef) {
-      nodeRef = new TreeNodeRef({
-        node,
-        dataShape: this.dataShape,
-        treeRef: this,
-        autoCommit: this.autoCommit,
-        batchedMutation: this.batchedMutation,
-        getDoc: this._params.getDoc,
-      })
-      this.nodeCache.set(id, nodeRef)
-    }
-    return nodeRef
   }
 
   /**
@@ -90,7 +86,8 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    * @returns The created TreeNodeRef
    */
   createNode(initialData?: Partial<Infer<DataShape>>): TreeNodeRef<DataShape> {
-    const loroNode = this.container.createNode()
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    const loroNode = container.createNode()
     const nodeRef = this.getOrCreateNodeRef(loroNode)
 
     // Initialize data if provided
@@ -100,7 +97,7 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
       }
     }
 
-    this.commitIfAuto()
+    this[INTERNAL_SYMBOL].commitIfAuto()
     return nodeRef
   }
 
@@ -109,7 +106,8 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    * Returns nodes in their fractional index order.
    */
   roots(): TreeNodeRef<DataShape>[] {
-    return this.container.roots().map(node => this.getOrCreateNodeRef(node))
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    return container.roots().map(node => this.getOrCreateNodeRef(node))
   }
 
   /**
@@ -117,50 +115,16 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    * Includes all nodes, not just roots.
    */
   nodes(): TreeNodeRef<DataShape>[] {
-    return this.container.nodes().map(node => this.getOrCreateNodeRef(node))
-  }
-
-  /**
-   * Get a node by its TreeID.
-   *
-   * @param id - The TreeID of the node to find
-   * @returns The TreeNodeRef if found, undefined otherwise
-   */
-  getNodeByID(id: TreeID): TreeNodeRef<DataShape> | undefined {
-    // Check cache first
-    const cached = this.nodeCache.get(id)
-    if (cached) return cached
-
-    // Check if node exists in tree
-    if (!this.container.has(id)) return undefined
-
-    // Find the node in the tree's nodes
-    const nodes = this.container.nodes()
-    const node = nodes.find(n => n.id === id)
-    if (!node) return undefined
-
-    return this.getOrCreateNodeRef(node)
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    return container.nodes().map(node => this.getOrCreateNodeRef(node))
   }
 
   /**
    * Check if a node with the given ID exists in the tree.
    */
   has(id: TreeID): boolean {
-    return this.container.has(id)
-  }
-
-  /**
-   * Delete a node and all its descendants.
-   * Also removes the node from the cache.
-   *
-   * @param target - The TreeID or TreeNodeRef to delete
-   */
-  delete(target: TreeID | TreeNodeRef<DataShape>): void {
-    const id = typeof target === "string" ? target : target.id
-    this.container.delete(id)
-    // Remove from cache
-    this.nodeCache.delete(id)
-    this.commitIfAuto()
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    return container.has(id)
   }
 
   /**
@@ -169,7 +133,8 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    * @param jitter - Optional jitter value to avoid conflicts (0 = no jitter)
    */
   enableFractionalIndex(jitter = 0): void {
-    this.container.enableFractionalIndex(jitter)
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    container.enableFractionalIndex(jitter)
   }
 
   /**
@@ -221,7 +186,8 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
       }
     }
 
-    const nativeJson = this.container.toJSON() as any[]
+    const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
+    const nativeJson = container.toJSON() as any[]
     flattenNodes(nativeJson)
     return result
   }

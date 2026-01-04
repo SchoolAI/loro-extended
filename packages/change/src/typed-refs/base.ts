@@ -6,15 +6,28 @@ import type { Infer } from "../types.js"
 /**
  * Symbol for internal methods that should not be enumerable or accessible to users.
  * Used to hide implementation details like absorbPlainValues(), getTypedRefParams(), etc.
+ *
+ * This achieves Success Criteria #7 from loro-api-refactor.md:
+ * "Internal methods hidden - Via Symbol, not enumerable"
  */
 export const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
 
+// ============================================================================
+// Minimal Interface for absorbPlainValues contract
+// ============================================================================
+
 /**
- * Interface for internal methods stored on refs via INTERNAL_SYMBOL.
+ * Minimal interface for refs that only need absorbPlainValues.
+ * Used by TreeNodeRef which doesn't extend TypedRef.
  */
-export interface RefInternals {
+export interface RefInternalsBase {
+  /** Absorb mutated plain values back into Loro containers */
   absorbPlainValues(): void
 }
+
+// ============================================================================
+// TypedRefParams and TypedRef Base Class
+// ============================================================================
 
 export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
@@ -25,18 +38,108 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   getDoc: () => LoroDoc // Needed for auto-commit
 }
 
-// Base class for all typed refs
+// ============================================================================
+// BaseRefInternals - Abstract base class for all internal implementations
+// ============================================================================
+
+/**
+ * Abstract base class for all ref internal implementations.
+ * Contains shared logic that was previously in TypedRef.createBaseInternals().
+ *
+ * Subclasses implement specific behavior for each ref type.
+ */
+export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
+  implements RefInternalsBase
+{
+  protected cachedContainer: ShapeToContainer<Shape> | undefined
+  protected loroNamespace: LoroRefBase | undefined
+
+  constructor(protected readonly params: TypedRefParams<Shape>) {}
+
+  /** Get the underlying Loro container (cached) */
+  getContainer(): ShapeToContainer<Shape> {
+    if (!this.cachedContainer) {
+      this.cachedContainer = this.params.getContainer()
+    }
+    return this.cachedContainer
+  }
+
+  /** Commit changes if autoCommit is enabled */
+  commitIfAuto(): void {
+    if (this.params.autoCommit) {
+      this.params.getDoc().commit()
+    }
+  }
+
+  /** Get the shape for this ref */
+  getShape(): Shape {
+    return this.params.shape
+  }
+
+  /** Get the placeholder value */
+  getPlaceholder(): Infer<Shape> | undefined {
+    return this.params.placeholder
+  }
+
+  /** Check if autoCommit is enabled */
+  getAutoCommit(): boolean {
+    return !!this.params.autoCommit
+  }
+
+  /** Check if in batched mutation mode */
+  getBatchedMutation(): boolean {
+    return !!this.params.batchedMutation
+  }
+
+  /** Get the LoroDoc */
+  getDoc(): LoroDoc {
+    return this.params.getDoc()
+  }
+
+  /** Get the loro namespace (cached) */
+  getLoroNamespace(): LoroRefBase {
+    if (!this.loroNamespace) {
+      this.loroNamespace = this.createLoroNamespace()
+    }
+    return this.loroNamespace
+  }
+
+  /** Absorb mutated plain values back into Loro containers - subclasses override */
+  abstract absorbPlainValues(): void
+
+  /** Create the loro() namespace object - subclasses override for specific types */
+  protected createLoroNamespace(): LoroRefBase {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self.params.getDoc()
+      },
+      get container(): unknown {
+        return self.getContainer()
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        return (self.getContainer() as any).subscribe(callback)
+      },
+    }
+  }
+}
+
+/**
+ * Base class for all typed refs.
+ *
+ * All internal methods are accessed via [INTERNAL_SYMBOL] to prevent
+ * namespace collisions with user data properties.
+ *
+ * Uses the Facade + Implementation pattern:
+ * - TypedRef is the thin public facade
+ * - BaseRefInternals subclasses contain all implementation logic
+ */
 export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
-  protected _cachedContainer?: ShapeToContainer<Shape>
-  private _loroNamespace?: LoroRefBase
-
-  constructor(protected _params: TypedRefParams<Shape>) {}
-
   /**
-   * Internal methods accessed via Symbol.
-   * Subclasses must implement this property with their absorbPlainValues logic.
+   * Internal implementation accessed via Symbol.
+   * Subclasses must set this to their specific internals class instance.
    */
-  abstract [INTERNAL_SYMBOL]: RefInternals
+  abstract [INTERNAL_SYMBOL]: BaseRefInternals<Shape>
 
   /**
    * Serializes the ref to a plain JSON-compatible value.
@@ -47,70 +150,8 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   /**
    * Access the loro() namespace via the well-known symbol.
    * This is used by the loro() function to access CRDT internals.
-   * Subclasses can override createLoroNamespace() to add container-specific methods.
    */
   get [LORO_SYMBOL](): LoroRefBase {
-    if (!this._loroNamespace) {
-      this._loroNamespace = this.createLoroNamespace()
-    }
-    return this._loroNamespace
-  }
-
-  /**
-   * Creates the loro() namespace object.
-   * Subclasses can override this to add container-specific methods.
-   */
-  protected createLoroNamespace(): LoroRefBase {
-    const self = this
-    return {
-      get doc(): LoroDoc {
-        return self._params.getDoc()
-      },
-      get container(): unknown {
-        return self.container
-      },
-      subscribe(callback: (event: unknown) => void): Subscription {
-        return (self.container as any).subscribe(callback)
-      },
-    }
-  }
-
-  protected get shape(): Shape {
-    return this._params.shape
-  }
-
-  protected get placeholder(): Infer<Shape> | undefined {
-    return this._params.placeholder
-  }
-
-  protected get autoCommit(): boolean {
-    return !!this._params.autoCommit
-  }
-
-  protected get batchedMutation(): boolean {
-    return !!this._params.batchedMutation
-  }
-
-  protected get doc(): LoroDoc {
-    return this._params.getDoc()
-  }
-
-  /**
-   * Commits changes if autoCommit is enabled.
-   * Call this after any mutation operation.
-   */
-  protected commitIfAuto(): void {
-    if (this.autoCommit) {
-      this.doc.commit()
-    }
-  }
-
-  protected get container(): ShapeToContainer<Shape> {
-    if (!this._cachedContainer) {
-      const container = this._params.getContainer()
-      this._cachedContainer = container
-      return container
-    }
-    return this._cachedContainer
+    return this[INTERNAL_SYMBOL].getLoroNamespace()
   }
 }

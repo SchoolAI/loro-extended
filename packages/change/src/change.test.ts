@@ -1,7 +1,7 @@
-import { loro } from "./loro.js"
 import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
+import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 

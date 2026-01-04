@@ -18,18 +18,18 @@ import type {
   TreeContainerShape,
 } from "../shape.js"
 import { INTERNAL_SYMBOL, type TypedRef, type TypedRefParams } from "./base.js"
-import { CounterRef } from "./counter.js"
-import { ListRef } from "./list.js"
-import { MovableListRef } from "./movable-list.js"
+import { CounterRef } from "./counter-ref.js"
+import { ListRef } from "./list-ref.js"
+import { MovableListRef } from "./movable-list-ref.js"
 import {
   listProxyHandler,
   movableListProxyHandler,
   recordProxyHandler,
 } from "./proxy-handlers.js"
-import { RecordRef } from "./record.js"
-import { createStructRef } from "./struct.js"
-import { TextRef } from "./text.js"
-import { TreeRef } from "./tree.js"
+import { RecordRef } from "./record-ref.js"
+import { createStructRef } from "./struct-ref.js"
+import { TextRef } from "./text-ref.js"
+import { TreeRef } from "./tree-ref.js"
 
 /**
  * Mapping from container shape types to their Loro constructor classes.
@@ -82,11 +82,7 @@ export function unwrapReadonlyPrimitive(
 function hasInternalSymbol(
   value: unknown,
 ): value is { [INTERNAL_SYMBOL]: { absorbPlainValues(): void } } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    INTERNAL_SYMBOL in value
-  )
+  return value !== null && typeof value === "object" && INTERNAL_SYMBOL in value
 }
 
 /**
@@ -187,7 +183,9 @@ export function assignPlainValueToTypedRef(
   ref: TypedRef<any>,
   value: any,
 ): boolean {
-  const shapeType = (ref as any).shape._type
+  // Access shape via INTERNAL_SYMBOL or fallback to direct property access for StructRef proxy
+  const shape = ref[INTERNAL_SYMBOL]?.getShape?.() ?? (ref as any).shape
+  const shapeType = shape?._type
 
   if (shapeType === "struct" || shapeType === "record") {
     for (const k in value) {

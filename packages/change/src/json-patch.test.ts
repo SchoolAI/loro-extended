@@ -1,7 +1,7 @@
-import { loro } from "./loro.js"
 import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
 import type { JsonPatch } from "./json-patch.js"
+import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 
@@ -588,4 +588,3 @@ describe("JSON Patch Integration", () => {
     })
   })
 })
-

@@ -12,10 +12,9 @@ import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
 import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
-import { DocRef } from "./typed-refs/doc.js"
+import { DocRef } from "./typed-refs/doc-ref.js"
 import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { validatePlaceholder } from "./validation.js"
-
 
 /**
  * Internal TypedDoc implementation (not directly exposed to users).
@@ -25,7 +24,7 @@ class TypedDocInternal<Shape extends DocShape> {
   private shape: Shape
   private placeholder: InferPlaceholderType<Shape>
   private doc: LoroDoc
-  private _valueRef: DocRef<Shape> | null = null
+  private valueRef: DocRef<Shape> | null = null
   // Reference to the proxy for returning from change()
   proxy: TypedDoc<Shape> | null = null
 
@@ -38,15 +37,15 @@ class TypedDocInternal<Shape extends DocShape> {
   }
 
   get value(): Mutable<Shape> {
-    if (!this._valueRef) {
-      this._valueRef = new DocRef({
+    if (!this.valueRef) {
+      this.valueRef = new DocRef({
         shape: this.shape,
         placeholder: this.placeholder as any,
         doc: this.doc,
         autoCommit: true,
       })
     }
-    return this._valueRef as unknown as Mutable<Shape>
+    return this.valueRef as unknown as Mutable<Shape>
   }
 
   toJSON(): Infer<Shape> {
@@ -71,7 +70,7 @@ class TypedDocInternal<Shape extends DocShape> {
     this.doc.commit()
 
     // Invalidate cached value ref since doc changed
-    this._valueRef = null
+    this.valueRef = null
   }
 
   applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void {

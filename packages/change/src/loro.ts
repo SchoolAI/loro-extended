@@ -44,13 +44,13 @@ import type {
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
 import type { TypedRef } from "./typed-refs/base.js"
-import type { CounterRef } from "./typed-refs/counter.js"
-import type { ListRef } from "./typed-refs/list.js"
-import type { MovableListRef } from "./typed-refs/movable-list.js"
-import type { RecordRef } from "./typed-refs/record.js"
-import type { StructRef } from "./typed-refs/struct.js"
-import type { TextRef } from "./typed-refs/text.js"
-import type { TreeRef } from "./typed-refs/tree.js"
+import type { CounterRef } from "./typed-refs/counter-ref.js"
+import type { ListRef } from "./typed-refs/list-ref.js"
+import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
+import type { RecordRef } from "./typed-refs/record-ref.js"
+import type { StructRef } from "./typed-refs/struct-ref.js"
+import type { TextRef } from "./typed-refs/text-ref.js"
+import type { TreeRef } from "./typed-refs/tree-ref.js"
 
 // ============================================================================
 // Symbol for loro() access

@@ -1,4 +1,3 @@
-import { loro } from "./loro.js"
 import {
   LoroCounter,
   LoroList,
@@ -9,6 +8,7 @@ import {
 } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { change, getLoroContainer, getLoroDoc } from "./functional-helpers.js"
+import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 

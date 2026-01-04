@@ -1,15 +1,18 @@
-import type { ListRef } from "./list.js"
-import type { MovableListRef } from "./movable-list.js"
-import type { RecordRef } from "./record.js"
+import { INTERNAL_SYMBOL } from "./base.js"
+import type { ListRef } from "./list-ref.js"
+import type { MovableListRef } from "./movable-list-ref.js"
+import type { RecordRef } from "./record-ref.js"
+import type { RecordRefInternals } from "./record-ref-internals.js"
 
 export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
   get: (target, prop) => {
     if (typeof prop === "string" && !(prop in target)) {
       // Use getRef for reading - returns undefined for non-existent keys
-      return target.getRef(prop)
+      return (target[INTERNAL_SYMBOL] as RecordRefInternals<any>).getRef(prop)
     }
     return Reflect.get(target, prop)
   },
+
   set: (target, prop, value) => {
     if (typeof prop === "string" && !(prop in target)) {
       target.set(prop, value)
@@ -17,6 +20,7 @@ export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
     }
     return Reflect.set(target, prop, value)
   },
+
   deleteProperty: (target, prop) => {
     if (typeof prop === "string" && !(prop in target)) {
       target.delete(prop)
@@ -24,6 +28,7 @@ export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
     }
     return Reflect.deleteProperty(target, prop)
   },
+
   // Support `in` operator for checking key existence
   has: (target, prop) => {
     if (typeof prop === "string") {
@@ -36,9 +41,11 @@ export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
     }
     return Reflect.has(target, prop)
   },
+
   ownKeys: target => {
     return target.keys()
   },
+
   getOwnPropertyDescriptor: (target, prop) => {
     if (typeof prop === "string" && target.has(prop)) {
       return {
@@ -61,6 +68,7 @@ export const listProxyHandler: ProxyHandler<ListRef<any>> = {
     }
     return Reflect.get(target, prop)
   },
+
   set: (target, prop, value) => {
     if (typeof prop === "string") {
       const index = Number(prop)
@@ -85,6 +93,7 @@ export const movableListProxyHandler: ProxyHandler<MovableListRef<any>> = {
     }
     return Reflect.get(target, prop)
   },
+
   set: (target, prop, value) => {
     if (typeof prop === "string") {
       const index = Number(prop)
