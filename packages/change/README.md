@@ -12,10 +12,10 @@ Working with Loro directly involves somewhat verbose container operations and co
 
 - **Schema-First Design**: Define your document structure with type-safe schemas
 - **Natural Syntax**: Write `doc.title.insert(0, "Hello")` instead of verbose CRDT operations
-- **Empty State Overlay**: Seamlessly blend default values with CRDT state
+- **Placeholders**: Seamlessly blend default values with CRDT state
 - **Full Type Safety**: Complete TypeScript support with compile-time validation
-- **Transactional Changes**: All mutations within a `$.batch()` block are atomic
-- **Loro Compatible**: Works seamlessly with existing Loro code (`doc.$.loroDoc` is a familiar `LoroDoc`)
+- **Transactional Changes**: All mutations within a `change()` block are atomic
+- **Loro Compatible**: Works seamlessly with existing Loro code (`loro(doc).doc` is a familiar `LoroDoc`)
 
 ## Installation
 
@@ -59,7 +59,7 @@ if ("alice" in doc.users) {
 
 // Batched mutations - commit together (optional, for performance)
 // Using functional helper (recommended)
-change(doc, (draft) => {
+doc.change((draft) => {
   draft.title.insert(0, "Change: ");
   draft.count.increment(10);
   draft.users.set("bob", { name: "Bob" });
@@ -85,7 +85,7 @@ import { Shape } from "@loro-extended/change";
 const blogSchema = Shape.doc({
   // CRDT containers for collaborative editing
   title: Shape.text(), // Collaborative text
-  viewCount: Shape.counter(), // Increment-only counter
+  viewCount: Shape.counter(), // Collaborative increment/decrement counter
 
   // Lists for ordered data
   tags: Shape.list(Shape.plain.string()), // List of strings
@@ -110,9 +110,20 @@ const blogSchema = Shape.doc({
 
 **NOTE:** Use `Shape.*` for collaborative containers and `Shape.plain.*` for plain values. Only put plain values inside Loro containers - a Loro container inside a plain JS struct or array won't work.
 
-### Empty State Overlay
+### Placeholders (Empty State Overlay)
 
-Empty state provides default values that are merged when CRDT containers are empty, keeping the whole document typesafe:
+Placeholders provide default values that are merged when CRDT containers are empty, ensuring the entire document remains type-safe even before any data has been written.
+
+#### Why placeholders matter in distributed systems:
+
+In traditional client-server architectures, you typically have a single source of truth that initializes default values. But in CRDTs, multiple peers can start working independently without coordination. This creates a challenge: who initializes the defaults?
+
+Placeholders solve this elegantly:
+
+- No initialization race conditions - Every peer sees the same defaults without needing to coordinate who writes them first
+- Zero-cost defaults - Placeholders aren't stored in the CRDT; they're computed on read. This means no wasted storage or sync bandwidth for default values
+- Conflict-free - Since placeholders aren't written to the CRDT, there's no possibility of conflicts between peers trying to initialize the same field
+- Lazy materialization - Defaults only become "real" CRDT data when a peer explicitly modifies them
 
 ```typescript
 // Use .placeholder() to set default values
@@ -141,7 +152,7 @@ console.log(doc.toJSON());
 // { title: "Untitled Document", viewCount: 0, ... }
 
 // After changes, CRDT values take priority over empty state
-change(doc, (draft) => {
+doc.change((draft) => {
   draft.title.insert(0, "My Blog Post");
   draft.viewCount.increment(10);
 });
@@ -153,7 +164,7 @@ console.log(doc.toJSON());
 
 ### Direct Mutations vs Batched Mutations
 
-With the Grand Unified API, schema properties are accessed directly on the doc. Mutations commit immediately by default:
+You can access and write schema properties directly on a TypedDoc. Mutations commit immediately by default:
 
 ```typescript
 // Direct mutations - each commits immediately
@@ -165,9 +176,7 @@ doc.tags.push("typescript");
 For batched operations (better performance, atomic undo), use `change()`:
 
 ```typescript
-import { change } from "@loro-extended/change";
-
-change(doc, (draft) => {
+doc.change((draft) => {
   // Text operations
   draft.title.insert(0, "📝");
   draft.title.delete(5, 3);
@@ -181,9 +190,9 @@ change(doc, (draft) => {
   draft.tags.insert(0, "loro");
   draft.tags.delete(1, 1);
 
-  // Struct operations (POJO values)
-  draft.metadata.set("author", "John Doe");
-  draft.metadata.delete("featured");
+  // Struct operations (property assignment)
+  draft.metadata.author = "John Doe";
+  delete draft.metadata.featured;
 
   // Movable list operations
   draft.sections.push({
@@ -195,7 +204,6 @@ change(doc, (draft) => {
 });
 
 // All changes are committed atomically as one transaction
-// change() returns the doc for chaining
 console.log(doc.toJSON()); // Updated document state
 ```
 
@@ -209,8 +217,6 @@ console.log(doc.toJSON()); // Updated document state
 | Performance-critical bulk updates | Batched: `change(doc, d => { ... })` |
 | Simple reads + writes             | Direct: `doc.users.set(...)`         |
 
-> **Note:** The `$.change()` method is available as an escape hatch, but the functional `change()` helper is recommended for cleaner code.
-
 ## Advanced Usage
 
 ### Discriminated Unions
@@ -218,12 +224,12 @@ console.log(doc.toJSON()); // Updated document state
 For type-safe tagged unions (like different message types or presence states), use `Shape.plain.discriminatedUnion()`:
 
 ```typescript
-import { Shape, mergeValue } from "@loro-extended/change";
+import { Shape } from "@loro-extended/change";
 
 // Define variant shapes - each must have the discriminant key
 const ClientPresenceShape = Shape.plain.struct({
   type: Shape.plain.string("client"), // Literal type for discrimination
-  name: Shape.plain.string(),
+  name: Shape.plain.string().placeholder("Anonymous"),
   input: Shape.plain.struct({
     force: Shape.plain.number(),
     angle: Shape.plain.number(),
@@ -247,26 +253,8 @@ const GamePresenceSchema = Shape.plain.discriminatedUnion("type", {
   server: ServerPresenceShape,
 });
 
-// Empty states for each variant
-const EmptyClientPresence = {
-  type: "client" as const,
-  name: "",
-  input: { force: 0, angle: 0 },
-};
-
-const EmptyServerPresence = {
-  type: "server" as const,
-  cars: {},
-  tick: 0,
-};
-
-// Use with mergeValue for presence data
-const crdtValue = { type: "client", name: "Alice" };
-const result = mergeValue(GamePresenceSchema, crdtValue, EmptyClientPresence);
-// Result: { type: "client", name: "Alice", input: { force: 0, angle: 0 } }
-
-// Type-safe filtering
-function handlePresence(presence: typeof result) {
+// Type-safe handling based on discriminant
+function handlePresence(presence: Infer<typeof GamePresenceSchema>) {
   if (presence.type === "server") {
     // TypeScript knows this is ServerPresence
     console.log(presence.cars, presence.tick);
@@ -279,9 +267,9 @@ function handlePresence(presence: typeof result) {
 
 **Key features:**
 
-- The discriminant key (e.g., `"type"`) determines which variant shape to use
-- Missing fields are filled from the empty state of the matching variant
-- Works seamlessly with `@loro-extended/react`'s `useEphemeral` hook
+- The discriminant (e.g., `"type"`) determines which variant shape to use
+- Use `.placeholder()` on fields to provide defaults (placeholders are applied automatically)
+- Works seamlessly with `@loro-extended/repo`'s presence system
 - Full TypeScript support for discriminated union types
 
 ### Untyped Integration with External Libraries
@@ -305,18 +293,7 @@ const CursorPresenceSchema = Shape.plain.struct({
 
 // With @loro-extended/repo:
 
-// Option 1: Shape.any() directly - entire document is untyped
-const handle = repo.get(docId, Shape.any(), { presence: CursorPresenceSchema });
-handle.loroDoc; // Raw LoroDoc - use Loro API directly
-handle.loroDoc.getMap("anything").set("key", "value");
-handle.presence.setSelf({
-  // Typed presence
-  anchor: cursor.encode(), // Uint8Array directly
-  focus: null,
-  user: { name: "Alice", color: "#ff0000" },
-});
-
-// Option 2: Shape.any() in a container - one container is untyped
+// Shape.any() in a container - one container is untyped
 const ProseMirrorDocShape = Shape.doc({
   doc: Shape.any(), // loro-prosemirror manages this
   metadata: Shape.struct({
@@ -324,7 +301,9 @@ const ProseMirrorDocShape = Shape.doc({
     title: Shape.text(),
   }),
 });
-const handle2 = repo.get(docId, ProseMirrorDocShape, { presence: CursorPresenceSchema });
+const handle2 = repo.get(docId, ProseMirrorDocShape, {
+  presence: CursorPresenceSchema,
+});
 handle2.doc.toJSON(); // { doc: unknown, metadata: { title: string } }
 ```
 
@@ -337,13 +316,13 @@ handle2.doc.toJSON(); // { doc: unknown, metadata: { title: string } }
 
 **When to use:**
 
-| Scenario                                    | Shape to Use                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| External library manages entire document    | `repo.get(docId, Shape.any(), { presence: presenceSchema })`       |
-| External library manages one container      | `Shape.doc({ doc: Shape.any(), ... })`                             |
-| Flexible metadata in presence               | `Shape.plain.any()` for dynamic values                             |
-| Binary cursor/selection data                | `Shape.plain.bytes().nullable()` for `Uint8Array` \| `null`        |
-| Full type safety                            | Use specific shapes like `Shape.struct()`, `Shape.text()`          |
+| Scenario                                 | Shape to Use                                                 |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| External library manages entire document | `repo.get(docId, Shape.any(), { presence: presenceSchema })` |
+| External library manages one container   | `Shape.doc({ doc: Shape.any(), ... })`                       |
+| Flexible metadata in presence            | `Shape.plain.any()` for dynamic values                       |
+| Binary cursor/selection data             | `Shape.plain.bytes().nullable()` for `Uint8Array` \| `null`  |
+| Full type safety                         | Use specific shapes like `Shape.struct()`, `Shape.text()`    |
 
 ### Nested Structures
 
@@ -356,29 +335,16 @@ const complexSchema = Shape.doc({
     metadata: Shape.struct({
       views: Shape.counter(),
       author: Shape.struct({
-        name: Shape.plain.string(),
+        name: Shape.plain.string().placeholder("Anonymous),
         email: Shape.plain.string(),
       }),
     }),
   }),
 });
 
-const emptyState = {
-  article: {
-    title: "",
-    metadata: {
-      views: 0,
-      author: {
-        name: "Anonymous",
-        email: "",
-      },
-    },
-  },
-};
-
 const doc = createTypedDoc(complexSchema);
 
-change(doc, (draft) => {
+doc.change((draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
   draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
@@ -427,7 +393,7 @@ const collaborativeSchema = Shape.doc({
   ),
 });
 
-change(doc, (draft) => {
+doc.change((draft) => {
   // Push creates and configures nested containers automatically
   draft.articles.push({
     title: "Collaborative Article",
@@ -440,15 +406,14 @@ change(doc, (draft) => {
   });
 
   // Later, edit the collaborative parts
-  // Note: articles[0] returns the actual CRDT containers
-  draft.articles.get(0)?.title.insert(0, "✨ ");
-  draft.articles.get(0)?.tags.push("real-time");
+  draft.articles.[0]?.title.insert(0, "✨ ");
+  draft.articles.[0]?.tags.push("real-time");
 });
 ```
 
 ## Path Selector DSL
 
-The `@loro-extended/change` package exports a type-safe path selector DSL for building (a subset of) JSONPath expressions with full TypeScript type inference. This is primarily used by `Handle.subscribe()` in `@loro-extended/repo` for efficient, type-safe subscriptions:
+The `@loro-extended/change` package exports a type-safe path selector DSL for building (a subset of) JSONPath expressions with full TypeScript type inference. This is primarily used by `handle.subscribe()` in `@loro-extended/repo` for efficient, type-safe subscriptions:
 
 ```typescript
 // In @loro-extended/repo, use with Handle.subscribe():
@@ -486,151 +451,124 @@ const doc = createTypedDoc(schema);
 const docFromExisting = createTypedDoc(schema, existingLoroDoc);
 ```
 
-#### `new TypedDoc<T>(schema, existingDoc?)` _(deprecated)_
+### The `loro()` Escape Hatch
 
-Constructor-style API. Use `createTypedDoc()` instead for cleaner code.
+The `loro()` function provides access to CRDT internals and container-specific operations. It follows a simple design principle:
+
+> **If it takes a plain JavaScript value, keep it on the ref.** > **If it takes a Loro container or exposes CRDT internals, use `loro()`.**
 
 ```typescript
-// Deprecated - use createTypedDoc() instead
-const doc = new TypedDoc(schema);
+import { loro } from "@loro-extended/change";
+
+// Access underlying Loro primitives
+loro(ref).doc; // LoroDoc
+loro(ref).container; // LoroList, LoroMap, etc. (correctly typed)
+loro(ref).subscribe(cb); // Subscribe to changes
+
+// Container operations (take Loro containers, not plain values)
+loro(list).pushContainer(loroMap);
+loro(list).insertContainer(0, loroMap);
+loro(struct).setContainer("key", loroMap);
+loro(record).setContainer("key", loroMap);
+
+// TypedDoc operations
+loro(doc).doc; // Raw LoroDoc access
+loro(doc).applyPatch(patch); // JSON Patch operations
+loro(doc).docShape; // Schema access
+loro(doc).rawValue; // Unmerged CRDT value
 ```
 
-### Functional Helpers (Recommended)
+#### API Surface by Ref Type
 
-These functional helpers provide a cleaner API and are the recommended way to work with TypedDoc:
+**ListRef / MovableListRef**
 
-#### `change(doc, mutator)`
+| Direct Access          | Only via `loro()`                   |
+| ---------------------- | ----------------------------------- |
+| `push(item)`           | `pushContainer(container)`          |
+| `insert(index, item)`  | `insertContainer(index, container)` |
+| `delete(index, len)`   | `subscribe(callback)`               |
+| `find(predicate)`      | `doc`                               |
+| `filter(predicate)`    | `container`                         |
+| `map(callback)`        |                                     |
+| `forEach(callback)`    |                                     |
+| `some(predicate)`      |                                     |
+| `every(predicate)`     |                                     |
+| `slice(start, end)`    |                                     |
+| `findIndex(predicate)` |                                     |
+| `length`, `[index]`    |                                     |
+| `toJSON()`             |                                     |
 
-Batches multiple mutations into a single transaction. Returns the doc for chaining.
+**StructRef**
 
-```typescript
-import { change } from "@loro-extended/change";
+| Direct Access                | Only via `loro()`              |
+| ---------------------------- | ------------------------------ |
+| `obj.property` (get)         | `setContainer(key, container)` |
+| `obj.property = value` (set) | `subscribe(callback)`          |
+| `Object.keys(obj)`           | `doc`                          |
+| `'key' in obj`               | `container`                    |
+| `delete obj.key`             |                                |
+| `toJSON()`                   |                                |
 
-change(doc, (draft) => {
-  draft.title.insert(0, "Hello");
-  draft.count.increment(5);
-});
+**RecordRef** (Map-like interface)
 
-// Chainable - change returns the doc
-change(doc, (d) => d.count.increment(1)).count.increment(2);
-```
+| Direct Access        | Only via `loro()`              |
+| -------------------- | ------------------------------ |
+| `get(key)`           | `setContainer(key, container)` |
+| `set(key, value)`    | `subscribe(callback)`          |
+| `delete(key)`        | `doc`                          |
+| `has(key)`           | `container`                    |
+| `keys()`, `values()` |                                |
+| `size`               |                                |
+| `toJSON()`           |                                |
 
-#### `doc.toJSON()`
+**TextRef**
 
-Returns the full plain JavaScript object representation of the document.
+| Direct Access                    | Only via `loro()`     |
+| -------------------------------- | --------------------- |
+| `insert(index, content)`         | `subscribe(callback)` |
+| `delete(index, len)`             | `doc`                 |
+| `update(text)`                   | `container`           |
+| `mark(range, key, value)`        |                       |
+| `unmark(range, key)`             |                       |
+| `toDelta()`, `applyDelta(delta)` |                       |
+| `toString()`, `valueOf()`        |                       |
+| `length`, `toJSON()`             |                       |
 
-```typescript
-const snapshot = doc.toJSON();
-// { title: "Hello", count: 5, ... }
-```
+**CounterRef**
 
-#### `getLoroDoc(doc)` / `getLoroDoc(ref)`
+| Direct Access        | Only via `loro()`     |
+| -------------------- | --------------------- |
+| `increment(value)`   | `subscribe(callback)` |
+| `decrement(value)`   | `doc`                 |
+| `value`, `valueOf()` | `container`           |
+| `toJSON()`           |                       |
 
-Access the underlying LoroDoc from a TypedDoc or any typed ref.
+**TypedDoc**
 
-```typescript
-import { getLoroDoc } from "@loro-extended/change";
+| Direct Access                  | Only via `loro()`     |
+| ------------------------------ | --------------------- |
+| `doc.property` (schema access) | `doc` (raw LoroDoc)   |
+| `toJSON()`                     | `subscribe(callback)` |
+| `change(fn)`                   | `applyPatch(patch)`   |
+|                                | `docShape`            |
+|                                | `rawValue`            |
 
-// From TypedDoc
-const loroDoc = getLoroDoc(doc);
-loroDoc.subscribe((event) => console.log("Changed:", event));
+### Subscribing to Ref Changes
 
-// From any ref (TextRef, CounterRef, ListRef, etc.)
-const titleRef = doc.title;
-const loroDoc = getLoroDoc(titleRef);
-loroDoc?.subscribe((event) => console.log("Changed:", event));
-```
-
-#### `getLoroContainer(ref)`
-
-Access the underlying Loro container from a typed ref. Returns the correctly-typed container.
-
-```typescript
-import { getLoroContainer } from "@loro-extended/change";
-
-const titleRef = doc.title;
-const loroText = getLoroContainer(titleRef);  // LoroText
-
-const countRef = doc.count;
-const loroCounter = getLoroContainer(countRef);  // LoroCounter
-
-const itemsRef = doc.items;
-const loroList = getLoroContainer(itemsRef);  // LoroList
-
-// Subscribe to container-level changes
-loroText.subscribe((event) => console.log("Text changed:", event));
-```
-
-### Ref Meta-Operations ($ namespace)
-
-Just as `doc.$` provides meta-operations on TypedDoc, all typed refs have a `$` namespace for accessing the underlying Loro primitives:
-
-#### `ref.$.loroDoc`
-
-Access the underlying LoroDoc from any ref.
-
-```typescript
-const titleRef = doc.title;
-const loroDoc = titleRef.$.loroDoc;
-
-loroDoc?.subscribe((event) => console.log("Doc changed:", event));
-```
-
-#### `ref.$.loroContainer`
-
-Access the underlying Loro container. Returns the correctly-typed container.
+The `loro()` function enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document:
 
 ```typescript
-const titleRef = doc.title;
-titleRef.$.loroContainer  // LoroText
+import { loro } from "@loro-extended/change";
 
-const countRef = doc.count;
-countRef.$.loroContainer  // LoroCounter
-
-const itemsRef = doc.items;
-itemsRef.$.loroContainer  // LoroList
-```
-
-#### `ref.$.subscribe(callback)`
-
-Subscribe to changes on this specific container.
-
-```typescript
-const titleRef = doc.title;
-
-const unsubscribe = titleRef.$.subscribe((event) => {
-  console.log("Text changed:", event);
-});
-
-// Later: unsubscribe()
-```
-
-This enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document:
-
-```typescript
 function TextEditor({ textRef }: { textRef: TextRef }) {
   useEffect(() => {
-    return textRef.$.subscribe((event) => {
+    return loro(textRef).subscribe((event) => {
       // Handle text changes
     });
   }, [textRef]);
-  
+
   return <div>...</div>;
 }
-```
-
-### $ Namespace (Escape Hatch)
-
-The `$` namespace provides access to meta-operations. While functional helpers are recommended, the `$` namespace is available for advanced use cases:
-
-#### `doc.$.change(mutator)`
-
-Same as `change(doc, mutator)`.
-
-```typescript
-doc.$.change((draft) => {
-  // Make changes to draft - all commit together
-});
 ```
 
 ### Schema Builders
@@ -720,7 +658,7 @@ email: Shape.plain
 
 ### TypedDoc API
 
-With the proxy-based API, schema properties are accessed directly on the doc object, and meta-operations are accessed via the `$` namespace.
+With the proxy-based API, schema properties are accessed directly on the doc object, and CRDT internals are accessed via the `loro()` function.
 
 #### Direct Schema Access
 
@@ -729,7 +667,7 @@ Access schema properties directly on the doc. Mutations commit immediately (auto
 ```typescript
 // Read values
 const title = doc.title.toString();
-const count = doc.count.value;
+const count = doc.count;
 
 // Mutate directly - commits immediately
 doc.title.insert(0, "Hello");
@@ -741,30 +679,32 @@ doc.users.has("alice"); // true
 "alice" in doc.users; // true
 ```
 
-For batched mutations, use `$.change()` instead.
+For batched mutations, use `change(doc, fn)`.
 
-#### `doc.$.toJSON()`
+#### `doc.toJSON()`
 
-Same as `doc.toJSON`. Returns the full plain JavaScript object representation.
+Returns the full plain JavaScript object representation.
 
 ```typescript
-const snapshot = doc.$.toJSON();
+const snapshot = doc.toJSON();
 ```
 
-#### `doc.$.rawValue`
+#### `loro(doc).rawValue`
 
-Returns raw CRDT state without empty state overlay.
+Returns raw CRDT state without placeholders (empty state overlay).
 
 ```typescript
-const crdtState = doc.$.rawValue;
+import { loro } from "@loro-extended/change";
+const crdtState = loro(doc).rawValue;
 ```
 
-#### `doc.$.loroDoc`
+#### `loro(doc).doc`
 
-Same as `getLoroDoc(doc)`. Access the underlying LoroDoc.
+Access the underlying LoroDoc.
 
 ```typescript
-const loroDoc = doc.$.loroDoc;
+import { loro } from "@loro-extended/change";
+const loroDoc = loro(doc).doc;
 ```
 
 ## CRDT Container Operations
@@ -827,7 +767,7 @@ draft.todos.forEach((todo, index) => {
 });
 ```
 
-**Important**: Methods like `find()` and `filter()` return **mutable draft objects** that you can modify directly:
+Methods like `find()` and `filter()` return **mutable draft objects** that you can modify directly:
 
 ```typescript
 change(doc, (draft) => {
@@ -993,7 +933,7 @@ You can easily get a plain JavaScript object snapshot of any part of the documen
 
 ```typescript
 // Get full document snapshot
-const snapshot = doc.$.toJSON();
+const snapshot = doc.toJSON();
 
 // Get snapshot of a specific list
 const todos = doc.todos.toJSON(); // returns plain array of todos
@@ -1133,7 +1073,7 @@ This package is part of the loro-extended ecosystem. Contributions welcome!
 
 - **Build**: `pnpm build`
 - **Test**: `pnpm test`
-- **Lint**: Uses Biome for formatting and linting
+- **Lint**: `pnpm check`
 
 ## License
 

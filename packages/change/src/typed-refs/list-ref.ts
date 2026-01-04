@@ -1,7 +1,7 @@
 import type { ContainerOrValueShape } from "../shape.js"
 import type { InferMutableType } from "../types.js"
 import type { TypedRefParams } from "./base.js"
-import { ListRefBase, ListRefBaseInternals } from "./list-ref-base.js"
+import { ListRefBase } from "./list-ref-base.js"
 import { ListRefInternals } from "./list-ref-internals.js"
 
 /**
