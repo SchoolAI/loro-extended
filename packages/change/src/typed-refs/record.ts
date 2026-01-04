@@ -14,7 +14,7 @@ import type {
 } from "../shape.js"
 import type { Infer, InferMutableType } from "../types.js"
 import { isContainerShape, isValueShape } from "../utils/type-guards.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import { TypedRef, INTERNAL_SYMBOL, type RefInternals, TypedRefParams } from "./base.js"
 import {
   absorbCachedPlainValues,
   assignPlainValueToTypedRef,
@@ -62,8 +62,14 @@ export class RecordRef<
     }
   }
 
-  absorbPlainValues() {
+  [INTERNAL_SYMBOL]: RefInternals = {
+
+
+    absorbPlainValues: () => {
     absorbCachedPlainValues(this.refCache, () => this.container)
+  },
+
+
   }
 
   getTypedRefParams<S extends ContainerShape>(

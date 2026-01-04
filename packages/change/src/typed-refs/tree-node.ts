@@ -2,7 +2,7 @@ import type { LoroDoc, LoroTreeNode, TreeID } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
-import type { TypedRefParams } from "./base.js"
+import { INTERNAL_SYMBOL, type RefInternals, type TypedRefParams } from "./base.js"
 import { createStructRef, type StructRef } from "./struct.js"
 
 // Forward declaration to avoid circular import
@@ -23,6 +23,11 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
 /**
  * Typed ref for a single tree node.
  * Provides type-safe access to node metadata via the `.data` property.
+ *
+ * **Note:** TreeNodeRef is not a subclass of TypedRef, but it implements
+ * `[INTERNAL_SYMBOL]: RefInternals` for consistency with other refs.
+ * This allows internal code to call `absorbPlainValues()` uniformly
+ * across all ref types during the `change()` commit phase.
  *
  * @example
  * ```typescript
@@ -198,12 +203,14 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   }
 
   /**
-   * Absorb plain values from the data StructRef.
+   * Internal methods accessed via INTERNAL_SYMBOL.
    */
-  absorbPlainValues(): void {
-    if (this._dataRef) {
-      this._dataRef.absorbPlainValues()
-    }
+  [INTERNAL_SYMBOL]: RefInternals = {
+    absorbPlainValues: () => {
+      if (this._dataRef) {
+        this._dataRef[INTERNAL_SYMBOL].absorbPlainValues()
+      }
+    },
   }
 
   /**

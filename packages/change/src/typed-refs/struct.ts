@@ -14,7 +14,12 @@ import type {
 } from "../shape.js"
 import type { Infer } from "../types.js"
 import { isValueShape } from "../utils/type-guards.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import {
+  INTERNAL_SYMBOL,
+  type RefInternals,
+  TypedRef,
+  type TypedRefParams,
+} from "./base.js"
 import {
   absorbCachedPlainValues,
   assignPlainValueToTypedRef,
@@ -71,8 +76,11 @@ class StructRefImpl<
     return this.createLoroNamespace() as LoroMapRef
   }
 
-  absorbPlainValues() {
-    absorbCachedPlainValues(this.propertyCache, () => this.loroMap)
+  // Implement the abstract INTERNAL_SYMBOL property
+  [INTERNAL_SYMBOL]: RefInternals = {
+    absorbPlainValues: () => {
+      absorbCachedPlainValues(this.propertyCache, () => this.loroMap)
+    },
   }
 
   getTypedRefParams<S extends ContainerShape>(
@@ -263,25 +271,20 @@ export function createStructRef<
 
   const proxy = new Proxy(impl, {
     get(target, prop, receiver) {
-      // Handle Symbol access (loro(), etc.)
+      // Handle Symbol access (loro(), internal, etc.)
       if (prop === LORO_SYMBOL) {
         return target.getLoroNamespace()
       }
 
-      // Handle $ for backward compatibility (deprecated)
-      if (prop === "$") {
-        return target.$
+      // Handle INTERNAL_SYMBOL for internal methods
+      if (prop === INTERNAL_SYMBOL) {
+        return target[INTERNAL_SYMBOL]
       }
 
       // Handle toJSON - use serializeRefToJSON with the proxy (receiver) so property access goes through the proxy
       if (prop === "toJSON") {
         return () =>
           serializeRefToJSON(receiver, Object.keys(target.structShape.shapes))
-      }
-
-      // Handle absorbPlainValues (internal)
-      if (prop === "absorbPlainValues") {
-        return () => target.absorbPlainValues()
       }
 
       // Handle shape access (internal - needed for assignPlainValueToTypedRef)
@@ -309,9 +312,8 @@ export function createStructRef<
     has(target, prop) {
       if (
         prop === LORO_SYMBOL ||
-        prop === "$" ||
+        prop === INTERNAL_SYMBOL ||
         prop === "toJSON" ||
-        prop === "absorbPlainValues" ||
         prop === "shape"
       ) {
         return true
@@ -403,20 +405,10 @@ export type StructRef<
   toJSON(): Infer<StructContainerShape<NestedShapes>>
 
   /**
-   * Absorbs cached plain values back into the CRDT.
+   * Internal methods accessed via INTERNAL_SYMBOL.
    * @internal
    */
-  absorbPlainValues(): void
-
-  /**
-   * Meta-operations namespace.
-   * @deprecated Use `loro(struct)` instead.
-   */
-  $: {
-    readonly loroDoc: LoroDoc
-    readonly loroContainer: LoroMap
-    subscribe(callback: (event: unknown) => void): Subscription
-  }
+  [INTERNAL_SYMBOL]: RefInternals
 }
 
 // Re-export for backward compatibility

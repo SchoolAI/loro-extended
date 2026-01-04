@@ -1,8 +1,64 @@
 ---
-"@loro-extended/change": minor
+"@loro-extended/change": major
 ---
 
-Add `loro()` escape hatch function, `doc.change()` method, and JavaScript-native StructRef API
+**BREAKING**: Remove `$` namespace, add `loro()` escape hatch function
+
+## Breaking Changes
+
+### `$` Namespace Removed
+
+The `$` namespace on TypedDoc and all refs has been removed. Use `loro()` instead:
+
+```typescript
+// OLD (no longer works)
+doc.$.change(draft => { ... })
+doc.$.loroDoc
+doc.$.applyPatch(patch)
+ref.$.loroDoc
+ref.$.loroContainer
+ref.$.subscribe(cb)
+
+// NEW (required)
+doc.change(draft => { ... })
+loro(doc).doc
+loro(doc).applyPatch(patch)
+loro(ref).doc
+loro(ref).container
+loro(ref).subscribe(cb)
+```
+
+### StructRef `.set()` Method Removed
+
+The `.set(key, value)` method on StructRef is no longer available. Use property assignment instead:
+
+```typescript
+// OLD (no longer works)
+doc.settings.set("darkMode", true)
+
+// NEW (required)
+doc.settings.darkMode = true
+```
+
+**Note:** RecordRef still has `.set()` since records have dynamic keys:
+
+```typescript
+// Records still use .set() for dynamic keys
+doc.users.set("alice", { name: "Alice" })
+```
+
+### Internal Methods Hidden via `INTERNAL_SYMBOL`
+
+Internal methods like `absorbPlainValues()` are now hidden behind a Symbol and are not directly accessible on refs:
+
+```typescript
+// OLD (no longer works)
+ref.absorbPlainValues()
+```
+
+The `INTERNAL_SYMBOL` is intentionally **not exported** from the package. This is a private implementation detail used internally by the library. If you need to access it for advanced use cases, you can use `Symbol.for("loro-extended:internal")`, but this is not recommended and may change without notice.
+
+This change hides implementation details from users and prevents namespace collisions.
 
 ## New Features
 
@@ -40,7 +96,6 @@ loro(doc).applyPatch(patch)
 The `change()` method is now available directly on TypedDoc:
 
 ```typescript
-// NEW (recommended)
 doc.change(draft => {
   draft.count.increment(10)
   draft.title.update("Hello")
@@ -85,57 +140,13 @@ console.log('darkMode' in doc.settings) // true
 delete doc.settings.theme
 ```
 
-## Breaking Changes
-
-### StructRef `.set()` Method Removed
-
-The `.set(key, value)` method on StructRef is no longer available. Use property assignment instead:
-
-```typescript
-// OLD (no longer works)
-doc.settings.set("darkMode", true)
-
-// NEW (required)
-doc.settings.darkMode = true
-```
-
-**Note:** RecordRef still has `.set()` since records have dynamic keys:
-
-```typescript
-// Records still use .set() for dynamic keys
-doc.users.set("alice", { name: "Alice" })
-```
-
-## Deprecations
-
-The `$` namespace is now deprecated but remains for backward compatibility:
-
-```typescript
-// OLD (deprecated)
-doc.$.change(draft => { ... })
-doc.$.loroDoc
-ref.$.loroDoc
-ref.$.loroContainer
-ref.$.subscribe(cb)
-
-// NEW (recommended)
-doc.change(draft => { ... })
-loro(doc).doc
-loro(ref).doc
-loro(ref).container
-loro(ref).subscribe(cb)
-```
-
-Container operations on refs are also deprecated in favor of `loro()`:
-- `list.pushContainer(c)` → `loro(list).pushContainer(c)`
-- `struct.setContainer(k, c)` → `loro(struct).setContainer(k, c)`
-
 ## Migration
 
-1. Replace `doc.$.change()` with `doc.change()`
-2. Replace `ref.$.loroDoc` with `loro(ref).doc`
-3. Replace `ref.$.loroContainer` with `loro(ref).container`
-4. Replace `ref.$.subscribe(cb)` with `loro(ref).subscribe(cb)`
-5. Replace `list.pushContainer(c)` with `loro(list).pushContainer(c)`
-6. Replace `struct.setContainer(k, c)` with `loro(struct).setContainer(k, c)`
-7. **Replace `struct.set("key", value)` with `struct.key = value`**
+1. **Replace `doc.$.change()` with `doc.change()`**
+2. **Replace `doc.$.applyPatch(patch)` with `loro(doc).applyPatch(patch)`**
+3. **Replace `ref.$.loroDoc` with `loro(ref).doc`**
+4. **Replace `ref.$.loroContainer` with `loro(ref).container`**
+5. **Replace `ref.$.subscribe(cb)` with `loro(ref).subscribe(cb)`**
+6. Replace `list.pushContainer(c)` with `loro(list).pushContainer(c)`
+7. Replace `struct.setContainer(k, c)` with `loro(struct).setContainer(k, c)`
+8. **Replace `struct.set("key", value)` with `struct.key = value`**

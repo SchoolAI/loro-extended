@@ -1,7 +1,7 @@
 import type { LoroDoc } from "loro-crdt"
 import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import { TypedRef, INTERNAL_SYMBOL, type RefInternals, TypedRefParams } from "./base.js"
 import { createContainerTypedRef, serializeRefToJSON } from "./utils.js"
 
 const containerGetter = {
@@ -98,11 +98,14 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
     ) as Infer<Shape>
   }
 
-  absorbPlainValues(): void {
-    // By iterating over the propertyCache, we achieve a small optimization
-    // by only absorbing values that have been 'touched' in some way
-    for (const [, ref] of this.propertyCache.entries()) {
-      ref.absorbPlainValues()
-    }
+  // Implement the abstract INTERNAL_SYMBOL property
+  [INTERNAL_SYMBOL]: RefInternals = {
+    absorbPlainValues: () => {
+      // By iterating over the propertyCache, we achieve a small optimization
+      // by only absorbing values that have been 'touched' in some way
+      for (const [, ref] of this.propertyCache.entries()) {
+        ref[INTERNAL_SYMBOL].absorbPlainValues()
+      }
+    },
   }
 }

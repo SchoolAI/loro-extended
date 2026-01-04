@@ -11,78 +11,11 @@ import {
 import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
+import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc.js"
 import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { validatePlaceholder } from "./validation.js"
 
-/**
- * Meta-operations namespace for TypedDoc.
- * Access via doc.$ to perform batch operations, serialization, etc.
- */
-export class TypedDocMeta<Shape extends DocShape> {
-  constructor(private internal: TypedDocInternal<Shape>) {}
-
-  /**
-   * The primary method of mutating typed documents.
-   * Batches multiple mutations into a single transaction.
-   * All changes commit together at the end.
-   *
-   * Use this for:
-   * - Find-and-mutate operations (required due to JS limitations)
-   * - Performance (fewer commits)
-   * - Atomic undo (all changes = one undo step)
-   *
-   * Returns the doc for chaining.
-   */
-  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
-    this.internal.change(fn)
-    return this.internal.proxy as TypedDoc<Shape>
-  }
-
-  /**
-   * Returns the full plain JavaScript object representation of the document.
-   * This is an expensive O(N) operation that serializes the entire document.
-   */
-  toJSON(): Infer<Shape> {
-    return this.internal.toJSON()
-  }
-
-  /**
-   * Apply JSON Patch operations to the document
-   *
-   * @param patch - Array of JSON Patch operations (RFC 6902)
-   * @param pathPrefix - Optional path prefix for scoped operations
-   * @returns Updated document value
-   */
-  applyPatch(
-    patch: JsonPatch,
-    pathPrefix?: (string | number)[],
-  ): TypedDoc<Shape> {
-    this.internal.applyPatch(patch, pathPrefix)
-    return this.internal.proxy as TypedDoc<Shape>
-  }
-
-  /**
-   * Access the underlying LoroDoc for advanced operations.
-   */
-  get loroDoc(): LoroDoc {
-    return this.internal.loroDoc
-  }
-
-  /**
-   * Access the document schema shape.
-   */
-  get docShape(): Shape {
-    return this.internal.docShape
-  }
-
-  /**
-   * Get raw CRDT value without placeholder overlay.
-   */
-  get rawValue(): any {
-    return this.internal.rawValue
-  }
-}
 
 /**
  * Internal TypedDoc implementation (not directly exposed to users).
@@ -134,7 +67,7 @@ class TypedDocInternal<Shape extends DocShape> {
       batchedMutation: true, // Enable value shape caching for find-and-mutate patterns
     })
     fn(draft as unknown as Mutable<Shape>)
-    draft.absorbPlainValues()
+    draft[INTERNAL_SYMBOL].absorbPlainValues()
     this.doc.commit()
 
     // Invalidate cached value ref since doc changed
@@ -221,12 +154,6 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
   change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
 
   /**
-   * Meta-operations namespace.
-   * @deprecated Use `loro(doc)` instead for CRDT access, and `doc.change()` for mutations.
-   */
-  $: TypedDocMeta<Shape>
-
-  /**
    * Returns the full plain JavaScript object representation of the document.
    * This is an O(N) operation that serializes the entire document.
    *
@@ -280,7 +207,6 @@ export function createTypedDoc<Shape extends DocShape>(
   existingDoc?: LoroDoc,
 ): TypedDoc<Shape> {
   const internal = new TypedDocInternal(shape, existingDoc || new LoroDoc())
-  const meta = new TypedDocMeta(internal)
 
   // Create the loro() namespace for this doc
   const loroNamespace: LoroTypedDocRef = {
@@ -313,7 +239,7 @@ export function createTypedDoc<Shape extends DocShape>(
   }
 
   // Create a proxy that delegates schema properties to the DocRef
-  // and provides change() and $ namespace
+  // and provides change() method
   const proxy = new Proxy(internal.value as object, {
     get(target, prop, receiver) {
       // loro() access via well-known symbol
@@ -326,11 +252,6 @@ export function createTypedDoc<Shape extends DocShape>(
         return changeFunction
       }
 
-      // $ namespace for meta-operations (deprecated, kept for backward compatibility)
-      if (prop === "$") {
-        return meta
-      }
-
       // toJSON() should always read fresh from the CRDT
       if (prop === "toJSON") {
         return () => internal.toJSON()
@@ -341,8 +262,8 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     set(target, prop, value, receiver) {
-      // Don't allow setting $, change, or LORO_SYMBOL
-      if (prop === "$" || prop === LORO_SYMBOL || prop === "change") {
+      // Don't allow setting change or LORO_SYMBOL
+      if (prop === LORO_SYMBOL || prop === "change") {
         return false
       }
 
@@ -352,23 +273,16 @@ export function createTypedDoc<Shape extends DocShape>(
 
     // Support 'in' operator
     has(target, prop) {
-      if (prop === "$" || prop === LORO_SYMBOL || prop === "change") return true
+      if (prop === LORO_SYMBOL || prop === "change") return true
       return Reflect.has(target, prop)
     },
 
-    // Support Object.keys() - don't include $, change, or LORO_SYMBOL in enumeration
+    // Support Object.keys() - don't include change or LORO_SYMBOL in enumeration
     ownKeys(target) {
       return Reflect.ownKeys(target)
     },
 
     getOwnPropertyDescriptor(target, prop) {
-      if (prop === "$") {
-        return {
-          configurable: true,
-          enumerable: false,
-          value: meta,
-        }
-      }
       if (prop === "change") {
         return {
           configurable: true,

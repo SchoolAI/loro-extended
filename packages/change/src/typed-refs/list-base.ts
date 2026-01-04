@@ -20,7 +20,12 @@ import {
   isContainerShape,
   isValueShape,
 } from "../utils/type-guards.js"
-import { TypedRef, type TypedRefParams } from "./base.js"
+import {
+  INTERNAL_SYMBOL,
+  type RefInternals,
+  TypedRef,
+  type TypedRefParams,
+} from "./base.js"
 import { createContainerTypedRef } from "./utils.js"
 
 // Shared logic for list operations
@@ -72,29 +77,32 @@ export abstract class ListRefBase<
     }
   }
 
-  absorbPlainValues() {
-    // Critical function: absorb mutated plain values back into Loro containers
-    // This is called at the end of change() to persist mutations made to plain objects
-    for (const [index, cachedItem] of this.itemCache.entries()) {
-      if (cachedItem) {
-        if (isValueShape(this.shape.shape)) {
-          // For value shapes, delegate to subclass-specific absorption logic
-          this.absorbValueAtIndex(index, cachedItem)
-        } else {
-          // For container shapes, the item should be a typed ref that handles its own absorption
-          if (
-            cachedItem &&
-            typeof cachedItem === "object" &&
-            "absorbPlainValues" in cachedItem
-          ) {
-            ;(cachedItem as any).absorbPlainValues()
+  // Implement the abstract INTERNAL_SYMBOL property
+  [INTERNAL_SYMBOL]: RefInternals = {
+    absorbPlainValues: () => {
+      // Critical function: absorb mutated plain values back into Loro containers
+      // This is called at the end of change() to persist mutations made to plain objects
+      for (const [index, cachedItem] of this.itemCache.entries()) {
+        if (cachedItem) {
+          if (isValueShape(this.shape.shape)) {
+            // For value shapes, delegate to subclass-specific absorption logic
+            this.absorbValueAtIndex(index, cachedItem)
+          } else {
+            // For container shapes, the item should be a typed ref that handles its own absorption
+            if (
+              cachedItem &&
+              typeof cachedItem === "object" &&
+              INTERNAL_SYMBOL in cachedItem
+            ) {
+              ;(cachedItem as any)[INTERNAL_SYMBOL].absorbPlainValues()
+            }
           }
         }
       }
-    }
 
-    // Clear the cache after absorbing values
-    this.itemCache.clear()
+      // Clear the cache after absorbing values
+      this.itemCache.clear()
+    },
   }
 
   // Abstract method to be implemented by subclasses

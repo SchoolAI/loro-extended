@@ -3,6 +3,19 @@ import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
 
+/**
+ * Symbol for internal methods that should not be enumerable or accessible to users.
+ * Used to hide implementation details like absorbPlainValues(), getTypedRefParams(), etc.
+ */
+export const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
+
+/**
+ * Interface for internal methods stored on refs via INTERNAL_SYMBOL.
+ */
+export interface RefInternals {
+  absorbPlainValues(): void
+}
+
 export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
   placeholder?: Infer<Shape>
@@ -12,87 +25,24 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   getDoc: () => LoroDoc // Needed for auto-commit
 }
 
-/**
- * Meta-operations namespace for typed refs.
- * Provides access to underlying Loro primitives.
- *
- * @deprecated Use `loro(ref)` instead. The `$` namespace will be removed in a future version.
- */
-export interface RefMetaNamespace<Shape extends DocShape | ContainerShape> {
-  /**
-   * Access the underlying LoroDoc.
-   * @deprecated Use `loro(ref).doc` instead.
-   */
-  readonly loroDoc: LoroDoc
-
-  /**
-   * Access the underlying Loro container (correctly typed).
-   * @deprecated Use `loro(ref).container` instead.
-   */
-  readonly loroContainer: ShapeToContainer<Shape>
-
-  /**
-   * Subscribe to container-level changes.
-   * @param callback - Function called when the container changes
-   * @returns Unsubscribe function
-   * @deprecated Use `loro(ref).subscribe(callback)` instead.
-   */
-  subscribe(callback: (event: unknown) => void): Subscription
-}
-
 // Base class for all typed refs
 export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   protected _cachedContainer?: ShapeToContainer<Shape>
-  private _$?: RefMetaNamespace<Shape>
   private _loroNamespace?: LoroRefBase
 
   constructor(protected _params: TypedRefParams<Shape>) {}
 
-  abstract absorbPlainValues(): void
+  /**
+   * Internal methods accessed via Symbol.
+   * Subclasses must implement this property with their absorbPlainValues logic.
+   */
+  abstract [INTERNAL_SYMBOL]: RefInternals
 
   /**
    * Serializes the ref to a plain JSON-compatible value.
    * Returns the plain type inferred from the shape.
    */
   abstract toJSON(): Infer<Shape>
-
-  /**
-   * Meta-operations namespace for accessing underlying Loro primitives.
-   *
-   * @deprecated Use `loro(ref)` instead. The `$` namespace will be removed in a future version.
-   *
-   * @example
-   * ```typescript
-   * // OLD (deprecated):
-   * textRef.$.loroDoc
-   * textRef.$.loroContainer
-   * textRef.$.subscribe(callback)
-   *
-   * // NEW (recommended):
-   * import { loro } from "@loro-extended/change"
-   * loro(textRef).doc
-   * loro(textRef).container
-   * loro(textRef).subscribe(callback)
-   * ```
-   */
-  get $(): RefMetaNamespace<Shape> {
-    if (!this._$) {
-      const self = this
-      this._$ = {
-        get loroDoc(): LoroDoc {
-          return self._params.getDoc()
-        },
-        get loroContainer(): ShapeToContainer<Shape> {
-          return self.container
-        },
-        subscribe(callback: (event: unknown) => void): Subscription {
-          // All Loro containers have a subscribe method
-          return (self.container as any).subscribe(callback)
-        },
-      }
-    }
-    return this._$
-  }
 
   /**
    * Access the loro() namespace via the well-known symbol.

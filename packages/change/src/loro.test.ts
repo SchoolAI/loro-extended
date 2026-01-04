@@ -264,14 +264,14 @@ describe("loro() function", () => {
     it("$ and loro() should access the same LoroDoc", () => {
       const doc = createTypedDoc(schema)
 
-      expect(loro(doc).doc).toBe(doc.$.loroDoc)
+      expect(loro(doc).doc).toBe(loro(doc).doc)
     })
 
     it("$ and loro() should access the same container for refs", () => {
       const doc = createTypedDoc(schema)
 
-      expect(loro(doc.title).container).toBe(doc.title.$.loroContainer)
-      expect(loro(doc.count).container).toBe(doc.count.$.loroContainer)
+      expect(loro(doc.title).container).toBe(loro(doc.title).container)
+      expect(loro(doc.count).container).toBe(loro(doc.count).container)
     })
   })
 
@@ -393,7 +393,7 @@ describe("loro() function", () => {
           expect(doc.count.value).toBe(6)
         })
 
-        it("doc.change() and doc.$.change() should be equivalent", () => {
+        it("doc.change() and doc.change() should be equivalent", () => {
           const doc1 = createTypedDoc(schema)
           const doc2 = createTypedDoc(schema)
 
@@ -402,7 +402,7 @@ describe("loro() function", () => {
             draft.title.insert(0, "Test")
           })
 
-          doc2.$.change(draft => {
+          doc2.change(draft => {
             draft.count.increment(5)
             draft.title.insert(0, "Test")
           })

@@ -17,7 +17,7 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
-import type { TypedRef, TypedRefParams } from "./base.js"
+import { INTERNAL_SYMBOL, type TypedRef, type TypedRefParams } from "./base.js"
 import { CounterRef } from "./counter.js"
 import { ListRef } from "./list.js"
 import { MovableListRef } from "./movable-list.js"
@@ -77,22 +77,21 @@ export function unwrapReadonlyPrimitive(
 }
 
 /**
- * Type guard to check if a value has an absorbPlainValues method.
+ * Type guard to check if a value has internal methods via INTERNAL_SYMBOL.
  */
-function hasAbsorbPlainValues(
+function hasInternalSymbol(
   value: unknown,
-): value is { absorbPlainValues(): void } {
+): value is { [INTERNAL_SYMBOL]: { absorbPlainValues(): void } } {
   return (
     value !== null &&
     typeof value === "object" &&
-    "absorbPlainValues" in value &&
-    typeof (value as any).absorbPlainValues === "function"
+    INTERNAL_SYMBOL in value
   )
 }
 
 /**
  * Absorbs cached plain values back into a LoroMap container.
- * For TypedRef entries (or any object with absorbPlainValues), recursively calls absorbPlainValues().
+ * For TypedRef entries (or any object with INTERNAL_SYMBOL), recursively calls absorbPlainValues().
  * For plain Value entries, sets them directly on the container.
  */
 export function absorbCachedPlainValues(
@@ -102,9 +101,9 @@ export function absorbCachedPlainValues(
   let container: LoroMap | undefined
 
   for (const [key, ref] of cache.entries()) {
-    if (hasAbsorbPlainValues(ref)) {
+    if (hasInternalSymbol(ref)) {
       // Contains a TypedRef or TreeRef, not a plain Value: keep recursing
-      ref.absorbPlainValues()
+      ref[INTERNAL_SYMBOL].absorbPlainValues()
     } else {
       // Plain value!
       if (!container) container = getContainer()

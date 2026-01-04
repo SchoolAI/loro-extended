@@ -5,7 +5,7 @@ import type {
   TreeNodeJSON,
 } from "../shape.js"
 import type { Infer } from "../types.js"
-import { TypedRef } from "./base.js"
+import { INTERNAL_SYMBOL, type RefInternals, TypedRef } from "./base.js"
 import { TreeNodeRef } from "./tree-node.js"
 
 /**
@@ -42,10 +42,12 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
    * Absorb plain values from all cached nodes.
    * Called before committing changes to ensure all pending values are written.
    */
-  absorbPlainValues(): void {
-    for (const nodeRef of this.nodeCache.values()) {
-      nodeRef.absorbPlainValues()
-    }
+  [INTERNAL_SYMBOL]: RefInternals = {
+    absorbPlainValues: () => {
+      for (const nodeRef of this.nodeCache.values()) {
+        nodeRef[INTERNAL_SYMBOL].absorbPlainValues()
+      }
+    },
   }
 
   /**

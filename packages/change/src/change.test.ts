@@ -1,3 +1,4 @@
+import { loro } from "./loro.js"
 import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
@@ -392,7 +393,7 @@ describe("CRDT Operations", () => {
         expect(draft.containerMap).toBeDefined()
       })
 
-      const rawValue = typedDoc.$.rawValue
+      const rawValue = loro(typedDoc).rawValue as any
       // Since no container was actually set, containerMap might be undefined
       expect(rawValue.containerMap).toBeUndefined()
     })
@@ -585,7 +586,7 @@ describe("Nested Operations", () => {
         articles: { metadata: { views: { page: 2 } } },
       })
 
-      expect(typedDoc.$.rawValue).toEqual({
+      expect(loro(typedDoc).rawValue).toEqual({
         articles: { metadata: { views: { page: 2 } } },
       })
     })
@@ -610,7 +611,7 @@ describe("Nested Operations", () => {
       }
 
       expect(result).toEqual(correctResult)
-      expect(typedDoc.$.rawValue).toEqual(correctResult)
+      expect(loro(typedDoc).rawValue).toEqual(correctResult)
     })
   })
 
@@ -1006,7 +1007,7 @@ describe("TypedLoroDoc", () => {
       })
 
       // Raw value should only contain what was actually set in CRDT
-      const rawValue = typedDoc.$.rawValue
+      const rawValue = loro(typedDoc).rawValue as any
       expect(rawValue.title).toBe("Hello")
       expect(rawValue.metadata).toBeUndefined()
 

@@ -1,6 +1,6 @@
 import type { LoroText } from "loro-crdt"
 import type { TextContainerShape } from "../shape.js"
-import { TypedRef } from "./base.js"
+import { INTERNAL_SYMBOL, type RefInternals, TypedRef } from "./base.js"
 
 // Text typed ref
 export class TextRef extends TypedRef<TextContainerShape> {
@@ -11,8 +11,14 @@ export class TextRef extends TypedRef<TextContainerShape> {
     return super.container as LoroText
   }
 
-  absorbPlainValues() {
+  [INTERNAL_SYMBOL]: RefInternals = {
+
+
+    absorbPlainValues: () => {
     // no plain values contained within
+  },
+
+
   }
 
   // Text methods

@@ -1,6 +1,6 @@
 import type { LoroCounter } from "loro-crdt"
 import type { CounterContainerShape } from "../shape.js"
-import { TypedRef } from "./base.js"
+import { INTERNAL_SYMBOL, type RefInternals, TypedRef } from "./base.js"
 
 // Counter typed ref
 export class CounterRef extends TypedRef<CounterContainerShape> {
@@ -11,8 +11,14 @@ export class CounterRef extends TypedRef<CounterContainerShape> {
     return super.container as LoroCounter
   }
 
-  absorbPlainValues() {
+  [INTERNAL_SYMBOL]: RefInternals = {
+
+
+    absorbPlainValues: () => {
     // no plain values contained within
+  },
+
+
   }
 
   increment(value: number = 1): void {

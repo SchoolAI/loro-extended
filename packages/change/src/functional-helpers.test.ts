@@ -1,3 +1,4 @@
+import { loro } from "./loro.js"
 import {
   LoroCounter,
   LoroList,
@@ -125,10 +126,10 @@ describe("functional helpers", () => {
       expect(typeof loroDoc.subscribe).toBe("function")
     })
 
-    it("should return the same LoroDoc as doc.$.loroDoc", () => {
+    it("should return the same LoroDoc as loro(doc).doc", () => {
       const doc = createTypedDoc(schema)
 
-      expect(getLoroDoc(doc)).toBe(doc.$.loroDoc)
+      expect(getLoroDoc(doc)).toBe(loro(doc).doc)
     })
   })
 
@@ -177,117 +178,117 @@ describe("functional helpers", () => {
     })
   })
 
-  describe("ref.$.loroDoc", () => {
+  describe("loro(ref).doc", () => {
     it("should return the LoroDoc from TextRef", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(titleRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(titleRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(countRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(countRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(itemsRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(itemsRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from MovableListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const movableItemsRef = doc.movableItems
 
-      expect(movableItemsRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(movableItemsRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from RecordRef", () => {
       const doc = createTypedDoc(fullSchema)
       const usersRef = doc.users
 
-      expect(usersRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(usersRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from StructRef", () => {
       const doc = createTypedDoc(fullSchema)
       const profileRef = doc.profile
 
-      expect(profileRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(profileRef).doc).toBe(loro(doc).doc)
     })
 
     it("should return the LoroDoc from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(treeRef.$.loroDoc).toBe(doc.$.loroDoc)
+      expect(loro(treeRef).doc).toBe(loro(doc).doc)
     })
   })
 
-  describe("ref.$.loroContainer", () => {
+  describe("loro(ref).container", () => {
     it("should return LoroText from TextRef", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(titleRef.$.loroContainer).toBeInstanceOf(LoroText)
+      expect(loro(titleRef).container).toBeInstanceOf(LoroText)
     })
 
     it("should return LoroCounter from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(countRef.$.loroContainer).toBeInstanceOf(LoroCounter)
+      expect(loro(countRef).container).toBeInstanceOf(LoroCounter)
     })
 
     it("should return LoroList from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(itemsRef.$.loroContainer).toBeInstanceOf(LoroList)
+      expect(loro(itemsRef).container).toBeInstanceOf(LoroList)
     })
 
     it("should return LoroMovableList from MovableListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const movableItemsRef = doc.movableItems
 
-      expect(movableItemsRef.$.loroContainer).toBeInstanceOf(LoroMovableList)
+      expect(loro(movableItemsRef).container).toBeInstanceOf(LoroMovableList)
     })
 
     it("should return LoroMap from RecordRef", () => {
       const doc = createTypedDoc(fullSchema)
       const usersRef = doc.users
 
-      expect(usersRef.$.loroContainer).toBeInstanceOf(LoroMap)
+      expect(loro(usersRef).container).toBeInstanceOf(LoroMap)
     })
 
     it("should return LoroMap from StructRef", () => {
       const doc = createTypedDoc(fullSchema)
       const profileRef = doc.profile
 
-      expect(profileRef.$.loroContainer).toBeInstanceOf(LoroMap)
+      expect(loro(profileRef).container).toBeInstanceOf(LoroMap)
     })
 
     it("should return LoroTree from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(treeRef.$.loroContainer).toBeInstanceOf(LoroTree)
+      expect(loro(treeRef).container).toBeInstanceOf(LoroTree)
     })
   })
 
-  describe("ref.$.subscribe()", () => {
+  describe("loro(ref).subscribe()", () => {
     it("should subscribe to TextRef changes", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
       const callback = vi.fn()
 
-      const unsubscribe = titleRef.$.subscribe(callback)
+      const unsubscribe = loro(titleRef).subscribe(callback)
       titleRef.insert(0, "Hello")
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -298,9 +299,9 @@ describe("functional helpers", () => {
       const countRef = doc.count
       const callback = vi.fn()
 
-      const unsubscribe = countRef.$.subscribe(callback)
+      const unsubscribe = loro(countRef).subscribe(callback)
       countRef.increment(5)
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -311,9 +312,9 @@ describe("functional helpers", () => {
       const itemsRef = doc.items
       const callback = vi.fn()
 
-      const unsubscribe = itemsRef.$.subscribe(callback)
+      const unsubscribe = loro(itemsRef).subscribe(callback)
       itemsRef.push("item1")
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -324,9 +325,9 @@ describe("functional helpers", () => {
       const usersRef = doc.users
       const callback = vi.fn()
 
-      const unsubscribe = usersRef.$.subscribe(callback)
+      const unsubscribe = loro(usersRef).subscribe(callback)
       usersRef.set("alice", { name: "Alice" })
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -337,9 +338,9 @@ describe("functional helpers", () => {
       const treeRef = doc.tree
       const callback = vi.fn()
 
-      const unsubscribe = treeRef.$.subscribe(callback)
+      const unsubscribe = loro(treeRef).subscribe(callback)
       treeRef.createNode()
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -350,11 +351,11 @@ describe("functional helpers", () => {
       const titleRef = doc.title
       const callback = vi.fn()
 
-      const unsubscribe = titleRef.$.subscribe(callback)
+      const unsubscribe = loro(titleRef).subscribe(callback)
       unsubscribe()
 
       titleRef.insert(0, "Hello")
-      doc.$.loroDoc.commit()
+      loro(doc).doc.commit()
 
       expect(callback).not.toHaveBeenCalled()
     })
@@ -365,28 +366,28 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(getLoroDoc(titleRef)).toBe(doc.$.loroDoc)
+      expect(getLoroDoc(titleRef)).toBe(loro(doc).doc)
     })
 
     it("should return LoroDoc from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(getLoroDoc(countRef)).toBe(doc.$.loroDoc)
+      expect(getLoroDoc(countRef)).toBe(loro(doc).doc)
     })
 
     it("should return LoroDoc from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(getLoroDoc(itemsRef)).toBe(doc.$.loroDoc)
+      expect(getLoroDoc(itemsRef)).toBe(loro(doc).doc)
     })
 
     it("should return LoroDoc from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(getLoroDoc(treeRef)).toBe(doc.$.loroDoc)
+      expect(getLoroDoc(treeRef)).toBe(loro(doc).doc)
     })
   })
 
@@ -447,14 +448,14 @@ describe("functional helpers", () => {
       expect(container).toBeInstanceOf(LoroTree)
     })
 
-    it("should return the same container as ref.$.loroContainer", () => {
+    it("should return the same container as loro(ref).container", () => {
       const doc = createTypedDoc(fullSchema)
 
-      expect(getLoroContainer(doc.title)).toBe(doc.title.$.loroContainer)
-      expect(getLoroContainer(doc.count)).toBe(doc.count.$.loroContainer)
-      expect(getLoroContainer(doc.items)).toBe(doc.items.$.loroContainer)
-      expect(getLoroContainer(doc.users)).toBe(doc.users.$.loroContainer)
-      expect(getLoroContainer(doc.tree)).toBe(doc.tree.$.loroContainer)
+      expect(getLoroContainer(doc.title)).toBe(loro(doc.title).container)
+      expect(getLoroContainer(doc.count)).toBe(loro(doc.count).container)
+      expect(getLoroContainer(doc.items)).toBe(loro(doc.items).container)
+      expect(getLoroContainer(doc.users)).toBe(loro(doc.users).container)
+      expect(getLoroContainer(doc.tree)).toBe(loro(doc.tree).container)
     })
   })
 })
