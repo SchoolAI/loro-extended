@@ -17,9 +17,7 @@ import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
 import type { RecordRef } from "./typed-refs/record-ref.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TextRef } from "./typed-refs/text-ref.js"
-
-// Note: TreeRef is not imported here to avoid circular dependency.
-// The TreeContainerShape uses a placeholder type that gets resolved at runtime.
+import type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
 
 export interface Shape<Plain, Mutable, Placeholder = Plain> {
   readonly _type: string
@@ -77,12 +75,42 @@ export type TreeNodeJSON<DataShape extends StructContainerShape> = {
 }
 
 /**
+ * Interface describing the TreeRef API for use in shape definitions.
+ * This avoids circular type references that would occur with the TreeRef class.
+ * @internal
+ */
+export interface TreeRefInterface<DataShape extends StructContainerShape> {
+  /** Get or create a node ref for a LoroTreeNode */
+  getOrCreateNodeRef(node: unknown): TreeNodeRef<DataShape>
+  /** Get a node by its ID */
+  getNodeByID(id: TreeID): TreeNodeRef<DataShape> | undefined
+  /** Delete a node from the tree */
+  delete(target: TreeID | TreeNodeRef<DataShape>): void
+  /** Serialize the tree to a nested JSON structure */
+  toJSON(): TreeNodeJSON<DataShape>[]
+  /** Create a new root node with optional initial data */
+  createNode(initialData?: Partial<DataShape["_plain"]>): TreeNodeRef<DataShape>
+  /** Get all root nodes (nodes without parents) */
+  roots(): TreeNodeRef<DataShape>[]
+  /** Get all nodes in the tree (unordered) */
+  nodes(): TreeNodeRef<DataShape>[]
+  /** Check if a node with the given ID exists in the tree */
+  has(id: TreeID): boolean
+  /** Enable fractional index generation for ordering */
+  enableFractionalIndex(jitter?: number): void
+  /** Get a flat array representation of all nodes */
+  toArray(): Array<{
+    id: TreeID
+    parent: TreeID | null
+    index: number
+    fractionalIndex: string
+    data: DataShape["_plain"]
+  }>
+}
+
+/**
  * Container shape for tree (forest) structures.
  * Each node in the tree has typed metadata stored in a LoroMap.
- *
- * Note: The Mutable type (second generic parameter) is `any` here to avoid
- * circular dependency with TreeRef. The actual type is resolved at runtime
- * and through the InferMutableType helper.
  *
  * @example
  * ```typescript
@@ -98,7 +126,7 @@ export type TreeNodeJSON<DataShape extends StructContainerShape> = {
  */
 export interface TreeContainerShape<
   DataShape extends StructContainerShape = StructContainerShape,
-> extends Shape<TreeNodeJSON<DataShape>[], any, never[]> {
+> extends Shape<TreeNodeJSON<DataShape>[], TreeRefInterface<DataShape>, never[]> {
   readonly _type: "tree"
   /**
    * The shape of each node's data (metadata).

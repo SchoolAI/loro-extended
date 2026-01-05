@@ -65,6 +65,9 @@ export type {
   StructValueShape,
   TextContainerShape,
   TreeContainerShape,
+  // Tree-related types
+  TreeNodeJSON,
+  TreeRefInterface,
   UnionValueShape,
   // Value shapes
   ValueShape,
