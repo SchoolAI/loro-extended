@@ -1,4 +1,4 @@
-import { Shape, loro } from "@loro-extended/change"
+import { loro, Shape } from "@loro-extended/change"
 import { beforeEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { Handle } from "./handle.js"

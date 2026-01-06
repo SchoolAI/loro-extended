@@ -126,7 +126,11 @@ export interface TreeRefInterface<DataShape extends StructContainerShape> {
  */
 export interface TreeContainerShape<
   DataShape extends StructContainerShape = StructContainerShape,
-> extends Shape<TreeNodeJSON<DataShape>[], TreeRefInterface<DataShape>, never[]> {
+> extends Shape<
+    TreeNodeJSON<DataShape>[],
+    TreeRefInterface<DataShape>,
+    never[]
+  > {
   readonly _type: "tree"
   /**
    * The shape of each node's data (metadata).

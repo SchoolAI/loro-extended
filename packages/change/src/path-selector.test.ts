@@ -342,8 +342,16 @@ describe("Path Selector DSL", () => {
 
       // Add some books
       doc.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, author: { name: "Author A" } })
-        draft.books.push({ title: "Second Book", price: 20, author: { name: "Author B" } })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          author: { name: "Author A" },
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          author: { name: "Author B" },
+        })
       })
 
       const builder = createPathBuilder(docShape)
@@ -358,8 +366,16 @@ describe("Path Selector DSL", () => {
 
       // Add some books
       doc.change(draft => {
-        draft.books.push({ title: "First Book", price: 10, author: { name: "Author A" } })
-        draft.books.push({ title: "Second Book", price: 20, author: { name: "Author B" } })
+        draft.books.push({
+          title: "First Book",
+          price: 10,
+          author: { name: "Author A" },
+        })
+        draft.books.push({
+          title: "Second Book",
+          price: 20,
+          author: { name: "Author B" },
+        })
       })
 
       const builder = createPathBuilder(docShape)

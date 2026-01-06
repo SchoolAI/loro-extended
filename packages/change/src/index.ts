@@ -18,15 +18,6 @@ export {
   type LoroTypedDocRef,
   loro,
 } from "./loro.js"
-// Typed ref types - for specifying types with the loro() function
-export type { CounterRef } from "./typed-refs/counter-ref.js"
-export type { ListRef } from "./typed-refs/list-ref.js"
-export type { MovableListRef } from "./typed-refs/movable-list-ref.js"
-export type { RecordRef } from "./typed-refs/record-ref.js"
-export type { StructRef } from "./typed-refs/struct-ref.js"
-export type { TextRef } from "./typed-refs/text-ref.js"
-export type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
-export type { TreeRef } from "./typed-refs/tree-ref.js"
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"
@@ -80,6 +71,15 @@ export type {
 export { Shape } from "./shape.js"
 export type { TypedDoc } from "./typed-doc.js"
 export { createTypedDoc } from "./typed-doc.js"
+// Typed ref types - for specifying types with the loro() function
+export type { CounterRef } from "./typed-refs/counter-ref.js"
+export type { ListRef } from "./typed-refs/list-ref.js"
+export type { MovableListRef } from "./typed-refs/movable-list-ref.js"
+export type { RecordRef } from "./typed-refs/record-ref.js"
+export type { StructRef } from "./typed-refs/struct-ref.js"
+export type { TextRef } from "./typed-refs/text-ref.js"
+export type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
+export type { TreeRef } from "./typed-refs/tree-ref.js"
 export type {
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
