@@ -21,7 +21,8 @@ export type ConnectionState =
   | "reconnecting"
 
 /**
- * Options for the WebSocket client adapter.
+ * Base options for the WebSocket client adapter.
+ * Used for browser-to-server connections.
  */
 export interface WsClientOptions {
   /** WebSocket URL to connect to */
@@ -43,6 +44,29 @@ export interface WsClientOptions {
 }
 
 /**
+ * Options for service-to-service WebSocket connections.
+ * Extends WsClientOptions with header support for authentication.
+ *
+ * Note: Headers are a Bun/Node-specific extension. The browser WebSocket API
+ * does not support custom headers per the WHATWG spec.
+ */
+export interface ServiceWsClientOptions extends WsClientOptions {
+  /**
+   * Headers to send during WebSocket upgrade.
+   * Used for authentication in service-to-service communication.
+   *
+   * @example
+   * ```typescript
+   * headers: {
+   *   "Authorization": "Bearer my-token",
+   *   "X-Internal-Secret": "shared-secret"
+   * }
+   * ```
+   */
+  headers?: Record<string, string>
+}
+
+/**
  * Default reconnection options.
  */
 const DEFAULT_RECONNECT = {
@@ -58,18 +82,27 @@ const DEFAULT_RECONNECT = {
  * Connects to a WebSocket server and handles bidirectional communication
  * using the native loro-extended wire protocol.
  *
- * @example
- * ```typescript
- * import { WsClientNetworkAdapter } from '@loro-extended/adapter-websocket/client'
+ * @deprecated Use the factory functions instead of instantiating directly:
+ * - `createWsClient()` - For browser-to-server connections
+ * - `createServiceWsClient()` - For service-to-service connections (supports headers)
  *
- * const adapter = new WsClientNetworkAdapter({
+ * @example Browser client
+ * ```typescript
+ * import { createWsClient } from '@loro-extended/adapter-websocket/client'
+ *
+ * const adapter = createWsClient({
  *   url: 'ws://localhost:3000/ws',
  *   reconnect: { enabled: true },
  * })
+ * ```
  *
- * const repo = new Repo({
- *   peerId: 'client-1',
- *   adapters: [adapter],
+ * @example Service-to-service client
+ * ```typescript
+ * import { createServiceWsClient } from '@loro-extended/adapter-websocket/client'
+ *
+ * const adapter = createServiceWsClient({
+ *   url: 'ws://localhost:3000/ws',
+ *   headers: { 'Authorization': 'Bearer token' },
  * })
  * ```
  */
@@ -80,7 +113,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private keepaliveTimer?: ReturnType<typeof setInterval>
   private reconnectAttempts = 0
   private reconnectTimer?: ReturnType<typeof setTimeout>
-  private options: WsClientOptions
+  private options: ServiceWsClientOptions
   private WebSocketImpl: typeof globalThis.WebSocket
   private isConnecting = false
   private shouldReconnect = true
@@ -88,7 +121,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   public connectionState: ConnectionState = "disconnected"
   private listeners = new Set<(state: ConnectionState) => void>()
 
-  constructor(options: WsClientOptions) {
+  constructor(options: ServiceWsClientOptions) {
     super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
@@ -179,8 +212,24 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     })
 
     try {
-      this.socket = new this.WebSocketImpl(url)
-      this.socket.binaryType = "arraybuffer"
+      // Create WebSocket with optional headers (Bun-specific extension)
+      // The browser WebSocket API doesn't support headers, but Bun does
+      if (this.options.headers && Object.keys(this.options.headers).length > 0) {
+        // Use Bun's extended WebSocket constructor with headers
+        // Type assertion via unknown needed because Bun extends the standard WebSocket API
+        // with a non-standard constructor signature
+        type BunWebSocketConstructor = new (
+          url: string,
+          options: { headers: Record<string, string> },
+        ) => WebSocket
+        const BunWebSocket = this.WebSocketImpl as unknown as BunWebSocketConstructor
+        this.socket = new BunWebSocket(url, {
+          headers: this.options.headers,
+        })
+      } else {
+        this.socket = new this.WebSocketImpl(url)
+      }
+      this.socket!.binaryType = "arraybuffer"
 
       await new Promise<void>((resolve, reject) => {
         if (!this.socket) {
@@ -458,4 +507,66 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   get isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN
   }
+}
+
+/**
+ * Create a WebSocket client adapter for browser-to-server connections.
+ *
+ * This is the recommended way to create a WebSocket client for browser environments.
+ * For service-to-service connections that need header-based authentication,
+ * use `createServiceWsClient()` instead.
+ *
+ * @example
+ * ```typescript
+ * import { createWsClient } from '@loro-extended/adapter-websocket/client'
+ *
+ * const adapter = createWsClient({
+ *   url: 'ws://localhost:3000/ws',
+ *   reconnect: { enabled: true },
+ * })
+ *
+ * const repo = new Repo({
+ *   peerId: 'browser-client',
+ *   adapters: [adapter],
+ * })
+ * ```
+ */
+export function createWsClient(options: WsClientOptions): WsClientNetworkAdapter {
+  return new WsClientNetworkAdapter(options)
+}
+
+/**
+ * Create a WebSocket client adapter for service-to-service connections.
+ *
+ * This factory function is for backend/server environments (Bun, Node.js)
+ * where you need to pass authentication headers during the WebSocket upgrade.
+ *
+ * **Note:** Headers are a Bun/Node-specific extension. The browser WebSocket API
+ * does not support custom headers per the WHATWG spec. For browser clients,
+ * use `createWsClient()` and authenticate via URL query parameters or
+ * first-message authentication.
+ *
+ * @example
+ * ```typescript
+ * import { createServiceWsClient } from '@loro-extended/adapter-websocket/client'
+ *
+ * const adapter = createServiceWsClient({
+ *   url: 'ws://primary-server:3000/ws',
+ *   headers: {
+ *     'Authorization': 'Bearer internal-service-token',
+ *     'X-Internal-Secret': process.env.INTERNAL_SECRET,
+ *   },
+ *   reconnect: { enabled: true },
+ * })
+ *
+ * const repo = new Repo({
+ *   peerId: 'secondary-server',
+ *   adapters: [adapter],
+ * })
+ * ```
+ */
+export function createServiceWsClient(
+  options: ServiceWsClientOptions,
+): WsClientNetworkAdapter {
+  return new WsClientNetworkAdapter(options)
 }

@@ -8,7 +8,13 @@
  */
 
 // Client adapter
-export { WsClientNetworkAdapter, type WsClientOptions } from "./client.js"
+export {
+  createServiceWsClient,
+  createWsClient,
+  type ServiceWsClientOptions,
+  WsClientNetworkAdapter,
+  type WsClientOptions,
+} from "./client.js"
 // Connection
 export { WsConnection } from "./connection.js"
 // Handler types
