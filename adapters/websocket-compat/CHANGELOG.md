@@ -1,5 +1,25 @@
 # @loro-extended/adapter-websocket
 
+## 3.0.2
+
+### Patch Changes
+
+- f941a95: Fix intermittent WebSocket connection establishment race condition
+
+  The WebSocket server adapter was calling `establishChannel()` immediately after sending the "ready" signal, which could cause a race condition where binary messages arrived before the client had processed "ready" and created its channel.
+
+  **Changes:**
+
+  - Remove `establishChannel()` call from server adapters (websocket and websocket-compat)
+  - The server's channel now gets established when it receives the client's `establish-request`
+  - Add test verifying server does not send binary before client sends establish-request
+  - Update documentation in `docs/messages.md` to clarify the establishment protocol
+
+  This aligns the WebSocket adapters with the SSE adapter pattern, where only the client initiates the establishment handshake.
+
+- Updated dependencies [f254aa2]
+  - @loro-extended/repo@5.0.0
+
 ## 3.0.1
 
 ### Patch Changes

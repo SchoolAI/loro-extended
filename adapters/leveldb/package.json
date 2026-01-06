@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-leveldb",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "LevelDB storage adapter for @loro-extended/repo",
   "author": "Duane Johnson",
   "license": "MIT",

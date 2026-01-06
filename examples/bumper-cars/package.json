@@ -1,7 +1,7 @@
 {
   "name": "example-bumper-cars",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "module",
   "scripts": {
     "build:all": "pnpm build:client && pnpm build:server",

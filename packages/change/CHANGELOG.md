@@ -1,5 +1,209 @@
 # @loro-extended/change
 
+## 5.0.0
+
+### Major Changes
+
+- cb7e307: **BREAKING**: Remove `$` namespace, add `loro()` escape hatch function
+
+  ## Breaking Changes
+
+  ### `$` Namespace Removed
+
+  The `$` namespace on TypedDoc and all refs has been removed. Use `loro()` instead:
+
+  ```typescript
+  // OLD (no longer works)
+  doc.$.change(draft => { ... })
+  doc.$.loroDoc
+  doc.$.applyPatch(patch)
+  ref.$.loroDoc
+  ref.$.loroContainer
+  ref.$.subscribe(cb)
+
+  // NEW (required)
+  doc.change(draft => { ... })
+  loro(doc).doc
+  loro(doc).applyPatch(patch)
+  loro(ref).doc
+  loro(ref).container
+  loro(ref).subscribe(cb)
+  ```
+
+  ### StructRef `.set()` Method Removed
+
+  The `.set(key, value)` method on StructRef is no longer available. Use property assignment instead:
+
+  ```typescript
+  // OLD (no longer works)
+  doc.settings.set("darkMode", true);
+
+  // NEW (required)
+  doc.settings.darkMode = true;
+  ```
+
+  **Note:** RecordRef still has `.set()` since records have dynamic keys:
+
+  ```typescript
+  // Records still use .set() for dynamic keys
+  doc.users.set("alice", { name: "Alice" });
+  ```
+
+  ### Internal Methods Hidden via `INTERNAL_SYMBOL`
+
+  Internal methods like `absorbPlainValues()` are now hidden behind a Symbol and are not directly accessible on refs:
+
+  ```typescript
+  // OLD (no longer works)
+  ref.absorbPlainValues();
+  ```
+
+  The `INTERNAL_SYMBOL` is intentionally **not exported** from the package. This is a private implementation detail used internally by the library. If you need to access it for advanced use cases, you can use `Symbol.for("loro-extended:internal")`, but this is not recommended and may change without notice.
+
+  This change hides implementation details from users and prevents namespace collisions.
+
+  ## New Features
+
+  ### `loro()` Function
+
+  A new `loro()` function is the recommended way to access underlying Loro primitives:
+
+  ```typescript
+  import { loro } from "@loro-extended/change";
+
+  // Access underlying LoroDoc
+  loro(ref).doc;
+
+  // Access underlying Loro container (correctly typed)
+  loro(ref).container; // LoroList, LoroMap, LoroText, etc.
+
+  // Subscribe to changes
+  loro(ref).subscribe(callback);
+
+  // Container operations
+  loro(list).pushContainer(loroMap);
+  loro(list).insertContainer(0, loroMap);
+  loro(struct).setContainer("key", loroMap);
+  loro(record).setContainer("key", loroMap);
+
+  // For TypedDoc
+  loro(doc).doc;
+  loro(doc).docShape;
+  loro(doc).rawValue;
+  loro(doc).applyPatch(patch);
+  ```
+
+  ### `doc.change()` Method
+
+  The `change()` method is now available directly on TypedDoc:
+
+  ```typescript
+  doc.change((draft) => {
+    draft.count.increment(10);
+    draft.title.update("Hello");
+  });
+
+  // Supports chaining
+  doc
+    .change((draft) => draft.count.increment(1))
+    .change((draft) => draft.count.increment(2));
+  ```
+
+  ### JavaScript-Native StructRef API
+
+  StructRef now uses a Proxy-based implementation that provides JavaScript-native object behavior:
+
+  ```typescript
+  const schema = Shape.doc({
+    settings: Shape.struct({
+      darkMode: Shape.plain.boolean().placeholder(false),
+      fontSize: Shape.plain.number().placeholder(14),
+      theme: Shape.plain.string().placeholder("light"),
+    }),
+  });
+
+  const doc = createTypedDoc(schema);
+
+  // Property assignment (NEW - recommended)
+  doc.settings.darkMode = true;
+  doc.settings.fontSize = 16;
+  doc.settings.theme = "dark";
+
+  // Property access
+  console.log(doc.settings.darkMode); // true
+
+  // Object.keys()
+  console.log(Object.keys(doc.settings)); // ['darkMode', 'fontSize', 'theme']
+
+  // 'key' in obj
+  console.log("darkMode" in doc.settings); // true
+
+  // delete obj.key (for optional properties)
+  delete doc.settings.theme;
+  ```
+
+  ## Migration
+
+  1. **Replace `doc.$.change()` with `doc.change()`**
+  2. **Replace `doc.$.applyPatch(patch)` with `loro(doc).applyPatch(patch)`**
+  3. **Replace `ref.$.loroDoc` with `loro(ref).doc`**
+  4. **Replace `ref.$.loroContainer` with `loro(ref).container`**
+  5. **Replace `ref.$.subscribe(cb)` with `loro(ref).subscribe(cb)`**
+  6. Replace `list.pushContainer(c)` with `loro(list).pushContainer(c)`
+  7. Replace `struct.setContainer(k, c)` with `loro(struct).setContainer(k, c)`
+  8. **Replace `struct.set("key", value)` with `struct.key = value`**
+
+### Minor Changes
+
+- 9a8048b: Make `getDoc` required in TypedRefParams and unify TreeRef with TypedRef
+
+  **Internal changes:**
+
+  - `TypedRefParams.getDoc` is now required instead of optional
+  - `TreeRef` now extends `TypedRef` instead of being a standalone class
+
+  **Improvements:**
+
+  - `$.loroDoc` now returns `LoroDoc` instead of `LoroDoc | undefined` on all refs
+  - `getLoroDoc()` helper now returns `LoroDoc` instead of `LoroDoc | undefined` for refs
+  - Removed ~40 lines of duplicated code from TreeRef (container caching, $, autoCommit, etc.)
+  - Removed `TreeRefMetaNamespace` interface (now uses inherited `RefMetaNamespace`)
+
+  **Non-breaking for external consumers:**
+
+  - Existing code with `?.` on `$.loroDoc` will still work
+  - New code can omit `?.` for cleaner access
+
+- 6e49a81: Add `$` namespace to typed refs for accessing underlying Loro primitives
+
+  This release adds a `$` namespace to all typed refs (TextRef, CounterRef, ListRef, MovableListRef, RecordRef, StructRef, TreeRef) that provides:
+
+  - `ref.$.loroDoc` - Access the underlying LoroDoc from any ref
+  - `ref.$.loroContainer` - Access the correctly-typed Loro container (LoroText, LoroCounter, LoroList, etc.)
+  - `ref.$.subscribe(callback)` - Subscribe to container-level changes
+
+  Also adds functional helpers:
+
+  - `getLoroDoc(ref)` - Functional API to get LoroDoc from any ref (extends existing `getLoroDoc(doc)`)
+  - `getLoroContainer(ref)` - New functional API to get the typed Loro container from any ref
+
+  This enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document:
+
+  ```typescript
+  function TextEditor({ textRef }: { textRef: TextRef }) {
+    useEffect(() => {
+      return textRef.$.subscribe((event) => {
+        // Handle text changes
+      });
+    }, [textRef]);
+
+    // Access the container for advanced operations
+    const loroText = textRef.$.loroContainer;
+
+    return <div>...</div>;
+  }
+  ```
+
 ## 4.0.0
 
 ### Minor Changes

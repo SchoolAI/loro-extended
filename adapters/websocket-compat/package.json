@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-websocket-compat",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "WebSocket network adapter implementing the Loro Syncing Protocol for compatibility with Loro servers (use @loro-extended/adapter-websocket for native loro-extended protocol)",
   "author": "Duane Johnson",
   "license": "MIT",

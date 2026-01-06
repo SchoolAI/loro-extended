@@ -1,5 +1,13 @@
 # @loro-extended/react
 
+## 5.0.0
+
+### Patch Changes
+
+- Updated dependencies [f254aa2]
+  - @loro-extended/repo@5.0.0
+  - @loro-extended/hooks-core@5.0.0
+
 ## 4.0.0
 
 ### Patch Changes

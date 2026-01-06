@@ -1,5 +1,19 @@
 # example-todo-sse
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies [f254aa2]
+- Updated dependencies [9a8048b]
+- Updated dependencies [cb7e307]
+- Updated dependencies [6e49a81]
+  - @loro-extended/repo@5.0.0
+  - @loro-extended/change@5.0.0
+  - @loro-extended/react@5.0.0
+  - @loro-extended/adapter-sse@5.0.0
+  - @loro-extended/adapter-leveldb@5.0.0
+
 ## 0.2.7
 
 ### Patch Changes
