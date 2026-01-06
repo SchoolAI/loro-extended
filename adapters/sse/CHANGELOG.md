@@ -1,5 +1,11 @@
 # @loro-extended/adapter-sse
 
+## 5.1.0
+
+### Patch Changes
+
+- @loro-extended/repo@5.1.0
+
 ## 5.0.0
 
 ### Patch Changes

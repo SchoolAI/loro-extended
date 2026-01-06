@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/change",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "description": "A schema-driven, type-safe wrapper for Loro CRDT that provides natural JavaScript syntax for collaborative data mutations",
   "author": "Duane Johnson",
   "license": "MIT",
