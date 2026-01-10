@@ -112,11 +112,18 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
 
   /**
    * Get all nodes in the tree (unordered).
-   * Includes all nodes, not just roots.
+   * By default, excludes deleted nodes (tombstones).
+   *
+   * @param options.includeDeleted - If true, includes deleted nodes. Default: false.
+   * @returns Array of TreeNodeRef for matching nodes
    */
-  nodes(): TreeNodeRef<DataShape>[] {
+  nodes(options?: { includeDeleted?: boolean }): TreeNodeRef<DataShape>[] {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroTree
-    return container.nodes().map(node => this.getOrCreateNodeRef(node))
+    const allNodes = container.nodes()
+    const filtered = options?.includeDeleted
+      ? allNodes
+      : allNodes.filter(node => !node.isDeleted())
+    return filtered.map(node => this.getOrCreateNodeRef(node))
   }
 
   /**

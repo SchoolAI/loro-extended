@@ -92,8 +92,8 @@ export interface TreeRefInterface<DataShape extends StructContainerShape> {
   createNode(initialData?: Partial<DataShape["_plain"]>): TreeNodeRef<DataShape>
   /** Get all root nodes (nodes without parents) */
   roots(): TreeNodeRef<DataShape>[]
-  /** Get all nodes in the tree (unordered) */
-  nodes(): TreeNodeRef<DataShape>[]
+  /** Get all nodes in the tree (unordered). By default excludes deleted nodes. */
+  nodes(options?: { includeDeleted?: boolean }): TreeNodeRef<DataShape>[]
   /** Check if a node with the given ID exists in the tree */
   has(id: TreeID): boolean
   /** Enable fractional index generation for ordering */
