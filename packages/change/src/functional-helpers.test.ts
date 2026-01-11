@@ -458,4 +458,406 @@ describe("functional helpers", () => {
       expect(getLoroContainer(doc.tree)).toBe(loro(doc.tree).container)
     })
   })
+
+  describe("change() on refs", () => {
+    describe("ListRef", () => {
+      it("should batch push operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.items, draft => {
+          draft.push("item1")
+          draft.push("item2")
+          draft.push("item3")
+        })
+
+        expect(doc.items.toJSON()).toEqual(["item1", "item2", "item3"])
+      })
+
+      it("should batch delete and push operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        // Setup initial data
+        doc.items.push("a")
+        doc.items.push("b")
+        doc.items.push("c")
+
+        change(doc.items, draft => {
+          draft.delete(1, 1) // Remove "b"
+          draft.push("d")
+        })
+
+        expect(doc.items.toJSON()).toEqual(["a", "c", "d"])
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.items, draft => {
+          draft.push("item1")
+        })
+
+        expect(result).toBe(doc.items)
+        result.push("item2")
+        expect(doc.items.toJSON()).toEqual(["item1", "item2"])
+      })
+
+      it("should support find-and-mutate patterns with value shapes", () => {
+        const listSchema = Shape.doc({
+          items: Shape.list(
+            Shape.plain.struct({
+              id: Shape.plain.string(),
+              count: Shape.plain.number(),
+            }),
+          ),
+        })
+        const doc = createTypedDoc(listSchema)
+
+        // Setup initial data
+        doc.items.push({ id: "a", count: 0 })
+        doc.items.push({ id: "b", count: 0 })
+
+        change(doc.items, draft => {
+          const item = draft.find(i => i.id === "b")
+          if (item) {
+            item.count = 10
+          }
+        })
+
+        expect(doc.items.toJSON()).toEqual([
+          { id: "a", count: 0 },
+          { id: "b", count: 10 },
+        ])
+      })
+    })
+
+    describe("TextRef", () => {
+      it("should batch insert operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.title, draft => {
+          draft.insert(0, "Hello")
+          draft.insert(5, " World")
+        })
+
+        expect(doc.title.toString()).toBe("Hello World")
+      })
+
+      it("should batch insert and delete operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        doc.title.insert(0, "Hello World")
+
+        change(doc.title, draft => {
+          draft.delete(5, 6) // Remove " World"
+          draft.insert(5, " Universe")
+        })
+
+        expect(doc.title.toString()).toBe("Hello Universe")
+      })
+
+      it("should support update operation", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        doc.title.insert(0, "Old Text")
+
+        change(doc.title, draft => {
+          draft.update("New Text")
+        })
+
+        expect(doc.title.toString()).toBe("New Text")
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.title, draft => {
+          draft.insert(0, "Hello")
+        })
+
+        expect(result).toBe(doc.title)
+        result.insert(5, "!")
+        expect(doc.title.toString()).toBe("Hello!")
+      })
+    })
+
+    describe("CounterRef", () => {
+      it("should batch increment operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.count, draft => {
+          draft.increment(5)
+          draft.increment(3)
+          draft.increment(2)
+        })
+
+        expect(doc.count.value).toBe(10)
+      })
+
+      it("should batch increment and decrement operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        doc.count.increment(10)
+
+        change(doc.count, draft => {
+          draft.increment(5)
+          draft.decrement(3)
+        })
+
+        expect(doc.count.value).toBe(12)
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.count, draft => {
+          draft.increment(5)
+        })
+
+        expect(result).toBe(doc.count)
+        result.increment(3)
+        expect(doc.count.value).toBe(8)
+      })
+    })
+
+    describe("StructRef", () => {
+      it("should batch property assignments", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.profile, draft => {
+          draft.bio.insert(0, "Hello")
+          draft.age.increment(25)
+        })
+
+        expect(doc.profile.bio.toString()).toBe("Hello")
+        expect(doc.profile.age.value).toBe(25)
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.profile, draft => {
+          draft.bio.insert(0, "Test")
+        })
+
+        expect(result).toBe(doc.profile)
+      })
+    })
+
+    describe("RecordRef", () => {
+      it("should batch set operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.users, draft => {
+          draft.set("alice", { name: "Alice" })
+          draft.set("bob", { name: "Bob" })
+        })
+
+        expect(doc.users.toJSON()).toEqual({
+          alice: { name: "Alice" },
+          bob: { name: "Bob" },
+        })
+      })
+
+      it("should batch set and delete operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        doc.users.set("alice", { name: "Alice" })
+        doc.users.set("bob", { name: "Bob" })
+
+        change(doc.users, draft => {
+          draft.delete("alice")
+          draft.set("charlie", { name: "Charlie" })
+        })
+
+        expect(doc.users.toJSON()).toEqual({
+          bob: { name: "Bob" },
+          charlie: { name: "Charlie" },
+        })
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.users, draft => {
+          draft.set("alice", { name: "Alice" })
+        })
+
+        expect(result).toBe(doc.users)
+      })
+    })
+
+    describe("TreeRef", () => {
+      it("should batch createNode operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.tree, draft => {
+          draft.createNode()
+          draft.createNode()
+        })
+
+        expect(doc.tree.roots().length).toBe(2)
+      })
+
+      it("should batch node creation with initial data", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.tree, draft => {
+          const node1 = draft.createNode()
+          node1.data.name.insert(0, "Node 1")
+
+          const node2 = draft.createNode()
+          node2.data.name.insert(0, "Node 2")
+        })
+
+        const roots = doc.tree.roots()
+        expect(roots.length).toBe(2)
+        expect(roots[0].data.name.toString()).toBe("Node 1")
+        expect(roots[1].data.name.toString()).toBe("Node 2")
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.tree, draft => {
+          draft.createNode()
+        })
+
+        expect(result).toBe(doc.tree)
+      })
+    })
+
+    describe("MovableListRef", () => {
+      it("should batch push operations", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.movableItems, draft => {
+          draft.push("item1")
+          draft.push("item2")
+        })
+
+        expect(doc.movableItems.toJSON()).toEqual(["item1", "item2"])
+      })
+
+      it("should return the original ref for chaining", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        const result = change(doc.movableItems, draft => {
+          draft.push("item1")
+        })
+
+        expect(result).toBe(doc.movableItems)
+      })
+    })
+
+    describe("nested change() calls", () => {
+      it("should handle nested change() calls correctly", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.items, outerDraft => {
+          outerDraft.push("outer1")
+
+          // Nested change on a different ref
+          change(doc.count, innerDraft => {
+            innerDraft.increment(10)
+          })
+
+          outerDraft.push("outer2")
+        })
+
+        expect(doc.items.toJSON()).toEqual(["outer1", "outer2"])
+        expect(doc.count.value).toBe(10)
+      })
+
+      it("should handle deeply nested change() calls", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc.items, d1 => {
+          d1.push("L1")
+
+          change(doc.count, d2 => {
+            d2.increment(1)
+
+            change(doc.title, d3 => {
+              d3.insert(0, "Deep")
+            })
+
+            d2.increment(2)
+          })
+
+          d1.push("L1-end")
+        })
+
+        expect(doc.items.toJSON()).toEqual(["L1", "L1-end"])
+        expect(doc.count.value).toBe(3)
+        expect(doc.title.toString()).toBe("Deep")
+      })
+    })
+
+    describe("encapsulation use case", () => {
+      it("should allow passing refs without exposing the doc", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        // Simulate a library function that only receives the ref
+        function addItems(itemsRef: typeof doc.items) {
+          change(itemsRef, draft => {
+            draft.push("library-item-1")
+            draft.push("library-item-2")
+          })
+        }
+
+        // User code passes the ref, not the doc
+        addItems(doc.items)
+
+        expect(doc.items.toJSON()).toEqual(["library-item-1", "library-item-2"])
+      })
+
+      it("should allow passing TreeRef for state machine use case", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        // Simulate a state machine library
+        function addStates(statesRef: typeof doc.tree) {
+          change(statesRef, draft => {
+            const idle = draft.createNode()
+            idle.data.name.insert(0, "idle")
+
+            const running = draft.createNode()
+            running.data.name.insert(0, "running")
+          })
+        }
+
+        addStates(doc.tree)
+
+        const roots = doc.tree.roots()
+        expect(roots.length).toBe(2)
+        expect(roots[0].data.name.toString()).toBe("idle")
+        expect(roots[1].data.name.toString()).toBe("running")
+      })
+    })
+
+    describe("regression: doc.change() still works", () => {
+      it("should still support doc.change() method", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        doc.change(draft => {
+          draft.title.insert(0, "Hello")
+          draft.count.increment(5)
+        })
+
+        expect(doc.title.toString()).toBe("Hello")
+        expect(doc.count.value).toBe(5)
+      })
+
+      it("should still support change(doc, fn) helper", () => {
+        const doc = createTypedDoc(fullSchema)
+
+        change(doc, draft => {
+          draft.title.insert(0, "World")
+          draft.count.increment(10)
+        })
+
+        expect(doc.title.toString()).toBe("World")
+        expect(doc.count.value).toBe(10)
+      })
+    })
+  })
 })

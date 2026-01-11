@@ -32,7 +32,7 @@ export class StructRefInternals<
   private propertyCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
   /** Get typed ref params for creating child refs at a key */
-  getTypedRefParams(
+  getChildTypedRefParams(
     key: string,
     shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
@@ -118,7 +118,7 @@ export class StructRefInternals<
     let ref = this.propertyCache.get(key)
     if (!ref) {
       ref = createContainerTypedRef(
-        this.getTypedRefParams(key, actualShape as ContainerShape),
+        this.getChildTypedRefParams(key, actualShape as ContainerShape),
       )
       this.propertyCache.set(key, ref)
     }

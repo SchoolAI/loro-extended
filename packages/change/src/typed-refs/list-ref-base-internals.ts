@@ -28,7 +28,7 @@ export class ListRefBaseInternals<
   protected itemCache = new Map<number, any>()
 
   /** Get typed ref params for creating child refs at an index */
-  getTypedRefParams(
+  getChildTypedRefParams(
     index: number,
     shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
@@ -147,7 +147,7 @@ export class ListRefBaseInternals<
     let cachedItem = this.itemCache.get(index)
     if (!cachedItem) {
       cachedItem = createContainerTypedRef(
-        this.getTypedRefParams(index, shape.shape as ContainerShape),
+        this.getChildTypedRefParams(index, shape.shape as ContainerShape),
       )
       this.itemCache.set(index, cachedItem)
     }

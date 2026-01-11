@@ -32,7 +32,7 @@ export class RecordRefInternals<
   private refCache = new Map<string, TypedRef<ContainerShape> | Value>()
 
   /** Get typed ref params for creating child refs at a key */
-  getTypedRefParams(
+  getChildTypedRefParams(
     key: string,
     shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
@@ -145,7 +145,7 @@ export class RecordRefInternals<
     let ref = this.refCache.get(key)
     if (!ref) {
       ref = createContainerTypedRef(
-        this.getTypedRefParams(key, shape as ContainerShape),
+        this.getChildTypedRefParams(key, shape as ContainerShape),
       )
       this.refCache.set(key, ref)
     }

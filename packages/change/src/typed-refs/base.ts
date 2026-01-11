@@ -96,6 +96,24 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this.params.getDoc()
   }
 
+  /**
+   * Get the TypedRefParams needed to recreate this ref.
+   * Used by change() to create draft refs with modified params.
+   *
+   * Returns a new params object with the same shape, placeholder, getContainer, and getDoc,
+   * but allows overriding autoCommit and batchedMutation for draft creation.
+   */
+  getTypedRefParams(): TypedRefParams<Shape> {
+    return {
+      shape: this.params.shape,
+      placeholder: this.params.placeholder,
+      getContainer: this.params.getContainer,
+      autoCommit: this.params.autoCommit,
+      batchedMutation: this.params.batchedMutation,
+      getDoc: this.params.getDoc,
+    }
+  }
+
   /** Get the loro namespace (cached) */
   getLoroNamespace(): LoroRefBase {
     if (!this.loroNamespace) {

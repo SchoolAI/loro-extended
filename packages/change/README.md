@@ -216,6 +216,100 @@ console.log(doc.toJSON()); // Updated document state
 | Atomic undo/redo                  | Batched: `change(doc, d => { ... })` |
 | Performance-critical bulk updates | Batched: `change(doc, d => { ... })` |
 | Simple reads + writes             | Direct: `doc.users.set(...)`         |
+| Encapsulated ref operations       | Ref-level: `change(ref, d => {...})` |
+
+### Ref-Level `change()` for Encapsulation
+
+The `change()` function also works on individual refs (ListRef, TextRef, TreeRef, etc.), enabling better encapsulation when you want to pass refs around without exposing the entire document:
+
+```typescript
+import { change } from "@loro-extended/change";
+
+// Library code - expose only the ref, not the doc
+class StateMachine {
+  private doc: TypedDoc<...>;
+  
+  get states(): TreeRef<StateNodeShape> {
+    return this.doc.states;
+  }
+}
+
+// User code - works with just the ref
+function addStates(states: TreeRef<StateNodeShape>) {
+  change(states, draft => {
+    const idle = draft.createNode();
+    idle.data.name.insert(0, "idle");
+    
+    const running = draft.createNode();
+    running.data.name.insert(0, "running");
+  });
+}
+
+// Usage
+const machine = new StateMachine();
+addStates(machine.states); // No access to the underlying doc needed!
+```
+
+This pattern is useful for:
+- **Library APIs**: Expose typed refs without leaking document structure
+- **Component isolation**: Pass refs to components that only need partial access
+- **Testing**: Mock or stub individual refs without full document setup
+
+All ref types support `change()`:
+
+```typescript
+// ListRef
+change(doc.items, draft => {
+  draft.push("item1");
+  draft.push("item2");
+});
+
+// TextRef
+change(doc.title, draft => {
+  draft.insert(0, "Hello ");
+  draft.insert(6, "World");
+});
+
+// CounterRef
+change(doc.count, draft => {
+  draft.increment(5);
+  draft.decrement(2);
+});
+
+// StructRef
+change(doc.profile, draft => {
+  draft.bio.insert(0, "Hello");
+  draft.age.increment(1);
+});
+
+// RecordRef
+change(doc.users, draft => {
+  draft.set("alice", { name: "Alice" });
+  draft.set("bob", { name: "Bob" });
+});
+
+// TreeRef
+change(doc.tree, draft => {
+  const node = draft.createNode();
+  node.data.name.insert(0, "root");
+});
+```
+
+Nested `change()` calls are safe - Loro's commit is idempotent:
+
+```typescript
+change(doc.items, outer => {
+  outer.push("from outer");
+  
+  // Nested change on a different ref - works correctly
+  change(doc.count, inner => {
+    inner.increment(10);
+  });
+  
+  outer.push("still in outer");
+});
+// All mutations are committed
+```
 
 ## Advanced Usage
 

@@ -52,7 +52,7 @@ export class DocRefInternals<
   }
 
   /** Get typed ref params for creating child refs at a key */
-  getTypedRefParams(
+  getChildTypedRefParams(
     key: string,
     shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
@@ -85,7 +85,7 @@ export class DocRefInternals<
     let ref = this.propertyCache.get(key)
 
     if (!ref) {
-      ref = createContainerTypedRef(this.getTypedRefParams(key, shape))
+      ref = createContainerTypedRef(this.getChildTypedRefParams(key, shape))
       this.propertyCache.set(key, ref)
     }
 
