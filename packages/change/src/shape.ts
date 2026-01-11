@@ -11,6 +11,7 @@ import type {
   Value,
 } from "loro-crdt"
 
+import { LORO_SYMBOL, type LoroTreeRef } from "./loro.js"
 import type { CounterRef } from "./typed-refs/counter-ref.js"
 import type { ListRef } from "./typed-refs/list-ref.js"
 import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
@@ -106,6 +107,11 @@ export interface TreeRefInterface<DataShape extends StructContainerShape> {
     fractionalIndex: string
     data: DataShape["_plain"]
   }>
+
+  /**
+   * Access CRDT internals via the well-known symbol.
+   */
+  readonly [LORO_SYMBOL]: LoroTreeRef
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { LoroDoc, LoroTreeNode, TreeID } from "loro-crdt"
+import { LORO_SYMBOL, type LoroTreeNodeRef } from "../loro.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import { INTERNAL_SYMBOL } from "./base.js"
@@ -38,6 +39,13 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
 
   constructor(params: TreeNodeRefParams<DataShape>) {
     this[INTERNAL_SYMBOL] = new TreeNodeRefInternals(params)
+  }
+
+  /**
+   * Access the loro() namespace via the well-known symbol.
+   */
+  get [LORO_SYMBOL](): LoroTreeNodeRef {
+    return this[INTERNAL_SYMBOL].getLoroNamespace()
   }
 
   /**

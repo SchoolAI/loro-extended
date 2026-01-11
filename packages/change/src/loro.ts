@@ -33,6 +33,7 @@ import type {
   LoroMovableList,
   LoroText,
   LoroTree,
+  LoroTreeNode,
   Subscription,
 } from "loro-crdt"
 import type { JsonPatch } from "./json-patch.js"
@@ -41,6 +42,7 @@ import type {
   ContainerShape,
   DocShape,
   StructContainerShape,
+  TreeRefInterface,
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
 import type { TypedRef } from "./typed-refs/base.js"
@@ -50,6 +52,7 @@ import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
 import type { RecordRef } from "./typed-refs/record-ref.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TextRef } from "./typed-refs/text-ref.js"
+import type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
 
 // ============================================================================
@@ -146,6 +149,14 @@ export interface LoroTreeRef extends LoroRefBase {
 }
 
 /**
+ * loro() return type for TreeNodeRef.
+ */
+export interface LoroTreeNodeRef extends LoroRefBase {
+  /** The underlying LoroTreeNode */
+  readonly container: LoroTreeNode
+}
+
+/**
  * loro() return type for TypedDoc.
  * Provides access to doc-level operations.
  */
@@ -213,8 +224,15 @@ export function loro(ref: CounterRef): LoroCounterRef
  * Access CRDT internals for a TreeRef.
  */
 export function loro<DataShape extends StructContainerShape>(
-  ref: TreeRef<DataShape>,
+  ref: TreeRef<DataShape> | TreeRefInterface<DataShape>,
 ): LoroTreeRef
+
+/**
+ * Access CRDT internals for a TreeNodeRef.
+ */
+export function loro<DataShape extends StructContainerShape>(
+  ref: TreeNodeRef<DataShape>,
+): LoroTreeNodeRef
 
 /**
  * Access CRDT internals for a TypedDoc.
@@ -260,7 +278,13 @@ export function loro<Shape extends ContainerShape>(
  * ```
  */
 export function loro(
-  refOrDoc: TypedRef<any> | TypedDoc<any> | TreeRef<any> | StructRef<any>,
+  refOrDoc:
+    | TypedRef<any>
+    | TypedDoc<any>
+    | TreeRef<any>
+    | TreeRefInterface<any>
+    | TreeNodeRef<any>
+    | StructRef<any>,
 ): LoroRefBase {
   // Access the loro namespace via the well-known symbol
   const loroNamespace = (refOrDoc as any)[LORO_SYMBOL]

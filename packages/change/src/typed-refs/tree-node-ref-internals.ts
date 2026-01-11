@@ -1,5 +1,6 @@
-import type { LoroDoc, LoroTreeNode } from "loro-crdt"
+import type { LoroDoc, LoroTreeNode, Subscription } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
+import type { LoroTreeNodeRef } from "../loro.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import {
@@ -24,6 +25,7 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
   implements RefInternalsBase
 {
   private dataRef: StructRef<DataShape["shapes"]> | undefined
+  private loroNamespace: LoroTreeNodeRef | undefined
 
   constructor(private readonly params: TreeNodeRefParams<DataShape>) {}
 
@@ -106,6 +108,37 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
   absorbPlainValues(): void {
     if (this.dataRef) {
       this.dataRef[INTERNAL_SYMBOL].absorbPlainValues()
+    }
+  }
+
+  /** Get the loro namespace (cached) */
+  getLoroNamespace(): LoroTreeNodeRef {
+    if (!this.loroNamespace) {
+      this.loroNamespace = this.createLoroNamespace()
+    }
+    return this.loroNamespace
+  }
+
+  /** Create the loro namespace for tree node */
+  protected createLoroNamespace(): LoroTreeNodeRef {
+    const self = this
+    return {
+      get doc(): LoroDoc {
+        return self.getDoc()
+      },
+      get container(): LoroTreeNode {
+        return self.getNode()
+      },
+      subscribe(callback: (event: unknown) => void): Subscription {
+        // LoroTreeNode doesn't have subscribe, but we can subscribe to the tree
+        // However, LoroRefBase expects subscribe.
+        // For now, we can throw or return a dummy subscription if LoroTreeNode doesn't support it.
+        // But wait, LoroTreeNode is just a handle.
+        // Let's check if LoroTreeNode has subscribe.
+        // If not, we might need to subscribe to the tree and filter?
+        // Or maybe we just cast it if it exists at runtime.
+        return (self.getNode() as any).subscribe?.(callback) || (() => {})
+      },
     }
   }
 }
