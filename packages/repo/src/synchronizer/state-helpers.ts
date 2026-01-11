@@ -1,4 +1,4 @@
-import type { SynchronizerModel } from "src/synchronizer-program.js"
+import type { SynchronizerModel } from "../synchronizer-program.js"
 import type { DocId, ReadyState, ReadyStateChannelMeta } from "../types.js"
 
 /**

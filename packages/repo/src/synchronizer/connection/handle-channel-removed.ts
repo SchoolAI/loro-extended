@@ -52,9 +52,9 @@
 
 import type { Logger } from "@logtape/logtape"
 import { current } from "mutative"
-import type { DocId } from "src/types.js"
 import { type Channel, isEstablished } from "../../channel.js"
 import type { Command, SynchronizerModel } from "../../synchronizer-program.js"
+import type { DocId } from "../../types.js"
 import { batchAsNeeded } from "../utils.js"
 
 export function handleChannelRemoved(

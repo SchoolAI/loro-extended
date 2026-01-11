@@ -22,9 +22,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "NO_COLOR=true vitest",
-    "typecheck": "tsc --noEmit --skipLibCheck"
+    "verify": "verify"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",
@@ -40,6 +38,7 @@
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.12.12",
     "@types/uuid": "^9.0.8",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "lodash-es": "^4.17.21",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
