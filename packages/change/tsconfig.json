@@ -5,7 +5,6 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
-    "lib": ["ESNext"],
-    "baseUrl": "."
+    "lib": ["ESNext"]
   }
 }

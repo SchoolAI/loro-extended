@@ -1,5 +1,5 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
-import { LORO_SYMBOL } from "../loro.js"
+import { LORO_SYMBOL, type LoroMapRef } from "../loro.js"
 import type { ContainerOrValueShape, StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import {
@@ -250,6 +250,12 @@ export type StructRef<
    * @internal
    */
   [INTERNAL_SYMBOL]: RefInternalsBase
+
+  /**
+   * Access CRDT internals via the well-known symbol.
+   * Used by the loro() function.
+   */
+  [LORO_SYMBOL]: LoroMapRef
 }
 
 // Re-export for backward compatibility

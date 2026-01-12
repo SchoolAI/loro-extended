@@ -187,9 +187,7 @@ export interface StructContainerShape<
   >,
 > extends Shape<
     { [K in keyof NestedShapes]: NestedShapes[K]["_plain"] },
-    StructRef<NestedShapes> & {
-      [K in keyof NestedShapes]: NestedShapes[K]["_mutable"]
-    },
+    StructRef<NestedShapes>,
     { [K in keyof NestedShapes]: NestedShapes[K]["_placeholder"] }
   > {
   readonly _type: "struct"

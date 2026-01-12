@@ -1,3 +1,4 @@
+import type { TreeID } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
 import { Shape } from "../shape.js"
@@ -140,8 +141,8 @@ describe("TreeRef", () => {
     it("should navigate parent/children relationships", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let rootId: string | undefined
-      let childId: string | undefined
+      let rootId: TreeID | undefined
+      let childId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root = draft.states.createNode()
@@ -153,21 +154,23 @@ describe("TreeRef", () => {
         childId = child.id
       })
 
+      const capturedRootId = rootId!
+      const capturedChildId = childId!
       change(typedDoc, draft => {
-        const root = draft.states.getNodeByID(rootId as string)
+        const root = draft.states.getNodeByID(capturedRootId)
         expect(root).toBeDefined()
         expect(root?.children()).toHaveLength(1)
 
-        const child = draft.states.getNodeByID(childId as string)
+        const child = draft.states.getNodeByID(capturedChildId)
         expect(child).toBeDefined()
-        expect(child?.parent()?.id).toBe(rootId)
+        expect(child?.parent()?.id).toBe(capturedRootId)
       })
     })
 
     it("should get node by ID", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let nodeId: string | undefined
+      let nodeId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root = draft.states.createNode()
@@ -175,8 +178,9 @@ describe("TreeRef", () => {
         nodeId = root.id
       })
 
+      const capturedNodeId = nodeId!
       change(typedDoc, draft => {
-        const node = draft.states.getNodeByID(nodeId as string)
+        const node = draft.states.getNodeByID(capturedNodeId)
         expect(node).toBeDefined()
         expect(node?.data.name.toString()).toBe("test")
       })
@@ -185,16 +189,17 @@ describe("TreeRef", () => {
     it("should check if node exists with has()", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let nodeId: string | undefined
+      let nodeId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root = draft.states.createNode()
         nodeId = root.id
       })
 
+      const capturedNodeId = nodeId!
       change(typedDoc, draft => {
-        expect(draft.states.has(nodeId as string)).toBe(true)
-        expect(draft.states.has("0@999" as any)).toBe(false)
+        expect(draft.states.has(capturedNodeId)).toBe(true)
+        expect(draft.states.has("0@999" as TreeID)).toBe(false)
       })
     })
   })
@@ -203,15 +208,16 @@ describe("TreeRef", () => {
     it("should delete a node", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let nodeId: string | undefined
+      let nodeId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root = draft.states.createNode()
         nodeId = root.id
       })
 
+      const capturedNodeId = nodeId!
       change(typedDoc, draft => {
-        draft.states.delete(nodeId as string)
+        draft.states.delete(capturedNodeId)
       })
 
       const json = typedDoc.toJSON()
@@ -221,9 +227,9 @@ describe("TreeRef", () => {
     it("should move nodes between parents", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let root1Id: string | undefined
-      let root2Id: string | undefined
-      let childId: string | undefined
+      let root1Id: TreeID | undefined
+      let root2Id: TreeID | undefined
+      let childId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root1 = draft.states.createNode()
@@ -239,18 +245,22 @@ describe("TreeRef", () => {
         childId = child.id
       })
 
+      const capturedRoot1Id = root1Id!
+      const capturedRoot2Id = root2Id!
+      const capturedChildId = childId!
+
       // Move child from root1 to root2
       change(typedDoc, draft => {
-        const child = draft.states.getNodeByID(childId as string)
-        const root2 = draft.states.getNodeByID(root2Id as string)
+        const child = draft.states.getNodeByID(capturedChildId)
+        const root2 = draft.states.getNodeByID(capturedRoot2Id)
         if (child && root2) {
           child.move(root2)
         }
       })
 
       change(typedDoc, draft => {
-        const root1 = draft.states.getNodeByID(root1Id as string)
-        const root2 = draft.states.getNodeByID(root2Id as string)
+        const root1 = draft.states.getNodeByID(capturedRoot1Id)
+        const root2 = draft.states.getNodeByID(capturedRoot2Id)
 
         expect(root1?.children()).toHaveLength(0)
         expect(root2?.children()).toHaveLength(1)
@@ -360,18 +370,19 @@ describe("TreeRef", () => {
     it("should track deleted nodes with isDeleted()", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
-      let nodeId: string | undefined
+      let nodeId: TreeID | undefined
 
       change(typedDoc, draft => {
         const root = draft.states.createNode()
         nodeId = root.id
       })
 
+      const capturedNodeId = nodeId!
       change(typedDoc, draft => {
-        const node = draft.states.getNodeByID(nodeId as string)
+        const node = draft.states.getNodeByID(capturedNodeId)
         if (node) {
           expect(node.isDeleted()).toBe(false)
-          draft.states.delete(nodeId as string)
+          draft.states.delete(capturedNodeId)
         }
       })
 

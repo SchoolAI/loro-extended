@@ -20,6 +20,7 @@ import type {
   StructContainerShape,
   TextContainerShape,
   TreeContainerShape,
+  TreeRefInterface,
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"
 import { INTERNAL_SYMBOL, type TypedRef } from "./typed-refs/base.js"
@@ -85,17 +86,42 @@ export function change<DataShape extends StructContainerShape>(
   fn: (draft: TreeRef<DataShape>) => void,
 ): TreeRef<DataShape>
 
-// Overload for TypedRef (all container refs)
-export function change<Shape extends ContainerShape>(
-  ref: TypedRef<Shape>,
-  fn: (draft: TypedRef<Shape>) => void,
-): TypedRef<Shape>
+// Overload for TreeRefInterface (the mutable type from TreeContainerShape)
+export function change<DataShape extends StructContainerShape>(
+  ref: TreeRefInterface<DataShape>,
+  fn: (draft: TreeRefInterface<DataShape>) => void,
+): TreeRefInterface<DataShape>
+
+// Overload for StructRef (special case - uses Proxy, not a class extending TypedRef)
+// This must come before the generic TypedRef overload to match StructRef properly
+export function change<
+  NestedShapes extends Record<string, ContainerOrValueShape>,
+>(
+  ref: StructRef<NestedShapes>,
+  fn: (draft: StructRef<NestedShapes>) => void,
+): StructRef<NestedShapes>
+
+// Overload for TypedRef (all container refs) - preserves concrete ref type
+export function change<T extends TypedRef<ContainerShape>>(
+  ref: T,
+  fn: (draft: T) => void,
+): T
 
 // Implementation
 export function change(
-  target: TypedDoc<any> | TypedRef<any> | TreeRef<any>,
+  target:
+    | TypedDoc<any>
+    | TypedRef<any>
+    | TreeRef<any>
+    | TreeRefInterface<any>
+    | StructRef<any>,
   fn: (draft: any) => void,
-): TypedDoc<any> | TypedRef<any> | TreeRef<any> {
+):
+  | TypedDoc<any>
+  | TypedRef<any>
+  | TreeRef<any>
+  | TreeRefInterface<any>
+  | StructRef<any> {
   // Check if it's a TypedDoc (has .change method)
   if ("change" in target && typeof (target as any).change === "function") {
     return (target as TypedDoc<any>).change(fn)
@@ -182,8 +208,15 @@ export function getLoroDoc<Shape extends ContainerShape>(
 export function getLoroDoc<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape>,
 ): LoroDoc
+export function getLoroDoc<DataShape extends StructContainerShape>(
+  ref: TreeRefInterface<DataShape>,
+): LoroDoc
 export function getLoroDoc(
-  docOrRef: TypedDoc<any> | TypedRef<any> | TreeRef<any>,
+  docOrRef:
+    | TypedDoc<any>
+    | TypedRef<any>
+    | TreeRef<any>
+    | TreeRefInterface<any>,
 ): LoroDoc {
   // Use loro() to access the underlying LoroDoc
   return loro(docOrRef as any).doc
@@ -229,11 +262,14 @@ export function getLoroContainer<
 export function getLoroContainer<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape>,
 ): LoroTree
+export function getLoroContainer<DataShape extends StructContainerShape>(
+  ref: TreeRefInterface<DataShape>,
+): LoroTree
 export function getLoroContainer<Shape extends ContainerShape>(
   ref: TypedRef<Shape>,
 ): ShapeToContainer<Shape>
 export function getLoroContainer(
-  ref: TypedRef<any> | TreeRef<any> | StructRef<any>,
+  ref: TypedRef<any> | TreeRef<any> | TreeRefInterface<any> | StructRef<any>,
 ): unknown {
   // Use loro() to access the underlying container
   return loro(ref as any).container

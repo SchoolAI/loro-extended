@@ -22,11 +22,10 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "vitest",
-    "typecheck": "tsc --noEmit --skipLibCheck"
+    "verify": "verify"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
