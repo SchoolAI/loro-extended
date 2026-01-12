@@ -236,6 +236,9 @@ importers:
       '@types/ws':
         specifier: ^8.5.13
         version: 8.18.1
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260103.1
+        version: 7.0.0-dev.20260103.1
       loro-crdt:
         specifier: ^1.10.3
         version: 1.10.4
