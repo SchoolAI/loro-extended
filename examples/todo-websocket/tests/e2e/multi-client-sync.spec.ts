@@ -10,10 +10,7 @@ test.describe("Multi-Client Synchronization", () => {
     await Promise.all([client1.goto("/"), client2.goto("/")])
 
     // Wait for ready state
-    await Promise.all([
-      waitForTodosReady(client1),
-      waitForTodosReady(client2),
-    ])
+    await Promise.all([waitForTodosReady(client1), waitForTodosReady(client2)])
 
     // Client 1 creates a todo
     await createTodo(client1, "Shared Todo")
@@ -33,10 +30,7 @@ test.describe("Multi-Client Synchronization", () => {
 
     // Setup clients
     await Promise.all([client1.goto("/"), client2.goto("/")])
-    await Promise.all([
-      waitForTodosReady(client1),
-      waitForTodosReady(client2),
-    ])
+    await Promise.all([waitForTodosReady(client1), waitForTodosReady(client2)])
     await createTodo(client1, "Toggle Sync Test")
 
     // Wait for client2 to see the todo first
@@ -59,10 +53,7 @@ test.describe("Multi-Client Synchronization", () => {
 
     // Setup clients
     await Promise.all([client1.goto("/"), client2.goto("/")])
-    await Promise.all([
-      waitForTodosReady(client1),
-      waitForTodosReady(client2),
-    ])
+    await Promise.all([waitForTodosReady(client1), waitForTodosReady(client2)])
     await createTodo(client1, "Delete Sync Test")
 
     // Wait for client2 to see the todo first
@@ -83,10 +74,7 @@ test.describe("Multi-Client Synchronization", () => {
 
     // Setup clients
     await Promise.all([client1.goto("/"), client2.goto("/")])
-    await Promise.all([
-      waitForTodosReady(client1),
-      waitForTodosReady(client2),
-    ])
+    await Promise.all([waitForTodosReady(client1), waitForTodosReady(client2)])
 
     // Both clients create todos concurrently
     await Promise.all([
