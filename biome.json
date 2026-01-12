@@ -13,12 +13,18 @@
     "lineWidth": 80,
     "indentWidth": 2,
     "indentStyle": "space",
-    "formatWithErrors": true
+    "formatWithErrors": false
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
+      },
       "suspicious": {
         "noExplicitAny": "off"
       }

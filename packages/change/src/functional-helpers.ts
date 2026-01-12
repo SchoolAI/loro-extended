@@ -19,7 +19,6 @@ import type {
   ShapeToContainer,
   StructContainerShape,
   TextContainerShape,
-  TreeContainerShape,
   TreeRefInterface,
 } from "./shape.js"
 import type { TypedDoc } from "./typed-doc.js"

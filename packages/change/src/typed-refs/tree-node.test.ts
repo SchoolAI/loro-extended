@@ -154,8 +154,12 @@ describe("TreeRef", () => {
         childId = child.id
       })
 
-      const capturedRootId = rootId!
-      const capturedChildId = childId!
+      expect(rootId).toBeDefined()
+      expect(childId).toBeDefined()
+      if (!rootId || !childId) return
+
+      const capturedRootId = rootId
+      const capturedChildId = childId
       change(typedDoc, draft => {
         const root = draft.states.getNodeByID(capturedRootId)
         expect(root).toBeDefined()
@@ -178,7 +182,10 @@ describe("TreeRef", () => {
         nodeId = root.id
       })
 
-      const capturedNodeId = nodeId!
+      expect(nodeId).toBeDefined()
+      if (!nodeId) return
+
+      const capturedNodeId = nodeId
       change(typedDoc, draft => {
         const node = draft.states.getNodeByID(capturedNodeId)
         expect(node).toBeDefined()
@@ -196,7 +203,10 @@ describe("TreeRef", () => {
         nodeId = root.id
       })
 
-      const capturedNodeId = nodeId!
+      expect(nodeId).toBeDefined()
+      if (!nodeId) return
+
+      const capturedNodeId = nodeId
       change(typedDoc, draft => {
         expect(draft.states.has(capturedNodeId)).toBe(true)
         expect(draft.states.has("0@999" as TreeID)).toBe(false)
@@ -215,7 +225,10 @@ describe("TreeRef", () => {
         nodeId = root.id
       })
 
-      const capturedNodeId = nodeId!
+      expect(nodeId).toBeDefined()
+      if (!nodeId) return
+
+      const capturedNodeId = nodeId
       change(typedDoc, draft => {
         draft.states.delete(capturedNodeId)
       })
@@ -245,9 +258,14 @@ describe("TreeRef", () => {
         childId = child.id
       })
 
-      const capturedRoot1Id = root1Id!
-      const capturedRoot2Id = root2Id!
-      const capturedChildId = childId!
+      expect(root1Id).toBeDefined()
+      expect(root2Id).toBeDefined()
+      expect(childId).toBeDefined()
+      if (!root1Id || !root2Id || !childId) return
+
+      const capturedRoot1Id = root1Id
+      const capturedRoot2Id = root2Id
+      const capturedChildId = childId
 
       // Move child from root1 to root2
       change(typedDoc, draft => {
@@ -377,7 +395,10 @@ describe("TreeRef", () => {
         nodeId = root.id
       })
 
-      const capturedNodeId = nodeId!
+      expect(nodeId).toBeDefined()
+      if (!nodeId) return
+
+      const capturedNodeId = nodeId
       change(typedDoc, draft => {
         const node = draft.states.getNodeByID(capturedNodeId)
         if (node) {
