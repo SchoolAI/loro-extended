@@ -10,13 +10,9 @@
     "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx --watch src/server/server.ts",
-    "format": "biome format --write .",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
-    "test:all": "pnpm test:e2e",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json"
+    "verify": "verify"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",
@@ -36,6 +32,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.19.9",
