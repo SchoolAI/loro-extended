@@ -9,10 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:all": "pnpm -r build && pnpm -r build:all",
-    "check": "pnpm -r check",
-    "test": "pnpm -r test",
-    "test:all": "pnpm -r test && pnpm -r test:all",
-    "typecheck": "pnpm -r typecheck"
+    "verify": "pnpm -r --parallel verify"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.7",
