@@ -137,6 +137,9 @@ importers:
       '@types/express':
         specifier: ^4.17.23
         version: 4.17.25
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260103.1
+        version: 7.0.0-dev.20260103.1
       loro-crdt:
         specifier: ^1.10.3
         version: 1.10.4
