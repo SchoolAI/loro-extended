@@ -26,9 +26,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "vitest",
-    "typecheck": "tsc --noEmit"
+    "verify": "verify"
   },
   "dependencies": {
     "@levischuck/tiny-cbor": "^0.3.2",
@@ -36,6 +34,7 @@
   },
   "devDependencies": {
     "@logtape/logtape": "^1.1.1",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^22.15.29",
     "@types/ws": "^8.5.13",
     "bun-types": "latest",

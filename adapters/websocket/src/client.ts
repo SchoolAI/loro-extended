@@ -229,7 +229,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       } else {
         this.socket = new this.WebSocketImpl(url)
       }
-      this.socket!.binaryType = "arraybuffer"
+      this.socket.binaryType = "arraybuffer"
 
       await new Promise<void>((resolve, reject) => {
         if (!this.socket) {
