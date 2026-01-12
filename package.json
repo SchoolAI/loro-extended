@@ -18,5 +18,11 @@
     "@biomejs/biome": "2.3.7",
     "@changesets/cli": "^2.29.7",
     "@halecraft/verify": "^1.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
+    }
   }
 }
