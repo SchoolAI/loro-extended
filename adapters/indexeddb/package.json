@@ -18,14 +18,14 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "vitest"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
     "idb": "^8.0.3"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "fake-indexeddb": "^6.2.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",

@@ -62,6 +62,9 @@ importers:
         specifier: ^8.0.3
         version: 8.0.3
     devDependencies:
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260103.1
+        version: 7.0.0-dev.20260103.1
       fake-indexeddb:
         specifier: ^6.2.0
         version: 6.2.5
