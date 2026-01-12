@@ -18,14 +18,14 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "vitest run --passWithNoTests"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
     "classic-level": "^1.4.1"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
