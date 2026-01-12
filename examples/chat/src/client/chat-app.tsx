@@ -1,10 +1,5 @@
-import {
-  useDoc,
-  useEphemeral,
-  useHandle,
-  useRepo,
-} from "@loro-extended/react"
-import { generateUUID, type DocId, type ReadyState } from "@loro-extended/repo"
+import { useDoc, useEphemeral, useHandle, useRepo } from "@loro-extended/react"
+import { type DocId, generateUUID, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
   ChatEphemeralDeclarations,
@@ -199,7 +194,8 @@ function ChatApp() {
   useEffect(() => {
     const updateConnectionStatus = (readyStates: ReadyState[]) => {
       const connected = readyStates.some(
-        s => s.state === "loaded" && s.channels.some(c => c.kind === "network"),
+        s =>
+          s.status === "synced" && s.channels.some(c => c.kind === "network"),
       )
 
       setIsConnected(connected)
