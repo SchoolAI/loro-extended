@@ -10,10 +10,9 @@
     "dev": "concurrently --raw \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx --watch src/server/server.ts",
-    "check": "biome check --write .",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
+    "verify": "verify"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",
@@ -31,6 +30,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.19.9",
