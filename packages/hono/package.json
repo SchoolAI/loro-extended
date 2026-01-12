@@ -22,14 +22,14 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "typecheck": "tsc --noEmit"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/hooks-core": "workspace:^",
     "@loro-extended/repo": "workspace:^"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"
   },
