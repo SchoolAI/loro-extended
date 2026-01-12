@@ -112,6 +112,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.6
         version: 8.16.0
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260103.1
+        version: 7.0.0-dev.20260103.1
       pg:
         specifier: ^8.13.0
         version: 8.16.3

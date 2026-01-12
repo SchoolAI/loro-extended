@@ -18,9 +18,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "biome check --write .",
-    "test": "vitest",
-    "typecheck": "tsc --noEmit"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^"
@@ -29,6 +27,7 @@
     "pg": "^8.0.0"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^22.15.29",
     "@types/pg": "^8.11.6",
     "pg": "^8.13.0",
