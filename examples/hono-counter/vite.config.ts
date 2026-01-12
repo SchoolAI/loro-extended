@@ -1,9 +1,8 @@
+// Change the import to use your runtime specific build
+import build from "@hono/vite-build/node"
 import devServer, { defaultOptions } from "@hono/vite-dev-server"
 import { defineConfig } from "vite"
 import wasm from "vite-plugin-wasm"
-
-// Change the import to use your runtime specific build
-import build from "@hono/vite-build/node"
 
 export default defineConfig(({ mode }) => {
   // Common optimizeDeps config for loro-crdt WASM

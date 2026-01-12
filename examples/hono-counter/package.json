@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build:all": "vite build --mode client && vite build",
-    "typecheck": "tsc --noEmit"
+    "verify": "verify"
   },
   "dependencies": {
     "@hono/node-server": "^1.12.2",
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@hono/vite-build": "^1.8.0",
     "@hono/vite-dev-server": "^0.23.0",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^20.11.17",
     "vite": "^7.2.0",
     "vite-plugin-wasm": "^3.5.0"
