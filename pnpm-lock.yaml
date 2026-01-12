@@ -965,6 +965,9 @@ importers:
         specifier: ^1.10.3
         version: 1.10.4
     devDependencies:
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260103.1
+        version: 7.0.0-dev.20260103.1
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
