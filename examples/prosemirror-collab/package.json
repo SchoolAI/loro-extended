@@ -7,8 +7,7 @@
     "dev": "tsx watch --ignore ./data src/server/server.ts",
     "dev:client": "vite",
     "build": "tsc -b && vite build",
-    "check": "biome check --write .",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
+    "verify": "verify"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",
@@ -38,6 +37,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^22.0.0",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
