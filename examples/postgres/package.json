@@ -8,7 +8,7 @@
     "start": "tsx src/index.ts",
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
-    "typecheck": "tsc --noEmit"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/adapter-postgres": "workspace:^",
@@ -16,6 +16,7 @@
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^22.15.29",
     "@types/pg": "^8.11.6",
     "tsx": "^4.19.4",
