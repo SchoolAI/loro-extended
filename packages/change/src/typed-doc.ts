@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
-import { LoroDoc, type Subscription } from "loro-crdt"
+import { LoroDoc, type PeerID, type Subscription } from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import {
   type JsonPatch,
@@ -129,6 +129,12 @@ class TypedDocInternal<Shape extends DocShape> {
  * loro(doc).subscribe(callback);
  * ```
  */
+/**
+ * Frontiers represent a specific version in the document's history.
+ * Each frontier is an operation ID consisting of a peer ID and counter.
+ */
+export type Frontiers = { peer: PeerID; counter: number }[]
+
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
   /**
    * The primary method of mutating typed documents.
@@ -163,6 +169,33 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
    * ```
    */
   toJSON(): Infer<Shape>
+
+  /**
+   * Creates a new TypedDoc at a specified version (frontiers).
+   * The forked doc will only contain history before the specified frontiers.
+   * The forked doc has a different PeerID from the original.
+   *
+   * For raw LoroDoc access, use: `loro(doc).doc.forkAt(frontiers)`
+   *
+   * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
+   * @returns A new TypedDoc with the same schema at the specified version
+   *
+   * @example
+   * ```typescript
+   * import { loro } from "@loro-extended/change";
+   *
+   * const doc = createTypedDoc(schema);
+   * doc.title.update("Hello");
+   * const frontiers = loro(doc).doc.frontiers();
+   * doc.title.update("World");
+   *
+   * // Fork at the earlier version
+   * const forkedDoc = doc.forkAt(frontiers);
+   * console.log(forkedDoc.title.toString()); // "Hello"
+   * console.log(doc.title.toString()); // "World"
+   * ```
+   */
+  forkAt(frontiers: Frontiers): TypedDoc<Shape>
 }
 
 /**
@@ -237,8 +270,14 @@ export function createTypedDoc<Shape extends DocShape>(
     return proxy
   }
 
+  // Create the forkAt() function that returns a new TypedDoc at the specified version
+  const forkAtFunction = (frontiers: Frontiers): TypedDoc<Shape> => {
+    const forkedLoroDoc = internal.loroDoc.forkAt(frontiers)
+    return createTypedDoc(internal.docShape, forkedLoroDoc)
+  }
+
   // Create a proxy that delegates schema properties to the DocRef
-  // and provides change() method
+  // and provides change() and forkAt() methods
   const proxy = new Proxy(internal.value as object, {
     get(target, prop, receiver) {
       // loro() access via well-known symbol
@@ -251,6 +290,11 @@ export function createTypedDoc<Shape extends DocShape>(
         return changeFunction
       }
 
+      // forkAt() method directly on doc
+      if (prop === "forkAt") {
+        return forkAtFunction
+      }
+
       // toJSON() should always read fresh from the CRDT
       if (prop === "toJSON") {
         return () => internal.toJSON()
@@ -261,8 +305,8 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     set(target, prop, value, receiver) {
-      // Don't allow setting change or LORO_SYMBOL
-      if (prop === LORO_SYMBOL || prop === "change") {
+      // Don't allow setting change, forkAt, or LORO_SYMBOL
+      if (prop === LORO_SYMBOL || prop === "change" || prop === "forkAt") {
         return false
       }
 
@@ -272,11 +316,12 @@ export function createTypedDoc<Shape extends DocShape>(
 
     // Support 'in' operator
     has(target, prop) {
-      if (prop === LORO_SYMBOL || prop === "change") return true
+      if (prop === LORO_SYMBOL || prop === "change" || prop === "forkAt")
+        return true
       return Reflect.has(target, prop)
     },
 
-    // Support Object.keys() - don't include change or LORO_SYMBOL in enumeration
+    // Support Object.keys() - don't include change, forkAt, or LORO_SYMBOL in enumeration
     ownKeys(target) {
       return Reflect.ownKeys(target)
     },
@@ -287,6 +332,13 @@ export function createTypedDoc<Shape extends DocShape>(
           configurable: true,
           enumerable: false,
           value: changeFunction,
+        }
+      }
+      if (prop === "forkAt") {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: forkAtFunction,
         }
       }
       if (prop === LORO_SYMBOL) {

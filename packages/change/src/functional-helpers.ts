@@ -21,7 +21,7 @@ import type {
   TextContainerShape,
   TreeRefInterface,
 } from "./shape.js"
-import type { TypedDoc } from "./typed-doc.js"
+import { createTypedDoc, type Frontiers, type TypedDoc } from "./typed-doc.js"
 import { INTERNAL_SYMBOL, type TypedRef } from "./typed-refs/base.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
@@ -272,4 +272,40 @@ export function getLoroContainer(
 ): unknown {
   // Use loro() to access the underlying container
   return loro(ref as any).container
+}
+
+/**
+ * Creates a new TypedDoc at a specified version (frontiers).
+ * The forked doc will only contain history before the specified frontiers.
+ * The forked doc has a different PeerID from the original.
+ *
+ * For raw LoroDoc access, use: `loro(doc).doc.forkAt(frontiers)`
+ *
+ * @param doc - The TypedDoc to fork
+ * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
+ * @returns A new TypedDoc with the same schema at the specified version
+ *
+ * @example
+ * ```typescript
+ * import { forkAt, loro } from "@loro-extended/change"
+ *
+ * const doc = createTypedDoc(schema);
+ * doc.title.update("Hello");
+ * const frontiers = loro(doc).doc.frontiers();
+ * doc.title.update("World");
+ *
+ * // Fork at the earlier version
+ * const forkedDoc = forkAt(doc, frontiers);
+ * console.log(forkedDoc.title.toString()); // "Hello"
+ * console.log(doc.title.toString()); // "World"
+ * ```
+ */
+export function forkAt<Shape extends DocShape>(
+  doc: TypedDoc<Shape>,
+  frontiers: Frontiers,
+): TypedDoc<Shape> {
+  const loroDoc = loro(doc).doc
+  const forkedLoroDoc = loroDoc.forkAt(frontiers)
+  const shape = loro(doc).docShape as Shape
+  return createTypedDoc(shape, forkedLoroDoc)
 }

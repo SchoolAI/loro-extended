@@ -5,7 +5,12 @@ export {
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
 // Functional helpers (recommended API)
-export { change, getLoroContainer, getLoroDoc } from "./functional-helpers.js"
+export {
+  change,
+  forkAt,
+  getLoroContainer,
+  getLoroDoc,
+} from "./functional-helpers.js"
 // The loro() escape hatch for CRDT internals
 export {
   LORO_SYMBOL,
@@ -69,7 +74,7 @@ export type {
 } from "./shape.js"
 // Schema and type exports
 export { Shape } from "./shape.js"
-export type { TypedDoc } from "./typed-doc.js"
+export type { Frontiers, TypedDoc } from "./typed-doc.js"
 export { createTypedDoc } from "./typed-doc.js"
 // Typed ref types - for specifying types with the loro() function
 export type { CounterRef } from "./typed-refs/counter-ref.js"
