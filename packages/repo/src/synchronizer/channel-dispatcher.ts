@@ -1,5 +1,4 @@
 import type { Logger } from "@logtape/logtape"
-import { omit } from "lodash-es"
 import { type ChannelMsg, isEstablished } from "../channel.js"
 import type { Permissions } from "../permissions.js"
 import type { Command, SynchronizerModel } from "../synchronizer-program.js"
@@ -19,6 +18,18 @@ import type {
   EstablishedHandlerContext,
 } from "./types.js"
 import { batchAsNeeded } from "./utils.js"
+
+/** Omit specified keys from an object */
+function omit<T extends object, K extends keyof T>(
+  obj: T,
+  keys: K[],
+): Omit<T, K> {
+  const result = { ...obj }
+  for (const key of keys) {
+    delete result[key]
+  }
+  return result as Omit<T, K>
+}
 
 /**
  * Dispatches channel protocol messages to their handlers
@@ -78,7 +89,7 @@ export function channelDispatcher(
     to: model.identity.name,
     via: fromChannelId,
     dir: "recv",
-    channelMessage: omit(channelMessage, "type"),
+    channelMessage: omit(channelMessage, ["type"]),
   })
 
   // Build context for establishment handlers (any channel state)
