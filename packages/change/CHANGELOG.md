@@ -1,5 +1,82 @@
 # @loro-extended/change
 
+## 5.2.0
+
+### Minor Changes
+
+- 6b074ee: **BREAKING**: `nodes()` now excludes deleted nodes by default
+
+  Previously, `tree.nodes()` returned all nodes including deleted tombstones, which caused "container is deleted" errors when users tried to access `.data` on deleted nodes.
+
+  Now `nodes()` filters out deleted nodes by default. To include deleted nodes, use `nodes({ includeDeleted: true })`.
+
+  ```typescript
+  // Default: excludes deleted nodes (prevents "container is deleted" errors)
+  const liveNodes = tree.nodes();
+
+  // Opt-in: include deleted nodes for advanced CRDT operations
+  const allNodes = tree.nodes({ includeDeleted: true });
+  ```
+
+  This aligns `nodes()` behavior with `roots()` and `children()`, which already exclude deleted nodes.
+
+- 7414993: Add `forkAt` support for TypedDoc to create typed document forks at specific versions
+
+  The `forkAt` method creates a new TypedDoc at a specified version (frontiers), preserving full type safety. Available as both a method on TypedDoc and a functional helper.
+
+  ```typescript
+  import { createTypedDoc, forkAt, loro } from "@loro-extended/change";
+
+  const doc = createTypedDoc(schema);
+  doc.title.update("Hello");
+  const frontiers = loro(doc).doc.frontiers();
+  doc.title.update("World");
+
+  // Method on TypedDoc
+  const forked = doc.forkAt(frontiers);
+
+  // Or functional helper
+  const forked2 = forkAt(doc, frontiers);
+
+  console.log(forked.title.toString()); // "Hello"
+  console.log(doc.title.toString()); // "World"
+  ```
+
+  Key features:
+
+  - Returns `TypedDoc<Shape>` with full type safety
+  - Forked doc is independent (changes don't affect original)
+  - Forked doc has a different PeerID
+  - Raw `LoroDoc.forkAt()` still accessible via `loro(doc).doc.forkAt()`
+  - New `Frontiers` type exported for convenience
+
+- 408c543: Add ref-level `change()` support for better encapsulation
+
+  The `change()` function now accepts any typed ref (ListRef, TextRef, CounterRef, StructRef, RecordRef, TreeRef, MovableListRef) in addition to TypedDoc. This enables passing refs around without exposing the entire document structure.
+
+  ```typescript
+  // Before: Required access to the doc
+  function addStates(doc: TypedDoc<...>) {
+    doc.change(draft => {
+      draft.states.createNode({ name: "idle" })
+    })
+  }
+
+  // After: Works with just the ref
+  function addStates(states: TreeRef<StateNodeShape>) {
+    change(states, draft => {
+      draft.createNode({ name: "idle" })
+    })
+  }
+  ```
+
+  Key features:
+
+  - All ref types supported (List, Text, Counter, Struct, Record, Tree, MovableList)
+  - Nested `change()` calls work correctly (Loro's commit is idempotent)
+  - Returns the original ref for chaining
+  - Find-and-mutate patterns work as expected
+
 ## 5.1.0
 
 ## 5.0.0

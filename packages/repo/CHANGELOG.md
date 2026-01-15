@@ -1,5 +1,18 @@
 # @loro-extended/repo
 
+## 5.2.0
+
+### Patch Changes
+
+- 6048f48: Remove lodash-es dependency to fix "WeakMap is not a constructor" error in Next.js with Turbopack
+
+  The bundled lodash-es code used `Function("return this")()` for global detection, which breaks under Turbopack's strict mode handling. Replaced with a native `omit` helper function.
+
+- Updated dependencies [6b074ee]
+- Updated dependencies [7414993]
+- Updated dependencies [408c543]
+  - @loro-extended/change@5.2.0
+
 ## 5.1.0
 
 ### Patch Changes
