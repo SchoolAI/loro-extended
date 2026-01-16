@@ -214,7 +214,10 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     try {
       // Create WebSocket with optional headers (Bun-specific extension)
       // The browser WebSocket API doesn't support headers, but Bun does
-      if (this.options.headers && Object.keys(this.options.headers).length > 0) {
+      if (
+        this.options.headers &&
+        Object.keys(this.options.headers).length > 0
+      ) {
         // Use Bun's extended WebSocket constructor with headers
         // Type assertion via unknown needed because Bun extends the standard WebSocket API
         // with a non-standard constructor signature
@@ -222,7 +225,8 @@ export class WsClientNetworkAdapter extends Adapter<void> {
           url: string,
           options: { headers: Record<string, string> },
         ) => WebSocket
-        const BunWebSocket = this.WebSocketImpl as unknown as BunWebSocketConstructor
+        const BunWebSocket = this
+          .WebSocketImpl as unknown as BunWebSocketConstructor
         this.socket = new BunWebSocket(url, {
           headers: this.options.headers,
         })
@@ -531,7 +535,9 @@ export class WsClientNetworkAdapter extends Adapter<void> {
  * })
  * ```
  */
-export function createWsClient(options: WsClientOptions): WsClientNetworkAdapter {
+export function createWsClient(
+  options: WsClientOptions,
+): WsClientNetworkAdapter {
   return new WsClientNetworkAdapter(options)
 }
 

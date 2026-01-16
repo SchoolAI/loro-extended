@@ -361,6 +361,131 @@ describe("functional helpers", () => {
     })
   })
 
+  describe("loro(ref).subscribe() for imported (remote) changes", () => {
+    it("should fire TextRef subscription when changes are imported", () => {
+      // Create two documents - simulating two clients
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      // Set up subscription on doc2's title ref
+      const callback = vi.fn()
+      const unsubscribe = loro(doc2.title).subscribe(callback)
+
+      // Make changes on doc1
+      doc1.title.insert(0, "Hello from doc1")
+      loro(doc1).doc.commit()
+
+      // Export from doc1 and import into doc2 (simulating sync)
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      // The subscription should have fired
+      expect(callback).toHaveBeenCalled()
+
+      // And the value should be updated
+      expect(doc2.title.toString()).toBe("Hello from doc1")
+
+      unsubscribe()
+    })
+
+    it("should fire CounterRef subscription when changes are imported", () => {
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      const callback = vi.fn()
+      const unsubscribe = loro(doc2.count).subscribe(callback)
+
+      doc1.count.increment(42)
+      loro(doc1).doc.commit()
+
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      expect(callback).toHaveBeenCalled()
+      expect(doc2.count.value).toBe(42)
+
+      unsubscribe()
+    })
+
+    it("should fire ListRef subscription when changes are imported", () => {
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      const callback = vi.fn()
+      const unsubscribe = loro(doc2.items).subscribe(callback)
+
+      doc1.items.push("item1")
+      doc1.items.push("item2")
+      loro(doc1).doc.commit()
+
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      expect(callback).toHaveBeenCalled()
+      expect(doc2.items.toJSON()).toEqual(["item1", "item2"])
+
+      unsubscribe()
+    })
+
+    it("should fire doc-level subscription when changes are imported", () => {
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      const callback = vi.fn()
+      const unsubscribe = loro(doc2).doc.subscribe(callback)
+
+      doc1.title.insert(0, "Hello")
+      loro(doc1).doc.commit()
+
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      expect(callback).toHaveBeenCalled()
+
+      unsubscribe()
+    })
+
+    it("should NOT fire subscription for containers that were not changed", () => {
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      // Subscribe to count, but only change title
+      const countCallback = vi.fn()
+      const unsubscribe = loro(doc2.count).subscribe(countCallback)
+
+      doc1.title.insert(0, "Hello")
+      loro(doc1).doc.commit()
+
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      // Count subscription should NOT have fired since count wasn't changed
+      expect(countCallback).not.toHaveBeenCalled()
+
+      unsubscribe()
+    })
+
+    it("should provide updated value in subscription callback", () => {
+      const doc1 = createTypedDoc(fullSchema)
+      const doc2 = createTypedDoc(fullSchema)
+
+      let capturedValue: string | undefined
+      const unsubscribe = loro(doc2.title).subscribe(() => {
+        capturedValue = doc2.title.toString()
+      })
+
+      doc1.title.insert(0, "Remote text")
+      loro(doc1).doc.commit()
+
+      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
+      loro(doc2).doc.import(snapshot)
+
+      expect(capturedValue).toBe("Remote text")
+
+      unsubscribe()
+    })
+  })
+
   describe("getLoroDoc() on refs", () => {
     it("should return LoroDoc from TextRef", () => {
       const doc = createTypedDoc(fullSchema)

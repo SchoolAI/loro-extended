@@ -19,7 +19,13 @@
   "pnpm": {
     "overrides": {
       "react": "19.1.0",
-      "react-dom": "19.1.0"
+      "react-dom": "19.1.0",
+      "loro-crdt": "1.10.3"
+    },
+    "packageExtensions": {
+      "loro-crdt": {
+        "module": "nodejs/index.js"
+      }
     }
   }
 }
