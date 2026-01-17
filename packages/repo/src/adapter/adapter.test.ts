@@ -8,6 +8,7 @@ import type {
 } from "../channel.js"
 import type { AdapterType, PeerID, PeerIdentityDetails } from "../types.js"
 import { Adapter, type AdapterContext } from "./adapter.js"
+import type { SendInterceptorContext } from "./interceptor.js"
 
 // Create a mock logger for tests
 const mockLogger = getLogger(["test"])
@@ -830,6 +831,205 @@ describe("Adapter", () => {
       const adapter = new MockAdapter("my-type")
 
       expect(adapter.adapterId).toMatch(/^my-type-[a-f0-9-]+$/)
+    })
+  })
+
+  describe("Send Interceptors", () => {
+    it("calls interceptor before sending", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      const interceptorCalls: string[] = []
+      adapter.addSendInterceptor((ctx, next) => {
+        interceptorCalls.push(ctx.envelope.message.type)
+        next()
+      })
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+
+      expect(interceptorCalls).toEqual(["channel/directory-request"])
+      expect(sendSpy).toHaveBeenCalled()
+    })
+
+    it("drops message when next() is not called", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      adapter.addSendInterceptor((_ctx, _next) => {
+        // Don't call next - message is dropped
+      })
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+
+      expect(sendSpy).not.toHaveBeenCalled()
+    })
+
+    it("delays message when next() is called asynchronously", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      adapter.addSendInterceptor((_ctx, next) => {
+        setTimeout(next, 50)
+      })
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+
+      // Not sent immediately
+      expect(sendSpy).not.toHaveBeenCalled()
+
+      // Sent after delay
+      await vi.waitFor(() => expect(sendSpy).toHaveBeenCalled())
+    })
+
+    it("chains multiple interceptors in order", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+
+      const order: number[] = []
+      adapter.addSendInterceptor((_ctx, next) => {
+        order.push(1)
+        next()
+      })
+      adapter.addSendInterceptor((_ctx, next) => {
+        order.push(2)
+        next()
+      })
+      adapter.addSendInterceptor((_ctx, next) => {
+        order.push(3)
+        next()
+      })
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+
+      expect(order).toEqual([1, 2, 3])
+    })
+
+    it("removes interceptor when unsubscribe is called", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      const unsubscribe = adapter.addSendInterceptor((_ctx, _next) => {
+        // Drop all messages
+      })
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+      expect(sendSpy).not.toHaveBeenCalled()
+
+      unsubscribe()
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+      expect(sendSpy).toHaveBeenCalled()
+    })
+
+    it("clears all interceptors with clearSendInterceptors()", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      adapter.addSendInterceptor((_ctx, _next) => {})
+      adapter.addSendInterceptor((_ctx, _next) => {})
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+      expect(sendSpy).not.toHaveBeenCalled()
+
+      adapter.clearSendInterceptors()
+
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message: { type: "channel/directory-request" },
+      })
+      expect(sendSpy).toHaveBeenCalled()
+    })
+
+    it("provides context with envelope, adapterType, and adapterId", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+
+      let capturedContext: SendInterceptorContext | undefined
+      adapter.addSendInterceptor((ctx, next) => {
+        capturedContext = ctx
+        next()
+      })
+
+      const message: ChannelMsg = { type: "channel/directory-request" }
+      adapter._send({
+        toChannelIds: [channel.channelId],
+        message,
+      })
+
+      expect(capturedContext).toBeDefined()
+      if (capturedContext) {
+        expect(capturedContext.envelope.message).toBe(message)
+        expect(capturedContext.adapterType).toBe("mock-adapter")
+        expect(capturedContext.adapterId).toMatch(/^mock-adapter-/)
+      }
+    })
+
+    it("uses fast path when no interceptors are present", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel = adapter.testAddChannel("context-1")
+      const sendSpy = vi.spyOn(channel, "send")
+
+      const message: ChannelMsg = { type: "channel/directory-request" }
+      const sentCount = adapter._send({
+        toChannelIds: [channel.channelId],
+        message,
+      })
+
+      expect(sentCount).toBe(1)
+      expect(sendSpy).toHaveBeenCalledWith(message)
+    })
+
+    it("returns optimistic count when interceptors are present", async () => {
+      adapter._initialize(context)
+      await adapter._start()
+      const channel1 = adapter.testAddChannel("context-1")
+      const channel2 = adapter.testAddChannel("context-2")
+
+      adapter.addSendInterceptor((_ctx, _next) => {
+        // Drop all messages
+      })
+
+      const sentCount = adapter._send({
+        toChannelIds: [channel1.channelId, channel2.channelId],
+        message: { type: "channel/directory-request" },
+      })
+
+      // Returns optimistic count even though messages are dropped
+      expect(sentCount).toBe(2)
     })
   })
 })

@@ -11,6 +11,7 @@ import type {
 import { ChannelDirectory } from "../channel-directory.js"
 import type { AdapterType, PeerIdentityDetails } from "../types.js"
 import { generateUUID } from "../utils/generate-uuid.js"
+import type { SendInterceptor, SendInterceptorContext } from "./interceptor.js"
 import type { HandleSendFn } from "./types.js"
 
 export type AnyAdapter = Adapter<any>
@@ -100,6 +101,7 @@ export abstract class Adapter<G> {
   protected identity?: PeerIdentityDetails
 
   #lifecycle: AdapterLifecycleState = { state: "created" }
+  #sendInterceptors: SendInterceptor[] = []
 
   constructor({ adapterType, adapterId }: AdapterParams) {
     this.adapterType = adapterType
@@ -293,9 +295,40 @@ export abstract class Adapter<G> {
    * matching channels.
    *
    * @param envelope an AddressedEnvelope with message inside
-   * @returns the number of channels to which the message was sent
+   * @returns the number of channels to which the message was sent (optimistic count when interceptors are present)
    */
   _send(envelope: AddressedEnvelope): number {
+    // If no interceptors, use fast path
+    if (this.#sendInterceptors.length === 0) {
+      return this.#doSend(envelope)
+    }
+
+    // Run through interceptor chain
+    const context: SendInterceptorContext = {
+      envelope,
+      adapterType: this.adapterType,
+      adapterId: this.adapterId,
+    }
+
+    const runChain = (index: number) => {
+      if (index >= this.#sendInterceptors.length) {
+        // End of chain - actually send
+        this.#doSend(envelope)
+        return
+      }
+      this.#sendInterceptors[index](context, () => runChain(index + 1))
+    }
+
+    runChain(0)
+
+    // Return optimistic count (actual send may be delayed/dropped)
+    return envelope.toChannelIds.length
+  }
+
+  /**
+   * Internal method that performs the actual send operation.
+   */
+  #doSend(envelope: AddressedEnvelope): number {
     let sentCount = 0
 
     for (const toChannelId of envelope.toChannelIds) {
@@ -308,5 +341,53 @@ export abstract class Adapter<G> {
     }
 
     return sentCount
+  }
+
+  // ============================================================================
+  // PUBLIC API - Send Interceptors
+  // ============================================================================
+
+  /**
+   * Add a send interceptor to the chain.
+   * Interceptors are called in order of addition.
+   *
+   * @param interceptor - The interceptor function
+   * @returns A function to remove the interceptor
+   *
+   * @example Delay all messages by 3 seconds
+   * ```typescript
+   * const unsubscribe = adapter.addSendInterceptor((ctx, next) => {
+   *   setTimeout(next, 3000)
+   * })
+   * ```
+   *
+   * @example Drop 10% of messages (simulate packet loss)
+   * ```typescript
+   * adapter.addSendInterceptor((ctx, next) => {
+   *   if (Math.random() > 0.1) next()
+   * })
+   * ```
+   *
+   * @example Log all messages
+   * ```typescript
+   * adapter.addSendInterceptor((ctx, next) => {
+   *   console.log('Sending:', ctx.envelope.message.type)
+   *   next()
+   * })
+   * ```
+   */
+  addSendInterceptor(interceptor: SendInterceptor): () => void {
+    this.#sendInterceptors.push(interceptor)
+    return () => {
+      const idx = this.#sendInterceptors.indexOf(interceptor)
+      if (idx >= 0) this.#sendInterceptors.splice(idx, 1)
+    }
+  }
+
+  /**
+   * Clear all send interceptors.
+   */
+  clearSendInterceptors(): void {
+    this.#sendInterceptors = []
   }
 }

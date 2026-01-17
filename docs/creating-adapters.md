@@ -257,6 +257,49 @@ protected generate(context: ConnectionContext): GeneratedChannel {
 }
 ```
 
+### 5. Send Interceptors
+
+Adapters support a middleware-style interceptor chain for outgoing messages. This is useful for:
+
+- **Simulating network conditions** - Delay, packet loss, throttling
+- **Debugging** - Logging message flow
+- **Testing** - Verifying message sequences
+- **Demos** - Showing CRDT merge behavior under network partitions
+
+```typescript
+import type { SendInterceptor } from "@loro-extended/repo";
+
+// Delay all messages by 3 seconds
+const unsubscribe = adapter.addSendInterceptor((ctx, next) => {
+  setTimeout(next, 3000);
+});
+
+// Drop 10% of messages (simulate packet loss)
+adapter.addSendInterceptor((ctx, next) => {
+  if (Math.random() > 0.1) next();
+});
+
+// Log all messages
+adapter.addSendInterceptor((ctx, next) => {
+  console.log("Sending:", ctx.envelope.message.type);
+  next();
+});
+
+// Remove a specific interceptor
+unsubscribe();
+
+// Clear all interceptors
+adapter.clearSendInterceptors();
+```
+
+The interceptor context provides:
+
+- `envelope` - The message envelope being sent (contains `toChannelIds` and `message`)
+- `adapterType` - The adapter type (e.g., "websocket-client")
+- `adapterId` - The adapter instance ID
+
+**Important**: If `next()` is not called, the message is dropped. This allows interceptors to filter or conditionally block messages.
+
 ## Example Adapters
 
 For complete implementations, see:
