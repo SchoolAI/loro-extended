@@ -167,6 +167,15 @@ h3 {
   border: 1px solid #e5e7eb;
 }
 
+.shared-setting-note {
+  margin: 0 0 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  background: #fef3c7;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: #92400e;
+}
+
 .approach-selector label {
   display: flex;
   align-items: flex-start;

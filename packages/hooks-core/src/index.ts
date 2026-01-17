@@ -32,13 +32,18 @@ export type {
 } from "./create-text-hooks"
 // Text hooks factory and types
 export { createTextHooks } from "./create-text-hooks"
+// Cursor utilities for delta-based cursor adjustment
+export {
+  adjustCursorFromDelta,
+  adjustSelectionFromDelta,
+} from "./create-text-hooks/cursor-utils"
 export type {
+  CursorPosition,
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "./create-undo-hooks"
 // Undo hooks factory and types
 export { createUndoHooks } from "./create-undo-hooks"
-
 // Types
 export type { FrameworkHooks } from "./types"
 export type { SyncStore } from "./utils/create-sync-store"

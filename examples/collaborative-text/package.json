@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",
+    "loro-crdt": "^1.10.3",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "ws": "^8.18.0"

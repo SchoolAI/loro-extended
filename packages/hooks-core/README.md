@@ -202,6 +202,103 @@ const { self, peers } = useEphemeral(handle.cursors)
 
 **Returns:** `{ self: T | undefined, peers: Map<string, T> }`
 
+### `createTextHooks(framework)`
+
+Creates hooks for collaborative text editing.
+
+```typescript
+import { createTextHooks } from "@loro-extended/hooks-core"
+import * as React from "react"
+
+export const { useCollaborativeText } = createTextHooks(React)
+```
+
+#### `useCollaborativeText(textRef, options?)`
+
+Binds an HTML input or textarea to a Loro text container with bidirectional sync and cursor preservation.
+
+```tsx
+function CollaborativeInput({ textRef }: { textRef: TextRef }) {
+  const { inputRef, defaultValue, placeholder } = useCollaborativeText(textRef)
+  return (
+    <input
+      ref={inputRef}
+      defaultValue={defaultValue}
+      placeholder={placeholder}
+    />
+  )
+}
+```
+
+**Cursor Behavior:**
+- **Local changes**: Cursor position is calculated based on the input type (insert, delete, etc.)
+- **Remote changes**: Uses delta-based adjustment to preserve cursor position relative to content. When a remote peer inserts or deletes text before your cursor, your cursor moves appropriately to stay in the same logical position.
+- **IME composition**: Properly handles input method editors for CJK and other languages
+
+**Options:**
+- `onBeforeChange?: () => boolean | undefined` - Called before applying a local change. Return `false` to prevent the change.
+- `onAfterChange?: () => void` - Called after any change (local or remote) is applied.
+
+### `createUndoHooks(framework)`
+
+Creates hooks for undo/redo management.
+
+```typescript
+import { createUndoHooks } from "@loro-extended/hooks-core"
+import * as React from "react"
+
+export const { useUndoManager } = createUndoHooks(React)
+```
+
+#### `useUndoManager(handle, options?)`
+
+Manages undo/redo with Loro's UndoManager. Automatically sets up keyboard shortcuts.
+
+```tsx
+function Editor({ handle }: { handle: Handle<DocSchema> }) {
+  const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
+  return (
+    <div>
+      <button onClick={undo} disabled={!canUndo}>Undo</button>
+      <button onClick={redo} disabled={!canRedo}>Redo</button>
+    </div>
+  )
+}
+```
+
+**Options:**
+- `mergeInterval?: number` - Time in ms to merge consecutive changes (default: 500)
+- `enableKeyboardShortcuts?: boolean` - Enable Ctrl/Cmd+Z and Ctrl/Cmd+Y (default: true)
+- `getCursors?: () => Cursor[]` - Callback to capture cursor positions before undo steps
+- `setCursors?: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void` - Callback to restore cursor positions after undo/redo
+
+**Cursor Restoration Example:**
+
+```tsx
+function EditorWithCursorRestore({ handle, textRef }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const loroText = loro(textRef).container
+  
+  const { undo, redo, canUndo, canRedo } = useUndoManager(handle, {
+    getCursors: () => {
+      const input = inputRef.current
+      if (!input) return []
+      const pos = input.selectionStart ?? 0
+      const cursor = loroText.getCursor(pos)
+      return cursor ? [cursor] : []
+    },
+    setCursors: (positions) => {
+      const input = inputRef.current
+      if (!input || positions.length === 0) return
+      const pos = positions[0].offset
+      input.setSelectionRange(pos, pos)
+    },
+  })
+  
+  // ... rest of component
+}
+```
+
 ## Usage Pattern
 
 ```typescript

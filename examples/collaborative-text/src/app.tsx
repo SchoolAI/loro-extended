@@ -1,4 +1,5 @@
 import { createWsClient } from "@loro-extended/adapter-websocket/client"
+import { loro } from "@loro-extended/change"
 import {
   type CounterRef,
   RepoProvider,
@@ -10,7 +11,16 @@ import {
   useRefValue,
   useUndoManager,
 } from "@loro-extended/react"
-import { useCallback, useEffect, useState } from "react"
+import type { Cursor, LoroText } from "loro-crdt"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { createRoot } from "react-dom/client"
 import "./styles.css"
 
@@ -22,6 +32,11 @@ const wsAdapter = createWsClient({
 
 // Schema - defines the shape of our collaborative document
 const FormSchema = Shape.doc({
+  // ============================================
+  // Shared Settings - synced across all clients
+  // ============================================
+  textApproach: Shape.text().placeholder("useCollaborativeText"), // "useRefValue" or "useCollaborativeText"
+
   // ============================================
   // Atomic Controls - useRefValue is the natural choice
   // These have discrete values where "last-write-wins" is intuitive
@@ -36,6 +51,93 @@ const FormSchema = Shape.doc({
   description: Shape.text().placeholder("Enter a description..."), // Long text
   notes: Shape.text().placeholder("Add some notes..."), // Long text
 })
+
+// ============================================
+// Cursor Context for Undo/Redo Restoration
+// ============================================
+// This context tracks the currently focused text input and its TextRef
+// so that useUndoManager can capture and restore cursor positions.
+
+interface FocusedInput {
+  element: HTMLInputElement | HTMLTextAreaElement
+  textRef: TextRef
+}
+
+interface CursorContextValue {
+  registerFocus: (
+    element: HTMLInputElement | HTMLTextAreaElement,
+    textRef: TextRef,
+  ) => void
+  unregisterFocus: (element: HTMLInputElement | HTMLTextAreaElement) => void
+  getCursors: () => Cursor[]
+  setCursors: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void
+}
+
+const CursorContext = createContext<CursorContextValue | null>(null)
+
+function CursorProvider({ children }: { children: React.ReactNode }) {
+  const focusedRef = useRef<FocusedInput | null>(null)
+
+  const registerFocus = useCallback(
+    (element: HTMLInputElement | HTMLTextAreaElement, textRef: TextRef) => {
+      focusedRef.current = { element, textRef }
+    },
+    [],
+  )
+
+  const unregisterFocus = useCallback(
+    (element: HTMLInputElement | HTMLTextAreaElement) => {
+      if (focusedRef.current?.element === element) {
+        focusedRef.current = null
+      }
+    },
+    [],
+  )
+
+  const getCursors = useCallback((): Cursor[] => {
+    const focused = focusedRef.current
+    if (!focused) return []
+
+    const { element, textRef } = focused
+    const pos = element.selectionStart ?? 0
+    const loroText = loro(textRef).container as LoroText
+    const cursor = loroText.getCursor(pos)
+    return cursor ? [cursor] : []
+  }, [])
+
+  const setCursors = useCallback(
+    (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => {
+      const focused = focusedRef.current
+      if (!focused || positions.length === 0) return
+
+      const { element } = focused
+      const pos = positions[0].offset
+      // Use requestAnimationFrame to ensure the DOM has updated
+      requestAnimationFrame(() => {
+        element.setSelectionRange(pos, pos)
+        element.focus()
+      })
+    },
+    [],
+  )
+
+  const value = useMemo(
+    () => ({ registerFocus, unregisterFocus, getCursors, setCursors }),
+    [registerFocus, unregisterFocus, getCursors, setCursors],
+  )
+
+  return (
+    <CursorContext.Provider value={value}>{children}</CursorContext.Provider>
+  )
+}
+
+function useCursorContext() {
+  const context = useContext(CursorContext)
+  if (!context) {
+    throw new Error("useCursorContext must be used within CursorProvider")
+  }
+  return context
+}
 
 // ============================================
 // Atomic Controls - Always use useRefValue
@@ -161,10 +263,39 @@ function RefValueInput({
 function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLTextAreaElement>(textRef)
+  const { registerFocus, unregisterFocus } = useCursorContext()
+  const elementRef = useRef<HTMLTextAreaElement | null>(null)
+
+  // Combine refs and register focus tracking
+  const combinedRef = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      elementRef.current = element
+      inputRef(element)
+
+      if (element) {
+        const handleFocus = () => registerFocus(element, textRef)
+        const handleBlur = () => unregisterFocus(element)
+
+        element.addEventListener("focus", handleFocus)
+        element.addEventListener("blur", handleBlur)
+
+        // Check if already focused
+        if (document.activeElement === element) {
+          registerFocus(element, textRef)
+        }
+
+        return () => {
+          element.removeEventListener("focus", handleFocus)
+          element.removeEventListener("blur", handleBlur)
+        }
+      }
+    },
+    [inputRef, registerFocus, unregisterFocus, textRef],
+  )
 
   return (
     <textarea
-      ref={inputRef}
+      ref={combinedRef}
       placeholder={placeholder}
       rows={4}
       defaultValue={defaultValue}
@@ -175,11 +306,40 @@ function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef)
+  const { registerFocus, unregisterFocus } = useCursorContext()
+  const elementRef = useRef<HTMLInputElement | null>(null)
+
+  // Combine refs and register focus tracking
+  const combinedRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      elementRef.current = element
+      inputRef(element)
+
+      if (element) {
+        const handleFocus = () => registerFocus(element, textRef)
+        const handleBlur = () => unregisterFocus(element)
+
+        element.addEventListener("focus", handleFocus)
+        element.addEventListener("blur", handleBlur)
+
+        // Check if already focused
+        if (document.activeElement === element) {
+          registerFocus(element, textRef)
+        }
+
+        return () => {
+          element.removeEventListener("focus", handleFocus)
+          element.removeEventListener("blur", handleBlur)
+        }
+      }
+    },
+    [inputRef, registerFocus, unregisterFocus, textRef],
+  )
 
   return (
     <input
       type="text"
-      ref={inputRef}
+      ref={combinedRef}
       placeholder={placeholder}
       defaultValue={defaultValue}
     />
@@ -194,11 +354,36 @@ type TextApproach = "useRefValue" | "useCollaborativeText"
 
 function App() {
   const handle = useHandle("shared-form", FormSchema)
-  const { status, priority, title, description, notes } = useDoc(handle)
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
+  const {
+    textApproach: textApproachValue,
+    status,
+    priority,
+    title,
+    description,
+    notes,
+  } = useDoc(handle)
+  const { getCursors, setCursors } = useCursorContext()
 
-  // Select between approaches for text controls only
-  const [textApproach, setTextApproach] = useState<TextApproach>("useRefValue")
+  // Use cursor-aware undo/redo
+  const { undo, redo, canUndo, canRedo } = useUndoManager(handle, {
+    getCursors,
+    setCursors,
+  })
+
+  // Shared text approach setting - synced across all clients
+  // Default to "useCollaborativeText" if not set
+  const textApproach: TextApproach =
+    textApproachValue === "useRefValue" ||
+    textApproachValue === "useCollaborativeText"
+      ? textApproachValue
+      : "useCollaborativeText"
+
+  const setTextApproach = useCallback(
+    (approach: TextApproach) => {
+      handle.doc.textApproach.update(approach)
+    },
+    [handle.doc.textApproach],
+  )
 
   // Network delay simulation (0-10000ms, default 3000ms)
   const [networkDelay, setNetworkDelay] = useState(3000)
@@ -299,13 +484,16 @@ function App() {
         </p>
 
         <div className="approach-selector">
+          <p className="shared-setting-note">
+            🔄 <em>This setting is shared across all clients!</em>
+          </p>
           <label>
             <input
               type="radio"
               name="approach"
               value="useRefValue"
               checked={textApproach === "useRefValue"}
-              onChange={e => setTextApproach(e.target.value as TextApproach)}
+              onChange={() => setTextApproach("useRefValue")}
             />
             <strong>useRefValue</strong> - Controlled inputs, simpler code. Best
             when concurrent editing is rare.
@@ -316,7 +504,7 @@ function App() {
               name="approach"
               value="useCollaborativeText"
               checked={textApproach === "useCollaborativeText"}
-              onChange={e => setTextApproach(e.target.value as TextApproach)}
+              onChange={() => setTextApproach("useCollaborativeText")}
             />
             <strong>useCollaborativeText</strong> - Character-level operations.
             Best for real-time collaboration.
@@ -361,6 +549,11 @@ function App() {
         <p>
           <strong>Keyboard shortcuts:</strong> Ctrl/Cmd+Z to undo, Ctrl/Cmd+Y or
           Ctrl/Cmd+Shift+Z to redo
+        </p>
+        <p>
+          <strong>Cursor restoration:</strong> When using{" "}
+          <code>useCollaborativeText</code>, undo/redo will restore your cursor
+          position!
         </p>
 
         <h3>Choosing the Right Approach</h3>
@@ -408,12 +601,14 @@ function App() {
   )
 }
 
-// Bootstrap - render the app
+// Bootstrap - render the app with CursorProvider
 const rootElement = document.getElementById("root")
 if (rootElement) {
   createRoot(rootElement).render(
     <RepoProvider config={{ adapters: [wsAdapter] }}>
-      <App />
+      <CursorProvider>
+        <App />
+      </CursorProvider>
     </RepoProvider>,
   )
 }

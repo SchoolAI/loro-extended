@@ -1,8 +1,19 @@
 import type { DocShape } from "@loro-extended/change"
 import type { EphemeralDeclarations, Handle } from "@loro-extended/repo"
+import type { Cursor } from "loro-crdt"
 import { UndoManager } from "loro-crdt"
 import type { FrameworkHooks } from "./types"
 import { createSyncStore } from "./utils/create-sync-store"
+
+/**
+ * Cursor position information for undo/redo restoration
+ */
+export interface CursorPosition {
+  /** The Loro Cursor object for stable position tracking */
+  cursor: Cursor
+  /** Optional: which end of a selection this represents */
+  side?: "start" | "end"
+}
 
 /**
  * Options for useUndoManager hook
@@ -18,6 +29,17 @@ export interface UseUndoManagerOptions {
    * Default: true
    */
   enableKeyboardShortcuts?: boolean
+  /**
+   * Callback to get current cursor positions before an undo/redo step is pushed.
+   * Return an array of Cursor objects representing current selection/cursor positions.
+   * These will be stored with the undo step and restored when popped.
+   */
+  getCursors?: () => Cursor[]
+  /**
+   * Callback to restore cursor positions after an undo/redo step is popped.
+   * Receives the resolved cursor positions (as indices) that were stored with the step.
+   */
+  setCursors?: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void
 }
 
 /**
@@ -73,12 +95,37 @@ export function createUndoHooks(framework: FrameworkHooks) {
   ): UseUndoManagerReturn {
     const mergeInterval = options?.mergeInterval ?? 500
     const enableKeyboardShortcuts = options?.enableKeyboardShortcuts ?? true
+    const getCursors = options?.getCursors
+    const setCursors = options?.setCursors
 
     const undoManager = useMemo(() => {
       return new UndoManager(handle.loroDoc, {
         mergeInterval,
+        // Wire up cursor callbacks if provided
+        onPush: getCursors
+          ? () => {
+              // Get current cursor positions and store them with the undo step
+              const cursors = getCursors()
+              return { value: null, cursors }
+            }
+          : undefined,
+        onPop: setCursors
+          ? (_isUndo, meta) => {
+              // Resolve stored cursors to current positions and restore them
+              const positions: Array<{ offset: number; side: -1 | 0 | 1 }> = []
+              for (const cursor of meta.cursors) {
+                const pos = handle.loroDoc.getCursorPos(cursor)
+                if (pos) {
+                  positions.push({ offset: pos.offset, side: pos.side })
+                }
+              }
+              if (positions.length > 0) {
+                setCursors(positions)
+              }
+            }
+          : undefined,
       })
-    }, [handle.loroDoc, mergeInterval])
+    }, [handle.loroDoc, mergeInterval, getCursors, setCursors])
 
     const undo = useCallback(() => {
       if (undoManager.canUndo()) {

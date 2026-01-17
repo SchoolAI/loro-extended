@@ -1,7 +1,9 @@
 import type { LoroTextRef, TextRef } from "@loro-extended/change"
 import { loro } from "@loro-extended/change"
+import type { Delta, LoroEventBatch, TextDiff } from "loro-crdt"
 import type { FrameworkHooks } from "../types"
 import { getPlaceholder, getRawTextValue } from "../utils/text-ref-helpers"
+import { adjustSelectionFromDelta } from "./cursor-utils"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
 
 /**
@@ -288,9 +290,12 @@ export function createTextHooks(framework: FrameworkHooks) {
 
     // Subscribe to remote changes
     useEffect(() => {
-      const unsubscribe = loroRef.subscribe(() => {
-        // Skip if this is a local change
-        if (isLocalChangeRef.current) return
+      const unsubscribe = loroRef.subscribe((rawEvent: unknown) => {
+        // Cast to LoroEventBatch to access event properties
+        const event = rawEvent as LoroEventBatch
+        // Skip if this is a local change (use event.by instead of isLocalChangeRef)
+        // "local" = local transaction, "import" = remote import, "checkout" = version checkout
+        if (event.by === "local" || isLocalChangeRef.current) return
 
         const input = elementRef.current
         if (!input) return
@@ -302,25 +307,35 @@ export function createTextHooks(framework: FrameworkHooks) {
         // Save cursor position before update
         const cursorStart = input.selectionStart ?? 0
         const cursorEnd = input.selectionEnd ?? 0
-        const oldLength = lastKnownValueRef.current?.length ?? 0
 
         // Update the input value
         input.value = newValue
         lastKnownValueRef.current = newValue
 
-        // Adjust cursor position based on length change
-        // Note: This is a simplified approach that assumes changes happen at the end.
-        // For more accurate cursor tracking with concurrent edits, you would need
-        // to analyze the actual delta operations from Loro.
-        const lengthDiff = newValue.length - oldLength
-        const newCursorStart = Math.max(
-          0,
-          Math.min(cursorStart + lengthDiff, newValue.length),
-        )
-        const newCursorEnd = Math.max(
-          0,
-          Math.min(cursorEnd + lengthDiff, newValue.length),
-        )
+        // Extract delta from the event for accurate cursor adjustment
+        // The event contains TextDiff with delta operations
+        let newCursorStart = cursorStart
+        let newCursorEnd = cursorEnd
+
+        // Find the text diff in the events
+        for (const loroEvent of event.events) {
+          const diff = loroEvent.diff as TextDiff
+          if (diff.type === "text" && diff.diff) {
+            // Use delta-based cursor adjustment for accurate positioning
+            const adjusted = adjustSelectionFromDelta(
+              cursorStart,
+              cursorEnd,
+              diff.diff as Delta<string>[],
+            )
+            newCursorStart = adjusted.start
+            newCursorEnd = adjusted.end
+            break // Only process the first text diff
+          }
+        }
+
+        // Clamp to valid range
+        newCursorStart = Math.max(0, Math.min(newCursorStart, newValue.length))
+        newCursorEnd = Math.max(0, Math.min(newCursorEnd, newValue.length))
 
         input.setSelectionRange(newCursorStart, newCursorEnd)
 
