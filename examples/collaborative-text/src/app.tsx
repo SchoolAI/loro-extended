@@ -1,4 +1,7 @@
-import { createWsClient } from "@loro-extended/adapter-websocket/client"
+import {
+  type ConnectionState,
+  createWsClient,
+} from "@loro-extended/adapter-websocket/client"
 import { loro } from "@loro-extended/change"
 import {
   type CounterRef,
@@ -24,25 +27,36 @@ import {
 import { createRoot } from "react-dom/client"
 import "./styles.css"
 
+// Document IDs
+const SETTINGS_DOC_ID = "shared-form-settings"
+const FORM_DOC_ID = "shared-form"
+
 // Create WebSocket adapter at module scope so it's accessible for interceptors
 const wsAdapter = createWsClient({
   url: `ws://${location.host}/ws`,
   reconnect: { enabled: true },
 })
 
-// Schema - defines the shape of our collaborative document
-const FormSchema = Shape.doc({
-  // ============================================
-  // Shared Settings - synced across all clients
-  // ============================================
-  textApproach: Shape.text().placeholder("useCollaborativeText"), // "useRefValue" or "useCollaborativeText"
+type TextApproach = "last-write-wins" | "collaborative"
 
+// Settings schema - synced instantly (no delay)
+const SettingsSchema = Shape.doc({
+  settings: Shape.struct({
+    textApproach: Shape.plain
+      .string<TextApproach>()
+      .placeholder("collaborative"),
+    networkDelay: Shape.counter().placeholder(0), // Network delay in ms (0-10000)
+  }),
+})
+
+// Form schema - synced with configurable delay
+const FormSchema = Shape.doc({
   // ============================================
   // Atomic Controls - useRefValue is the natural choice
   // These have discrete values where "last-write-wins" is intuitive
   // ============================================
   status: Shape.text().placeholder("draft"), // Dropdown selection
-  priority: Shape.counter().placeholder(2), // Numeric priority (1-5)
+  priority: Shape.counter(), // Numeric priority (0-5)
 
   // ============================================
   // Text Controls - choice depends on collaboration pattern
@@ -51,6 +65,31 @@ const FormSchema = Shape.doc({
   description: Shape.text().placeholder("Enter a description..."), // Long text
   notes: Shape.text().placeholder("Add some notes..."), // Long text
 })
+
+/**
+ * Helper to extract docId from a channel message.
+ * Returns undefined for messages without docId (like establish-request/response).
+ */
+function getDocIdFromMessage(message: unknown): string | undefined {
+  if (typeof message !== "object" || message === null) return undefined
+  const msg = message as Record<string, unknown>
+
+  // Direct docId field (sync-request, sync-response, update, ephemeral, etc.)
+  if ("docId" in msg && typeof msg.docId === "string") {
+    return msg.docId
+  }
+
+  // Batch messages - check first message for docId
+  if (
+    msg.type === "channel/batch" &&
+    Array.isArray(msg.messages) &&
+    msg.messages.length > 0
+  ) {
+    return getDocIdFromMessage(msg.messages[0])
+  }
+
+  return undefined
+}
 
 // ============================================
 // Cursor Context for Undo/Redo Restoration
@@ -180,14 +219,14 @@ function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
   // CounterRef.toJSON() returns number
   const { value } = useRefValue(priorityRef) as { value: number }
   // Clamp to valid range for display
-  const displayValue = Math.max(1, Math.min(5, value))
+  const displayValue = Math.max(0, Math.min(5, value))
 
   return (
     <div className="priority-selector">
       <button
         type="button"
         onClick={() => priorityRef.decrement(1)}
-        disabled={displayValue <= 1}
+        disabled={displayValue <= 0}
         className="priority-btn"
       >
         −
@@ -350,61 +389,93 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
 // Main App Component
 // ============================================
 
-type TextApproach = "useRefValue" | "useCollaborativeText"
-
 function App() {
-  const handle = useHandle("shared-form", FormSchema)
+  // Two separate handles: settings (instant sync) and form (delayed sync)
+  const settingsHandle = useHandle(SETTINGS_DOC_ID, SettingsSchema)
+  const formHandle = useHandle(FORM_DOC_ID, FormSchema)
+
+  // Subscribe to both documents
   const {
-    textApproach: textApproachValue,
-    status,
-    priority,
-    title,
-    description,
-    notes,
-  } = useDoc(handle)
+    settings: {
+      textApproach: textApproachValue,
+      networkDelay: networkDelayValue,
+    },
+  } = useDoc(settingsHandle)
+  const { status, priority, title, description, notes } = useDoc(formHandle)
+
   const { getCursors, setCursors } = useCursorContext()
 
-  // Use cursor-aware undo/redo
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle, {
+  // Use cursor-aware undo/redo (only for form, not settings)
+  const { undo, redo, canUndo, canRedo } = useUndoManager(formHandle, {
     getCursors,
     setCursors,
   })
 
-  // Shared text approach setting - synced across all clients
+  // Shared text approach setting - synced instantly across all clients
   // Default to "useCollaborativeText" if not set
   const textApproach: TextApproach =
-    textApproachValue === "useRefValue" ||
-    textApproachValue === "useCollaborativeText"
+    textApproachValue === "last-write-wins" ||
+    textApproachValue === "collaborative"
       ? textApproachValue
-      : "useCollaborativeText"
+      : "collaborative"
 
-  const setTextApproach = useCallback(
-    (approach: TextApproach) => {
-      handle.doc.textApproach.update(approach)
+  const setTextApproach = (approach: TextApproach) => {
+    settingsHandle.doc.settings.textApproach = approach
+  }
+
+  // Network delay from shared settings (0-10000ms, default 3000ms)
+  // Clamp to valid range
+  const networkDelay = Math.max(0, Math.min(10000, networkDelayValue ?? 3000))
+
+  const setNetworkDelay = useCallback(
+    (delay: number) => {
+      // Counter uses increment/decrement, so we need to calculate the delta
+      const currentValue = networkDelayValue ?? 3000
+      const delta = delay - currentValue
+      if (delta > 0) {
+        settingsHandle.doc.settings.networkDelay.increment(delta)
+      } else if (delta < 0) {
+        settingsHandle.doc.settings.networkDelay.decrement(-delta)
+      }
     },
-    [handle.doc.textApproach],
+    [settingsHandle.doc.settings, networkDelayValue],
   )
 
-  // Network delay simulation (0-10000ms, default 3000ms)
-  const [networkDelay, setNetworkDelay] = useState(3000)
+  // Connection status from WebSocket adapter
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("disconnected")
+
+  // Subscribe to connection state changes
+  useEffect(() => {
+    return wsAdapter.subscribe(setConnectionState)
+  }, [])
 
   // Manage send interceptor lifecycle based on delay setting
+  // Settings document syncs instantly, form document is delayed
   useEffect(() => {
     if (networkDelay === 0) {
       wsAdapter.clearSendInterceptors()
       return
     }
-    const unsubscribe = wsAdapter.addSendInterceptor((_ctx, next) => {
-      setTimeout(next, networkDelay)
+    const unsubscribe = wsAdapter.addSendInterceptor((ctx, next) => {
+      // Check if this message is for the settings document
+      const docId = getDocIdFromMessage(ctx.envelope.message)
+      if (docId === SETTINGS_DOC_ID) {
+        // Settings sync instantly - no delay
+        next()
+      } else {
+        // All other messages are delayed
+        setTimeout(next, networkDelay)
+      }
     })
     return unsubscribe
   }, [networkDelay])
 
   const renderTextInput = (textRef: TextRef, multiline = false) => {
     switch (textApproach) {
-      case "useRefValue":
+      case "last-write-wins":
         return <RefValueInput textRef={textRef} multiline={multiline} />
-      case "useCollaborativeText":
+      case "collaborative":
         return multiline ? (
           <CollaborativeTextarea textRef={textRef} />
         ) : (
@@ -415,7 +486,21 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Collaborative Form</h1>
+      <div className="header">
+        <h1>Collaborative Form</h1>
+        <div className={`connection-status connection-${connectionState}`}>
+          <span className="connection-dot" />
+          <span className="connection-label">
+            {connectionState === "connected"
+              ? "Connected"
+              : connectionState === "connecting"
+                ? "Connecting..."
+                : connectionState === "reconnecting"
+                  ? "Reconnecting..."
+                  : "Disconnected"}
+          </span>
+        </div>
+      </div>
 
       <div className="toolbar">
         <button type="button" onClick={undo} disabled={!canUndo}>
@@ -424,25 +509,6 @@ function App() {
         <button type="button" onClick={redo} disabled={!canRedo}>
           ⟳ Redo
         </button>
-        <div className="toolbar-separator" />
-        <div className="delay-control">
-          <label htmlFor="network-delay">
-            🌐 Network Delay:{" "}
-            {networkDelay === 0
-              ? "Off"
-              : `${(networkDelay / 1000).toFixed(1)}s`}
-          </label>
-          <input
-            id="network-delay"
-            type="range"
-            min="0"
-            max="10000"
-            step="500"
-            value={networkDelay}
-            onChange={e => setNetworkDelay(Number(e.target.value))}
-            className="delay-slider"
-          />
-        </div>
       </div>
 
       {/* ============================================ */}
@@ -458,7 +524,7 @@ function App() {
 
         <div className="field">
           <span className="field-label">Status</span>
-          <StatusDropdown statusRef={handle.doc.status} />
+          <StatusDropdown statusRef={formHandle.doc.status} />
           <div className="preview">
             <strong>Current value:</strong> {status || "draft"}
           </div>
@@ -466,7 +532,7 @@ function App() {
 
         <div className="field">
           <span className="field-label">Priority</span>
-          <PrioritySelector priorityRef={handle.doc.priority} />
+          <PrioritySelector priorityRef={formHandle.doc.priority} />
           <div className="preview">
             <strong>Current value:</strong> {priority}
           </div>
@@ -479,41 +545,13 @@ function App() {
       <section className="section">
         <h2>Text Controls</h2>
         <p className="section-description">
-          For text inputs, the choice depends on your collaboration pattern.
-          Switch between approaches to compare:
+          Text inputs using <code>{textApproach}</code>. Change the approach in
+          Demo Settings below.
         </p>
-
-        <div className="approach-selector">
-          <p className="shared-setting-note">
-            🔄 <em>This setting is shared across all clients!</em>
-          </p>
-          <label>
-            <input
-              type="radio"
-              name="approach"
-              value="useRefValue"
-              checked={textApproach === "useRefValue"}
-              onChange={() => setTextApproach("useRefValue")}
-            />
-            <strong>useRefValue</strong> - Controlled inputs, simpler code. Best
-            when concurrent editing is rare.
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="approach"
-              value="useCollaborativeText"
-              checked={textApproach === "useCollaborativeText"}
-              onChange={() => setTextApproach("useCollaborativeText")}
-            />
-            <strong>useCollaborativeText</strong> - Character-level operations.
-            Best for real-time collaboration.
-          </label>
-        </div>
 
         <div className="field">
           <span className="field-label">Title (single line)</span>
-          {renderTextInput(handle.doc.title)}
+          {renderTextInput(formHandle.doc.title)}
           <div className="preview">
             <strong>Current value:</strong> {title || "(empty)"}
           </div>
@@ -521,7 +559,7 @@ function App() {
 
         <div className="field">
           <span className="field-label">Description (multi-line)</span>
-          {renderTextInput(handle.doc.description, true)}
+          {renderTextInput(formHandle.doc.description, true)}
           <div className="preview">
             <strong>Current value:</strong>
             <pre>{description || "(empty)"}</pre>
@@ -530,10 +568,74 @@ function App() {
 
         <div className="field">
           <span className="field-label">Notes</span>
-          {renderTextInput(handle.doc.notes, true)}
+          {renderTextInput(formHandle.doc.notes, true)}
           <div className="preview">
             <strong>Current value:</strong>
             <pre>{notes || "(empty)"}</pre>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================ */}
+      {/* Demo Settings Section */}
+      {/* ============================================ */}
+      <section className="section settings-section">
+        <h2>⚙️ Demo Settings</h2>
+        <p className="section-description">
+          These settings are <strong>shared across all clients</strong> and sync
+          instantly (bypassing the network delay). Try changing them in one tab
+          and watch the other tabs update!
+        </p>
+
+        <div className="settings-grid">
+          <div className="setting-item">
+            <span className="setting-label">Text Input Approach</span>
+            <div className="approach-selector">
+              <label>
+                <input
+                  type="radio"
+                  name="approach"
+                  value="useRefValue"
+                  checked={textApproach === "last-write-wins"}
+                  onChange={() => setTextApproach("last-write-wins")}
+                />
+                <strong>useRefValue</strong> - Controlled inputs, simpler code
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="approach"
+                  value="useCollaborativeText"
+                  checked={textApproach === "collaborative"}
+                  onChange={() => setTextApproach("collaborative")}
+                />
+                <strong>useCollaborativeText</strong> - Character-level
+                operations
+              </label>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <span className="setting-label">
+              Network Delay:{" "}
+              {networkDelay === 0
+                ? "Off"
+                : `${(networkDelay / 1000).toFixed(1)}s`}
+            </span>
+            <input
+              id="network-delay"
+              type="range"
+              min="0"
+              max="10000"
+              step="500"
+              value={networkDelay}
+              onChange={e => setNetworkDelay(Number(e.target.value))}
+              className="delay-slider settings-slider"
+            />
+            <p className="setting-hint">
+              Simulates network latency for form data. Settings always sync
+              instantly.
+            </p>
           </div>
         </div>
       </section>
