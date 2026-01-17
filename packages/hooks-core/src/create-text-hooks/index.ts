@@ -1,7 +1,25 @@
 import type { LoroTextRef, TextRef } from "@loro-extended/change"
-import { loro } from "@loro-extended/change"
+import { INTERNAL_SYMBOL, loro } from "@loro-extended/change"
 import type { FrameworkHooks } from "../types"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
+
+/**
+ * Get the raw CRDT value from a TextRef, bypassing placeholder logic.
+ * This returns the actual content stored in the CRDT, which may be empty
+ * even if textRef.toString() would return a placeholder.
+ */
+function getRawCrdtValue(textRef: TextRef): string {
+  return (loro(textRef) as LoroTextRef).container.toString()
+}
+
+/**
+ * Get the placeholder value from a TextRef, if one is defined.
+ */
+function getPlaceholder(textRef: TextRef): string | undefined {
+  return (textRef as any)[INTERNAL_SYMBOL]?.getPlaceholder() as
+    | string
+    | undefined
+}
 
 /**
  * Options for useCollaborativeText hook
@@ -24,9 +42,16 @@ export interface UseCollaborativeTextOptions {
 export interface UseCollaborativeTextReturn<
   T extends HTMLInputElement | HTMLTextAreaElement,
 > {
-  /** Ref to attach to the input/textarea element */
-  inputRef: { current: T | null }
-  /** Event handlers to spread onto the input/textarea */
+  /**
+   * Ref callback to attach to the input/textarea element.
+   * This is a callback ref, not a ref object - pass it directly to the ref prop.
+   */
+  inputRef: (element: T | null) => void
+  /**
+   * Event handlers - kept for API compatibility but are no-ops.
+   * Native event listeners are attached automatically via the ref callback.
+   * @deprecated These handlers are no longer needed - just use inputRef
+   */
   handlers: {
     onBeforeInput: (e: InputEvent) => void
     onCompositionStart: () => void
@@ -44,28 +69,32 @@ export interface UseCollaborativeTextReturn<
  * @returns Object containing useCollaborativeText hook
  */
 export function createTextHooks(framework: FrameworkHooks) {
-  const { useRef, useEffect, useCallback, useMemo } = framework
+  const { useRef, useEffect, useMemo, useCallback } = framework
 
   /**
    * Hook for binding an HTML input or textarea to a LoroText container.
    * Handles bidirectional sync with cursor position preservation.
+   *
+   * The hook uses a ref callback pattern to ensure proper initialization:
+   * - When the element mounts, its value is synced FROM the CRDT
+   * - Native event listeners are attached immediately
+   * - Selection bounds are validated before any CRDT operation
    *
    * Note: For best performance, wrap `onBeforeChange` and `onAfterChange` callbacks
    * in `useCallback` to prevent unnecessary re-subscriptions.
    *
    * @param textRef - A TextRef from the typed document
    * @param options - Optional configuration
-   * @returns Object with inputRef, event handlers, and defaultValue
+   * @returns Object with inputRef callback, event handlers, and defaultValue
    *
    * @example
    * ```tsx
    * function CollaborativeInput({ textRef }: { textRef: TextRef }) {
-   *   const { inputRef, handlers, defaultValue } = useCollaborativeText(textRef)
+   *   const { inputRef, defaultValue } = useCollaborativeText(textRef)
    *   return (
    *     <input
    *       ref={inputRef}
    *       defaultValue={defaultValue}
-   *       {...handlers}
    *     />
    *   )
    * }
@@ -77,9 +106,15 @@ export function createTextHooks(framework: FrameworkHooks) {
     textRef: TextRef,
     options?: UseCollaborativeTextOptions,
   ): UseCollaborativeTextReturn<T> {
-    const inputRef = useRef<T | null>(null)
+    // Store the current element for access in effects
+    const elementRef = useRef<T | null>(null)
+    // Store cleanup function for event listeners
+    const cleanupRef = useRef<(() => void) | null>(null)
+    // Track if we're in the middle of a local change
     const isLocalChangeRef = useRef<boolean>(false)
+    // Track the last known value to detect changes
     const lastKnownValueRef = useRef<string>(textRef.toString())
+    // Track IME composition state
     const isComposingRef = useRef<boolean>(false)
 
     // Extract individual options to avoid re-subscriptions when options object changes
@@ -90,14 +125,190 @@ export function createTextHooks(framework: FrameworkHooks) {
     // This is critical for subscription stability
     const loroRef = useMemo(() => loro(textRef) as LoroTextRef, [textRef])
 
+    // Create stable handler references that always have the latest closure values
+    const handleBeforeInputRef = useRef<(e: InputEvent) => void>(() => {})
+    const handleCompositionStartRef = useRef<() => void>(() => {})
+    const handleCompositionEndRef = useRef<(e: CompositionEvent) => void>(
+      () => {},
+    )
+
+    // Update handler refs - these always have the latest closure values
+    handleBeforeInputRef.current = (e: InputEvent) => {
+      // Don't intercept during IME composition
+      if (isComposingRef.current) return
+
+      const { inputType, data } = e
+
+      // Handle undefined inputType (can happen in some browsers/scenarios)
+      if (!inputType) {
+        console.warn("[useCollaborativeText] Unhandled inputType: undefined")
+        return
+      }
+
+      // Handle historyUndo/historyRedo BEFORE preventDefault
+      // Let browser handle these when UndoManager is not being used
+      if (inputType === "historyUndo" || inputType === "historyRedo") {
+        // Don't prevent default - let browser or UndoManager handle it
+        return
+      }
+
+      // Now we can safely prevent default for all other input types
+      e.preventDefault()
+
+      // Check if change should be allowed
+      if (onBeforeChange?.() === false) return
+
+      const input = e.target as T
+
+      // Get CRDT length for bounds validation
+      const crdtValue = textRef.toString()
+      const crdtLength = crdtValue.length
+
+      // Clamp selection to valid bounds within the CRDT
+      // This prevents "Index out of bound" errors when input has stale content
+      const rawStart = input.selectionStart ?? 0
+      const rawEnd = input.selectionEnd ?? 0
+      const start = Math.min(Math.max(0, rawStart), crdtLength)
+      const end = Math.min(Math.max(0, rawEnd), crdtLength)
+
+      isLocalChangeRef.current = true
+
+      try {
+        // Look up the handler for this input type
+        const handler = inputHandlers[inputType]
+
+        if (handler) {
+          handler({
+            textRef,
+            start,
+            end,
+            data,
+            input,
+            event: e,
+          })
+        } else {
+          // For unhandled input types, log a warning
+          console.warn(
+            `[useCollaborativeText] Unhandled inputType: ${inputType}`,
+          )
+        }
+
+        // Update local tracking
+        lastKnownValueRef.current = textRef.toString()
+
+        // Update input value and cursor position
+        input.value = lastKnownValueRef.current
+
+        // Calculate new cursor position
+        const newCursor = calculateNewCursor(
+          inputType,
+          start,
+          end,
+          data,
+          input.value.length,
+        )
+
+        input.setSelectionRange(newCursor, newCursor)
+
+        onAfterChange?.()
+      } finally {
+        isLocalChangeRef.current = false
+      }
+    }
+
+    handleCompositionStartRef.current = () => {
+      isComposingRef.current = true
+    }
+
+    handleCompositionEndRef.current = (e: CompositionEvent) => {
+      isComposingRef.current = false
+
+      // The composition has ended - the text is already in the input
+      // We need to sync it to the CRDT
+      const input = e.target as T
+      const currentValue = input.value
+      const oldValue = lastKnownValueRef.current ?? ""
+
+      if (currentValue === oldValue) return
+
+      // Check if change should be allowed
+      if (onBeforeChange?.() === false) {
+        // Revert the input
+        input.value = oldValue
+        return
+      }
+
+      isLocalChangeRef.current = true
+
+      try {
+        // Find where the composition occurred and update the CRDT
+        // For simplicity, we'll use the update() method which replaces all text
+        // A more sophisticated approach would diff the strings
+        textRef.update(currentValue)
+        lastKnownValueRef.current = currentValue
+
+        onAfterChange?.()
+      } finally {
+        isLocalChangeRef.current = false
+      }
+    }
+
+    // Ref callback that fires when element mounts/unmounts
+    // This ensures proper initialization and event listener attachment
+    const setInputRef = useCallback(
+      (element: T | null) => {
+        // Cleanup previous element's listeners
+        if (cleanupRef.current) {
+          cleanupRef.current()
+          cleanupRef.current = null
+        }
+
+        elementRef.current = element
+
+        if (element) {
+          // CRITICAL: Sync input value FROM the CRDT immediately
+          // This ensures the input always reflects the CRDT state
+          const crdtValue = textRef.toString()
+          element.value = crdtValue
+          lastKnownValueRef.current = crdtValue
+
+          // Create event listener wrappers that delegate to refs
+          // This allows the handlers to be updated without re-attaching listeners
+          const onBeforeInput = (e: Event) => {
+            handleBeforeInputRef.current?.(e as InputEvent)
+          }
+          const onCompositionStart = () => {
+            handleCompositionStartRef.current?.()
+          }
+          const onCompositionEnd = (e: Event) => {
+            handleCompositionEndRef.current?.(e as CompositionEvent)
+          }
+
+          // Attach native event listeners
+          // We use native listeners because React's synthetic events don't provide
+          // the full InputEvent API (e.g., inputType is undefined in React)
+          element.addEventListener("beforeinput", onBeforeInput)
+          element.addEventListener("compositionstart", onCompositionStart)
+          element.addEventListener("compositionend", onCompositionEnd)
+
+          // Store cleanup function
+          cleanupRef.current = () => {
+            element.removeEventListener("beforeinput", onBeforeInput)
+            element.removeEventListener("compositionstart", onCompositionStart)
+            element.removeEventListener("compositionend", onCompositionEnd)
+          }
+        }
+      },
+      [textRef],
+    )
+
     // Subscribe to remote changes
-    // Note: loroRef is derived from textRef, so we only need textRef in deps
     useEffect(() => {
       const unsubscribe = loroRef.subscribe(() => {
         // Skip if this is a local change
         if (isLocalChangeRef.current) return
 
-        const input = inputRef.current
+        const input = elementRef.current
         if (!input) return
 
         const newValue = textRef.toString()
@@ -134,129 +345,22 @@ export function createTextHooks(framework: FrameworkHooks) {
       return unsubscribe
     }, [textRef, loroRef, onAfterChange])
 
-    const handleBeforeInput = useCallback(
-      (e: InputEvent) => {
-        // Don't intercept during IME composition
-        if (isComposingRef.current) return
-
-        const { inputType, data } = e
-
-        // Handle undefined inputType (can happen in some browsers/scenarios)
-        if (!inputType) {
-          console.warn("[useCollaborativeText] Unhandled inputType: undefined")
-          return
+    // Cleanup on unmount
+    useEffect(() => {
+      return () => {
+        if (cleanupRef.current) {
+          cleanupRef.current()
+          cleanupRef.current = null
         }
-
-        // Handle historyUndo/historyRedo BEFORE preventDefault
-        // Let browser handle these when UndoManager is not being used
-        if (inputType === "historyUndo" || inputType === "historyRedo") {
-          // Don't prevent default - let browser or UndoManager handle it
-          return
-        }
-
-        // Now we can safely prevent default for all other input types
-        e.preventDefault()
-
-        // Check if change should be allowed
-        if (onBeforeChange?.() === false) return
-
-        const input = e.target as T
-        const start = input.selectionStart ?? 0
-        const end = input.selectionEnd ?? 0
-
-        isLocalChangeRef.current = true
-
-        try {
-          // Look up the handler for this input type
-          const handler = inputHandlers[inputType]
-
-          if (handler) {
-            handler({
-              textRef,
-              start,
-              end,
-              data,
-              input,
-              event: e,
-            })
-          } else {
-            // For unhandled input types, log a warning
-            console.warn(
-              `[useCollaborativeText] Unhandled inputType: ${inputType}`,
-            )
-          }
-
-          // Update local tracking
-          lastKnownValueRef.current = textRef.toString()
-
-          // Update input value and cursor position
-          input.value = lastKnownValueRef.current
-
-          // Calculate new cursor position
-          const newCursor = calculateNewCursor(
-            inputType,
-            start,
-            end,
-            data,
-            input.value.length,
-          )
-
-          input.setSelectionRange(newCursor, newCursor)
-
-          onAfterChange?.()
-        } finally {
-          isLocalChangeRef.current = false
-        }
-      },
-      [textRef, onBeforeChange, onAfterChange],
-    )
-
-    const handleCompositionStart = useCallback(() => {
-      isComposingRef.current = true
+      }
     }, [])
 
-    const handleCompositionEnd = useCallback(
-      (e: CompositionEvent) => {
-        isComposingRef.current = false
-
-        // The composition has ended - the text is already in the input
-        // We need to sync it to the CRDT
-        const input = e.target as T
-        const currentValue = input.value
-        const oldValue = lastKnownValueRef.current ?? ""
-
-        if (currentValue === oldValue) return
-
-        // Check if change should be allowed
-        if (onBeforeChange?.() === false) {
-          // Revert the input
-          input.value = oldValue
-          return
-        }
-
-        isLocalChangeRef.current = true
-
-        try {
-          // Find where the composition occurred and update the CRDT
-          // For simplicity, we'll use the update() method which replaces all text
-          // A more sophisticated approach would diff the strings
-          textRef.update(currentValue)
-          lastKnownValueRef.current = currentValue
-
-          onAfterChange?.()
-        } finally {
-          isLocalChangeRef.current = false
-        }
-      },
-      [textRef, onBeforeChange, onAfterChange],
-    )
-
     return {
-      inputRef: inputRef as { current: T | null },
+      inputRef: setInputRef,
       handlers: {
-        onBeforeInput: handleBeforeInput as (e: InputEvent) => void,
-        onCompositionStart: handleCompositionStart,
-        onCompositionEnd: handleCompositionEnd,
+        onBeforeInput: () => {}, // No-op - using native listener via ref callback
+        onCompositionStart: () => {}, // No-op - using native listener via ref callback
+        onCompositionEnd: () => {}, // No-op - using native listener via ref callback
       },
       defaultValue: textRef.toString(),
     }

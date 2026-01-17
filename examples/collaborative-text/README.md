@@ -16,7 +16,7 @@ This example demonstrates best practices for binding plain HTML `<input>` and `<
 pnpm install
 
 # Start the dev server
-pnpm --filter example-text-input-collab dev
+pnpm --filter example-collaborative-text dev
 ```
 
 Then open http://localhost:5173 in multiple browser tabs to see real-time collaboration.
@@ -28,11 +28,11 @@ Then open http://localhost:5173 in multiple browser tabs to see real-time collab
 The `useCollaborativeText` hook binds an HTML input or textarea to a `TextRef`:
 
 ```tsx
-import { useCollaborativeText, type TextRef } from "@loro-extended/react"
+import { useCollaborativeText, type TextRef } from "@loro-extended/react";
 
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
   const { inputRef, handlers, defaultValue } =
-    useCollaborativeText<HTMLInputElement>(textRef)
+    useCollaborativeText<HTMLInputElement>(textRef);
 
   return (
     <input
@@ -42,11 +42,12 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
       onCompositionStart={handlers.onCompositionStart}
       onCompositionEnd={handlers.onCompositionEnd}
     />
-  )
+  );
 }
 ```
 
 The hook:
+
 1. Captures `beforeinput` events to translate user actions into LoroText operations
 2. Subscribes to the LoroText container for remote changes
 3. Updates the input value while preserving cursor position
@@ -57,21 +58,26 @@ The hook:
 The `useUndoManager` hook provides undo/redo functionality:
 
 ```tsx
-import { useUndoManager } from "@loro-extended/react"
+import { useUndoManager } from "@loro-extended/react";
 
 function Editor({ handle }) {
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
+  const { undo, redo, canUndo, canRedo } = useUndoManager(handle);
 
   return (
     <div>
-      <button onClick={undo} disabled={!canUndo}>Undo</button>
-      <button onClick={redo} disabled={!canRedo}>Redo</button>
+      <button onClick={undo} disabled={!canUndo}>
+        Undo
+      </button>
+      <button onClick={redo} disabled={!canRedo}>
+        Redo
+      </button>
     </div>
-  )
+  );
 }
 ```
 
 The hook:
+
 1. Creates a Loro `UndoManager` for the document
 2. Provides `undo` and `redo` functions
 3. Tracks `canUndo` and `canRedo` state reactively
@@ -84,10 +90,11 @@ const TextSchema = Shape.doc({
   title: Shape.text().placeholder("Untitled"),
   description: Shape.text(),
   notes: Shape.text(),
-})
+});
 ```
 
 Each `Shape.text()` creates a `LoroText` container that supports:
+
 - Character-by-character collaborative editing
 - Rich text marks (bold, italic, etc.)
 - Efficient delta-based synchronization
@@ -96,13 +103,13 @@ Each `Shape.text()` creates a `LoroText` container that supports:
 
 The hook uses the `beforeinput` event (InputEvent API) for fine-grained control over text operations:
 
-| Input Type | Description | LoroText Operation |
-|------------|-------------|-------------------|
-| `insertText` | Normal typing | `insert(pos, text)` |
-| `insertFromPaste` | Paste | `delete(start, len)` + `insert(start, text)` |
-| `deleteContentBackward` | Backspace | `delete(pos-1, 1)` |
-| `deleteContentForward` | Delete key | `delete(pos, 1)` |
-| `insertLineBreak` | Enter key | `insert(pos, '\n')` |
+| Input Type              | Description   | LoroText Operation                           |
+| ----------------------- | ------------- | -------------------------------------------- |
+| `insertText`            | Normal typing | `insert(pos, text)`                          |
+| `insertFromPaste`       | Paste         | `delete(start, len)` + `insert(start, text)` |
+| `deleteContentBackward` | Backspace     | `delete(pos-1, 1)`                           |
+| `deleteContentForward`  | Delete key    | `delete(pos, 1)`                             |
+| `insertLineBreak`       | Enter key     | `insert(pos, '\n')`                          |
 
 ## Options
 
@@ -112,12 +119,12 @@ The hook uses the `beforeinput` event (InputEvent API) for fine-grained control 
 useCollaborativeText(textRef, {
   onBeforeChange: () => {
     // Return false to prevent the change
-    return true
+    return true;
   },
   onAfterChange: () => {
     // Called after each change (local or remote)
   },
-})
+});
 ```
 
 ### useUndoManager Options
@@ -126,7 +133,7 @@ useCollaborativeText(textRef, {
 useUndoManager(handle, {
   mergeInterval: 500, // ms to merge consecutive changes (default: 500)
   enableKeyboardShortcuts: true, // Enable Ctrl/Cmd+Z shortcuts (default: true)
-})
+});
 ```
 
 ## Architecture

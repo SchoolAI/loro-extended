@@ -1,5 +1,6 @@
 {
-  "name": "example-text-input-collab",
+  "name": "example-collaborative-text",
+  "description": "An example of collaborative textarea and input via useCollaborativeText",
   "private": true,
   "type": "module",
   "scripts": {

@@ -103,19 +103,12 @@ export function createUndoHooks(framework: FrameworkHooks) {
       })
 
       // Subscribe to document changes to update undo/redo state
+      // Note: We always call onChange() and let createSyncStore handle caching.
+      // The filtering logic was causing issues because it compared against
+      // the old cache value before createSyncStore updated it.
       const subscribeToSource = (onChange: () => void) => {
         return handle.loroDoc.subscribe(() => {
-          const newState = computeValue()
-          const current = cacheRef.current
-
-          // Only notify if state actually changed
-          if (
-            !current ||
-            newState.canUndo !== current.canUndo ||
-            newState.canRedo !== current.canRedo
-          ) {
-            onChange()
-          }
+          onChange()
         })
       }
 

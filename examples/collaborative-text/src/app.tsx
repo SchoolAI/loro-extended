@@ -75,50 +75,46 @@ function SimpleControlledInput({
 // Pros: Efficient character-by-character operations, better for concurrent editing
 // Cons: More complex, uses uncontrolled inputs
 
-function CollaborativeInput({
+function CollaborativeTextarea({
   textRef,
   placeholder,
-  multiline = false,
 }: {
   textRef: TextRef
   placeholder?: string
-  multiline?: boolean
 }) {
-  const { inputRef, handlers, defaultValue } = useCollaborativeText<
-    HTMLInputElement | HTMLTextAreaElement
-  >(textRef)
+  // The hook uses a ref callback pattern for proper initialization:
+  // - Syncs input value FROM the CRDT when element mounts
+  // - Attaches native event listeners immediately
+  // - Validates selection bounds before CRDT operations
+  const { inputRef, defaultValue } =
+    useCollaborativeText<HTMLTextAreaElement>(textRef)
 
-  if (multiline) {
-    return (
-      <textarea
-        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-        placeholder={placeholder}
-        rows={4}
-        defaultValue={defaultValue}
-        onBeforeInput={
-          handlers.onBeforeInput as unknown as React.FormEventHandler
-        }
-        onCompositionStart={handlers.onCompositionStart}
-        onCompositionEnd={
-          handlers.onCompositionEnd as unknown as React.CompositionEventHandler
-        }
-      />
-    )
-  }
+  return (
+    <textarea
+      ref={inputRef}
+      placeholder={placeholder}
+      rows={4}
+      defaultValue={defaultValue}
+    />
+  )
+}
+
+function CollaborativeInput({
+  textRef,
+  placeholder,
+}: {
+  textRef: TextRef
+  placeholder?: string
+}) {
+  const { inputRef, defaultValue } =
+    useCollaborativeText<HTMLInputElement>(textRef)
 
   return (
     <input
       type="text"
-      ref={inputRef as React.RefObject<HTMLInputElement>}
+      ref={inputRef}
       placeholder={placeholder}
       defaultValue={defaultValue}
-      onBeforeInput={
-        handlers.onBeforeInput as unknown as React.FormEventHandler
-      }
-      onCompositionStart={handlers.onCompositionStart}
-      onCompositionEnd={
-        handlers.onCompositionEnd as unknown as React.CompositionEventHandler
-      }
     />
   )
 }
@@ -178,10 +174,9 @@ function App() {
       <div className="field">
         <span className="field-label">Description (multi-line)</span>
         {useHook ? (
-          <CollaborativeInput
+          <CollaborativeTextarea
             textRef={handle.doc.description}
             placeholder="Enter a description..."
-            multiline
           />
         ) : (
           <SimpleControlledInput
@@ -200,10 +195,9 @@ function App() {
       <div className="field">
         <span className="field-label">Notes</span>
         {useHook ? (
-          <CollaborativeInput
+          <CollaborativeTextarea
             textRef={handle.doc.notes}
             placeholder="Add some notes..."
-            multiline
           />
         ) : (
           <SimpleControlledInput
