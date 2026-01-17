@@ -1,7 +1,13 @@
 import type { LoroTextRef, TextRef } from "@loro-extended/change"
-import { INTERNAL_SYMBOL, loro } from "@loro-extended/change"
+import { loro } from "@loro-extended/change"
 import type { FrameworkHooks } from "../types"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
+
+/**
+ * Well-known symbol for accessing internal methods on TypedRefs.
+ * This is the same symbol used by @loro-extended/change.
+ */
+const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
 
 /**
  * Get the raw CRDT value from a TextRef, bypassing placeholder logic.
@@ -48,17 +54,15 @@ export interface UseCollaborativeTextReturn<
    */
   inputRef: (element: T | null) => void
   /**
-   * Event handlers - kept for API compatibility but are no-ops.
-   * Native event listeners are attached automatically via the ref callback.
-   * @deprecated These handlers are no longer needed - just use inputRef
+   * Initial value for the input (use as defaultValue).
+   * This is the raw CRDT value, which may be empty even if a placeholder is defined.
    */
-  handlers: {
-    onBeforeInput: (e: InputEvent) => void
-    onCompositionStart: () => void
-    onCompositionEnd: (e: CompositionEvent) => void
-  }
-  /** Initial value for the input (use as defaultValue) */
   defaultValue: string
+  /**
+   * Placeholder text from the Shape definition, if any.
+   * Use this as the HTML placeholder attribute for proper UX.
+   */
+  placeholder?: string
 }
 
 /**
@@ -113,7 +117,8 @@ export function createTextHooks(framework: FrameworkHooks) {
     // Track if we're in the middle of a local change
     const isLocalChangeRef = useRef<boolean>(false)
     // Track the last known value to detect changes
-    const lastKnownValueRef = useRef<string>(textRef.toString())
+    // IMPORTANT: Use raw CRDT value, not textRef.toString() which may return placeholder
+    const lastKnownValueRef = useRef<string>(getRawCrdtValue(textRef))
     // Track IME composition state
     const isComposingRef = useRef<boolean>(false)
 
@@ -161,7 +166,8 @@ export function createTextHooks(framework: FrameworkHooks) {
       const input = e.target as T
 
       // Get CRDT length for bounds validation
-      const crdtValue = textRef.toString()
+      // Use raw CRDT value to avoid placeholder confusion
+      const crdtValue = getRawCrdtValue(textRef)
       const crdtLength = crdtValue.length
 
       // Clamp selection to valid bounds within the CRDT
@@ -193,8 +199,8 @@ export function createTextHooks(framework: FrameworkHooks) {
           )
         }
 
-        // Update local tracking
-        lastKnownValueRef.current = textRef.toString()
+        // Update local tracking with raw CRDT value
+        lastKnownValueRef.current = getRawCrdtValue(textRef)
 
         // Update input value and cursor position
         input.value = lastKnownValueRef.current
@@ -266,9 +272,10 @@ export function createTextHooks(framework: FrameworkHooks) {
         elementRef.current = element
 
         if (element) {
-          // CRITICAL: Sync input value FROM the CRDT immediately
-          // This ensures the input always reflects the CRDT state
-          const crdtValue = textRef.toString()
+          // CRITICAL: Sync input value FROM the raw CRDT immediately
+          // Use getRawCrdtValue to avoid placeholder - the placeholder should be
+          // shown via the HTML placeholder attribute, not as actual content
+          const crdtValue = getRawCrdtValue(textRef)
           element.value = crdtValue
           lastKnownValueRef.current = crdtValue
 
@@ -311,7 +318,8 @@ export function createTextHooks(framework: FrameworkHooks) {
         const input = elementRef.current
         if (!input) return
 
-        const newValue = textRef.toString()
+        // Use raw CRDT value to avoid placeholder confusion
+        const newValue = getRawCrdtValue(textRef)
         if (newValue === lastKnownValueRef.current) return
 
         // Save cursor position before update
@@ -357,12 +365,10 @@ export function createTextHooks(framework: FrameworkHooks) {
 
     return {
       inputRef: setInputRef,
-      handlers: {
-        onBeforeInput: () => {}, // No-op - using native listener via ref callback
-        onCompositionStart: () => {}, // No-op - using native listener via ref callback
-        onCompositionEnd: () => {}, // No-op - using native listener via ref callback
-      },
-      defaultValue: textRef.toString(),
+      // Use raw CRDT value - placeholder should be shown via HTML placeholder attribute
+      defaultValue: getRawCrdtValue(textRef),
+      // Expose the Shape placeholder for use as HTML placeholder attribute
+      placeholder: getPlaceholder(textRef),
     }
   }
 

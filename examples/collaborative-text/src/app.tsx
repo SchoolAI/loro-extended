@@ -75,18 +75,13 @@ function SimpleControlledInput({
 // Pros: Efficient character-by-character operations, better for concurrent editing
 // Cons: More complex, uses uncontrolled inputs
 
-function CollaborativeTextarea({
-  textRef,
-  placeholder,
-}: {
-  textRef: TextRef
-  placeholder?: string
-}) {
+function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
   // The hook uses a ref callback pattern for proper initialization:
   // - Syncs input value FROM the CRDT when element mounts
   // - Attaches native event listeners immediately
   // - Validates selection bounds before CRDT operations
-  const { inputRef, defaultValue } =
+  // - Returns the Shape placeholder for use as HTML placeholder
+  const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLTextAreaElement>(textRef)
 
   return (
@@ -99,14 +94,8 @@ function CollaborativeTextarea({
   )
 }
 
-function CollaborativeInput({
-  textRef,
-  placeholder,
-}: {
-  textRef: TextRef
-  placeholder?: string
-}) {
-  const { inputRef, defaultValue } =
+function CollaborativeInput({ textRef }: { textRef: TextRef }) {
+  const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef)
 
   return (
@@ -155,15 +144,12 @@ function App() {
       <div className="field">
         <span className="field-label">Title (single line)</span>
         {useHook ? (
-          <CollaborativeInput
-            textRef={handle.doc.title}
-            placeholder="Enter a title..."
-          />
+          <CollaborativeInput textRef={handle.doc.title} />
         ) : (
           <SimpleControlledInput
             textRef={handle.doc.title}
             value={title}
-            placeholder="Enter a title..."
+            placeholder="Untitled Document"
           />
         )}
         <div className="preview">
@@ -174,10 +160,7 @@ function App() {
       <div className="field">
         <span className="field-label">Description (multi-line)</span>
         {useHook ? (
-          <CollaborativeTextarea
-            textRef={handle.doc.description}
-            placeholder="Enter a description..."
-          />
+          <CollaborativeTextarea textRef={handle.doc.description} />
         ) : (
           <SimpleControlledInput
             textRef={handle.doc.description}
@@ -195,10 +178,7 @@ function App() {
       <div className="field">
         <span className="field-label">Notes</span>
         {useHook ? (
-          <CollaborativeTextarea
-            textRef={handle.doc.notes}
-            placeholder="Add some notes..."
-          />
+          <CollaborativeTextarea textRef={handle.doc.notes} />
         ) : (
           <SimpleControlledInput
             textRef={handle.doc.notes}
