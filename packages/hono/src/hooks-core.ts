@@ -1,5 +1,6 @@
 import {
   createHooks,
+  createRefHooks,
   createTextHooks,
   createUndoHooks,
 } from "@loro-extended/hooks-core"
@@ -10,3 +11,4 @@ export const { RepoContext, useRepo, useHandle, useDoc, useEphemeral } =
 
 export const { useCollaborativeText } = createTextHooks(Hono)
 export const { useUndoManager } = createUndoHooks(Hono)
+export const { useRefValue } = createRefHooks(Hono)

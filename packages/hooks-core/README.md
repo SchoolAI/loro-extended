@@ -8,7 +8,8 @@ This package implements a "handle-first" pattern for working with Loro documents
 
 1. **`useHandle`** - Get a stable, typed document handle (never re-renders)
 2. **`useDoc`** - Subscribe to document changes with optional selectors
-3. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
+3. **`useRefValue`** - Subscribe to a single typed ref (fine-grained reactivity)
+4. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 ## Installation
 
@@ -125,6 +126,48 @@ const todoCount = useDoc(handle, d => d.todos.length)
 - `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector function
 
 **Returns:** The document value or selected value
+
+#### `useRefValue(ref)`
+
+Subscribes to a single typed ref and returns its current value. Provides fine-grained reactivity - only re-renders when this specific container changes.
+
+```typescript
+// For TextRef - returns value and placeholder
+const { value, placeholder } = useRefValue(handle.doc.title)
+
+// For CounterRef - returns value
+const { value } = useRefValue(handle.doc.count)
+
+// For ListRef - returns value array
+const { value } = useRefValue(handle.doc.items)
+```
+
+**Parameters:**
+- `ref: AnyTypedRef` - A typed ref (`TextRef`, `ListRef`, `CounterRef`, `RecordRef`, `StructRef`, `MovableListRef`, or `TreeRef`)
+
+**Returns:** An object with:
+- `value` - The current value (type depends on ref type)
+- `placeholder` - (TextRef only) The placeholder from `Shape.text().placeholder()`
+
+**Use Cases:**
+- Building controlled inputs without prop drilling
+- Fine-grained subscriptions to specific containers
+- Accessing Shape placeholders automatically
+
+```tsx
+// Example: Controlled input without prop drilling
+function TitleInput({ textRef }: { textRef: TextRef }) {
+  const { value, placeholder } = useRefValue(textRef)
+  
+  return (
+    <input
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => textRef.update(e.target.value)}
+    />
+  )
+}
+```
 
 #### `usePresence(handle)` (Deprecated)
 

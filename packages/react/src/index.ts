@@ -1,15 +1,22 @@
 // Re-export schema-related types from @loro-extended/change
 export type {
+  CounterRef,
   DocShape,
   Infer,
+  ListRef,
+  MovableListRef,
   Mutable,
+  RecordRef,
+  StructRef,
   TextRef,
+  TreeRef,
 } from "@loro-extended/change"
 export { change, getLoroDoc, Shape } from "@loro-extended/change"
 // Re-export hook types from @loro-extended/hooks-core
 export type {
   UseCollaborativeTextOptions,
   UseCollaborativeTextReturn,
+  UseRefValueReturn,
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
@@ -23,6 +30,7 @@ export {
   useDoc,
   useEphemeral,
   useHandle,
+  useRefValue,
   useRepo,
   useUndoManager,
 } from "./hooks-core.js"

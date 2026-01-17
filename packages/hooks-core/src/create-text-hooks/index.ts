@@ -1,31 +1,8 @@
 import type { LoroTextRef, TextRef } from "@loro-extended/change"
 import { loro } from "@loro-extended/change"
 import type { FrameworkHooks } from "../types"
+import { getPlaceholder, getRawTextValue } from "../utils/text-ref-helpers"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
-
-/**
- * Well-known symbol for accessing internal methods on TypedRefs.
- * This is the same symbol used by @loro-extended/change.
- */
-const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
-
-/**
- * Get the raw CRDT value from a TextRef, bypassing placeholder logic.
- * This returns the actual content stored in the CRDT, which may be empty
- * even if textRef.toString() would return a placeholder.
- */
-function getRawCrdtValue(textRef: TextRef): string {
-  return (loro(textRef) as LoroTextRef).container.toString()
-}
-
-/**
- * Get the placeholder value from a TextRef, if one is defined.
- */
-function getPlaceholder(textRef: TextRef): string | undefined {
-  return (textRef as any)[INTERNAL_SYMBOL]?.getPlaceholder() as
-    | string
-    | undefined
-}
 
 /**
  * Options for useCollaborativeText hook
@@ -118,7 +95,7 @@ export function createTextHooks(framework: FrameworkHooks) {
     const isLocalChangeRef = useRef<boolean>(false)
     // Track the last known value to detect changes
     // IMPORTANT: Use raw CRDT value, not textRef.toString() which may return placeholder
-    const lastKnownValueRef = useRef<string>(getRawCrdtValue(textRef))
+    const lastKnownValueRef = useRef<string>(getRawTextValue(textRef))
     // Track IME composition state
     const isComposingRef = useRef<boolean>(false)
 
@@ -167,7 +144,7 @@ export function createTextHooks(framework: FrameworkHooks) {
 
       // Get CRDT length for bounds validation
       // Use raw CRDT value to avoid placeholder confusion
-      const crdtValue = getRawCrdtValue(textRef)
+      const crdtValue = getRawTextValue(textRef)
       const crdtLength = crdtValue.length
 
       // Clamp selection to valid bounds within the CRDT
@@ -200,7 +177,7 @@ export function createTextHooks(framework: FrameworkHooks) {
         }
 
         // Update local tracking with raw CRDT value
-        lastKnownValueRef.current = getRawCrdtValue(textRef)
+        lastKnownValueRef.current = getRawTextValue(textRef)
 
         // Update input value and cursor position
         input.value = lastKnownValueRef.current
@@ -273,9 +250,9 @@ export function createTextHooks(framework: FrameworkHooks) {
 
         if (element) {
           // CRITICAL: Sync input value FROM the raw CRDT immediately
-          // Use getRawCrdtValue to avoid placeholder - the placeholder should be
+          // Use getRawTextValue to avoid placeholder - the placeholder should be
           // shown via the HTML placeholder attribute, not as actual content
-          const crdtValue = getRawCrdtValue(textRef)
+          const crdtValue = getRawTextValue(textRef)
           element.value = crdtValue
           lastKnownValueRef.current = crdtValue
 
@@ -319,7 +296,7 @@ export function createTextHooks(framework: FrameworkHooks) {
         if (!input) return
 
         // Use raw CRDT value to avoid placeholder confusion
-        const newValue = getRawCrdtValue(textRef)
+        const newValue = getRawTextValue(textRef)
         if (newValue === lastKnownValueRef.current) return
 
         // Save cursor position before update
@@ -366,9 +343,9 @@ export function createTextHooks(framework: FrameworkHooks) {
     return {
       inputRef: setInputRef,
       // Use raw CRDT value - placeholder should be shown via HTML placeholder attribute
-      defaultValue: getRawCrdtValue(textRef),
+      defaultValue: getRawTextValue(textRef),
       // Expose the Shape placeholder for use as HTML placeholder attribute
-      placeholder: getPlaceholder(textRef),
+      placeholder: getPlaceholder<string>(textRef),
     }
   }
 

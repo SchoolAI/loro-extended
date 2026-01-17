@@ -10,6 +10,7 @@ export { change, getLoroDoc, Shape } from "@loro-extended/change"
 export type {
   UseCollaborativeTextOptions,
   UseCollaborativeTextReturn,
+  UseRefValueReturn,
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
@@ -23,6 +24,7 @@ export {
   useDoc,
   useEphemeral,
   useHandle,
+  useRefValue,
   useRepo,
   useUndoManager,
 } from "./hooks-core.js"

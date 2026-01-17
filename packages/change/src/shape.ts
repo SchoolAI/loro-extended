@@ -222,6 +222,27 @@ export interface AnyContainerShape extends Shape<unknown, unknown, undefined> {
   readonly _type: "any"
 }
 
+/**
+ * Union of all container shape types.
+ *
+ * Each container shape has a `_mutable` type parameter that maps to the
+ * corresponding TypedRef class (e.g., TextContainerShape → TextRef).
+ * This enables deriving ref types from shapes:
+ *
+ * ```typescript
+ * // Get the ref type for any container shape
+ * type RefType = ContainerShape["_mutable"]
+ *
+ * // Exclude AnyContainerShape to get only typed refs
+ * type AnyTypedRef = Exclude<ContainerShape, AnyContainerShape>["_mutable"]
+ * ```
+ *
+ * This creates intentional parallel hierarchies:
+ * - ContainerShape → defines what data looks like (schema)
+ * - TypedRef (via _mutable) → defines how you interact with data
+ * - loro() overloads → CRDT escape hatch (IDE DX)
+ * - change() overloads → mutation boundaries (IDE DX)
+ */
 export type ContainerShape =
   | AnyContainerShape
   | CounterContainerShape

@@ -1,13 +1,13 @@
-# Collaborative Text Inputs Example
+# Collaborative Form Example
 
-This example demonstrates best practices for binding plain HTML `<input>` and `<textarea>` elements to `LoroText` containers for real-time collaborative editing.
+This example demonstrates best practices for building collaborative forms with `loro-extended`. It shows how to choose the right hook based on your form control type and collaboration pattern.
 
 ## Features
 
-- **Bidirectional sync**: Local changes are immediately reflected in the CRDT, and remote changes update the input
-- **Cursor preservation**: Cursor position is maintained during remote edits
-- **Undo/Redo**: Full undo/redo support with keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z)
-- **IME support**: Proper handling of composition events for CJK input methods
+- **Atomic controls**: Dropdown, checkbox, counter using `useRefValue`
+- **Text controls**: Switchable between `useRefValue` and `useCollaborativeText`
+- **Undo/Redo**: Full undo/redo support with keyboard shortcuts
+- **Real-time sync**: Changes sync instantly across browser tabs
 
 ## Running the Example
 
@@ -21,19 +21,78 @@ pnpm --filter example-collaborative-text dev
 
 Then open http://localhost:5173 in multiple browser tabs to see real-time collaboration.
 
-## Key Concepts
+## Choosing the Right Approach
 
-### useCollaborativeText Hook
+The key insight: **choose your hook based on the control type and collaboration pattern**.
 
-The `useCollaborativeText` hook binds an HTML input or textarea to a `TextRef`:
+| Control Type | Hook | Why |
+|--------------|------|-----|
+| Dropdown, Checkbox, Radio | `useRefValue` | Atomic values - last-write-wins is intuitive |
+| Counter, Slider | `useRefValue` | CRDT counter handles concurrent increments |
+| Text (rarely concurrent) | `useRefValue` | Simpler, controlled inputs work fine |
+| Text (concurrent editing) | `useCollaborativeText` | Character-level merge preserves all edits |
+
+### Atomic Controls (Always `useRefValue`)
+
+For controls with discrete/atomic values, `useRefValue` is the natural choice because "last-write-wins" is the intuitive behavior:
 
 ```tsx
-import { useCollaborativeText, type TextRef } from "@loro-extended/react";
+// Dropdown - selecting an option is atomic
+function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
+  const { value } = useRefValue(statusRef);
+  return (
+    <select value={value} onChange={(e) => statusRef.update(e.target.value)}>
+      <option value="draft">Draft</option>
+      <option value="published">Published</option>
+    </select>
+  );
+}
 
+// Counter - increment/decrement operations merge via CRDT
+function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
+  const { value } = useRefValue(priorityRef);
+  return (
+    <div>
+      <button onClick={() => priorityRef.decrement(1)}>−</button>
+      <span>{value}</span>
+      <button onClick={() => priorityRef.increment(1)}>+</button>
+    </div>
+  );
+}
+```
+
+### Text Controls (Depends on Collaboration Pattern)
+
+For text inputs, the choice depends on whether concurrent editing is expected:
+
+#### `useRefValue` - For Single-User Sync or Turn-Based Editing
+
+```tsx
+function ControlledInput({ textRef }: { textRef: TextRef }) {
+  const { value, placeholder } = useRefValue(textRef);
+  return (
+    <input
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => textRef.update(e.target.value)}
+    />
+  );
+}
+```
+
+**Best for:**
+- Settings pages
+- Form fields where only one person edits at a time
+- Single-user apps with cross-device sync
+
+**Tradeoff:** During concurrent editing, `textRef.update()` replaces the entire text, which can produce unexpected merges.
+
+#### `useCollaborativeText` - For Real-Time Collaboration
+
+```tsx
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef);
-
   return (
     <input
       ref={inputRef}
@@ -44,102 +103,77 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
 }
 ```
 
-The hook uses a **ref callback pattern** for proper initialization:
+**Best for:**
+- Document editing (Google Docs-style)
+- Chat inputs
+- Any text field where users might type simultaneously
 
-1. When the element mounts, its value is synced FROM the CRDT
-2. Native event listeners are attached immediately via the ref callback
-3. Selection bounds are validated before any CRDT operation
-4. Shape placeholders are exposed as the `placeholder` property for use as HTML placeholder
+**Benefit:** Character-level operations preserve user intent during merges.
 
-The hook also:
+## Network Partition Behavior
 
-- Captures `beforeinput` events to translate user actions into LoroText operations
-- Subscribes to the LoroText container for remote changes
-- Updates the input value while preserving cursor position
-- Handles IME composition events for proper CJK support
+Understanding how edits merge during network issues helps you choose the right approach.
 
-### useUndoManager Hook
+### Atomic Controls (Dropdown, Checkbox)
 
-The `useUndoManager` hook provides undo/redo functionality:
+During a partition:
+1. User A selects "In Review"
+2. User B selects "Published"
+3. After sync: One wins (based on timestamp)
 
-```tsx
-import { useUndoManager } from "@loro-extended/react";
+**This is expected!** There's no meaningful "merge" of two dropdown selections.
 
-function Editor({ handle }) {
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle);
+### Text with `useRefValue`
 
-  return (
-    <div>
-      <button onClick={undo} disabled={!canUndo}>
-        Undo
-      </button>
-      <button onClick={redo} disabled={!canRedo}>
-        Redo
-      </button>
-    </div>
-  );
-}
-```
+During a partition:
+1. User A: "Hello" → "Hello World"
+2. User B: "Hello" → "Hello There"
+3. After sync: "Hello World There" (or similar interleaving)
 
-The hook:
+**Unexpected!** Neither user intended this result.
 
-1. Creates a Loro `UndoManager` for the document
-2. Provides `undo` and `redo` functions
-3. Tracks `canUndo` and `canRedo` state reactively
-4. Sets up keyboard shortcuts automatically (can be disabled via options)
+### Text with `useCollaborativeText`
 
-### Schema Definition
+During a partition:
+1. User A types: insert(5, " World")
+2. User B types: insert(5, " There")
+3. After sync: Both insertions preserved at their positions
+
+**Better!** Both users' complete edits are kept, though the result may still need manual cleanup.
+
+## Schema Definition
 
 ```tsx
-const TextSchema = Shape.doc({
+const FormSchema = Shape.doc({
+  // Atomic controls
+  status: Shape.text().placeholder("draft"),
+  priority: Shape.counter().placeholder(2),
+  
+  // Text controls
   title: Shape.text().placeholder("Untitled"),
   description: Shape.text(),
   notes: Shape.text(),
 });
 ```
 
-Each `Shape.text()` creates a `LoroText` container that supports:
+## Undo/Redo
 
-- Character-by-character collaborative editing
-- Rich text marks (bold, italic, etc.)
-- Efficient delta-based synchronization
-
-## Event Handling
-
-The hook uses the `beforeinput` event (InputEvent API) for fine-grained control over text operations:
-
-| Input Type              | Description   | LoroText Operation                           |
-| ----------------------- | ------------- | -------------------------------------------- |
-| `insertText`            | Normal typing | `insert(pos, text)`                          |
-| `insertFromPaste`       | Paste         | `delete(start, len)` + `insert(start, text)` |
-| `deleteContentBackward` | Backspace     | `delete(pos-1, 1)`                           |
-| `deleteContentForward`  | Delete key    | `delete(pos, 1)`                             |
-| `insertLineBreak`       | Enter key     | `insert(pos, '\n')`                          |
-
-## Options
-
-### useCollaborativeText Options
+The `useUndoManager` hook provides undo/redo functionality:
 
 ```tsx
-useCollaborativeText(textRef, {
-  onBeforeChange: () => {
-    // Return false to prevent the change
-    return true;
-  },
-  onAfterChange: () => {
-    // Called after each change (local or remote)
-  },
-});
+function Editor({ handle }) {
+  const { undo, redo, canUndo, canRedo } = useUndoManager(handle);
+
+  return (
+    <div>
+      <button onClick={undo} disabled={!canUndo}>Undo</button>
+      <button onClick={redo} disabled={!canRedo}>Redo</button>
+    </div>
+  );
+}
 ```
 
-### useUndoManager Options
-
-```tsx
-useUndoManager(handle, {
-  mergeInterval: 500, // ms to merge consecutive changes (default: 500)
-  enableKeyboardShortcuts: true, // Enable Ctrl/Cmd+Z shortcuts (default: true)
-});
-```
+**Keyboard shortcuts:** Ctrl/Cmd+Z to undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z to redo.
 
 ## Architecture
 
@@ -148,8 +182,13 @@ useUndoManager(handle, {
 │                      Browser Client                          │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐    ┌──────────────────┐    ┌────────────┐ │
-│  │ HTML Input  │───▶│ useCollaborative │───▶│  TextRef   │ │
-│  │  /Textarea  │◀───│      Text        │◀───│ (LoroText) │ │
+│  │ Form Input  │───▶│   useRefValue    │───▶│  TypedRef  │ │
+│  │  (atomic)   │◀───│                  │◀───│            │ │
+│  └─────────────┘    └──────────────────┘    └────────────┘ │
+│                                                             │
+│  ┌─────────────┐    ┌──────────────────┐    ┌────────────┐ │
+│  │ Text Input  │───▶│ useCollaborative │───▶│  TextRef   │ │
+│  │(concurrent) │◀───│      Text        │◀───│ (LoroText) │ │
 │  └─────────────┘    └──────────────────┘    └────────────┘ │
 │                              │                      │       │
 │                              ▼                      ▼       │
