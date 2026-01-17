@@ -1,7 +1,7 @@
 import { Shape } from "@loro-extended/change"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
-import { useHandle, usePresence } from "../index.js"
+import { useEphemeral, useHandle } from "../index.js"
 import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
 
 // Document schema
@@ -19,14 +19,7 @@ const PresenceSchema = Shape.plain.object({
   status: Shape.plain.string().placeholder("offline"),
 })
 
-// Expected placeholder values derived from schema
-const _expectedPlaceholder = {
-  cursor: { x: 0, y: 0 },
-  name: "Anonymous",
-  status: "offline",
-}
-
-describe("usePresence", () => {
+describe("useEphemeral (presence)", () => {
   it("should provide typed self and peers", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
@@ -36,7 +29,7 @@ describe("usePresence", () => {
         const handle = useHandle(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        return usePresence(handle)
+        return useEphemeral(handle.presence)
       },
       {
         wrapper: RepoWrapper,
@@ -58,7 +51,7 @@ describe("usePresence", () => {
         const handle = useHandle(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        const presence = usePresence(handle)
+        const presence = useEphemeral(handle.presence)
         return { handle, presence }
       },
       {
@@ -89,7 +82,7 @@ describe("usePresence", () => {
         const handle = useHandle(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        const presence = usePresence(handle)
+        const presence = useEphemeral(handle.presence)
         return { handle, presence }
       },
       {
@@ -146,7 +139,7 @@ describe("usePresence", () => {
         const handle = useHandle(documentId, DocSchema, {
           presence: UnionSchema,
         })
-        return usePresence(handle)
+        return useEphemeral(handle.presence)
       },
       {
         wrapper: RepoWrapper,

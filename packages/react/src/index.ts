@@ -23,7 +23,6 @@ export {
   useDoc,
   useEphemeral,
   useHandle,
-  usePresence,
   useRepo,
   useUndoManager,
 } from "./hooks-core.js"
