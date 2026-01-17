@@ -70,6 +70,67 @@ h3 {
   cursor: not-allowed;
 }
 
+.toolbar-separator {
+  width: 1px;
+  height: 1.5rem;
+  background: #d1d5db;
+  margin: 0 0.5rem;
+}
+
+/* Network delay control */
+.delay-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.delay-control label {
+  font-size: 0.8125rem;
+  color: #4b5563;
+  white-space: nowrap;
+  min-width: 140px;
+}
+
+.delay-slider {
+  width: 120px;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #e5e7eb;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.delay-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #2563eb;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.delay-slider::-webkit-slider-thumb:hover {
+  background: #1d4ed8;
+}
+
+.delay-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #2563eb;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.delay-slider::-moz-range-thumb:hover {
+  background: #1d4ed8;
+}
+
 /* Sections */
 .section {
   margin-bottom: 2rem;

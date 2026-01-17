@@ -10,9 +10,15 @@ import {
   useRefValue,
   useUndoManager,
 } from "@loro-extended/react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import "./styles.css"
+
+// Create WebSocket adapter at module scope so it's accessible for interceptors
+const wsAdapter = createWsClient({
+  url: `ws://${location.host}/ws`,
+  reconnect: { enabled: true },
+})
 
 // Schema - defines the shape of our collaborative document
 const FormSchema = Shape.doc({
@@ -194,6 +200,21 @@ function App() {
   // Select between approaches for text controls only
   const [textApproach, setTextApproach] = useState<TextApproach>("useRefValue")
 
+  // Network delay simulation (0-10000ms, default 3000ms)
+  const [networkDelay, setNetworkDelay] = useState(3000)
+
+  // Manage send interceptor lifecycle based on delay setting
+  useEffect(() => {
+    if (networkDelay === 0) {
+      wsAdapter.clearSendInterceptors()
+      return
+    }
+    const unsubscribe = wsAdapter.addSendInterceptor((_ctx, next) => {
+      setTimeout(next, networkDelay)
+    })
+    return unsubscribe
+  }, [networkDelay])
+
   const renderTextInput = (textRef: TextRef, multiline = false) => {
     switch (textApproach) {
       case "useRefValue":
@@ -218,6 +239,25 @@ function App() {
         <button type="button" onClick={redo} disabled={!canRedo}>
           ⟳ Redo
         </button>
+        <div className="toolbar-separator" />
+        <div className="delay-control">
+          <label htmlFor="network-delay">
+            🌐 Network Delay:{" "}
+            {networkDelay === 0
+              ? "Off"
+              : `${(networkDelay / 1000).toFixed(1)}s`}
+          </label>
+          <input
+            id="network-delay"
+            type="range"
+            min="0"
+            max="10000"
+            step="500"
+            value={networkDelay}
+            onChange={e => setNetworkDelay(Number(e.target.value))}
+            className="delay-slider"
+          />
+        </div>
       </div>
 
       {/* ============================================ */}
@@ -368,12 +408,7 @@ function App() {
   )
 }
 
-// Bootstrap - connect to WebSocket and render
-const wsAdapter = createWsClient({
-  url: `ws://${location.host}/ws`,
-  reconnect: { enabled: true },
-})
-
+// Bootstrap - render the app
 const rootElement = document.getElementById("root")
 if (rootElement) {
   createRoot(rootElement).render(

@@ -4,8 +4,9 @@ This example demonstrates best practices for building collaborative forms with `
 
 ## Features
 
-- **Atomic controls**: Dropdown, checkbox, counter using `useRefValue`
+- **Atomic controls**: Dropdown, counter using `useRefValue`
 - **Text controls**: Switchable between `useRefValue` and `useCollaborativeText`
+- **Network delay simulation**: Slider to add 0-10s delay to outgoing messages
 - **Undo/Redo**: Full undo/redo support with keyboard shortcuts
 - **Real-time sync**: Changes sync instantly across browser tabs
 
@@ -109,6 +110,42 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
 - Any text field where users might type simultaneously
 
 **Benefit:** Character-level operations preserve user intent during merges.
+
+## Network Delay Simulation
+
+The difference between `useRefValue` and `useCollaborativeText` is **hard to see** when testing locally because messages sync almost instantly. To make the merge behavior visible, use the **Network Delay slider** in the toolbar.
+
+### How It Works
+
+The slider adds a delay (0-10 seconds, default 3s) to all **outgoing** messages using the `addSendInterceptor` API:
+
+```typescript
+// Delay all outgoing messages
+wsAdapter.addSendInterceptor((ctx, next) => {
+  setTimeout(next, networkDelay)
+})
+```
+
+### Testing the Difference
+
+1. Open two browser tabs
+2. Set the delay to 3 seconds on both tabs
+3. In Tab A, type "Hello World" in a text field
+4. Immediately in Tab B, type "Hello There" in the same field
+5. Wait for sync and observe the merge result
+
+**With `useRefValue`:** You'll see unexpected character interleaving because each keystroke replaces the entire text.
+
+**With `useCollaborativeText`:** Both edits are preserved at their insertion points because operations are character-level.
+
+### Why Send-Only Delay?
+
+The interceptor only delays outgoing messages, not incoming ones. This creates an asymmetric delay where:
+- Your local edits appear immediately
+- Your edits reach others after the delay
+- Others' edits reach you immediately
+
+This is actually **better for demonstration** because you can see your local state diverge from the synced state, then watch the merge happen.
 
 ## Network Partition Behavior
 
