@@ -650,7 +650,7 @@ importers:
         specifier: ^3.5.0
         version: 3.5.0(vite@7.3.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
 
-  examples/text-input-collab:
+  examples/collaborative-text:
     dependencies:
       '@loro-extended/adapter-websocket':
         specifier: workspace:^

@@ -31,27 +31,32 @@ The `useCollaborativeText` hook binds an HTML input or textarea to a `TextRef`:
 import { useCollaborativeText, type TextRef } from "@loro-extended/react";
 
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
-  const { inputRef, handlers, defaultValue } =
+  const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef);
 
   return (
     <input
       ref={inputRef}
       defaultValue={defaultValue}
-      onBeforeInput={handlers.onBeforeInput}
-      onCompositionStart={handlers.onCompositionStart}
-      onCompositionEnd={handlers.onCompositionEnd}
+      placeholder={placeholder}
     />
   );
 }
 ```
 
-The hook:
+The hook uses a **ref callback pattern** for proper initialization:
 
-1. Captures `beforeinput` events to translate user actions into LoroText operations
-2. Subscribes to the LoroText container for remote changes
-3. Updates the input value while preserving cursor position
-4. Handles IME composition events for proper CJK support
+1. When the element mounts, its value is synced FROM the CRDT
+2. Native event listeners are attached immediately via the ref callback
+3. Selection bounds are validated before any CRDT operation
+4. Shape placeholders are exposed as the `placeholder` property for use as HTML placeholder
+
+The hook also:
+
+- Captures `beforeinput` events to translate user actions into LoroText operations
+- Subscribes to the LoroText container for remote changes
+- Updates the input value while preserving cursor position
+- Handles IME composition events for proper CJK support
 
 ### useUndoManager Hook
 

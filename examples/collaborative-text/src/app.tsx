@@ -1,4 +1,4 @@
-import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client"
+import { createWsClient } from "@loro-extended/adapter-websocket/client"
 import {
   RepoProvider,
   Shape,
@@ -212,8 +212,9 @@ function App() {
 }
 
 // Bootstrap - connect to WebSocket and render
-const wsAdapter = new WsClientNetworkAdapter({
+const wsAdapter = createWsClient({
   url: `ws://${location.host}/ws`,
+  reconnect: { enabled: true },
 })
 
 const rootElement = document.getElementById("root")
