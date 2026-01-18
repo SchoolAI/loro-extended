@@ -5,4 +5,5 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   format: "esm",
+  external: ["loro-crdt"],
 })
