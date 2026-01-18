@@ -179,30 +179,81 @@ export function createContainerTypedRef(
   }
 }
 
+/**
+ * Assigns a plain JavaScript value to a TypedRef.
+ *
+ * For struct/record types, this batches all property assignments and only
+ * commits once at the end to avoid multiple subscription notifications.
+ *
+ * @param ref - The TypedRef to assign to
+ * @param value - The plain value to assign
+ * @param skipCommit - If true, skip the final commit (caller will handle it)
+ * @returns true if assignment was successful, false otherwise
+ */
 export function assignPlainValueToTypedRef(
   ref: TypedRef<any>,
   value: any,
+  skipCommit = false,
 ): boolean {
-  // Access shape via INTERNAL_SYMBOL or fallback to direct property access for StructRef proxy
-  const shape = ref[INTERNAL_SYMBOL]?.getShape?.() ?? (ref as any).shape
+  // Access internals via INTERNAL_SYMBOL
+  const internals = ref[INTERNAL_SYMBOL]
+  const shape = internals?.getShape?.() ?? (ref as any).shape
   const shapeType = shape?._type
 
   if (shapeType === "struct" || shapeType === "record") {
-    for (const k in value) {
-      ;(ref as any)[k] = value[k]
+    // Suppress auto-commit during batch assignment to avoid multiple notifications
+    const wasSuppressed = internals?.isSuppressAutoCommit?.() ?? false
+    if (internals && !wasSuppressed) {
+      internals.setSuppressAutoCommit(true)
     }
+
+    try {
+      for (const k in value) {
+        ;(ref as any)[k] = value[k]
+      }
+    } finally {
+      // Restore auto-commit state
+      if (internals && !wasSuppressed) {
+        internals.setSuppressAutoCommit(false)
+      }
+    }
+
+    // Commit once after all properties are assigned (unless skipCommit is true)
+    if (!skipCommit && internals?.getAutoCommit?.()) {
+      internals.getDoc().commit()
+    }
+
     return true
   }
 
   if (shapeType === "list" || shapeType === "movableList") {
     if (Array.isArray(value)) {
       const listRef = ref as any
-      if (listRef.length > 0) {
-        listRef.delete(0, listRef.length)
+
+      // Suppress auto-commit during batch operations
+      const wasSuppressed = internals?.isSuppressAutoCommit?.() ?? false
+      if (internals && !wasSuppressed) {
+        internals.setSuppressAutoCommit(true)
       }
-      for (const item of value) {
-        listRef.push(item)
+
+      try {
+        if (listRef.length > 0) {
+          listRef.delete(0, listRef.length)
+        }
+        for (const item of value) {
+          listRef.push(item)
+        }
+      } finally {
+        if (internals && !wasSuppressed) {
+          internals.setSuppressAutoCommit(false)
+        }
       }
+
+      // Commit once after all items are added (unless skipCommit is true)
+      if (!skipCommit && internals?.getAutoCommit?.()) {
+        internals.getDoc().commit()
+      }
+
       return true
     }
   }

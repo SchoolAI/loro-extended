@@ -166,9 +166,10 @@ export class RecordRefInternals<
     } else {
       // For container shapes, try to assign the plain value
       // Use getOrCreateRef to ensure the container is created
+      // assignPlainValueToTypedRef handles batching and commits internally
       const ref = this.getOrCreateRef(key)
       if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
-        this.commitIfAuto()
+        // Don't call commitIfAuto here - assignPlainValueToTypedRef handles it
         return
       }
       throw new Error(

@@ -36,7 +36,8 @@ TypedRef (public facade)
 | `getTypedRefParams()` | Returns params to recreate the ref (used by `change()` for draft creation) |
 | `getChildTypedRefParams(key/index, shape)` | Returns params for creating child refs (lists, structs, records) |
 | `absorbPlainValues()` | Commits cached plain value mutations back to Loro containers |
-| `commitIfAuto()` | Commits if `autoCommit` mode is enabled |
+| `commitIfAuto()` | Commits if `autoCommit` mode is enabled (respects suppression flag) |
+| `setSuppressAutoCommit(boolean)` | Temporarily suppress auto-commit during batch operations |
 
 ### Draft Creation for `change()`
 
@@ -61,6 +62,21 @@ When `batchedMutation: false` (direct access):
 
 - Values are read fresh from Loro on each access
 - No caching overhead for simple reads
+
+### Batch Assignment and Subscription Timing
+
+When assigning a plain object to a struct/record via `ref.set(key, value)` or property assignment, `assignPlainValueToTypedRef()` handles the assignment atomically:
+
+1. **Suppresses auto-commit** before iterating over properties
+2. **Assigns all properties** in a loop
+3. **Restores auto-commit** state
+4. **Commits once** at the end (if autoCommit is enabled)
+
+This ensures subscribers see **complete data** on the first notification, not partial data from intermediate states.
+
+**Why this matters**: Without batching, each property assignment would trigger a separate `commit()` and subscription notification. Subscribers would see incomplete objects (e.g., `{ a: "value", b: "", c: "" }` on first notification).
+
+The `setSuppressAutoCommit()` mechanism is reentrant-safe - it tracks whether suppression was already active to avoid double-restoring.
 
 ## Naming Conventions
 

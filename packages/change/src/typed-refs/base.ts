@@ -53,6 +53,7 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
 {
   protected cachedContainer: ShapeToContainer<Shape> | undefined
   protected loroNamespace: LoroRefBase | undefined
+  private _suppressAutoCommit = false
 
   constructor(protected readonly params: TypedRefParams<Shape>) {}
 
@@ -64,11 +65,24 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this.cachedContainer
   }
 
-  /** Commit changes if autoCommit is enabled */
+  /** Commit changes if autoCommit is enabled and not suppressed */
   commitIfAuto(): void {
-    if (this.params.autoCommit) {
+    if (this.params.autoCommit && !this._suppressAutoCommit) {
       this.params.getDoc().commit()
     }
+  }
+
+  /**
+   * Temporarily suppress auto-commit during batch operations.
+   * Used by assignPlainValueToTypedRef() to batch multiple property assignments.
+   */
+  setSuppressAutoCommit(suppress: boolean): void {
+    this._suppressAutoCommit = suppress
+  }
+
+  /** Check if auto-commit is currently suppressed */
+  isSuppressAutoCommit(): boolean {
+    return this._suppressAutoCommit
   }
 
   /** Get the shape for this ref */

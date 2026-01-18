@@ -142,9 +142,10 @@ export class StructRefInternals<
       this.commitIfAuto()
     } else {
       // For container shapes, try to assign the plain value
+      // assignPlainValueToTypedRef handles batching and commits internally
       const ref = this.getOrCreateRef(key, shape)
       if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
-        this.commitIfAuto()
+        // Don't call commitIfAuto here - assignPlainValueToTypedRef handles it
         return
       }
       throw new Error(
