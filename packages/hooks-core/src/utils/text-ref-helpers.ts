@@ -1,11 +1,6 @@
 import type { TextRef } from "@loro-extended/change"
 import { loro } from "@loro-extended/change"
-
-/**
- * Well-known symbol for accessing internal methods on TypedRefs.
- * This is the same symbol used by @loro-extended/change.
- */
-const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
+import { getPlaceholderSafe } from "./type-guards"
 
 /**
  * Check if a ref is a TextRef.
@@ -33,12 +28,9 @@ export function getRawTextValue(textRef: TextRef): string {
 /**
  * Get the placeholder value from a TypedRef, if one is defined.
  * Returns undefined if no placeholder is set or if the placeholder is an empty string.
+ *
+ * Uses type-safe access via the INTERNAL_SYMBOL.
  */
 export function getPlaceholder<T>(ref: unknown): T | undefined {
-  const placeholder = (ref as any)[INTERNAL_SYMBOL]?.getPlaceholder() as
-    | T
-    | undefined
-  // Treat empty string as "no placeholder" for consistency
-  if (placeholder === "") return undefined
-  return placeholder
+  return getPlaceholderSafe<T>(ref)
 }

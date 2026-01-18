@@ -247,6 +247,7 @@ export function createUndoHooks(
           _isUndo: boolean,
           meta: { value: unknown; cursors: Cursor[] },
         ) => {
+          // Early return if no cursors to restore
           if (meta.cursors.length === 0) return
 
           // Get the container ID from the stored value

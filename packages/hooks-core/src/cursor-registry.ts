@@ -1,4 +1,5 @@
-import { loro, type TextRef } from "@loro-extended/change"
+import type { TextRef } from "@loro-extended/change"
+import { getContainerIdFromTextRef } from "./utils/container-id"
 
 /**
  * Information about a registered text element
@@ -126,11 +127,9 @@ export class CursorRegistry {
 
   /**
    * Get the container ID for a TextRef.
-   * Uses the underlying LoroText container's ID.
+   * Uses the shared utility for consistent container ID resolution.
    */
   private getContainerId(textRef: TextRef): string {
-    // TextRef wraps a LoroText container - get its ID via loro()
-    // The container ID is stable and unique within a document
-    return loro(textRef).container.id.toString()
+    return getContainerIdFromTextRef(textRef)
   }
 }

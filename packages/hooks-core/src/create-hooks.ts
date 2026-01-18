@@ -105,10 +105,20 @@ export function createHooks(framework: FrameworkHooks) {
 
     const store = useMemo(() => {
       // Compute the current snapshot value
+      // Optimization: Check version first to avoid unnecessary toJSON() calls
       const computeValue = (): { version: number; value: R | Infer<D> } => {
+        const newVersion = handle.loroDoc.opCount()
+
+        // If we have a cached value with the same version, return it
+        // This avoids expensive toJSON() calls when the document hasn't changed
+        if (cacheRef.current && cacheRef.current.version === newVersion) {
+          return cacheRef.current
+        }
+
+        // Version changed or no cache - compute new value
         const json = handle.doc.toJSON()
         return {
-          version: handle.loroDoc.opCount(),
+          version: newVersion,
           value: selector ? selector(json) : json,
         }
       }

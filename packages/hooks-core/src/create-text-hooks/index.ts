@@ -5,6 +5,7 @@ import type { CursorRegistry } from "../cursor-registry"
 import type { FrameworkHooks } from "../types"
 import { NAMESPACE_ORIGIN_PREFIX } from "../undo-manager-registry"
 import { getPlaceholder, getRawTextValue } from "../utils/text-ref-helpers"
+import { validateNamespaceSafe } from "../utils/validate-namespace"
 import { adjustSelectionFromDelta } from "./cursor-utils"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
 
@@ -129,6 +130,12 @@ export function createTextHooks(
     const onBeforeChange = options?.onBeforeChange
     const onAfterChange = options?.onAfterChange
     const undoNamespace = options?.undoNamespace
+
+    // Validate namespace format if provided
+    // This is done once when the hook is called, not on every render
+    if (undoNamespace !== undefined) {
+      validateNamespaceSafe(undoNamespace)
+    }
 
     // Memoize the loro namespace to prevent recreation on every render
     // This is critical for subscription stability

@@ -11,6 +11,7 @@ import {
   getRawTextValue,
   isTextRef,
 } from "./utils/text-ref-helpers"
+import { hasToJSON } from "./utils/type-guards"
 
 // ============================================================================
 // Type definitions for useRefValue return types
@@ -90,7 +91,13 @@ export function createRefHooks(framework: FrameworkHooks) {
    */
   function useRefValue<R extends AnyTypedRef>(ref: R): UseRefValueReturn<R> {
     // Get the loro namespace for subscription
-    const loroRef = useMemo(() => loro(ref as any) as LoroRefBase, [ref])
+    // The loro() function accepts any TypedRef and returns a LoroRefBase
+    // We use a type assertion here because AnyTypedRef is a union type
+    // that loro() can handle, but TypeScript can't infer this
+    const loroRef = useMemo(
+      () => loro(ref as Parameters<typeof loro>[0]) as LoroRefBase,
+      [ref],
+    )
 
     // Cache ref for the sync store
     const cacheRef = useRef<UseRefValueReturn<R> | null>(null)
@@ -111,15 +118,23 @@ export function createRefHooks(framework: FrameworkHooks) {
           return { value } as UseRefValueReturn<R>
         }
 
-        // For other ref types, use toJSON()
-        const value = (ref as any).toJSON()
-        const placeholder = getPlaceholder(ref)
+        // For other ref types, use toJSON() via type guard
+        // All AnyTypedRef types have a toJSON method, so this is safe
+        if (hasToJSON(ref)) {
+          const value = ref.toJSON()
+          const placeholder = getPlaceholder(ref)
 
-        // Only include placeholder if it's defined and truthy
-        if (placeholder) {
-          return { value, placeholder } as UseRefValueReturn<R>
+          // Only include placeholder if it's defined and truthy
+          if (placeholder) {
+            return { value, placeholder } as UseRefValueReturn<R>
+          }
+          return { value } as UseRefValueReturn<R>
         }
-        return { value } as UseRefValueReturn<R>
+
+        // Fallback for unexpected ref types (should never happen with proper typing)
+        throw new Error(
+          "[useRefValue] Ref does not have a toJSON method. This is likely a bug.",
+        )
       }
 
       // Subscribe to container changes

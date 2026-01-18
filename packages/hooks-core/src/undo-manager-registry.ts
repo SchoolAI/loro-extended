@@ -1,5 +1,6 @@
 import type { Cursor, LoroDoc, LoroEventBatch, Value } from "loro-crdt"
 import { UndoManager } from "loro-crdt"
+import { validateNamespaceSafe } from "./utils/validate-namespace"
 
 /** Origin prefix for namespace-based undo */
 export const NAMESPACE_ORIGIN_PREFIX = "loro-extended:ns:"
@@ -50,8 +51,11 @@ export class UndoManagerRegistry {
 
   /**
    * Get or create an UndoManager for a specific namespace.
-   * When a new namespace is registered, all existing managers are updated
-   * to exclude the new namespace's origin prefix.
+   *
+   * **Important**: UndoManager's `excludeOriginPrefixes` cannot be updated after creation.
+   * For proper namespace isolation, register all namespaces before making any changes.
+   * If a namespace is registered after other managers exist, a warning will be logged
+   * because existing managers won't exclude the new namespace's changes.
    *
    * @param namespace - The namespace for this manager (undefined for default)
    * @param options - Additional options for the UndoManager
@@ -65,6 +69,11 @@ export class UndoManagerRegistry {
       onPop?: OnPopCallback
     },
   ): UndoManager {
+    // Validate namespace format if provided
+    if (namespace !== undefined) {
+      validateNamespaceSafe(namespace)
+    }
+
     // Check if we already have a manager for this namespace
     const existing = this.managers.get(namespace)
     if (existing) {
@@ -95,11 +104,6 @@ export class UndoManagerRegistry {
 
     // Register it
     this.managers.set(namespace, { undoManager, namespace })
-
-    // Update all existing managers to exclude this new namespace
-    if (namespace !== undefined) {
-      this.updateExistingManagers(namespace)
-    }
 
     return undoManager
   }
@@ -141,18 +145,6 @@ export class UndoManagerRegistry {
     }
 
     return prefixes
-  }
-
-  /**
-   * Update all existing managers to exclude a newly registered namespace.
-   * Note: UndoManager doesn't have a method to update excludeOriginPrefixes
-   * after creation. For best results, register all namespaces before use.
-   * This method is a placeholder for future enhancement.
-   */
-  private updateExistingManagers(_newNamespace: string): void {
-    // UndoManager doesn't support updating excludeOriginPrefixes after creation.
-    // For now, this is a no-op. Users should register all namespaces upfront.
-    // A future enhancement could recreate managers with updated prefixes.
   }
 
   /**

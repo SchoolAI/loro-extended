@@ -58,7 +58,10 @@ function createMockFrameworkHooks(): FrameworkHooks {
       effects.push({ effect, deps })
     },
 
-    useCallback: <T extends Function>(callback: T, _deps: unknown[]) => {
+    useCallback: <T extends (...args: unknown[]) => unknown>(
+      callback: T,
+      _deps: unknown[],
+    ) => {
       return callback
     },
 
