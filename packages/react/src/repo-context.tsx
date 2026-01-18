@@ -1,15 +1,45 @@
 import { Repo, type RepoParams } from "@loro-extended/repo"
 import { type ReactNode, useEffect, useMemo } from "react"
-import { RepoContext } from "./hooks-core.js"
+import {
+  CursorRegistry,
+  CursorRegistryContext,
+  RepoContext,
+} from "./hooks-core.js"
+
+/**
+ * Configuration options for RepoProvider
+ */
+export interface RepoProviderConfig extends RepoParams {
+  /**
+   * Whether to enable automatic cursor restoration for undo/redo.
+   * When enabled, cursor positions are automatically tracked and restored
+   * when using useCollaborativeText with useUndoManager.
+   * Default: true
+   */
+  cursorRestoration?: boolean
+}
 
 export const RepoProvider = ({
   config,
   children,
 }: {
-  config: RepoParams
+  config: RepoProviderConfig
   children: ReactNode
 }) => {
-  const repo = useMemo(() => new Repo(config), [config])
+  // Extract cursorRestoration option (default: true)
+  const cursorRestoration = config.cursorRestoration ?? true
+
+  const repo = useMemo(() => {
+    // Create a copy without cursorRestoration for Repo
+    const { cursorRestoration: _, ...repoParams } = config
+    return new Repo(repoParams)
+  }, [config])
+
+  // Create cursor registry if cursor restoration is enabled
+  const cursorRegistry = useMemo(
+    () => (cursorRestoration ? new CursorRegistry() : null),
+    [cursorRestoration],
+  )
 
   // Proper cleanup when component unmounts
   useEffect(() => {
@@ -19,7 +49,20 @@ export const RepoProvider = ({
     }
   }, [repo])
 
-  return <RepoContext.Provider value={repo}>{children}</RepoContext.Provider>
+  // Wrap with cursor registry context if enabled
+  const content = (
+    <RepoContext.Provider value={repo}>{children}</RepoContext.Provider>
+  )
+
+  if (cursorRegistry) {
+    return (
+      <CursorRegistryContext.Provider value={cursorRegistry}>
+        {content}
+      </CursorRegistryContext.Provider>
+    )
+  }
+
+  return content
 }
 
 export { useRepo } from "./hooks-core.js"

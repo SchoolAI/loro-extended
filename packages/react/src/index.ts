@@ -25,8 +25,11 @@ export type { DocId, Handle } from "@loro-extended/repo"
 
 // Hooks
 export {
+  CursorRegistry,
+  CursorRegistryContext,
   RepoContext,
   useCollaborativeText,
+  useCursorRegistry,
   useDoc,
   useEphemeral,
   useHandle,

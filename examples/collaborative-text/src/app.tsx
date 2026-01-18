@@ -2,7 +2,6 @@ import {
   type ConnectionState,
   createWsClient,
 } from "@loro-extended/adapter-websocket/client"
-import { loro } from "@loro-extended/change"
 import {
   type CounterRef,
   RepoProvider,
@@ -14,16 +13,7 @@ import {
   useRefValue,
   useUndoManager,
 } from "@loro-extended/react"
-import type { Cursor, LoroText } from "loro-crdt"
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import "./styles.css"
 
@@ -89,93 +79,6 @@ function getDocIdFromMessage(message: unknown): string | undefined {
   }
 
   return undefined
-}
-
-// ============================================
-// Cursor Context for Undo/Redo Restoration
-// ============================================
-// This context tracks the currently focused text input and its TextRef
-// so that useUndoManager can capture and restore cursor positions.
-
-interface FocusedInput {
-  element: HTMLInputElement | HTMLTextAreaElement
-  textRef: TextRef
-}
-
-interface CursorContextValue {
-  registerFocus: (
-    element: HTMLInputElement | HTMLTextAreaElement,
-    textRef: TextRef,
-  ) => void
-  unregisterFocus: (element: HTMLInputElement | HTMLTextAreaElement) => void
-  getCursors: () => Cursor[]
-  setCursors: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void
-}
-
-const CursorContext = createContext<CursorContextValue | null>(null)
-
-function CursorProvider({ children }: { children: React.ReactNode }) {
-  const focusedRef = useRef<FocusedInput | null>(null)
-
-  const registerFocus = useCallback(
-    (element: HTMLInputElement | HTMLTextAreaElement, textRef: TextRef) => {
-      focusedRef.current = { element, textRef }
-    },
-    [],
-  )
-
-  const unregisterFocus = useCallback(
-    (element: HTMLInputElement | HTMLTextAreaElement) => {
-      if (focusedRef.current?.element === element) {
-        focusedRef.current = null
-      }
-    },
-    [],
-  )
-
-  const getCursors = useCallback((): Cursor[] => {
-    const focused = focusedRef.current
-    if (!focused) return []
-
-    const { element, textRef } = focused
-    const pos = element.selectionStart ?? 0
-    const loroText = loro(textRef).container as LoroText
-    const cursor = loroText.getCursor(pos)
-    return cursor ? [cursor] : []
-  }, [])
-
-  const setCursors = useCallback(
-    (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => {
-      const focused = focusedRef.current
-      if (!focused || positions.length === 0) return
-
-      const { element } = focused
-      const pos = positions[0].offset
-      // Use requestAnimationFrame to ensure the DOM has updated
-      requestAnimationFrame(() => {
-        element.setSelectionRange(pos, pos)
-        element.focus()
-      })
-    },
-    [],
-  )
-
-  const value = useMemo(
-    () => ({ registerFocus, unregisterFocus, getCursors, setCursors }),
-    [registerFocus, unregisterFocus, getCursors, setCursors],
-  )
-
-  return (
-    <CursorContext.Provider value={value}>{children}</CursorContext.Provider>
-  )
-}
-
-function useCursorContext() {
-  const context = useContext(CursorContext)
-  if (!context) {
-    throw new Error("useCursorContext must be used within CursorProvider")
-  }
-  return context
 }
 
 // ============================================
@@ -298,43 +201,18 @@ function RefValueInput({
 // This approach uses the useCollaborativeText hook for fine-grained CRDT operations.
 // Best for: Real-time collaboration, document editing - where concurrent editing is expected.
 // Benefit: Character-level operations preserve user intent during merges.
+//
+// NOTE: With the new automatic cursor restoration, we no longer need to manually
+// track focus or register with a CursorContext. The CursorRegistry built into
+// RepoProvider handles this automatically!
 
 function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLTextAreaElement>(textRef)
-  const { registerFocus, unregisterFocus } = useCursorContext()
-  const elementRef = useRef<HTMLTextAreaElement | null>(null)
-
-  // Combine refs and register focus tracking
-  const combinedRef = useCallback(
-    (element: HTMLTextAreaElement | null) => {
-      elementRef.current = element
-      inputRef(element)
-
-      if (element) {
-        const handleFocus = () => registerFocus(element, textRef)
-        const handleBlur = () => unregisterFocus(element)
-
-        element.addEventListener("focus", handleFocus)
-        element.addEventListener("blur", handleBlur)
-
-        // Check if already focused
-        if (document.activeElement === element) {
-          registerFocus(element, textRef)
-        }
-
-        return () => {
-          element.removeEventListener("focus", handleFocus)
-          element.removeEventListener("blur", handleBlur)
-        }
-      }
-    },
-    [inputRef, registerFocus, unregisterFocus, textRef],
-  )
 
   return (
     <textarea
-      ref={combinedRef}
+      ref={inputRef}
       placeholder={placeholder}
       rows={4}
       defaultValue={defaultValue}
@@ -345,40 +223,11 @@ function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef)
-  const { registerFocus, unregisterFocus } = useCursorContext()
-  const elementRef = useRef<HTMLInputElement | null>(null)
-
-  // Combine refs and register focus tracking
-  const combinedRef = useCallback(
-    (element: HTMLInputElement | null) => {
-      elementRef.current = element
-      inputRef(element)
-
-      if (element) {
-        const handleFocus = () => registerFocus(element, textRef)
-        const handleBlur = () => unregisterFocus(element)
-
-        element.addEventListener("focus", handleFocus)
-        element.addEventListener("blur", handleBlur)
-
-        // Check if already focused
-        if (document.activeElement === element) {
-          registerFocus(element, textRef)
-        }
-
-        return () => {
-          element.removeEventListener("focus", handleFocus)
-          element.removeEventListener("blur", handleBlur)
-        }
-      }
-    },
-    [inputRef, registerFocus, unregisterFocus, textRef],
-  )
 
   return (
     <input
       type="text"
-      ref={combinedRef}
+      ref={inputRef}
       placeholder={placeholder}
       defaultValue={defaultValue}
     />
@@ -403,13 +252,9 @@ function App() {
   } = useDoc(settingsHandle)
   const { status, priority, title, description, notes } = useDoc(formHandle)
 
-  const { getCursors, setCursors } = useCursorContext()
-
-  // Use cursor-aware undo/redo (only for form, not settings)
-  const { undo, redo, canUndo, canRedo } = useUndoManager(formHandle, {
-    getCursors,
-    setCursors,
-  })
+  // Use undo/redo - cursor restoration is now automatic!
+  // No need for getCursors/setCursors callbacks anymore.
+  const { undo, redo, canUndo, canRedo } = useUndoManager(formHandle)
 
   // Shared text approach setting - synced instantly across all clients
   // Default to "useCollaborativeText" if not set
@@ -654,8 +499,8 @@ function App() {
         </p>
         <p>
           <strong>Cursor restoration:</strong> When using{" "}
-          <code>useCollaborativeText</code>, undo/redo will restore your cursor
-          position!
+          <code>useCollaborativeText</code>, undo/redo will automatically
+          restore your cursor position to the correct field!
         </p>
 
         <h3>Choosing the Right Approach</h3>
@@ -703,14 +548,14 @@ function App() {
   )
 }
 
-// Bootstrap - render the app with CursorProvider
+// Bootstrap - render the app
+// Note: CursorProvider is no longer needed! RepoProvider now includes
+// automatic cursor restoration via the built-in CursorRegistry.
 const rootElement = document.getElementById("root")
 if (rootElement) {
   createRoot(rootElement).render(
     <RepoProvider config={{ adapters: [wsAdapter] }}>
-      <CursorProvider>
-        <App />
-      </CursorProvider>
+      <App />
     </RepoProvider>,
   )
 }

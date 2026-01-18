@@ -2,7 +2,12 @@ import type { DocShape } from "@loro-extended/change"
 import type { EphemeralDeclarations, Handle } from "@loro-extended/repo"
 import type { Cursor } from "loro-crdt"
 import { UndoManager } from "loro-crdt"
+import type { CursorRegistry } from "./cursor-registry"
 import type { FrameworkHooks } from "./types"
+import {
+  NAMESPACE_ORIGIN_PREFIX,
+  type UndoManagerRegistry,
+} from "./undo-manager-registry"
 import { createSyncStore } from "./utils/create-sync-store"
 
 /**
@@ -33,11 +38,17 @@ export interface UseUndoManagerOptions {
    * Callback to get current cursor positions before an undo/redo step is pushed.
    * Return an array of Cursor objects representing current selection/cursor positions.
    * These will be stored with the undo step and restored when popped.
+   *
+   * Note: When using automatic cursor restoration via CursorRegistry, this callback
+   * is not needed - the registry handles cursor tracking automatically.
    */
   getCursors?: () => Cursor[]
   /**
    * Callback to restore cursor positions after an undo/redo step is popped.
    * Receives the resolved cursor positions (as indices) that were stored with the step.
+   *
+   * Note: When using automatic cursor restoration via CursorRegistry, this callback
+   * is not needed - the registry handles cursor restoration automatically.
    */
   setCursors?: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void
 }
@@ -59,25 +70,49 @@ export interface UseUndoManagerReturn {
 }
 
 /**
+ * Configuration for createUndoHooks factory
+ */
+export interface CreateUndoHooksConfig {
+  /**
+   * Function to get the cursor registry from context.
+   * If provided, cursor restoration will be automatic.
+   */
+  getCursorRegistry?: () => CursorRegistry | null
+  /**
+   * Function to get the undo manager registry from context.
+   * If provided, namespace-based undo will be supported.
+   */
+  getUndoManagerRegistry?: () => UndoManagerRegistry | null
+}
+
+/**
  * Creates undo manager hooks for collaborative editing.
  *
  * @param framework - Framework-specific hook implementations
+ * @param config - Optional configuration for cursor registry integration
  * @returns Object containing useUndoManager hook
  */
-export function createUndoHooks(framework: FrameworkHooks) {
+export function createUndoHooks(
+  framework: FrameworkHooks,
+  config?: CreateUndoHooksConfig,
+) {
   const { useMemo, useEffect, useCallback, useSyncExternalStore, useRef } =
     framework
+  const getCursorRegistry = config?.getCursorRegistry
+  const getUndoManagerRegistry = config?.getUndoManagerRegistry
 
   /**
    * Hook for managing undo/redo with Loro's UndoManager.
    * Automatically sets up keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y).
    *
    * @param handle - The document handle
-   * @param options - Optional configuration
+   * @param namespaceOrOptions - Optional namespace string or options object
+   * @param options - Optional configuration (when namespace is provided as second arg)
    * @returns Object with undo, redo functions and canUndo, canRedo state
    *
    * @example
    * ```tsx
+   * // Basic usage
    * function Editor({ handle }: { handle: Handle<DocSchema> }) {
    *   const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
    *   return (
@@ -87,45 +122,188 @@ export function createUndoHooks(framework: FrameworkHooks) {
    *     </div>
    *   )
    * }
+   *
+   * // With namespace for scoped undo
+   * function HeaderEditor({ handle }: { handle: Handle<DocSchema> }) {
+   *   const { undo, redo } = useUndoManager(handle, "header")
+   *   // This undo only affects changes made with undoNamespace="header"
+   * }
    * ```
    */
   function useUndoManager(
     handle: Handle<DocShape, EphemeralDeclarations>,
-    options?: UseUndoManagerOptions,
+    namespaceOrOptions?: string | UseUndoManagerOptions,
+    optionsArg?: UseUndoManagerOptions,
   ): UseUndoManagerReturn {
+    // Parse arguments - support both (handle, options) and (handle, namespace, options)
+    const namespace =
+      typeof namespaceOrOptions === "string" ? namespaceOrOptions : undefined
+    const options =
+      typeof namespaceOrOptions === "object" ? namespaceOrOptions : optionsArg
+
     const mergeInterval = options?.mergeInterval ?? 500
     const enableKeyboardShortcuts = options?.enableKeyboardShortcuts ?? true
-    const getCursors = options?.getCursors
-    const setCursors = options?.setCursors
+    const getCursorsOption = options?.getCursors
+    const setCursorsOption = options?.setCursors
+
+    // Get registries (may be null if no provider)
+    // Note: getCursorRegistry is called via a getter function so it always gets the latest value
+    const undoManagerRegistry = getUndoManagerRegistry?.()
+
+    // Calculate excludeOriginPrefixes for namespace isolation
+    const excludeOriginPrefixes = useMemo(() => {
+      if (!namespace && !undoManagerRegistry) {
+        return undefined
+      }
+
+      // Get all registered namespaces and exclude them (except our own)
+      const prefixes: string[] = []
+      if (undoManagerRegistry) {
+        for (const ns of undoManagerRegistry.getAllNamespaces()) {
+          if (ns !== namespace && ns !== undefined) {
+            prefixes.push(`${NAMESPACE_ORIGIN_PREFIX}${ns}`)
+          }
+        }
+      }
+
+      return prefixes.length > 0 ? prefixes : undefined
+    }, [namespace, undoManagerRegistry])
+
+    // Create stable onPush callback that stores cursor AND container ID
+    // We use the getter function pattern so the callback always gets the latest registry
+    const onPush = useMemo(() => {
+      // If user provided getCursors, use that
+      if (getCursorsOption) {
+        return () => {
+          const cursors = getCursorsOption()
+          return { value: null, cursors }
+        }
+      }
+
+      // If we have a cursor registry getter, use automatic cursor tracking
+      if (getCursorRegistry) {
+        return () => {
+          const cursorRegistry = getCursorRegistry()
+          if (!cursorRegistry) {
+            return { value: null, cursors: [] }
+          }
+
+          const focused = cursorRegistry.getFocused()
+          if (!focused) {
+            return { value: null, cursors: [] }
+          }
+
+          // Get cursor position from the focused element
+          const element = focused.element
+          const start = element.selectionStart ?? 0
+
+          // Create a Loro cursor at the current position
+          const loroText = handle.loroDoc.getText(focused.containerId)
+          if (!loroText || start > loroText.length) {
+            return { value: null, cursors: [] }
+          }
+
+          const cursor = loroText.getCursor(start, 0)
+          if (!cursor) {
+            return { value: null, cursors: [] }
+          }
+
+          // Store the container ID with the cursor for restoration
+          return {
+            value: { containerId: focused.containerId },
+            cursors: [cursor],
+          }
+        }
+      }
+
+      return undefined
+    }, [getCursorsOption, getCursorRegistry, handle.loroDoc])
+
+    // Create stable onPop callback that restores cursor to the correct element
+    // We use the getter function pattern so the callback always gets the latest registry
+    const onPop = useMemo(() => {
+      // If user provided setCursors, use that
+      if (setCursorsOption) {
+        return (
+          _isUndo: boolean,
+          meta: { value: unknown; cursors: Cursor[] },
+        ) => {
+          const positions: Array<{ offset: number; side: -1 | 0 | 1 }> = []
+          for (const cursor of meta.cursors) {
+            const pos = handle.loroDoc.getCursorPos(cursor)
+            if (pos) {
+              positions.push({ offset: pos.offset, side: pos.side })
+            }
+          }
+          if (positions.length > 0) {
+            setCursorsOption(positions)
+          }
+        }
+      }
+
+      // If we have a cursor registry getter, use automatic cursor restoration
+      if (getCursorRegistry) {
+        return (
+          _isUndo: boolean,
+          meta: { value: unknown; cursors: Cursor[] },
+        ) => {
+          if (meta.cursors.length === 0) return
+
+          // Get the container ID from the stored value
+          const storedValue = meta.value as { containerId?: string } | null
+          const containerId = storedValue?.containerId
+          if (!containerId) return
+
+          // Get the current cursor registry
+          const cursorRegistry = getCursorRegistry()
+          if (!cursorRegistry) return
+
+          // Find the element for this container ID
+          const registered = cursorRegistry.getElement(containerId)
+          if (!registered) return
+
+          // Resolve the cursor position
+          const cursor = meta.cursors[0]
+          const pos = handle.loroDoc.getCursorPos(cursor)
+          if (!pos) return
+
+          // Restore cursor to the correct element
+          const element = registered.element
+          const offset = Math.min(pos.offset, element.value.length)
+          element.setSelectionRange(offset, offset)
+          element.focus()
+        }
+      }
+
+      return undefined
+    }, [setCursorsOption, getCursorRegistry, handle.loroDoc])
 
     const undoManager = useMemo(() => {
+      // If we have an undo manager registry, use it for namespace coordination
+      if (undoManagerRegistry && namespace !== undefined) {
+        return undoManagerRegistry.getOrCreate(namespace, {
+          mergeInterval,
+          onPush,
+          onPop,
+        })
+      }
+
+      // Otherwise create a standalone UndoManager
       return new UndoManager(handle.loroDoc, {
         mergeInterval,
-        // Wire up cursor callbacks if provided
-        onPush: getCursors
-          ? () => {
-              // Get current cursor positions and store them with the undo step
-              const cursors = getCursors()
-              return { value: null, cursors }
-            }
-          : undefined,
-        onPop: setCursors
-          ? (_isUndo, meta) => {
-              // Resolve stored cursors to current positions and restore them
-              const positions: Array<{ offset: number; side: -1 | 0 | 1 }> = []
-              for (const cursor of meta.cursors) {
-                const pos = handle.loroDoc.getCursorPos(cursor)
-                if (pos) {
-                  positions.push({ offset: pos.offset, side: pos.side })
-                }
-              }
-              if (positions.length > 0) {
-                setCursors(positions)
-              }
-            }
-          : undefined,
+        excludeOriginPrefixes,
+        onPush,
+        onPop,
       })
-    }, [handle.loroDoc, mergeInterval, getCursors, setCursors])
+    }, [
+      handle.loroDoc,
+      mergeInterval,
+      excludeOriginPrefixes,
+      onPush,
+      onPop,
+      undoManagerRegistry,
+      namespace,
+    ])
 
     const undo = useCallback(() => {
       if (undoManager.canUndo()) {

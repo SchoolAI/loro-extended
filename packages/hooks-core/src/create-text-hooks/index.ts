@@ -1,10 +1,14 @@
 import type { LoroTextRef, TextRef } from "@loro-extended/change"
-import { loro } from "@loro-extended/change"
+import { getLoroDoc, loro } from "@loro-extended/change"
 import type { Delta, LoroEventBatch, TextDiff } from "loro-crdt"
+import type { CursorRegistry } from "../cursor-registry"
 import type { FrameworkHooks } from "../types"
 import { getPlaceholder, getRawTextValue } from "../utils/text-ref-helpers"
 import { adjustSelectionFromDelta } from "./cursor-utils"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
+
+/** Origin prefix for namespace-based undo */
+const NAMESPACE_ORIGIN_PREFIX = "loro-extended:ns:"
 
 /**
  * Options for useCollaborativeText hook
@@ -19,6 +23,12 @@ export interface UseCollaborativeTextOptions {
    * Called after a change is applied (local or remote).
    */
   onAfterChange?: () => void
+  /**
+   * Undo namespace for this text field.
+   * When set, changes will be tagged with this namespace via setNextCommitOrigin,
+   * allowing namespace-scoped undo/redo.
+   */
+  undoNamespace?: string
 }
 
 /**
@@ -45,14 +55,30 @@ export interface UseCollaborativeTextReturn<
 }
 
 /**
+ * Configuration for createTextHooks factory
+ */
+export interface CreateTextHooksConfig {
+  /**
+   * Function to get the cursor registry from context.
+   * If provided, elements will be auto-registered for cursor restoration.
+   */
+  getCursorRegistry?: () => CursorRegistry | null
+}
+
+/**
  * Creates text input hooks for collaborative editing.
  * These hooks bind HTML input/textarea elements to LoroText containers.
  *
  * @param framework - Framework-specific hook implementations
+ * @param config - Optional configuration for cursor registry integration
  * @returns Object containing useCollaborativeText hook
  */
-export function createTextHooks(framework: FrameworkHooks) {
+export function createTextHooks(
+  framework: FrameworkHooks,
+  config?: CreateTextHooksConfig,
+) {
   const { useRef, useEffect, useMemo, useCallback } = framework
+  const getCursorRegistry = config?.getCursorRegistry
 
   /**
    * Hook for binding an HTML input or textarea to a LoroText container.
@@ -104,10 +130,23 @@ export function createTextHooks(framework: FrameworkHooks) {
     // Extract individual options to avoid re-subscriptions when options object changes
     const onBeforeChange = options?.onBeforeChange
     const onAfterChange = options?.onAfterChange
+    const undoNamespace = options?.undoNamespace
 
     // Memoize the loro namespace to prevent recreation on every render
     // This is critical for subscription stability
     const loroRef = useMemo(() => loro(textRef) as LoroTextRef, [textRef])
+
+    // Get the LoroDoc for setting commit origin
+    const loroDoc = useMemo(() => getLoroDoc(textRef), [textRef])
+
+    // Helper to set the commit origin before changes when namespace is specified
+    const setNamespaceOrigin = useCallback(() => {
+      if (undoNamespace) {
+        loroDoc.setNextCommitOrigin(
+          `${NAMESPACE_ORIGIN_PREFIX}${undoNamespace}`,
+        )
+      }
+    }, [loroDoc, undoNamespace])
 
     // Create stable handler references that always have the latest closure values
     const handleBeforeInputRef = useRef<(e: InputEvent) => void>(() => {})
@@ -141,6 +180,9 @@ export function createTextHooks(framework: FrameworkHooks) {
 
       // Check if change should be allowed
       if (onBeforeChange?.() === false) return
+
+      // Set the commit origin for namespace-based undo before making changes
+      setNamespaceOrigin()
 
       const input = e.target as T
 
@@ -223,6 +265,9 @@ export function createTextHooks(framework: FrameworkHooks) {
         return
       }
 
+      // Set the commit origin for namespace-based undo before making changes
+      setNamespaceOrigin()
+
       isLocalChangeRef.current = true
 
       try {
@@ -242,7 +287,10 @@ export function createTextHooks(framework: FrameworkHooks) {
     // This ensures proper initialization and event listener attachment
     const setInputRef = useCallback(
       (element: T | null) => {
-        // Cleanup previous element's listeners
+        // Get cursor registry (may be null if no provider)
+        const cursorRegistry = getCursorRegistry?.()
+
+        // Cleanup previous element's listeners and registry
         if (cleanupRef.current) {
           cleanupRef.current()
           cleanupRef.current = null
@@ -258,6 +306,11 @@ export function createTextHooks(framework: FrameworkHooks) {
           element.value = crdtValue
           lastKnownValueRef.current = crdtValue
 
+          // Register with cursor registry if available
+          if (cursorRegistry) {
+            cursorRegistry.register(textRef, element, undoNamespace)
+          }
+
           // Create event listener wrappers that delegate to refs
           // This allows the handlers to be updated without re-attaching listeners
           const onBeforeInput = (e: Event) => {
@@ -270,32 +323,59 @@ export function createTextHooks(framework: FrameworkHooks) {
             handleCompositionEndRef.current?.(e as CompositionEvent)
           }
 
+          // Focus/blur handlers for cursor registry
+          const onFocus = () => {
+            cursorRegistry?.setFocused(textRef)
+          }
+          const onBlur = () => {
+            // Only clear focus if this element was the focused one
+            const focused = cursorRegistry?.getFocused()
+            if (focused?.element === element) {
+              cursorRegistry?.setFocused(null)
+            }
+          }
+
           // Attach native event listeners
           // We use native listeners because React's synthetic events don't provide
           // the full InputEvent API (e.g., inputType is undefined in React)
           element.addEventListener("beforeinput", onBeforeInput)
           element.addEventListener("compositionstart", onCompositionStart)
           element.addEventListener("compositionend", onCompositionEnd)
+          element.addEventListener("focus", onFocus)
+          element.addEventListener("blur", onBlur)
 
           // Store cleanup function
           cleanupRef.current = () => {
             element.removeEventListener("beforeinput", onBeforeInput)
             element.removeEventListener("compositionstart", onCompositionStart)
             element.removeEventListener("compositionend", onCompositionEnd)
+            element.removeEventListener("focus", onFocus)
+            element.removeEventListener("blur", onBlur)
+
+            // Unregister from cursor registry
+            if (cursorRegistry) {
+              cursorRegistry.unregister(textRef)
+            }
           }
         }
       },
-      [textRef],
+      [textRef, undoNamespace, getCursorRegistry],
     )
 
-    // Subscribe to remote changes
+    // Subscribe to remote changes and undo/redo events
     useEffect(() => {
       const unsubscribe = loroRef.subscribe((rawEvent: unknown) => {
         // Cast to LoroEventBatch to access event properties
         const event = rawEvent as LoroEventBatch
-        // Skip if this is a local change (use event.by instead of isLocalChangeRef)
-        // "local" = local transaction, "import" = remote import, "checkout" = version checkout
-        if (event.by === "local" || isLocalChangeRef.current) return
+        // Skip if we're in the middle of processing a local input event.
+        // We use isLocalChangeRef instead of event.by === "local" because:
+        // - isLocalChangeRef is only true during our beforeinput handler
+        // - event.by === "local" is true for BOTH user input AND undo/redo operations
+        // - We need to update the textarea for undo/redo, so we can't filter on event.by
+        if (isLocalChangeRef.current) return
+        // Also skip if this is a local change that we didn't initiate (e.g., from another hook)
+        // but only if the value hasn't actually changed
+        void event // Keep event in scope for future use (e.g., delta-based cursor adjustment)
 
         const input = elementRef.current
         if (!input) return
