@@ -71,6 +71,16 @@ export class UndoManagerRegistry {
       return existing.undoManager
     }
 
+    // Warn if registering a new namespace after other managers exist
+    // This is important because excludeOriginPrefixes cannot be updated after creation
+    if (this.managers.size > 0 && namespace !== undefined) {
+      console.warn(
+        `[UndoManagerRegistry] Registering namespace "${namespace}" after other managers exist. ` +
+          `Existing managers will not exclude this namespace's changes from their undo stacks. ` +
+          `For best results, register all namespaces before making changes.`,
+      )
+    }
+
     // Calculate excludeOriginPrefixes for this new manager
     // It should exclude all OTHER namespaces
     const excludeOriginPrefixes = this.calculateExcludePrefixes(namespace)

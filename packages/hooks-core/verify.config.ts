@@ -13,5 +13,11 @@ export default defineConfig({
       parser: "tsc",
       reportingDependsOn: ["format"],
     },
+    {
+      key: "test",
+      run: "./node_modules/.bin/vitest run",
+      parser: "vitest",
+      reportingDependsOn: ["format", "types"],
+    },
   ],
 })

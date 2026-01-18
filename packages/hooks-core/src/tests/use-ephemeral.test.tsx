@@ -1,8 +1,12 @@
 import { Shape } from "@loro-extended/change"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
-import { useEphemeral, useHandle } from "../index.js"
-import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
+import {
+  createRepoWrapper,
+  createTestDocumentId,
+  useEphemeral,
+  useHandle,
+} from "../test-utils"
 
 // Document schema
 const DocSchema = Shape.doc({

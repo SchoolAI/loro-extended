@@ -383,6 +383,10 @@ See the example applications for complete implementations:
 - Network adapters: `@loro-extended/adapter-sse`, `@loro-extended/adapter-websocket`, `@loro-extended/adapter-webrtc`
 - Storage adapters: `@loro-extended/adapter-indexeddb`, `@loro-extended/adapter-leveldb`, `@loro-extended/adapter-postgres`
 
+## Testing
+
+Core hook tests are located in `@loro-extended/hooks-core`. This package provides React-specific bindings that wrap the framework-agnostic hook implementations.
+
 ## Requirements
 
 - React 18+

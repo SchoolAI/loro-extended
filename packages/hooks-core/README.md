@@ -271,6 +271,23 @@ function Editor({ handle }: { handle: Handle<DocSchema> }) {
 - `enableKeyboardShortcuts?: boolean` - Enable Ctrl/Cmd+Z and Ctrl/Cmd+Y (default: true)
 - `getCursors?: () => Cursor[]` - Callback to capture cursor positions before undo steps
 - `setCursors?: (positions: Array<{ offset: number; side: -1 | 0 | 1 }>) => void` - Callback to restore cursor positions after undo/redo
+- `namespace?: string` - Namespace for isolated undo stacks (see Namespace-Based Undo below)
+
+**Namespace-Based Undo:**
+
+When building forms or editors with multiple independent text fields, you may want each field to have its own undo stack. Use the `namespace` option to isolate undo operations:
+
+```tsx
+function FormEditor({ handle }: { handle: Handle<FormSchema> }) {
+  // Each field gets its own undo stack
+  const { undo: undoTitle } = useUndoManager(handle, { namespace: "title" })
+  const { undo: undoBody } = useUndoManager(handle, { namespace: "body" })
+  
+  // Undo in title field won't affect body field
+}
+```
+
+> **Important:** Register all namespaces before making changes. If you register a namespace after other managers exist, a warning will be logged. This is because `excludeOriginPrefixes` is calculated at manager creation time and cannot be updated afterward.
 
 **Cursor Restoration Example:**
 

@@ -3,12 +3,10 @@ import { getLoroDoc, loro } from "@loro-extended/change"
 import type { Delta, LoroEventBatch, TextDiff } from "loro-crdt"
 import type { CursorRegistry } from "../cursor-registry"
 import type { FrameworkHooks } from "../types"
+import { NAMESPACE_ORIGIN_PREFIX } from "../undo-manager-registry"
 import { getPlaceholder, getRawTextValue } from "../utils/text-ref-helpers"
 import { adjustSelectionFromDelta } from "./cursor-utils"
 import { calculateNewCursor, inputHandlers } from "./input-handlers"
-
-/** Origin prefix for namespace-based undo */
-const NAMESPACE_ORIGIN_PREFIX = "loro-extended:ns:"
 
 /**
  * Options for useCollaborativeText hook

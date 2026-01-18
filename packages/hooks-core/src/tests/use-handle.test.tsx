@@ -1,8 +1,11 @@
 import { Shape } from "@loro-extended/change"
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
-import { useHandle } from "../index.js"
-import { createRepoWrapper, createTestDocumentId } from "../test-utils.js"
+import {
+  createRepoWrapper,
+  createTestDocumentId,
+  useHandle,
+} from "../test-utils"
 
 const testSchema = Shape.doc({
   title: Shape.text().placeholder("Test Document"),

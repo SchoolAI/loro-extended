@@ -13,11 +13,7 @@ export default defineConfig({
       parser: "tsc",
       reportingDependsOn: ["format"],
     },
-    {
-      key: "test",
-      run: "./node_modules/.bin/vitest run",
-      parser: "vitest",
-      reportingDependsOn: ["format", "types"],
-    },
+    // Tests for hooks have been moved to @loro-extended/hooks-core
+    // This package only contains React-specific bindings
   ],
 })

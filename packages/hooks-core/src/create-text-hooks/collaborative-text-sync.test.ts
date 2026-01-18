@@ -5,11 +5,14 @@
  * LoroText CRDT after various operations including:
  * - Text insertion and deletion
  * - Undo and redo operations
+ * - Auto-registration with CursorRegistry
+ * - Namespace origin tagging
  */
 
-import { createTypedDoc, loro, Shape } from "@loro-extended/change"
+import { createTypedDoc, getLoroDoc, loro, Shape } from "@loro-extended/change"
 import type { LoroEventBatch } from "loro-crdt"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
+import { CursorRegistry } from "../cursor-registry"
 import type { FrameworkHooks } from "../types"
 import { getRawTextValue } from "../utils/text-ref-helpers"
 import { createTextHooks } from "./index"
@@ -370,5 +373,409 @@ describe("Collaborative Text Synchronization", () => {
       // The textarea should also be updated (this now passes with the fix!)
       expect(textareaValue).toBe("Hello")
     })
+  })
+})
+
+// ============================================================================
+// Auto-registration with CursorRegistry Tests
+// ============================================================================
+
+describe("Auto-registration with CursorRegistry", () => {
+  it("registers element on mount when cursor registry is available", () => {
+    const cursorRegistry = new CursorRegistry()
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework, {
+      getCursorRegistry: () => cursorRegistry,
+    })
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Before mount, registry should be empty
+    expect(cursorRegistry.getAllContainerIds().length).toBe(0)
+
+    // Mount the element
+    result.inputRef(textarea)
+
+    // After mount, element should be registered
+    expect(cursorRegistry.getAllContainerIds().length).toBe(1)
+  })
+
+  it("unregisters element on unmount", () => {
+    const cursorRegistry = new CursorRegistry()
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework, {
+      getCursorRegistry: () => cursorRegistry,
+    })
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+    expect(cursorRegistry.getAllContainerIds().length).toBe(1)
+
+    // Unmount (pass null to ref callback)
+    result.inputRef(null)
+    expect(cursorRegistry.getAllContainerIds().length).toBe(0)
+  })
+
+  it("updates focus state on focus event", () => {
+    const cursorRegistry = new CursorRegistry()
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework, {
+      getCursorRegistry: () => cursorRegistry,
+    })
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Initially no focus
+    expect(cursorRegistry.getFocused()).toBeNull()
+
+    // Simulate focus event
+    const focusEvent = new Event("focus")
+    textarea.dispatchEvent(focusEvent)
+
+    // Should now be focused
+    expect(cursorRegistry.getFocused()).not.toBeNull()
+    expect(cursorRegistry.getFocused()?.element).toBe(textarea)
+  })
+
+  it("clears focus state on blur event", () => {
+    const cursorRegistry = new CursorRegistry()
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework, {
+      getCursorRegistry: () => cursorRegistry,
+    })
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount and focus
+    result.inputRef(textarea)
+    const focusEvent = new Event("focus")
+    textarea.dispatchEvent(focusEvent)
+    expect(cursorRegistry.getFocused()).not.toBeNull()
+
+    // Simulate blur event
+    const blurEvent = new Event("blur")
+    textarea.dispatchEvent(blurEvent)
+
+    // Should no longer be focused
+    expect(cursorRegistry.getFocused()).toBeNull()
+  })
+
+  it("handles missing cursor registry gracefully", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework, {
+      getCursorRegistry: () => null, // No registry
+    })
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Should not throw
+    expect(() => {
+      result.inputRef(textarea)
+    }).not.toThrow()
+
+    // Should still work for basic functionality
+    expect(textarea.value).toBe("")
+  })
+})
+
+// ============================================================================
+// Namespace Origin Tagging Tests
+// ============================================================================
+
+describe("Namespace origin tagging", () => {
+  it("calls setNextCommitOrigin before changes when undoNamespace is set", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const loroDoc = getLoroDoc(typedDoc.content)
+
+    // Spy on setNextCommitOrigin
+    const setNextCommitOriginSpy = vi.spyOn(loroDoc, "setNextCommitOrigin")
+
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content, {
+      undoNamespace: "header",
+    })
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Simulate typing
+    textarea.selectionStart = 0
+    textarea.selectionEnd = 0
+    const event = createMockInputEvent("insertText", "Hello", textarea)
+    textarea.dispatchEvent(event)
+
+    // Should have called setNextCommitOrigin with the namespace
+    expect(setNextCommitOriginSpy).toHaveBeenCalledWith(
+      "loro-extended:ns:header",
+    )
+
+    setNextCommitOriginSpy.mockRestore()
+  })
+
+  it("does not call setNextCommitOrigin when undoNamespace is not set", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const loroDoc = getLoroDoc(typedDoc.content)
+
+    // Spy on setNextCommitOrigin
+    const setNextCommitOriginSpy = vi.spyOn(loroDoc, "setNextCommitOrigin")
+
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    // No undoNamespace option
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Simulate typing
+    textarea.selectionStart = 0
+    textarea.selectionEnd = 0
+    const event = createMockInputEvent("insertText", "Hello", textarea)
+    textarea.dispatchEvent(event)
+
+    // Should NOT have called setNextCommitOrigin
+    expect(setNextCommitOriginSpy).not.toHaveBeenCalled()
+
+    setNextCommitOriginSpy.mockRestore()
+  })
+})
+
+// ============================================================================
+// Selection Bounds Edge Cases
+// ============================================================================
+
+describe("Selection bounds edge cases", () => {
+  it("clamps selection to CRDT length when input has stale content", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    // CRDT has short text
+    typedDoc.content.insert(0, "Hi")
+
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Simulate stale input state - selection beyond CRDT length
+    // This can happen if the input hasn't been updated yet
+    textarea.selectionStart = 100
+    textarea.selectionEnd = 100
+
+    // Try to type - should not throw "Index out of bound"
+    const event = createMockInputEvent("insertText", "X", textarea)
+    expect(() => {
+      textarea.dispatchEvent(event)
+    }).not.toThrow()
+
+    // The text should be inserted at the clamped position (end of CRDT)
+    expect(getRawTextValue(typedDoc.content)).toBe("HiX")
+  })
+})
+
+// ============================================================================
+// IME Composition Tests
+// ============================================================================
+
+/**
+ * Creates a mock CompositionEvent for testing.
+ */
+function createMockCompositionEvent(
+  type: "compositionstart" | "compositionend",
+  data: string,
+  target: HTMLTextAreaElement,
+): CompositionEvent {
+  return {
+    type,
+    data,
+    target,
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  } as unknown as CompositionEvent
+}
+
+describe("IME Composition", () => {
+  it("syncs composed text to CRDT after composition ends", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Simulate composition start
+    const startEvent = createMockCompositionEvent(
+      "compositionstart",
+      "",
+      textarea,
+    )
+    textarea.dispatchEvent(startEvent)
+
+    // User types Chinese characters (simulated by setting value directly)
+    textarea.value = "你好"
+    textarea.selectionStart = 2
+    textarea.selectionEnd = 2
+
+    // Simulate composition end
+    const endEvent = createMockCompositionEvent(
+      "compositionend",
+      "你好",
+      textarea,
+    )
+    textarea.dispatchEvent(endEvent)
+
+    // CRDT should have the composed text
+    expect(getRawTextValue(typedDoc.content)).toBe("你好")
+  })
+
+  it("handles composition with existing text", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    // Pre-populate with some text
+    typedDoc.content.insert(0, "Hello ")
+
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+    expect(textarea.value).toBe("Hello ")
+
+    // Position cursor at end
+    textarea.selectionStart = 6
+    textarea.selectionEnd = 6
+
+    // Simulate composition
+    const startEvent = createMockCompositionEvent(
+      "compositionstart",
+      "",
+      textarea,
+    )
+    textarea.dispatchEvent(startEvent)
+
+    // User types Chinese
+    textarea.value = "Hello 世界"
+    textarea.selectionStart = 8
+    textarea.selectionEnd = 8
+
+    // End composition
+    const endEvent = createMockCompositionEvent(
+      "compositionend",
+      "世界",
+      textarea,
+    )
+    textarea.dispatchEvent(endEvent)
+
+    // CRDT should have both texts
+    expect(getRawTextValue(typedDoc.content)).toBe("Hello 世界")
+  })
+
+  it("handles composition at different cursor positions", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    typedDoc.content.insert(0, "AB")
+
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content)
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Position cursor in the middle
+    textarea.selectionStart = 1
+    textarea.selectionEnd = 1
+
+    // Simulate composition
+    const startEvent = createMockCompositionEvent(
+      "compositionstart",
+      "",
+      textarea,
+    )
+    textarea.dispatchEvent(startEvent)
+
+    // User types in the middle
+    textarea.value = "A中B"
+    textarea.selectionStart = 2
+    textarea.selectionEnd = 2
+
+    // End composition
+    const endEvent = createMockCompositionEvent(
+      "compositionend",
+      "中",
+      textarea,
+    )
+    textarea.dispatchEvent(endEvent)
+
+    // CRDT should have text inserted in the middle
+    expect(getRawTextValue(typedDoc.content)).toBe("A中B")
+  })
+
+  it("reverts input when onBeforeChange returns false during composition", () => {
+    const framework = createMockFrameworkHooks()
+    const { useCollaborativeText } = createTextHooks(framework)
+
+    const typedDoc = createTypedDoc(TestSchema)
+    const result = useCollaborativeText<HTMLTextAreaElement>(typedDoc.content, {
+      onBeforeChange: () => false, // Reject all changes
+    })
+    const textarea = createMockTextarea()
+
+    // Mount
+    result.inputRef(textarea)
+
+    // Simulate composition
+    const startEvent = createMockCompositionEvent(
+      "compositionstart",
+      "",
+      textarea,
+    )
+    textarea.dispatchEvent(startEvent)
+
+    // User types
+    textarea.value = "test"
+    textarea.selectionStart = 4
+    textarea.selectionEnd = 4
+
+    // End composition
+    const endEvent = createMockCompositionEvent(
+      "compositionend",
+      "test",
+      textarea,
+    )
+    textarea.dispatchEvent(endEvent)
+
+    // Input should be reverted
+    expect(textarea.value).toBe("")
+    // CRDT should be unchanged
+    expect(getRawTextValue(typedDoc.content)).toBe("")
   })
 })
