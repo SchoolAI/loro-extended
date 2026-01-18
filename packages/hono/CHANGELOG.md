@@ -1,5 +1,49 @@
 # @loro-extended/hono
 
+## 5.3.0
+
+### Patch Changes
+
+- 8fffae6: Add `useRefValue` hook for fine-grained subscriptions to typed refs
+
+  The new `useRefValue` hook subscribes to a single typed ref (TextRef, ListRef, CounterRef, etc.) and returns its current value. This provides:
+
+  - **No prop drilling** - Components only need the ref, not value + placeholder
+  - **Automatic placeholder** - Extracts placeholder from `Shape.text().placeholder()`
+  - **Fine-grained subscriptions** - Only re-renders when this specific container changes
+  - **Type-safe** - Return type is inferred from the ref type
+
+  Example usage:
+
+  ```tsx
+  import { useRefValue, type TextRef } from "@loro-extended/react";
+
+  function ControlledInput({ textRef }: { textRef: TextRef }) {
+    // No need to pass value or placeholder as props!
+    const { value, placeholder } = useRefValue(textRef);
+
+    return (
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => textRef.update(e.target.value)}
+      />
+    );
+  }
+  ```
+
+  This is particularly useful for building controlled inputs without the prop drilling required when using `useDoc` at the parent level.
+
+- Updated dependencies [c97a468]
+- Updated dependencies [5a87c2b]
+- Updated dependencies [de27b84]
+- Updated dependencies [790e1eb]
+- Updated dependencies [de27b84]
+- Updated dependencies [8fffae6]
+- Updated dependencies [8fffae6]
+  - @loro-extended/repo@5.3.0
+  - @loro-extended/hooks-core@5.3.0
+
 ## 5.2.0
 
 ### Patch Changes

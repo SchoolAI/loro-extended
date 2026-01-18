@@ -1,5 +1,86 @@
 # @loro-extended/react
 
+## 5.3.0
+
+### Minor Changes
+
+- de27b84: Add automatic cursor restoration and namespace-based undo
+
+  - Cursor restoration now works automatically when using `useCollaborativeText` with `useUndoManager`
+  - Cursor position is stored with container ID in `onPush`, restored to correct element in `onPop`
+  - Add namespace support to scope undo/redo to specific groups of fields
+  - Namespaces use `LoroDoc.setNextCommitOrigin()` and `UndoManager.excludeOriginPrefixes`
+  - Add `cursorRestoration` config option to `RepoProvider` (default: true)
+
+  ### New API
+
+  ```tsx
+  // Namespace-based undo
+  const { undo: undoHeader } = useUndoManager(handle, "header")
+  const { undo: undoBody } = useUndoManager(handle, "body")
+
+  // Assign fields to namespaces
+  <CollaborativeInput textRef={titleRef} undoNamespace="header" />
+  <CollaborativeTextarea textRef={descriptionRef} undoNamespace="body" />
+  ```
+
+  ### How It Works
+
+  1. When `undoNamespace="header"` is set, changes call `doc.setNextCommitOrigin("loro-extended:ns:header")` before commit
+  2. The "header" UndoManager has `excludeOriginPrefixes: ["loro-extended:ns:body", ...]` to ignore other namespaces
+  3. Cursor position is stored with the container ID of the focused element
+  4. On undo, the cursor is restored to the element matching the stored container ID
+
+  ### Migration
+
+  Apps using manual cursor tracking via `getCursors`/`setCursors` can remove that code - it's now automatic. To opt-out:
+
+  ```tsx
+  <RepoProvider config={{ cursorRestoration: false }}>
+  ```
+
+### Patch Changes
+
+- 8fffae6: Add `useRefValue` hook for fine-grained subscriptions to typed refs
+
+  The new `useRefValue` hook subscribes to a single typed ref (TextRef, ListRef, CounterRef, etc.) and returns its current value. This provides:
+
+  - **No prop drilling** - Components only need the ref, not value + placeholder
+  - **Automatic placeholder** - Extracts placeholder from `Shape.text().placeholder()`
+  - **Fine-grained subscriptions** - Only re-renders when this specific container changes
+  - **Type-safe** - Return type is inferred from the ref type
+
+  Example usage:
+
+  ```tsx
+  import { useRefValue, type TextRef } from "@loro-extended/react";
+
+  function ControlledInput({ textRef }: { textRef: TextRef }) {
+    // No need to pass value or placeholder as props!
+    const { value, placeholder } = useRefValue(textRef);
+
+    return (
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => textRef.update(e.target.value)}
+      />
+    );
+  }
+  ```
+
+  This is particularly useful for building controlled inputs without the prop drilling required when using `useDoc` at the parent level.
+
+- Updated dependencies [c97a468]
+- Updated dependencies [5a87c2b]
+- Updated dependencies [de27b84]
+- Updated dependencies [790e1eb]
+- Updated dependencies [de27b84]
+- Updated dependencies [8fffae6]
+- Updated dependencies [8fffae6]
+  - @loro-extended/repo@5.3.0
+  - @loro-extended/hooks-core@5.3.0
+
 ## 5.2.0
 
 ### Patch Changes

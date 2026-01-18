@@ -1,5 +1,141 @@
 # @loro-extended/hooks-core
 
+## 5.3.0
+
+### Minor Changes
+
+- 5a87c2b: **useCollaborativeText**: Fixed cursor position during remote changes using delta-based adjustment. Previously, the hook used a naive length-difference algorithm that assumed all changes happened at the end of the text, causing cursor jumps when remote edits occurred before the cursor. Now it uses the actual delta operations from Loro events to accurately adjust cursor positions.
+
+  **useUndoManager**: Added optional `getCursors`/`setCursors` callbacks for cursor restoration during undo/redo operations. When provided, cursor positions are captured before each undo step is pushed and restored when the step is popped, using Loro's stable Cursor API.
+
+  New exports:
+
+  - `CursorPosition` type for cursor position information
+  - `adjustCursorFromDelta()` utility for delta-based cursor adjustment
+  - `adjustSelectionFromDelta()` utility for selection range adjustment
+
+- de27b84: Add automatic cursor restoration and namespace-based undo
+
+  - Cursor restoration now works automatically when using `useCollaborativeText` with `useUndoManager`
+  - Cursor position is stored with container ID in `onPush`, restored to correct element in `onPop`
+  - Add namespace support to scope undo/redo to specific groups of fields
+  - Namespaces use `LoroDoc.setNextCommitOrigin()` and `UndoManager.excludeOriginPrefixes`
+  - Add `cursorRestoration` config option to `RepoProvider` (default: true)
+
+  ### New API
+
+  ```tsx
+  // Namespace-based undo
+  const { undo: undoHeader } = useUndoManager(handle, "header")
+  const { undo: undoBody } = useUndoManager(handle, "body")
+
+  // Assign fields to namespaces
+  <CollaborativeInput textRef={titleRef} undoNamespace="header" />
+  <CollaborativeTextarea textRef={descriptionRef} undoNamespace="body" />
+  ```
+
+  ### How It Works
+
+  1. When `undoNamespace="header"` is set, changes call `doc.setNextCommitOrigin("loro-extended:ns:header")` before commit
+  2. The "header" UndoManager has `excludeOriginPrefixes: ["loro-extended:ns:body", ...]` to ignore other namespaces
+  3. Cursor position is stored with the container ID of the focused element
+  4. On undo, the cursor is restored to the element matching the stored container ID
+
+  ### Migration
+
+  Apps using manual cursor tracking via `getCursors`/`setCursors` can remove that code - it's now automatic. To opt-out:
+
+  ```tsx
+  <RepoProvider config={{ cursorRestoration: false }}>
+  ```
+
+- 8fffae6: Add `useRefValue` hook for fine-grained subscriptions to typed refs
+
+  The new `useRefValue` hook subscribes to a single typed ref (TextRef, ListRef, CounterRef, etc.) and returns its current value. This provides:
+
+  - **No prop drilling** - Components only need the ref, not value + placeholder
+  - **Automatic placeholder** - Extracts placeholder from `Shape.text().placeholder()`
+  - **Fine-grained subscriptions** - Only re-renders when this specific container changes
+  - **Type-safe** - Return type is inferred from the ref type
+
+  Example usage:
+
+  ```tsx
+  import { useRefValue, type TextRef } from "@loro-extended/react";
+
+  function ControlledInput({ textRef }: { textRef: TextRef }) {
+    // No need to pass value or placeholder as props!
+    const { value, placeholder } = useRefValue(textRef);
+
+    return (
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => textRef.update(e.target.value)}
+      />
+    );
+  }
+  ```
+
+  This is particularly useful for building controlled inputs without the prop drilling required when using `useDoc` at the parent level.
+
+### Patch Changes
+
+- de27b84: Fix textarea desync after undo/redo operations in useCollaborativeText
+
+  The subscription handler in `useCollaborativeText` was incorrectly filtering out undo/redo events because they have `event.by === "local"`. This caused the textarea to not update when the user performed undo/redo operations via the UndoManager, resulting in a desync between the textarea content and the underlying CRDT.
+
+  **Root cause:** The condition `if (event.by === "local" || isLocalChangeRef.current) return` filtered out ALL events with `event.by === "local"`, including undo/redo events which also have this value.
+
+  **Fix:** Remove the `event.by === "local"` check and rely solely on `isLocalChangeRef.current` to determine if an event should be skipped. The `isLocalChangeRef` is only true during our `beforeinput` handler, so it correctly distinguishes between:
+
+  - User typing (should skip - we already updated the textarea)
+  - Undo/redo operations (should NOT skip - need to update textarea)
+  - Remote changes (should NOT skip - need to update textarea)
+
+- 790e1eb: Improve error handling, type safety, and add namespace validation
+
+  ## Error Handling
+
+  - Add try-catch to `createSyncStore` subscription callback to prevent errors from breaking React rendering
+  - Add debug logging for cursor restoration failures in `useUndoManager`
+
+  ## Type Safety
+
+  - Create `utils/type-guards.ts` with proper type guards (hasToJSON, hasSubscribe, hasInternalMethods, getPlaceholderSafe, toJSONSafe)
+  - Replace unsafe `any` casts with type guards in `create-ref-hooks.ts` and `text-ref-helpers.ts`
+  - Improve `useCallback` type signature in `FrameworkHooks` interface
+
+  ## Namespace Validation
+
+  - Add `utils/validate-namespace.ts` with validation functions for undo namespaces
+  - Validate namespace format in `UndoManagerRegistry.getOrCreate()` and `useCollaborativeText`
+  - Namespaces must start with a letter, contain only letters/numbers/underscores/hyphens, max 64 chars
+
+  ## Code Cleanup
+
+  - Remove dead `updateExistingManagers` method from `UndoManagerRegistry`
+  - Add JSDoc explaining the limitation of late namespace registration
+  - Create shared `utils/container-id.ts` for consistent container ID resolution
+  - Update `CursorRegistry` to use shared container ID utility
+
+  ## Performance
+
+  - Optimize `useDoc` to check version before calling `toJSON()` to avoid unnecessary computation
+
+- 8fffae6: Simplify ref type definitions and fix placeholder typing
+
+  - `AnyTypedRef` is now derived from `ContainerShape["_mutable"]` instead of manually listing all ref types
+  - `UseRefValueReturn<R>` simplified from 8 conditional branches to a single unified type
+  - **Bug fix**: `placeholder` is now correctly typed for all ref types, not just `TextRef`
+    (the runtime already returned placeholders for all refs, but the types didn't reflect this)
+  - Removed redundant individual return type interfaces (`UseCounterRefValueReturn`, etc.)
+
+  This is an internal refactoring with one bug fix. No breaking changes to the public API.
+
+- Updated dependencies [c97a468]
+  - @loro-extended/repo@5.3.0
+
 ## 5.2.0
 
 ### Patch Changes
