@@ -90,7 +90,9 @@ new WebSocketServer({ server: httpServer, path: "/ws" }).on(
 const port = Number(process.env.PORT) || 5173
 httpServer.listen(port, () => {
   const elapsed = Date.now() - serverStartTime
-  console.log(`🚀 Server running at http://localhost:${port} (started in ${elapsed}ms)`)
+  console.log(
+    `🚀 Server running at http://localhost:${port} (started in ${elapsed}ms)`,
+  )
   // Process any connections that arrived during startup
   processPendingConnections()
 })

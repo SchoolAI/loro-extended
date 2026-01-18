@@ -39,18 +39,29 @@ const SettingsSchema = Shape.doc({
   }),
 })
 
-// Form schema - synced with configurable delay
+// ============================================
+// Form Schema
+// ============================================
+// This schema demonstrates the two categories of form controls:
+//
+// 1. ATOMIC CONTROLS (status, priority)
+//    - Use `useRefValue` - values are discrete/atomic
+//    - "Last-write-wins" is intuitive for dropdowns, checkboxes, counters
+//    - Example: If User A selects "review" and User B selects "published"
+//      during a network partition, one must win - there's no meaningful merge
+//
+// 2. TEXT CONTROLS (title, description, notes)
+//    - Can use either `useRefValue` or `useCollaborativeText`
+//    - useRefValue: Simpler, replaces entire text on each keystroke
+//    - useCollaborativeText: Character-level operations preserve user intent
+//    - Choose based on whether concurrent editing is expected
+//
 const FormSchema = Shape.doc({
-  // ============================================
-  // Atomic Controls - useRefValue is the natural choice
-  // These have discrete values where "last-write-wins" is intuitive
-  // ============================================
+  // Atomic controls - always use useRefValue
   status: Shape.text().placeholder("draft"), // Dropdown selection
-  priority: Shape.counter(), // Numeric priority (0-5)
+  priority: Shape.counter(), // Numeric counter (0-5)
 
-  // ============================================
-  // Text Controls - choice depends on collaboration pattern
-  // ============================================
+  // Text controls - choice depends on collaboration pattern
   title: Shape.text().placeholder("Untitled Document"), // Short text
   description: Shape.text().placeholder("Enter a description..."), // Long text
   notes: Shape.text().placeholder("Add some notes..."), // Long text
@@ -58,18 +69,15 @@ const FormSchema = Shape.doc({
 
 /**
  * Helper to extract docId from a channel message.
- * Returns undefined for messages without docId (like establish-request/response).
  */
 function getDocIdFromMessage(message: unknown): string | undefined {
   if (typeof message !== "object" || message === null) return undefined
   const msg = message as Record<string, unknown>
 
-  // Direct docId field (sync-request, sync-response, update, ephemeral, etc.)
   if ("docId" in msg && typeof msg.docId === "string") {
     return msg.docId
   }
 
-  // Batch messages - check first message for docId
   if (
     msg.type === "channel/batch" &&
     Array.isArray(msg.messages) &&
@@ -82,18 +90,40 @@ function getDocIdFromMessage(message: unknown): string | undefined {
 }
 
 // ============================================
+// Connection Status Bar
+// ============================================
+
+function ConnectionBar({ state }: { state: ConnectionState }) {
+  const messages: Record<ConnectionState, string> = {
+    connected: "Syncing in real-time",
+    connecting: "Connecting...",
+    reconnecting: "Reconnecting...",
+    disconnected: "Offline — changes will sync when reconnected",
+  }
+
+  return (
+    <div className={`connection-bar ${state}`}>
+      <span className="connection-dot" />
+      <span>{messages[state]}</span>
+    </div>
+  )
+}
+
+// ============================================
 // Atomic Controls - Always use useRefValue
 // ============================================
 // These controls have discrete/atomic values where "last-write-wins"
 // is the intuitive and expected behavior during concurrent edits.
+//
+// StatusDropdown: A dropdown selection is atomic - there's no meaningful
+// "merge" of two different selections. If User A selects "review" and
+// User B selects "published" during a network partition, one must win.
+//
+// PrioritySelector: Uses CounterRef where concurrent increments/decrements
+// merge naturally via CRDT semantics. The UI shows a single value.
 
 /**
  * Status Dropdown - demonstrates useRefValue for atomic selection.
- *
- * Why useRefValue? A dropdown selection is atomic - there's no meaningful
- * "merge" of two different selections. If User A selects "review" and
- * User B selects "published" during a network partition, one must win.
- * This is exactly what users expect from a dropdown.
  */
 function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
   const { value } = useRefValue(statusRef)
@@ -113,15 +143,10 @@ function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
 
 /**
  * Priority Selector - demonstrates useRefValue with CounterRef.
- *
- * Why useRefValue with CounterRef? Priority is a numeric value where
- * concurrent increments/decrements merge naturally via CRDT semantics.
- * However, the UI still shows a single value - there's no "partial" priority.
+ * CRDT counter handles concurrent increments/decrements automatically.
  */
 function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
-  // CounterRef.toJSON() returns number
   const { value } = useRefValue(priorityRef) as { value: number }
-  // Clamp to valid range for display
   const displayValue = Math.max(0, Math.min(5, value))
 
   return (
@@ -151,13 +176,27 @@ function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
 }
 
 // ============================================
-// Text Controls - useRefValue (Controlled)
+// Text Controls - Choice depends on collaboration pattern
 // ============================================
-// This approach uses useRefValue for controlled inputs with automatic value/placeholder.
-// Best for: Single-user sync, form fields, settings - where concurrent editing is rare.
-// Tradeoff: Replaces entire text on each keystroke, which can produce unexpected
-// merges during concurrent editing (e.g., "Hello World" + "Hello There" → "Hello World There")
+//
+// useRefValue (RefValueInput):
+//   - Controlled inputs with automatic value/placeholder
+//   - Best for: Single-user sync, form fields, settings
+//   - Tradeoff: Replaces entire text on each keystroke, which can produce
+//     unexpected merges during concurrent editing
+//
+// useCollaborativeText (CollaborativeInput/CollaborativeTextarea):
+//   - Uncontrolled inputs with fine-grained CRDT operations
+//   - Best for: Real-time collaboration, document editing
+//   - Benefit: Character-level operations preserve user intent during merges
+//
+// NOTE: With automatic cursor restoration built into RepoProvider,
+// undo/redo will restore cursor position to the correct field automatically.
 
+/**
+ * RefValueInput - Controlled input using useRefValue.
+ * Simpler code, but replaces entire text on each keystroke.
+ */
 function RefValueInput({
   textRef,
   multiline = false,
@@ -195,17 +234,10 @@ function RefValueInput({
   )
 }
 
-// ============================================
-// Text Controls - useCollaborativeText (Uncontrolled)
-// ============================================
-// This approach uses the useCollaborativeText hook for fine-grained CRDT operations.
-// Best for: Real-time collaboration, document editing - where concurrent editing is expected.
-// Benefit: Character-level operations preserve user intent during merges.
-//
-// NOTE: With the new automatic cursor restoration, we no longer need to manually
-// track focus or register with a CursorContext. The CursorRegistry built into
-// RepoProvider handles this automatically!
-
+/**
+ * CollaborativeTextarea - Uncontrolled textarea using useCollaborativeText.
+ * Character-level operations preserve user intent during concurrent edits.
+ */
 function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLTextAreaElement>(textRef)
@@ -220,6 +252,10 @@ function CollaborativeTextarea({ textRef }: { textRef: TextRef }) {
   )
 }
 
+/**
+ * CollaborativeInput - Uncontrolled input using useCollaborativeText.
+ * Best for real-time collaboration where multiple users may type simultaneously.
+ */
 function CollaborativeInput({ textRef }: { textRef: TextRef }) {
   const { inputRef, defaultValue, placeholder } =
     useCollaborativeText<HTMLInputElement>(textRef)
@@ -235,29 +271,102 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
 }
 
 // ============================================
+// Settings Panel
+// ============================================
+
+function SettingsPanel({
+  isOpen,
+  textApproach,
+  setTextApproach,
+  networkDelay,
+  setNetworkDelay,
+}: {
+  isOpen: boolean
+  textApproach: TextApproach
+  setTextApproach: (approach: TextApproach) => void
+  networkDelay: number
+  setNetworkDelay: (delay: number) => void
+}) {
+  return (
+    <div className={`settings-panel ${isOpen ? "expanded" : "collapsed"}`}>
+      <div className="settings-content">
+        <h3 className="settings-title">Demo Settings</h3>
+
+        <div className="setting-item">
+          <span className="setting-label">Text Input Mode</span>
+          <div className="approach-selector">
+            <label>
+              <input
+                type="radio"
+                name="approach"
+                value="collaborative"
+                checked={textApproach === "collaborative"}
+                onChange={() => setTextApproach("collaborative")}
+              />
+              <span>
+                <strong>Collaborative</strong> — Character-level merging
+              </span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="approach"
+                value="last-write-wins"
+                checked={textApproach === "last-write-wins"}
+                onChange={() => setTextApproach("last-write-wins")}
+              />
+              <span>
+                <strong>Last-write-wins</strong> — Simpler, controlled inputs
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="setting-item">
+          <span className="setting-label">
+            Network Delay:{" "}
+            {networkDelay === 0
+              ? "Off"
+              : `${(networkDelay / 1000).toFixed(1)}s`}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="10000"
+            step="500"
+            value={networkDelay}
+            onChange={e => setNetworkDelay(Number(e.target.value))}
+            className="settings-slider"
+          />
+          <p className="setting-hint">
+            Simulates network latency to demonstrate merge behavior
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // Main App Component
 // ============================================
 
 function App() {
-  // Two separate handles: settings (instant sync) and form (delayed sync)
   const settingsHandle = useHandle(SETTINGS_DOC_ID, SettingsSchema)
   const formHandle = useHandle(FORM_DOC_ID, FormSchema)
 
-  // Subscribe to both documents
   const {
     settings: {
       textApproach: textApproachValue,
       networkDelay: networkDelayValue,
     },
   } = useDoc(settingsHandle)
-  const { status, priority, title, description, notes } = useDoc(formHandle)
 
-  // Use undo/redo - cursor restoration is now automatic!
-  // No need for getCursors/setCursors callbacks anymore.
   const { undo, redo, canUndo, canRedo } = useUndoManager(formHandle)
 
-  // Shared text approach setting - synced instantly across all clients
-  // Default to "useCollaborativeText" if not set
+  // Settings state
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   const textApproach: TextApproach =
     textApproachValue === "last-write-wins" ||
     textApproachValue === "collaborative"
@@ -268,14 +377,11 @@ function App() {
     settingsHandle.doc.settings.textApproach = approach
   }
 
-  // Network delay from shared settings (0-10000ms, default 3000ms)
-  // Clamp to valid range
-  const networkDelay = Math.max(0, Math.min(10000, networkDelayValue ?? 3000))
+  const networkDelay = Math.max(0, Math.min(10000, networkDelayValue ?? 0))
 
   const setNetworkDelay = useCallback(
     (delay: number) => {
-      // Counter uses increment/decrement, so we need to calculate the delta
-      const currentValue = networkDelayValue ?? 3000
+      const currentValue = networkDelayValue ?? 0
       const delta = delay - currentValue
       if (delta > 0) {
         settingsHandle.doc.settings.networkDelay.increment(delta)
@@ -286,30 +392,25 @@ function App() {
     [settingsHandle.doc.settings, networkDelayValue],
   )
 
-  // Connection status from WebSocket adapter
+  // Connection status
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected")
 
-  // Subscribe to connection state changes
   useEffect(() => {
     return wsAdapter.subscribe(setConnectionState)
   }, [])
 
-  // Manage send interceptor lifecycle based on delay setting
-  // Settings document syncs instantly, form document is delayed
+  // Network delay interceptor
   useEffect(() => {
     if (networkDelay === 0) {
       wsAdapter.clearSendInterceptors()
       return
     }
     const unsubscribe = wsAdapter.addSendInterceptor((ctx, next) => {
-      // Check if this message is for the settings document
       const docId = getDocIdFromMessage(ctx.envelope.message)
       if (docId === SETTINGS_DOC_ID) {
-        // Settings sync instantly - no delay
         next()
       } else {
-        // All other messages are delayed
         setTimeout(next, networkDelay)
       }
     })
@@ -330,227 +431,94 @@ function App() {
   }
 
   return (
-    <div className="container">
+    <>
+      {/* Connection Status */}
+      <ConnectionBar state={connectionState} />
+
+      {/* Header */}
       <div className="header">
         <h1>Collaborative Form</h1>
-        <div className={`connection-status connection-${connectionState}`}>
-          <span className="connection-dot" />
-          <span className="connection-label">
-            {connectionState === "connected"
-              ? "Connected"
-              : connectionState === "connecting"
-                ? "Connecting..."
-                : connectionState === "reconnecting"
-                  ? "Reconnecting..."
-                  : "Disconnected"}
-          </span>
+        <div className="header-actions">
+          <button
+            type="button"
+            className={`settings-toggle ${settingsOpen ? "active" : ""}`}
+            onClick={() => setSettingsOpen(!settingsOpen)}
+          >
+            ⚙️ Settings
+          </button>
         </div>
       </div>
 
-      <div className="toolbar">
-        <button type="button" onClick={undo} disabled={!canUndo}>
-          ⟲ Undo
-        </button>
-        <button type="button" onClick={redo} disabled={!canRedo}>
-          ⟳ Redo
-        </button>
+      {/* Settings Panel (collapsible) */}
+      <SettingsPanel
+        isOpen={settingsOpen}
+        textApproach={textApproach}
+        setTextApproach={setTextApproach}
+        networkDelay={networkDelay}
+        setNetworkDelay={setNetworkDelay}
+      />
+
+      {/* Main Form Card */}
+      <div className="form-card">
+        {/* Atomic Controls */}
+        <div className="form-section">
+          <div className="field">
+            <span className="field-label">Status</span>
+            <StatusDropdown statusRef={formHandle.doc.status} />
+          </div>
+
+          <div className="field">
+            <span className="field-label">Priority</span>
+            <PrioritySelector priorityRef={formHandle.doc.priority} />
+          </div>
+        </div>
+
+        <div className="form-divider" />
+
+        {/* Text Controls */}
+        <div className="form-section">
+          <div className="field">
+            <span className="field-label">Title</span>
+            {renderTextInput(formHandle.doc.title)}
+          </div>
+
+          <div className="field">
+            <span className="field-label">Description</span>
+            {renderTextInput(formHandle.doc.description, true)}
+          </div>
+
+          <div className="field">
+            <span className="field-label">Notes</span>
+            {renderTextInput(formHandle.doc.notes, true)}
+          </div>
+        </div>
+
+        {/* Form Footer with Undo/Redo */}
+        <div className="form-footer">
+          <button type="button" onClick={undo} disabled={!canUndo}>
+            ⟲ Undo
+          </button>
+          <button type="button" onClick={redo} disabled={!canRedo}>
+            ⟳ Redo
+          </button>
+        </div>
       </div>
 
-      {/* ============================================ */}
-      {/* Atomic Controls Section */}
-      {/* ============================================ */}
-      <section className="section">
-        <h2>Atomic Controls</h2>
-        <p className="section-description">
-          These controls always use <code>useRefValue</code> because their
-          values are discrete/atomic. "Last-write-wins" is the intuitive
-          behavior for dropdowns, checkboxes, and counters.
-        </p>
-
-        <div className="field">
-          <span className="field-label">Status</span>
-          <StatusDropdown statusRef={formHandle.doc.status} />
-          <div className="preview">
-            <strong>Current value:</strong> {status || "draft"}
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label">Priority</span>
-          <PrioritySelector priorityRef={formHandle.doc.priority} />
-          <div className="preview">
-            <strong>Current value:</strong> {priority}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================ */}
-      {/* Text Controls Section */}
-      {/* ============================================ */}
-      <section className="section">
-        <h2>Text Controls</h2>
-        <p className="section-description">
-          Text inputs using <code>{textApproach}</code>. Change the approach in
-          Demo Settings below.
-        </p>
-
-        <div className="field">
-          <span className="field-label">Title (single line)</span>
-          {renderTextInput(formHandle.doc.title)}
-          <div className="preview">
-            <strong>Current value:</strong> {title || "(empty)"}
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label">Description (multi-line)</span>
-          {renderTextInput(formHandle.doc.description, true)}
-          <div className="preview">
-            <strong>Current value:</strong>
-            <pre>{description || "(empty)"}</pre>
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label">Notes</span>
-          {renderTextInput(formHandle.doc.notes, true)}
-          <div className="preview">
-            <strong>Current value:</strong>
-            <pre>{notes || "(empty)"}</pre>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================ */}
-      {/* Demo Settings Section */}
-      {/* ============================================ */}
-      <section className="section settings-section">
-        <h2>⚙️ Demo Settings</h2>
-        <p className="section-description">
-          These settings are <strong>shared across all clients</strong> and sync
-          instantly (bypassing the network delay). Try changing them in one tab
-          and watch the other tabs update!
-        </p>
-
-        <div className="settings-grid">
-          <div className="setting-item">
-            <span className="setting-label">Text Input Approach</span>
-            <div className="approach-selector">
-              <label>
-                <input
-                  type="radio"
-                  name="approach"
-                  value="useRefValue"
-                  checked={textApproach === "last-write-wins"}
-                  onChange={() => setTextApproach("last-write-wins")}
-                />
-                <strong>useRefValue</strong> - Controlled inputs, simpler code
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="approach"
-                  value="useCollaborativeText"
-                  checked={textApproach === "collaborative"}
-                  onChange={() => setTextApproach("collaborative")}
-                />
-                <strong>useCollaborativeText</strong> - Character-level
-                operations
-              </label>
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <span className="setting-label">
-              Network Delay:{" "}
-              {networkDelay === 0
-                ? "Off"
-                : `${(networkDelay / 1000).toFixed(1)}s`}
-            </span>
-            <input
-              id="network-delay"
-              type="range"
-              min="0"
-              max="10000"
-              step="500"
-              value={networkDelay}
-              onChange={e => setNetworkDelay(Number(e.target.value))}
-              className="delay-slider settings-slider"
-            />
-            <p className="setting-hint">
-              Simulates network latency for form data. Settings always sync
-              instantly.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================ */}
-      {/* Help Section */}
-      {/* ============================================ */}
-      <div className="hint">
+      {/* Help Footer */}
+      <div className="help-footer">
         <p>
-          <strong>Open this page in another tab</strong> to see real-time
-          collaboration!
+          <strong>Open in another tab</strong> to see real-time collaboration
         </p>
         <p>
-          <strong>Keyboard shortcuts:</strong> Ctrl/Cmd+Z to undo, Ctrl/Cmd+Y or
-          Ctrl/Cmd+Shift+Z to redo
+          <span className="shortcut">⌘Z</span> undo{" "}
+          <span className="shortcut">⌘⇧Z</span> redo
         </p>
-        <p>
-          <strong>Cursor restoration:</strong> When using{" "}
-          <code>useCollaborativeText</code>, undo/redo will automatically
-          restore your cursor position to the correct field!
-        </p>
-
-        <h3>Choosing the Right Approach</h3>
-        <table className="comparison-table">
-          <thead>
-            <tr>
-              <th>Control Type</th>
-              <th>Hook</th>
-              <th>Why</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Dropdown, Checkbox, Radio</td>
-              <td>
-                <code>useRefValue</code>
-              </td>
-              <td>Atomic values - last-write-wins is intuitive</td>
-            </tr>
-            <tr>
-              <td>Counter, Slider</td>
-              <td>
-                <code>useRefValue</code>
-              </td>
-              <td>CRDT counter handles concurrent increments</td>
-            </tr>
-            <tr>
-              <td>Text (rarely concurrent)</td>
-              <td>
-                <code>useRefValue</code>
-              </td>
-              <td>Simpler, controlled inputs work fine</td>
-            </tr>
-            <tr>
-              <td>Text (concurrent editing)</td>
-              <td>
-                <code>useCollaborativeText</code>
-              </td>
-              <td>Character-level merge preserves all edits</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
-    </div>
+    </>
   )
 }
 
-// Bootstrap - render the app
-// Note: CursorProvider is no longer needed! RepoProvider now includes
-// automatic cursor restoration via the built-in CursorRegistry.
+// Bootstrap
 const rootElement = document.getElementById("root")
 if (rootElement) {
   createRoot(rootElement).render(
