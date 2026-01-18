@@ -1,27 +1,30 @@
-import { defineConfig } from "@halecraft/verify"
+import { defineConfig, parsers } from "@halecraft/verify"
 
 export default defineConfig({
   tasks: [
     {
       key: "format",
-      run: "../../node_modules/.bin/biome check --write .",
-      parser: "biome",
+      run: "biome check --write .",
+      parser: parsers.biome,
     },
     {
       key: "types",
       reportingDependsOn: ["format"],
       children: [
         {
-          key: "types:app",
-          run: "./node_modules/.bin/tsgo --noEmit --skipLibCheck -p tsconfig.app.json",
-          parser: "tsc",
+          key: "app",
+          run: "tsgo --noEmit --skipLibCheck -p tsconfig.app.json",
+          parser: parsers.tsc,
         },
         {
-          key: "types:node",
-          run: "./node_modules/.bin/tsgo --noEmit --skipLibCheck -p tsconfig.node.json",
-          parser: "tsc",
+          key: "node",
+          run: "tsgo --noEmit --skipLibCheck -p tsconfig.node.json",
+          parser: parsers.tsc,
         },
       ],
     },
   ],
+  env: {
+    NO_COLOR: "1",
+  },
 })
