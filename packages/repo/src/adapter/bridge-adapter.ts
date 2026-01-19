@@ -83,6 +83,35 @@ type BridgeAdapterParams = {
   logger?: Logger
 }
 
+/**
+ * An in-memory adapter for testing that connects multiple peers within the same process.
+ *
+ * BridgeAdapter simulates real network adapter behavior by delivering messages
+ * asynchronously via `queueMicrotask()`. This ensures tests exercise the same
+ * async codepaths as production adapters (WebSocket, SSE, etc.).
+ *
+ * **Important**: Tests using BridgeAdapter should use `waitForSync()` or
+ * `waitUntilReady()` to await synchronization, just like they would with
+ * real network adapters.
+ *
+ * @example
+ * ```typescript
+ * const bridge = new Bridge()
+ * const repoA = new Repo({
+ *   adapters: [new BridgeAdapter({ adapterType: "peer-a", bridge })],
+ * })
+ * const repoB = new Repo({
+ *   adapters: [new BridgeAdapter({ adapterType: "peer-b", bridge })],
+ * })
+ *
+ * const handleA = repoA.get("doc", DocSchema)
+ * handleA.change(draft => { draft.text.insert(0, "hello") })
+ *
+ * const handleB = repoB.get("doc", DocSchema)
+ * await handleB.waitForSync() // Wait for async message delivery
+ * expect(handleB.doc.toJSON().text).toBe("hello")
+ * ```
+ */
 export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
   readonly bridge: Bridge
   readonly logger: Logger
@@ -262,8 +291,11 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
    * Deliver a message from another adapter to the appropriate channel.
    * Called by Bridge.routeMessage().
    *
-   * Delivers messages synchronously. The Synchronizer's receive queue handles
-   * recursion prevention by queuing messages and processing them iteratively.
+   * Delivers messages asynchronously via queueMicrotask() to simulate real
+   * network adapter behavior. This ensures tests using BridgeAdapter exercise
+   * the same async codepaths as production adapters (WebSocket, SSE, etc.).
+   *
+   * Tests should use `waitForSync()` or `waitUntilReady()` to await sync completion.
    */
   deliverMessage(fromAdapterType: AdapterType, message: ChannelMsg): void {
     const channelId = this.adapterToChannel.get(fromAdapterType)
@@ -271,15 +303,25 @@ export class BridgeAdapter extends Adapter<BridgeAdapterContext> {
       const channel = this.channels.get(channelId)
       if (channel) {
         this.logger.trace(
-          "delivering message {messageType} to channel {channelId} from {from}",
+          "queueing message {messageType} to channel {channelId} from {from}",
           {
             from: fromAdapterType,
             messageType: message.type,
             channelId,
           },
         )
-        // Deliver synchronously - the Synchronizer's receive queue prevents recursion
-        channel.onReceive(message)
+        // Defer delivery to next microtask - simulates async network behavior
+        queueMicrotask(() => {
+          this.logger.trace(
+            "delivering message {messageType} to channel {channelId} from {from}",
+            {
+              from: fromAdapterType,
+              messageType: message.type,
+              channelId,
+            },
+          )
+          channel.onReceive(message)
+        })
       } else {
         this.logger.warn(
           "channel {channelId} not found for message delivery from {fromAdapterType}",

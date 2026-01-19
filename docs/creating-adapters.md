@@ -305,8 +305,32 @@ The interceptor context provides:
 For complete implementations, see:
 
 - [InMemoryStorageAdapter](../packages/repo/src/storage/in-memory-storage-adapter.ts) - Simple in-memory storage
-- [BridgeAdapter](../packages/repo/src/adapter/bridge-adapter.ts) - In-process peer connection
+- [BridgeAdapter](../packages/repo/src/adapter/bridge-adapter.ts) - In-process peer connection for testing
 - [WebSocket Adapter](../adapters/websocket/) - WebSocket implementation
 - [SSE Adapter](../adapters/sse/) - Server-Sent Events implementation
 - [IndexedDB Adapter](../adapters/indexeddb/) - Browser storage
 - [PostgreSQL Adapter](../adapters/postgres/) - Server database storage
+
+## Testing with BridgeAdapter
+
+`BridgeAdapter` is designed for testing and delivers messages asynchronously via `queueMicrotask()` to simulate real network behavior. This ensures your tests exercise the same async codepaths as production adapters.
+
+```typescript
+const bridge = new Bridge()
+const repoA = new Repo({
+  adapters: [new BridgeAdapter({ adapterType: "peer-a", bridge })],
+})
+const repoB = new Repo({
+  adapters: [new BridgeAdapter({ adapterType: "peer-b", bridge })],
+})
+
+// Make changes and wait for sync
+const handleA = repoA.get("doc", DocSchema)
+handleA.change(draft => { draft.text.insert(0, "hello") })
+
+const handleB = repoB.get("doc", DocSchema)
+await handleB.waitForSync() // Required - messages are delivered asynchronously
+expect(handleB.doc.toJSON().text).toBe("hello")
+```
+
+**Important**: Always use `waitForSync()` or `waitUntilReady()` when testing with `BridgeAdapter`. Do not assume synchronous message delivery.

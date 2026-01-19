@@ -88,6 +88,34 @@ This distinction is important:
 - `getTypedRefParams()` - "How do I recreate myself?"
 - `getChildTypedRefParams(key, shape)` - "How do I create a child at this key?"
 
+## Adapter Architecture
+
+### Async Message Delivery
+
+All adapters deliver messages **asynchronously** to simulate real network behavior:
+
+| Adapter | Delivery Mechanism |
+|---------|-------------------|
+| `BridgeAdapter` | `queueMicrotask()` |
+| `WebSocket` | Network I/O |
+| `SSE` | HTTP + EventSource |
+| `Storage` | Async I/O |
+
+This ensures tests using `BridgeAdapter` exercise the same async codepaths as production adapters, catching race conditions and async state management bugs early.
+
+**Important**: Tests should use `waitForSync()` or `waitUntilReady()` to await synchronization:
+
+```typescript
+// Correct pattern
+handleA.change(draft => { draft.text.insert(0, "hello") })
+await handleB.waitForSync()
+expect(handleB.doc.toJSON().text).toBe("hello")
+```
+
+### WorkQueue and Recursion Prevention
+
+The Synchronizer uses a `WorkQueue` to prevent infinite recursion when adapters deliver messages. Messages are queued and processed iteratively, not recursively. However, this doesn't change timing - with `BridgeAdapter`, messages are still delivered in a different microtask.
+
 ## Testing Patterns
 
 ### Investigating Loro Behavior
@@ -103,3 +131,36 @@ const changes = doc.getAllChanges()
 ```
 
 Version vectors from `doc.version().toJSON()` may return empty objects in some cases.
+
+### Testing with BridgeAdapter
+
+`BridgeAdapter` is the recommended adapter for unit and integration tests. It delivers messages asynchronously via `queueMicrotask()` to match production adapter behavior.
+
+```typescript
+const bridge = new Bridge()
+const repoA = new Repo({
+  adapters: [new BridgeAdapter({ adapterType: "peer-a", bridge })],
+})
+const repoB = new Repo({
+  adapters: [new BridgeAdapter({ adapterType: "peer-b", bridge })],
+})
+
+// Make changes on A
+const handleA = repoA.get("doc", DocSchema)
+handleA.change(draft => { draft.text.insert(0, "hello") })
+
+// Wait for sync on B
+const handleB = repoB.get("doc", DocSchema)
+await handleB.waitForSync()
+expect(handleB.doc.toJSON().text).toBe("hello")
+```
+
+For low-level synchronizer tests that need fine-grained control, use `flushMicrotasks()`:
+
+```typescript
+import { flushMicrotasks } from "@loro-extended/repo/test-utils"
+
+channel.onReceive(syncRequest)
+await flushMicrotasks()
+expect(mockAdapter.sentMessages.length).toBeGreaterThan(0)
+```

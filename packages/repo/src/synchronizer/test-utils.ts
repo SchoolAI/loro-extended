@@ -33,32 +33,42 @@ import type { CommandContext } from "./command-executor.js"
  *
  * ## Background
  *
- * The Synchronizer now uses a **receive queue** to handle message processing.
+ * The Synchronizer uses a **receive queue** to handle message processing.
  * When a message arrives during dispatch, it's queued and processed after the
  * current dispatch completes. This prevents infinite recursion without requiring
  * async boundaries.
  *
  * ## When is this needed?
  *
- * In most cases, `flushMicrotasks()` is **no longer needed** because:
- * - MockAdapter delivers messages synchronously
- * - The Synchronizer's receive queue processes them iteratively
- * - Sends happen synchronously at the end of each dispatch
+ * This is needed when testing with adapters that deliver messages asynchronously:
  *
- * However, you may still need it for:
- * - Tests that use real async adapters (WebSocket, SSE)
- * - Tests that need to wait for other async operations
- * - Legacy tests that haven't been updated yet
+ * - **BridgeAdapter**: Uses `queueMicrotask()` to simulate real network behavior
+ * - **WebSocket/SSE adapters**: Inherently async due to network I/O
+ *
+ * For **MockAdapter** (which delivers synchronously), `flushMicrotasks()` is
+ * typically not needed.
+ *
+ * ## Recommended Approach
+ *
+ * For high-level integration tests, prefer using `waitForSync()` or
+ * `waitUntilReady()` instead of `flushMicrotasks()`. These APIs are what
+ * production code uses and provide better test coverage.
+ *
+ * Use `flushMicrotasks()` only for low-level synchronizer tests that need
+ * fine-grained control over message timing.
  *
  * ## Example
  *
  * ```typescript
- * // With MockAdapter, this is usually sufficient:
- * mockAdapter.simulateChannelMessage(channelId, syncRequest)
- * expect(mockAdapter.sentMessages.length).toBeGreaterThan(0)
+ * // PREFERRED: Use waitForSync() for high-level tests
+ * handleA.change(draft => { draft.text.insert(0, "hello") })
+ * await handleB.waitForSync()
+ * expect(handleB.doc.toJSON().text).toBe("hello")
  *
- * // But if you need to wait for async operations:
+ * // LOW-LEVEL: Use flushMicrotasks() for synchronizer unit tests
+ * channel.onReceive(syncRequest)
  * await flushMicrotasks()
+ * expect(mockAdapter.sentMessages.length).toBeGreaterThan(0)
  * ```
  */
 export async function flushMicrotasks(): Promise<void> {

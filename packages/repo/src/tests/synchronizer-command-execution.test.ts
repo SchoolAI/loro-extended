@@ -127,8 +127,9 @@ describe("Synchronizer - Command Execution", () => {
       bidirectional: false,
     })
 
-    // MockAdapter delivers synchronously, so no need to wait for microtasks
-    // (BridgeAdapter uses queueMicrotask for async delivery, but MockAdapter doesn't)
+    // MockAdapter delivers synchronously, so no need to wait for microtasks.
+    // Note: BridgeAdapter also uses queueMicrotask for async delivery to simulate
+    // real network behavior - tests using BridgeAdapter should use waitForSync().
 
     // Should have sent sync-response (may be inside a batch)
     expect(mockAdapter.sentMessages.length).toBeGreaterThanOrEqual(1)
