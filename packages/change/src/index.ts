@@ -4,6 +4,7 @@ export {
   derivePlaceholder,
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
+
 // Functional helpers (recommended API)
 export {
   change,
@@ -11,6 +12,7 @@ export {
   getLoroContainer,
   getLoroDoc,
 } from "./functional-helpers.js"
+
 // The loro() escape hatch for CRDT internals
 export {
   LORO_SYMBOL,
@@ -23,11 +25,13 @@ export {
   type LoroTypedDocRef,
   loro,
 } from "./loro.js"
+
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"
 export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
 export { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
+
 export type {
   PathBuilder,
   PathNode,
@@ -35,43 +39,41 @@ export type {
   PathSelector,
 } from "./path-selector.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
+// Shape utilities
+// Container shapes
+// Value shapes
 export type {
-  // Escape hatch shapes for untyped integration
   AnyContainerShape,
   AnyValueShape,
   ArrayValueShape,
   ContainerOrValueShape,
   ContainerShape,
   ContainerType as RootContainerType,
-  // Container shapes
   CounterContainerShape,
-  // Discriminated union for tagged unions
+  // Tagged union
   DiscriminatedUnionValueShape,
-  // Schema node types
   DocShape,
   ListContainerShape,
-  /** @deprecated Use StructContainerShape instead */
-  MapContainerShape,
   MovableListContainerShape,
-  /** @deprecated Use StructValueShape instead */
-  ObjectValueShape,
+  NumberValueShape,
   RecordContainerShape,
   RecordValueShape,
+  StringValueShape,
   StructContainerShape,
   StructValueShape,
   TextContainerShape,
   TreeContainerShape,
-  // Tree-related types
   TreeNodeJSON,
   TreeRefInterface,
+  // Union of two or more plain value types
   UnionValueShape,
-  // Value shapes
   ValueShape,
   // WithNullable type for shapes that support .nullable()
   WithNullable,
   // WithPlaceholder type for shapes that support .placeholder()
   WithPlaceholder,
 } from "./shape.js"
+
 // Schema and type exports
 export { Shape } from "./shape.js"
 export type { Frontiers, TypedDoc } from "./typed-doc.js"
