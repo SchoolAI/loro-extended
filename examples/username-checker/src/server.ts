@@ -82,12 +82,17 @@ const handle = repo.get("username-rpc", DocSchema, EphemeralDeclarations)
 
 // Debug: Subscribe to document changes
 handle.subscribe(() => {
-  console.log("[Server] Document changed, current state:", handle.doc.rpc.keys())
+  console.log(
+    "[Server] Document changed, current state:",
+    handle.doc.rpc.keys(),
+  )
 })
 
 // Debug: Subscribe to LOCAL updates specifically (this is what triggers sync)
 handle.loroDoc.subscribeLocalUpdates(() => {
-  console.log("[Server] LOCAL update detected - this should trigger sync to peers")
+  console.log(
+    "[Server] LOCAL update detected - this should trigger sync to peers",
+  )
   // Log the current peer subscriptions and sync state
   const model = (repo.synchronizer as any).model
   if (model) {
@@ -97,10 +102,12 @@ handle.loroDoc.subscribeLocalUpdates(() => {
       console.log(`[Server] Peer ${peerId}:`, {
         subscriptions: [...peerState.subscriptions],
         channels: [...peerState.channels],
-        docSyncState: docSyncState ? {
-          status: docSyncState.status,
-          lastKnownVersion: docSyncState.lastKnownVersion?.toJSON(),
-        } : undefined,
+        docSyncState: docSyncState
+          ? {
+              status: docSyncState.status,
+              lastKnownVersion: docSyncState.lastKnownVersion?.toJSON(),
+            }
+          : undefined,
       })
     }
     // Log our version

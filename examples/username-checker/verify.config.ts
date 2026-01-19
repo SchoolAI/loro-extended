@@ -13,6 +13,12 @@ export default defineConfig({
       parser: parsers.tsc,
       reportingDependsOn: ["format"],
     },
+    {
+      key: "test",
+      run: "playwright test",
+      parser: parsers.vitest, // Playwright output is similar enough to vitest
+      reportingDependsOn: ["types"],
+    },
   ],
   env: {
     NO_COLOR: "1",
