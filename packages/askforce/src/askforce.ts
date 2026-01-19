@@ -12,13 +12,14 @@ import {
   DEFAULT_HEARTBEAT_INTERVAL,
   removeActiveAsk,
 } from "./presence.js"
+import type { AskEntryShape, PlainAskEntry } from "./schema.js"
 import {
   AskforceError,
   type AskforceOptions,
   type AskHandler,
   type AskStatus,
+  type FailedAnswer,
   type OnAskOptions,
-  type WorkerAnswer,
   type WorkerPresence,
 } from "./types.js"
 
@@ -27,56 +28,6 @@ import {
  */
 function generateAskId(): string {
   return `ask_${generateUUID()}`
-}
-
-/**
- * The shape of an ask entry in the record.
- */
-interface AskEntryShape {
-  id: string
-  question: unknown
-  askedAt: number
-  askedBy: string
-  answers: Record<string, WorkerAnswer<unknown>>
-}
-
-/**
- * Type guard to check if a value is a valid AskEntryShape.
- * Used to safely convert CRDT data to typed objects.
- */
-function isAskEntryShape(value: unknown): value is AskEntryShape {
-  if (typeof value !== "object" || value === null) {
-    return false
-  }
-  const obj = value as Record<string, unknown>
-  return (
-    typeof obj.id === "string" &&
-    typeof obj.askedAt === "number" &&
-    typeof obj.askedBy === "string" &&
-    typeof obj.answers === "object" &&
-    obj.answers !== null
-  )
-}
-
-/**
- * Safely access the answers record from a CRDT entry.
- * Returns undefined if the entry doesn't have an answers property.
- */
-function getAnswersRef(
-  entry: unknown,
-): { set: (key: string, value: unknown) => void } | undefined {
-  if (typeof entry !== "object" || entry === null) {
-    return undefined
-  }
-  const obj = entry as Record<string, unknown>
-  if (
-    typeof obj.answers === "object" &&
-    obj.answers !== null &&
-    typeof (obj.answers as Record<string, unknown>).set === "function"
-  ) {
-    return obj.answers as { set: (key: string, value: unknown) => void }
-  }
-  return undefined
 }
 
 /**
@@ -110,8 +61,8 @@ export class Askforce<
   Q extends ValueShape = ValueShape,
   A extends ValueShape = ValueShape,
 > {
-  // RecordRef is generic over any shape
-  private readonly recordRef: RecordRef<any>
+  // RecordRef is generic over the AskEntryShape
+  private readonly recordRef: RecordRef<AskEntryShape<Q, A>>
   private readonly ephemeral: TypedEphemeral<WorkerPresence>
   private readonly peerId: string
   private readonly mode: "rpc" | "pool"
@@ -122,7 +73,7 @@ export class Askforce<
     new Map()
 
   constructor(
-    recordRef: RecordRef<any>,
+    recordRef: RecordRef<AskEntryShape<Q, A>>,
     ephemeral: TypedEphemeral<WorkerPresence>,
     options: AskforceOptions,
   ) {
@@ -142,15 +93,13 @@ export class Askforce<
   ask(question: Q["_plain"]): string {
     const askId = generateAskId()
 
-    const entry: AskEntryShape = {
+    this.recordRef.set(askId, {
       id: askId,
       question,
       askedAt: Date.now(),
       askedBy: this.peerId,
       answers: {},
-    }
-
-    this.recordRef.set(askId, entry)
+    })
 
     return askId
   }
@@ -257,10 +206,7 @@ export class Askforce<
           return true
         }
 
-        const answers = entry.answers as Record<
-          string,
-          WorkerAnswer<A["_plain"]>
-        >
+        const { answers } = entry
 
         // In RPC mode, return the first answer
         // In Pool mode, use pickOne for deterministic selection
@@ -280,12 +226,8 @@ export class Askforce<
           Object.keys(answers).length > 0
         ) {
           const failureReasons = Object.values(answers)
-            .filter(a => a.status === "failed")
-            .map(
-              a =>
-                (a as { status: "failed"; reason: string; failedAt: number })
-                  .reason,
-            )
+            .filter((a): a is FailedAnswer => a.status === "failed")
+            .map(a => a.reason)
           resolved = true
           cleanup()
           reject(
@@ -342,7 +284,7 @@ export class Askforce<
       return "pending"
     }
 
-    const answers = entry.answers as Record<string, WorkerAnswer<unknown>>
+    const { answers } = entry
     const answerCount = Object.keys(answers).length
 
     if (answerCount === 0) {
@@ -379,21 +321,24 @@ export class Askforce<
       return []
     }
 
-    const answers = entry.answers as Record<string, WorkerAnswer<A["_plain"]>>
-    return Object.entries(answers)
-      .filter(
-        (
-          e,
-        ): e is [
-          string,
-          { status: "answered"; data: A["_plain"]; answeredAt: number },
-        ] => e[1].status === "answered",
-      )
-      .map(([workerId, answer]) => ({
-        workerId,
-        data: answer.data,
-        answeredAt: answer.answeredAt,
-      }))
+    const { answers } = entry
+    const result: Array<{
+      workerId: string
+      data: A["_plain"]
+      answeredAt: number
+    }> = []
+
+    for (const [workerId, answer] of Object.entries(answers)) {
+      if (answer.status === "answered") {
+        result.push({
+          workerId,
+          data: answer.data,
+          answeredAt: answer.answeredAt,
+        })
+      }
+    }
+
+    return result
   }
 
   /**
@@ -413,21 +358,26 @@ export class Askforce<
   // Private Methods
   // ═══════════════════════════════════════════════════════════════
 
-  private getEntry(askId: string): AskEntryShape | undefined {
+  /**
+   * Get the plain (JSON) representation of an ask entry.
+   *
+   * TYPE BOUNDARY: This is the single point where we bridge between the Loro
+   * type system (which uses Infer<>/ExpandDeep for IDE display) and our
+   * application types (which use Q["_plain"] and A["_plain"] directly).
+   *
+   * The assertion here is safe because:
+   * 1. The schema defines the exact structure we expect
+   * 2. ExpandDeep produces structurally identical types
+   * 3. All downstream code uses PlainAskEntry<Q, A> without further casts
+   */
+  private getEntry(askId: string): PlainAskEntry<Q, A> | undefined {
     const entry = this.recordRef.get(askId)
     if (!entry) {
       return undefined
     }
-    // Convert StructRef to plain object using toJSON if available
-    const plainEntry =
-      typeof entry === "object" &&
-      entry !== null &&
-      "toJSON" in entry &&
-      typeof entry.toJSON === "function"
-        ? entry.toJSON()
-        : entry
-    // Validate the shape before returning
-    return isAskEntryShape(plainEntry) ? plainEntry : undefined
+    // Convert StructRef to plain object using toJSON
+    // Type assertion bridges Infer<> (ExpandDeep) to our PlainAskEntry type
+    return entry.toJSON() as unknown as PlainAskEntry<Q, A>
   }
 
   /**
@@ -476,7 +426,7 @@ export class Askforce<
     }
 
     // Check if we've already answered
-    const answers = entry.answers as Record<string, WorkerAnswer<unknown>>
+    const { answers, question } = entry
     if (this.peerId in answers) {
       return
     }
@@ -490,7 +440,7 @@ export class Askforce<
     this.claimAsk(askId)
 
     try {
-      const answer = await handler(askId, entry.question as Q["_plain"])
+      const answer = await handler(askId, question)
       this.completeAsk(askId, answer)
     } catch (error) {
       this.failAsk(
@@ -508,11 +458,10 @@ export class Askforce<
       this.ephemeral.self ?? createWorkerPresence(this.peerId)
     this.ephemeral.setSelf(addActiveAsk(currentPresence, askId))
 
-    // Write pending answer to CRDT
+    // Write pending answer to CRDT using typed access
     const entry = this.recordRef.get(askId)
-    const answersRef = getAnswersRef(entry)
-    if (answersRef) {
-      answersRef.set(this.peerId, {
+    if (entry) {
+      entry.answers.set(this.peerId, {
         status: "pending",
         claimedAt: Date.now(),
       })
@@ -521,9 +470,8 @@ export class Askforce<
 
   private completeAsk(askId: string, data: A["_plain"]): void {
     const entry = this.recordRef.get(askId)
-    const answersRef = getAnswersRef(entry)
-    if (answersRef) {
-      answersRef.set(this.peerId, {
+    if (entry) {
+      entry.answers.set(this.peerId, {
         status: "answered",
         data,
         answeredAt: Date.now(),
@@ -533,9 +481,8 @@ export class Askforce<
 
   private failAsk(askId: string, reason: string): void {
     const entry = this.recordRef.get(askId)
-    const answersRef = getAnswersRef(entry)
-    if (answersRef) {
-      answersRef.set(this.peerId, {
+    if (entry) {
+      entry.answers.set(this.peerId, {
         status: "failed",
         reason,
         failedAt: Date.now(),
@@ -644,7 +591,6 @@ export class Askforce<
       return false
     }
 
-    const answers = entry.answers as Record<string, WorkerAnswer<unknown>>
-    return Object.keys(answers).length > 0
+    return Object.keys(entry.answers).length > 0
   }
 }

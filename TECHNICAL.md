@@ -78,6 +78,45 @@ This ensures subscribers see **complete data** on the first notification, not pa
 
 The `setSuppressAutoCommit()` mechanism is reentrant-safe - it tracks whether suppression was already active to avoid double-restoring.
 
+### Infer<> vs InferRaw<> and Type Boundaries
+
+The `@loro-extended/change` package provides two type inference utilities:
+
+| Type | Behavior | Use Case |
+|------|----------|----------|
+| `Infer<Shape>` | Uses `ExpandDeep` for IDE hover display | Public API types, documentation |
+| `InferRaw<Shape>` | Direct extraction, preserves type identity | Internal types, generic constraints |
+
+**The Problem**: `ExpandDeep` transforms `A["_plain"]` into a structurally equivalent but nominally different type. This breaks type identity when generic classes need to match types across boundaries.
+
+**The Solution - Type Boundary Pattern**:
+
+When building generic classes that use Loro shapes, define plain types using the generic parameters directly:
+
+```typescript
+// ❌ Breaks type identity - Infer<> uses ExpandDeep
+type PlainEntry<A extends ValueShape> = Infer<EntryShape<A>>
+
+// ✅ Preserves type identity - uses A["_plain"] directly
+interface PlainEntry<A extends ValueShape> {
+  data: A["_plain"]
+  timestamp: number
+}
+```
+
+Then create a **single documented type boundary** where Loro's types meet application types:
+
+```typescript
+private getEntry(id: string): PlainEntry<A> | undefined {
+  const entry = this.recordRef.get(id)
+  if (!entry) return undefined
+  // TYPE BOUNDARY: Bridge from Infer<> (ExpandDeep) to our PlainEntry type
+  return entry.toJSON() as unknown as PlainEntry<A>
+}
+```
+
+All downstream code flows naturally from this boundary without casts.
+
 ## Naming Conventions
 
 ### Internal Method Naming
