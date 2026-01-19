@@ -108,17 +108,53 @@ function convertStructInput(
   }
 
   const map = new LoroMap()
-  for (const [k, v] of Object.entries(value)) {
+
+  // Iterate over schema keys to ensure all nested containers are materialized
+  for (const k of Object.keys(shape.shapes)) {
     const nestedSchema = shape.shapes[k]
-    if (nestedSchema) {
+    const v = value[k]
+
+    if (v !== undefined) {
       const convertedValue = convertInputToRef(v, nestedSchema)
       if (isContainer(convertedValue)) {
         map.setContainer(k, convertedValue)
       } else {
         map.set(k, convertedValue)
       }
-    } else {
-      map.set(k, value)
+    } else if (isContainerShape(nestedSchema)) {
+      // If value is missing but it's a container shape, create an empty container
+      // This ensures deterministic container IDs across peers
+      let emptyValue: any
+      if (nestedSchema._type === "struct" || nestedSchema._type === "record") {
+        emptyValue = {}
+      } else if (
+        nestedSchema._type === "list" ||
+        nestedSchema._type === "movableList"
+      ) {
+        emptyValue = []
+      } else if (nestedSchema._type === "text") {
+        emptyValue = ""
+      } else if (nestedSchema._type === "counter") {
+        emptyValue = 0
+      }
+
+      if (emptyValue !== undefined) {
+        const convertedValue = convertInputToRef(emptyValue, nestedSchema)
+        if (isContainer(convertedValue)) {
+          map.setContainer(k, convertedValue)
+        }
+      }
+    }
+  }
+
+  // Also handle keys present in value but not in schema (if any, though for structs this shouldn't happen ideally)
+  // But for backward compatibility or loose typing, we might want to preserve them?
+  // The original code did:
+  // if (nestedSchema) { ... } else { map.set(k, value) }
+  // So it allowed extra keys.
+  for (const [k, v] of Object.entries(value)) {
+    if (!shape.shapes[k]) {
+      map.set(k, v)
     }
   }
 

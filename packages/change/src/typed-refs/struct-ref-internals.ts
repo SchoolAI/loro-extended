@@ -13,7 +13,12 @@ import type {
   ValueShape,
 } from "../shape.js"
 import { isValueShape } from "../utils/type-guards.js"
-import { BaseRefInternals, type TypedRef, type TypedRefParams } from "./base.js"
+import {
+  BaseRefInternals,
+  INTERNAL_SYMBOL,
+  type TypedRef,
+  type TypedRefParams,
+} from "./base.js"
 import {
   absorbCachedPlainValues,
   assignPlainValueToTypedRef,
@@ -168,6 +173,24 @@ export class StructRefInternals<
       this.propertyCache,
       () => this.getContainer() as LoroMap,
     )
+  }
+
+  /** Force materialization of the container and its nested containers */
+  override materialize(): void {
+    // Ensure this container exists
+    this.getContainer()
+
+    // Recursively materialize nested containers
+    const structShape = this.getShape() as StructContainerShape<NestedShapes>
+    for (const key in structShape.shapes) {
+      const shape = structShape.shapes[key]
+      if (!isValueShape(shape)) {
+        // Get the ref (which creates it if needed)
+        const ref = this.getOrCreateRef(key, shape) as TypedRef<any>
+        // Force materialization
+        ref[INTERNAL_SYMBOL].materialize()
+      }
+    }
   }
 
   /** Create the loro namespace for struct */

@@ -197,6 +197,12 @@ export function assignPlainValueToTypedRef(
 ): boolean {
   // Access internals via INTERNAL_SYMBOL
   const internals = ref[INTERNAL_SYMBOL]
+
+  // Force materialization of the container
+  if (internals) {
+    internals.materialize()
+  }
+
   const shape = internals?.getShape?.() ?? (ref as any).shape
   const shapeType = shape?._type
 

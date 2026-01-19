@@ -111,6 +111,13 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
     }
   }
 
+  /** Force materialization of the container and its nested containers */
+  materialize(): void {
+    // Ensure data ref is created and materialized
+    const dataRef = this.getOrCreateDataRef()
+    dataRef[INTERNAL_SYMBOL].materialize()
+  }
+
   /** Get the loro namespace (cached) */
   getLoroNamespace(): LoroTreeNodeRef {
     if (!this.loroNamespace) {

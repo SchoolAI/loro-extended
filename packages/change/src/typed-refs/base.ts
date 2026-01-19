@@ -23,6 +23,8 @@ export const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
 export interface RefInternalsBase {
   /** Absorb mutated plain values back into Loro containers */
   absorbPlainValues(): void
+  /** Force materialization of the container and its nested containers */
+  materialize(): void
 }
 
 // ============================================================================
@@ -138,6 +140,11 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
 
   /** Absorb mutated plain values back into Loro containers - subclasses override */
   abstract absorbPlainValues(): void
+
+  /** Force materialization of the container and its nested containers */
+  materialize(): void {
+    this.getContainer()
+  }
 
   /** Create the loro() namespace object - subclasses override for specific types */
   protected createLoroNamespace(): LoroRefBase {

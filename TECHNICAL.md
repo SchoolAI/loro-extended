@@ -78,6 +78,38 @@ This ensures subscribers see **complete data** on the first notification, not pa
 
 The `setSuppressAutoCommit()` mechanism is reentrant-safe - it tracks whether suppression was already active to avoid double-restoring.
 
+### Nested Container Materialization
+
+**Problem**: CRDTs require deterministic container IDs across peers. When a struct is created with an empty nested container (e.g., `{ answers: {} }`), the nested `LoroMap` must be created immediately—not lazily on first access. Otherwise, each peer creates its own container with a different ID, causing sync failures.
+
+**Solution**: Eager materialization for statically-known structures:
+
+| Container Type | Materialization Strategy |
+|----------------|-------------------------|
+| `Struct` | **Eager** - all nested containers created on initialization |
+| `Doc` | **Eager** - all root containers created on initialization |
+| `Record` | **Lazy** until `set()`, then eager for item's nested struct |
+| `List` | **Lazy** until `push()`/`insert()`, then eager for item's nested struct |
+| `Tree` | **Lazy** until `createNode()`, then eager for node's data struct |
+
+**Implementation**:
+
+1. `StructRefInternals.materialize()` recursively creates all nested containers defined in the schema
+2. `assignPlainValueToTypedRef()` calls `materialize()` before assigning values
+3. `convertStructInput()` iterates over **schema keys** (not just value keys) to create containers for missing fields
+
+**Key Insight**: The creator of a data structure is responsible for materializing all its nested containers. This ensures container IDs are deterministic and consistent across peers.
+
+```typescript
+// ❌ Bug: Empty nested container may not materialize
+recordRef.set("item-1", { id: "item-1", metadata: {} })
+
+// ✅ Fixed: materialize() is called automatically, creating the nested LoroMap
+// Container ID is now deterministic across all peers
+```
+
+See `packages/change/NESTED_CONTAINER_MATERIALIZATION_BUG.md` for the full bug report and resolution.
+
 ### Infer<> vs InferRaw<> and Type Boundaries
 
 The `@loro-extended/change` package provides two type inference utilities:
