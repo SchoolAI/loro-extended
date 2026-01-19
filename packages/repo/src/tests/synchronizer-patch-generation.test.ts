@@ -58,7 +58,7 @@ class MockAdapter extends Adapter<{ name: string }> {
 describe("Synchronizer - Patch Generation", () => {
   let mockAdapter: MockAdapter
   let patches: Patch[]
-  let onPatch: ReturnType<typeof vi.fn>
+  let onPatch: (newPatches: Patch[]) => void
 
   beforeEach(() => {
     patches = []

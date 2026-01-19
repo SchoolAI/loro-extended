@@ -178,8 +178,9 @@ const result = await Bun.build({
 if (!result.success) throw new AggregateError(result.logs, "Build failed")
 
 // Start the server
+const port = Number(process.env.PORT) || 5173
 Bun.serve<BunWsData>({
-  port: 5173,
+  port,
   async fetch(req, server) {
     const url = new URL(req.url)
 
@@ -201,7 +202,7 @@ Bun.serve<BunWsData>({
 
 console.log(`
 🔍 Username Checker - Askforce RPC Demo
-   http://localhost:5173
+   http://localhost:${port}
 
    This demo shows how Askforce RPC replaces REST APIs.
    No HTTP endpoints - just CRDT sync!

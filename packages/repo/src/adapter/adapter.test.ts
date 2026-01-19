@@ -6,7 +6,7 @@ import type {
   ConnectedChannel,
   GeneratedChannel,
 } from "../channel.js"
-import type { AdapterType, PeerID, PeerIdentityDetails } from "../types.js"
+import type { AdapterType, PeerID } from "../types.js"
 import { Adapter, type AdapterContext } from "./adapter.js"
 import type { SendInterceptorContext } from "./interceptor.js"
 
@@ -58,14 +58,7 @@ class MockAdapter extends Adapter<string> {
 
 describe("Adapter", () => {
   let adapter: MockAdapter
-  let context: {
-    identity: PeerIdentityDetails
-    logger: typeof mockLogger
-    onChannelAdded: ReturnType<typeof vi.fn>
-    onChannelRemoved: ReturnType<typeof vi.fn>
-    onChannelReceive: ReturnType<typeof vi.fn>
-    onChannelEstablish: ReturnType<typeof vi.fn>
-  }
+  let context: AdapterContext
 
   beforeEach(() => {
     adapter = new MockAdapter()
@@ -76,7 +69,7 @@ describe("Adapter", () => {
       onChannelRemoved: vi.fn(),
       onChannelReceive: vi.fn(),
       onChannelEstablish: vi.fn(),
-    }
+    } as AdapterContext
   })
 
   describe("Lifecycle State Management", () => {
@@ -315,7 +308,7 @@ describe("Adapter", () => {
       adapter.testAddChannel("test-context")
 
       // Create new context
-      const newContext: AdapterContext = {
+      const newContext = {
         identity: {
           peerId: "0" satisfies PeerID,
           name: "test-peer",
@@ -326,7 +319,7 @@ describe("Adapter", () => {
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),
         onChannelEstablish: vi.fn(),
-      }
+      } as AdapterContext
 
       // Stop and re-initialize with new context
       await adapter._stop()
@@ -655,7 +648,7 @@ describe("Adapter", () => {
       }
 
       const adapter = new OnStartChannelAdapter({ adapterType: "test-adapter" })
-      const onStartContext: AdapterContext = {
+      const onStartContext = {
         identity: {
           peerId: "0" satisfies PeerID,
           name: "test-peer",
@@ -666,7 +659,7 @@ describe("Adapter", () => {
         onChannelRemoved: vi.fn(),
         onChannelReceive: vi.fn(),
         onChannelEstablish: vi.fn(),
-      }
+      } as AdapterContext
       adapter._initialize(onStartContext)
 
       // Should not throw

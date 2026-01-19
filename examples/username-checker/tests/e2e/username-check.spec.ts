@@ -60,7 +60,8 @@ test.describe("Username Checker RPC Sync", () => {
     page,
   }) => {
     // Test with a username that should be available
-    const uniqueUsername = `testuser_${Date.now()}`
+    // Use base36 encoding to keep username under 20 chars (e.g., "user_m5x7abc" = 12 chars)
+    const uniqueUsername = `user_${Date.now().toString(36)}`
 
     await checkUsername(page, uniqueUsername)
 

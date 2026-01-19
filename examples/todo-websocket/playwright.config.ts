@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test"
 
-const port = Number(process.env.PORT) || 5173
+// Use a unique port for e2e tests to avoid conflicts with other examples
+// Port allocation: todo-sse uses 8000/8001, username-checker uses 8002, todo-websocket uses 8003
+const port = 8003
 
 export default defineConfig({
   testDir: "./tests/e2e",

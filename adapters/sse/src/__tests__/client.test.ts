@@ -21,27 +21,42 @@ function createSyncRequest(): ChannelMsgSyncRequest {
   }
 }
 
-// Store the current mock instance
-let currentMockEventSource: {
+// Type for the mock EventSource
+type MockEventSourceType = {
   readyState: number
   onopen: ((event: Event) => void) | null
   onmessage: ((event: MessageEvent) => void) | null
   onerror: ((event: Event) => void) | null
   close: ReturnType<typeof vi.fn>
-} | null = null
+}
 
-vi.mock("reconnecting-eventsource", () => ({
-  default: vi.fn().mockImplementation(() => {
-    currentMockEventSource = {
-      readyState: 1, // OPEN
-      onopen: null,
-      onmessage: null,
-      onerror: null,
-      close: vi.fn(),
-    }
-    return currentMockEventSource
-  }),
-}))
+// Store the current mock instance - use globalThis to share between hoisted mock and test code
+declare global {
+  // eslint-disable-next-line no-var
+  var __mockEventSource: MockEventSourceType | null
+}
+
+globalThis.__mockEventSource = null
+
+// Helper to get the current mock event source
+const mockES = () => globalThis.__mockEventSource
+
+vi.mock("reconnecting-eventsource", () => {
+  // Mock class for ReconnectingEventSource (vitest v4 requires class/function for constructors)
+  return {
+    default: class MockReconnectingEventSource {
+      readyState = 1 // OPEN
+      onopen: ((event: Event) => void) | null = null
+      onmessage: ((event: MessageEvent) => void) | null = null
+      onerror: ((event: Event) => void) | null = null
+      close = vi.fn()
+
+      constructor() {
+        globalThis.__mockEventSource = this
+      }
+    },
+  }
+})
 
 // Mock fetch
 const mockFetch = vi.fn()
@@ -65,7 +80,7 @@ describe("SseClientNetworkAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    currentMockEventSource = null
+    globalThis.__mockEventSource = null
     mockFetch.mockResolvedValue({ ok: true })
 
     adapter = new SseClientNetworkAdapter({
@@ -97,10 +112,10 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // EventSource should be created
-      expect(currentMockEventSource).not.toBeNull()
+      expect(mockES()).not.toBeNull()
 
       // Trigger onopen to create channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       expect(adapter.channels.size).toBe(1)
     })
@@ -129,10 +144,10 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // EventSource should be created with handlers
-      expect(currentMockEventSource).not.toBeNull()
-      expect(currentMockEventSource?.onopen).toBeDefined()
-      expect(currentMockEventSource?.onmessage).toBeDefined()
-      expect(currentMockEventSource?.onerror).toBeDefined()
+      expect(mockES()).not.toBeNull()
+      expect(mockES()?.onopen).toBeDefined()
+      expect(mockES()?.onmessage).toBeDefined()
+      expect(mockES()?.onerror).toBeDefined()
     })
 
     it("creates channel on EventSource open", async () => {
@@ -142,7 +157,7 @@ describe("SseClientNetworkAdapter", () => {
       expect(adapter.channels.size).toBe(0)
 
       // Simulate EventSource open
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       expect(adapter.channels.size).toBe(1)
       expect(context.onChannelAdded).toHaveBeenCalledTimes(1)
@@ -153,11 +168,11 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create channel first
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       expect(adapter.channels.size).toBe(1)
 
       // Simulate error
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
 
       // Channel should still exist (waiting for max attempts)
       expect(adapter.channels.size).toBe(1)
@@ -168,11 +183,11 @@ describe("SseClientNetworkAdapter", () => {
       adapter._initialize(context)
       await adapter._start()
 
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       await adapter._stop()
 
-      expect(currentMockEventSource?.close).toHaveBeenCalled()
+      expect(mockES()?.close).toHaveBeenCalled()
       expect(adapter.channels.size).toBe(0)
     })
   })
@@ -183,17 +198,18 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       // Store reference to the old EventSource before it gets replaced
-      if (!currentMockEventSource) {
+      const es = mockES()
+      if (!es) {
         throw new Error("EventSource should be created")
       }
-      const oldEventSource = currentMockEventSource
+      const oldEventSource = es
 
       // Simulate EventSource being closed
-      currentMockEventSource.readyState = 2 // CLOSED
+      es.readyState = 2 // CLOSED
 
       // Try to send a message - Send should trigger reconnection, not throw
       await channel.send(createSyncRequest())
@@ -207,14 +223,15 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       // Simulate EventSource being closed
-      if (!currentMockEventSource) {
+      const es = mockES()
+      if (!es) {
         throw new Error("EventSource should be created")
       }
-      currentMockEventSource.readyState = 2 // CLOSED
+      es.readyState = 2 // CLOSED
 
       // Try to send a message
       await channel.send(createSyncRequest())
@@ -228,14 +245,15 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       // EventSource is open (readyState = 1)
-      if (!currentMockEventSource) {
+      const es = mockES()
+      if (!es) {
         throw new Error("EventSource should be created")
       }
-      currentMockEventSource.readyState = 1
+      es.readyState = 1
 
       // Send a message
       await channel.send(createSyncRequest())
@@ -258,14 +276,14 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create initial channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       expect(adapter.channels.size).toBe(1)
       expect(context.onChannelAdded).toHaveBeenCalledTimes(1)
 
       const originalChannelId = Array.from(adapter.channels)[0].channelId
 
       // Simulate reconnection by triggering onopen again
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Should preserve existing channel
       expect(adapter.channels.size).toBe(1)
@@ -281,7 +299,7 @@ describe("SseClientNetworkAdapter", () => {
       await adapter._start()
 
       // Create channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Simulate receiving a message
       const messageData = {
@@ -289,7 +307,7 @@ describe("SseClientNetworkAdapter", () => {
         identity: { peerId: "server-peer", name: "Server", type: "service" },
       }
 
-      currentMockEventSource?.onmessage?.({
+      mockES()?.onmessage?.({
         data: JSON.stringify(messageData),
       } as MessageEvent)
 
@@ -308,7 +326,7 @@ describe("SseClientNetworkAdapter", () => {
         identity: { peerId: "server-peer", name: "Server", type: "service" },
       }
 
-      currentMockEventSource?.onmessage?.({
+      mockES()?.onmessage?.({
         data: JSON.stringify(messageData),
       } as MessageEvent)
 
@@ -323,7 +341,7 @@ describe("SseClientNetworkAdapter", () => {
       adapter._initialize(context)
       await adapter._start()
 
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       // Manually clear peerId to simulate uninitialized state
@@ -343,7 +361,7 @@ describe("SseClientNetworkAdapter", () => {
       adapter._initialize(context)
       await adapter._start()
 
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       await expect(channel.send(createSyncRequest())).rejects.toThrow(
@@ -374,7 +392,7 @@ describe("SseClientNetworkAdapter", () => {
       adapter._initialize(context)
       await adapter._start()
 
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       expect(adapter.connectionState).toBe("connected")
     })
@@ -382,10 +400,10 @@ describe("SseClientNetworkAdapter", () => {
     it("transitions to 'reconnecting' on error (not 'disconnected')", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Simulate error
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
 
       expect(adapter.connectionState).toBe("reconnecting")
       // Channel should NOT be removed yet
@@ -395,13 +413,13 @@ describe("SseClientNetworkAdapter", () => {
     it("returns to 'connected' when EventSource reconnects after error", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Simulate error then reconnect
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.connectionState).toBe("reconnecting")
 
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       expect(adapter.connectionState).toBe("connected")
     })
   })
@@ -410,29 +428,29 @@ describe("SseClientNetworkAdapter", () => {
     it("increments reconnectAttempts on each error", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       expect(adapter.reconnectAttempts).toBe(0)
 
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.reconnectAttempts).toBe(1)
 
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.reconnectAttempts).toBe(2)
     })
 
     it("resets reconnectAttempts to 0 on successful reconnection", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Simulate multiple errors
-      currentMockEventSource?.onerror?.(new Event("error"))
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.reconnectAttempts).toBe(2)
 
       // Successful reconnection
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       expect(adapter.reconnectAttempts).toBe(0)
     })
 
@@ -444,17 +462,17 @@ describe("SseClientNetworkAdapter", () => {
       })
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // First two errors - channel should remain
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.channels.size).toBe(1)
 
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.channels.size).toBe(1)
 
       // Third error - max reached, channel should be removed
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.channels.size).toBe(0)
       expect(adapter.connectionState).toBe("disconnected")
     })
@@ -464,12 +482,12 @@ describe("SseClientNetworkAdapter", () => {
     it("keeps the same channel during reconnection attempts", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       const originalChannelId = Array.from(adapter.channels)[0].channelId
 
       // Error occurs
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
 
       // Channel should still exist with same ID
       expect(adapter.channels.size).toBe(1)
@@ -479,12 +497,13 @@ describe("SseClientNetworkAdapter", () => {
     it("preserves channel when reconnect() is triggered by send on closed socket", async () => {
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       const originalChannelId = Array.from(adapter.channels)[0].channelId
 
       // Simulate closed socket
-      if (currentMockEventSource) currentMockEventSource.readyState = 2 // CLOSED
+      const es = mockES()
+      if (es) es.readyState = 2 // CLOSED
 
       // Trigger send, which triggers reconnect()
       const channel = Array.from(adapter.channels)[0]
@@ -504,17 +523,17 @@ describe("SseClientNetworkAdapter", () => {
       })
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       const originalChannelId = Array.from(adapter.channels)[0].channelId
 
       // Max attempts reached - channel removed
-      currentMockEventSource?.onerror?.(new Event("error"))
-      currentMockEventSource?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
+      mockES()?.onerror?.(new Event("error"))
       expect(adapter.channels.size).toBe(0)
 
       // New connection - new channel
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       expect(adapter.channels.size).toBe(1)
       expect(Array.from(adapter.channels)[0].channelId).not.toBe(
         originalChannelId,
@@ -531,7 +550,7 @@ describe("SseClientNetworkAdapter", () => {
 
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       await channel.send(createSyncRequest())
@@ -552,7 +571,7 @@ describe("SseClientNetworkAdapter", () => {
 
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       await expect(channel.send(createSyncRequest())).rejects.toThrow(
@@ -586,7 +605,7 @@ describe("SseClientNetworkAdapter", () => {
 
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       const sendPromise = channel.send(createSyncRequest())
@@ -616,7 +635,7 @@ describe("SseClientNetworkAdapter", () => {
 
       adapter._initialize(context)
       await adapter._start()
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
       const channel = Array.from(adapter.channels)[0]
 
       const sendPromise = channel.send(createSyncRequest())
@@ -625,7 +644,7 @@ describe("SseClientNetworkAdapter", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1)
 
       // Simulate EventSource reconnect before retry happens
-      currentMockEventSource?.onopen?.(new Event("open"))
+      mockES()?.onopen?.(new Event("open"))
 
       // Advance time past retry delay AND wait for rejection
       // We use Promise.all to ensure we catch the rejection as it happens

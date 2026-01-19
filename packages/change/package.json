@@ -30,7 +30,7 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.17"
   },
   "peerDependencies": {
     "loro-crdt": "^1.10.3"

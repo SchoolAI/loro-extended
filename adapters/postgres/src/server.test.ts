@@ -162,7 +162,7 @@ describe("PostgresStorageAdapter", () => {
       expect(loadedData).toEqual(data)
     })
 
-    it("should handle large data", async () => {
+    it("should handle large data", { timeout: 30000 }, async () => {
       const key: StorageKey = ["largeDoc"]
       // Create 1MB of data
       const data = new Uint8Array(1024 * 1024)
