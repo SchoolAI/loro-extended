@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/server.ts",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "dependencies": {
     "@loro-extended/adapter-websocket": "workspace:^",

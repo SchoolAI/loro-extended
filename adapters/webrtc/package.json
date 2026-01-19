@@ -18,7 +18,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^"

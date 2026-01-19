@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "dependencies": {
     "@loro-extended/adapter-postgres": "workspace:^",
@@ -20,6 +21,7 @@
     "@types/node": "^22.15.29",
     "@types/pg": "^8.11.6",
     "tsx": "^4.19.4",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

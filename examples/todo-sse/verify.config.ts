@@ -24,6 +24,12 @@ export default defineConfig({
       ],
     },
     {
+      key: "logic",
+      run: "vitest run",
+      parser: parsers.vitest,
+      reportingDependsOn: ["format", "types"],
+    },
+    {
       key: "test-e2e",
       run: "playwright test",
       reportingDependsOn: ["format", "types"],

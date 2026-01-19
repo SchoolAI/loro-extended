@@ -22,7 +22,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260103.1",

@@ -22,7 +22,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "dependencies": {
     "@loro-extended/hooks-core": "workspace:^",
@@ -30,8 +31,10 @@
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "jsdom": "^26.1.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "hono": ">=4",

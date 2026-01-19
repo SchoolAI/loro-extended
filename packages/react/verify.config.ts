@@ -13,8 +13,12 @@ export default defineConfig({
       parser: parsers.tsc,
       reportingDependsOn: ["format"],
     },
-    // Tests for hooks have been moved to @loro-extended/hooks-core
-    // This package only contains React-specific bindings
+    {
+      key: "logic",
+      run: "vitest run",
+      parser: parsers.vitest,
+      reportingDependsOn: ["format", "types"],
+    },
   ],
   env: {
     NO_COLOR: "1",

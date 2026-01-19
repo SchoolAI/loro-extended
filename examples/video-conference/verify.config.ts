@@ -24,7 +24,7 @@ export default defineConfig({
       ],
     },
     {
-      key: "test",
+      key: "logic",
       run: "vitest run",
       parser: parsers.vitest,
     },

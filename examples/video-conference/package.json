@@ -12,7 +12,8 @@
     "dev:server": "tsx --watch src/server/server.ts",
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
-    "verify": "verify"
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",

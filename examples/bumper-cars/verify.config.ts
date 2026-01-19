@@ -23,6 +23,12 @@ export default defineConfig({
         },
       ],
     },
+    {
+      key: "logic",
+      run: "vitest run",
+      parser: parsers.vitest,
+      reportingDependsOn: ["format", "types"],
+    },
   ],
   env: {
     NO_COLOR: "1",

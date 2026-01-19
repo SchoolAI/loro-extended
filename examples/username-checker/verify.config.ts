@@ -14,7 +14,7 @@ export default defineConfig({
       reportingDependsOn: ["format"],
     },
     {
-      key: "test",
+      key: "logic",
       run: "playwright test",
       parser: parsers.vitest, // Playwright output is similar enough to vitest
       reportingDependsOn: ["types"],

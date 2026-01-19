@@ -14,7 +14,7 @@ export default defineConfig({
       reportingDependsOn: ["format"],
     },
     // {
-    //   key: "test",
+    //   key: "logic",
     //   run: "vitest run",
     //   parser: parsers.vitest,
     //   reportingDependsOn: ["format", "types"],
