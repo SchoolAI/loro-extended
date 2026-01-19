@@ -1,0 +1,6 @@
+# Force Bun to use the nodejs entry point for loro-crdt
+# This avoids the top-level await issue in the bundler entry point
+
+[resolve]
+# Alias loro-crdt to its nodejs entry point
+alias = { "loro-crdt" = "loro-crdt/nodejs/index.js" }
