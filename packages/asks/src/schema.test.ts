@@ -1,10 +1,10 @@
 import { Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
-import { createAskforceSchema } from "./schema.js"
+import { createAskSchema } from "./schema.js"
 
-describe("createAskforceSchema", () => {
+describe("createAskSchema", () => {
   it("creates a record schema with the correct structure", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -14,7 +14,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("includes all required fields in the ask entry schema", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -28,7 +28,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("creates answers as a record of discriminated unions", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -40,7 +40,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("discriminated union has pending, answered, and failed variants", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -55,7 +55,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("pending variant has claimedAt field", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -68,7 +68,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("answered variant has data and answeredAt fields", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )
@@ -82,7 +82,7 @@ describe("createAskforceSchema", () => {
   })
 
   it("failed variant has reason and failedAt fields", () => {
-    const schema = createAskforceSchema(
+    const schema = createAskSchema(
       Shape.plain.struct({ query: Shape.plain.string() }),
       Shape.plain.struct({ result: Shape.plain.string() }),
     )

@@ -4,7 +4,7 @@
 "@loro-extended/change": patch
 "@loro-extended/hono": patch
 "@loro-extended/hooks-core": patch
-"@loro-extended/askforce": patch
+"@loro-extended/asks": patch
 "@loro-extended/adapter-http-polling": patch
 "@loro-extended/adapter-indexeddb": patch
 "@loro-extended/adapter-leveldb": patch

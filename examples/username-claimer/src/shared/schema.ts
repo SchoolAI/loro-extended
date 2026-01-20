@@ -1,4 +1,4 @@
-import { createAskforceSchema } from "@loro-extended/askforce"
+import { createAskSchema } from "@loro-extended/asks"
 import { type Infer, Shape } from "@loro-extended/change"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -46,17 +46,14 @@ export function isValidUsername(username: string): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Askforce Schema - Creates the RPC queue structure
+// Asks Schema - Creates the RPC queue structure
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * The Askforce schema wraps Question/Answer into a CRDT-backed RPC queue.
+ * The Asks schema wraps Question/Answer into a CRDT-backed RPC queue.
  * Each "ask" becomes an entry in this record, keyed by ask ID.
  */
-export const UsernameRpcSchema = createAskforceSchema(
-  QuestionSchema,
-  AnswerSchema,
-)
+export const UsernameRpcSchema = createAskSchema(QuestionSchema, AnswerSchema)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Claimed Username Schema - For tracking claimed usernames
@@ -78,7 +75,7 @@ export type ClaimedUsername = Infer<typeof ClaimedUsernameSchema>
 
 /**
  * RPC Document - Client-writable
- * Contains the Askforce RPC queue for question/answer communication.
+ * Contains the Asks RPC queue for question/answer communication.
  */
 export const RpcDocSchema = Shape.doc({
   rpc: UsernameRpcSchema,
@@ -104,11 +101,11 @@ export const DocSchema = RpcDocSchema
 export type Doc = RpcDoc
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Worker Presence Schema - For Askforce coordination
+// Worker Presence Schema - For Asks coordination
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Worker presence is used by Askforce to track active workers.
+ * Worker presence is used by Asks to track active workers.
  * This enables features like staggered claiming in Pool mode.
  */
 export const WorkerPresenceSchema = Shape.plain.struct({

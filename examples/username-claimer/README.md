@@ -1,6 +1,6 @@
-# Username Claimer - Askforce RPC Demo
+# Username Claimer - Asks RPC Demo
 
-This example demonstrates how **Askforce RPC** replaces traditional REST APIs for a common web pattern: claiming usernames during signup. It showcases real-time CRDT sync, offline capability, and connection state management.
+This example demonstrates how **Asks RPC** replaces traditional REST APIs for a common web pattern: claiming usernames during signup. It showcases real-time CRDT sync, offline capability, and connection state management.
 
 ## Quick Start
 
@@ -45,17 +45,17 @@ app.post('/api/claim-username', async (req, res) => {
 })
 ```
 
-### The Askforce RPC Solution
+### The Asks RPC Solution
 
-With Askforce, the same pattern becomes:
+With Asks, the same pattern becomes:
 
 ```typescript
 // Client
-const askId = askforce.ask({ username })
-const answer = await askforce.waitFor(askId)
+const askId = asks.ask({ username })
+const answer = await asks.waitFor(askId)
 
 // Server
-askforce.onAsk(async (askId, question) => {
+asks.onAsk(async (askId, question) => {
   const { username } = question
   // ... validation and persistence logic
   return { claimed: true }
@@ -64,7 +64,7 @@ askforce.onAsk(async (askId, question) => {
 
 ## Benefits
 
-| Feature | REST | Askforce RPC |
+| Feature | REST | Asks RPC |
 |---------|------|--------------|
 | Type Safety | Manual (OpenAPI, etc.) | Built-in via schemas |
 | Offline Support | None | Claims queue automatically |
@@ -80,7 +80,7 @@ askforce.onAsk(async (askId, question) => {
 │                                                                 │
 │   Browser                              Server                   │
 │   ┌─────────────┐                     ┌─────────────┐          │
-│   │ askforce    │                     │ askforce    │          │
+│   │ asks        │                     │ asks        │          │
 │   │ .ask()      │──── WebSocket ─────▶│ .onAsk()    │          │
 │   │ .waitFor()  │◀─── CRDT Sync ──────│ return {...}│          │
 │   └─────────────┘                     └─────────────┘          │
@@ -104,8 +104,8 @@ askforce.onAsk(async (askId, question) => {
 
 ```
 src/
-├── server.ts              # Bun server + Askforce onAsk handler
-├── app.tsx                # React UI + Askforce ask/waitFor
+├── server.ts              # Bun server + Asks onAsk handler
+├── app.tsx                # React UI + Asks ask/waitFor
 ├── config.ts              # Centralized timeout and limit constants
 ├── styles.css             # Styling with animations
 ├── use-connection-state.ts # Hook for WebSocket connection state
@@ -137,7 +137,7 @@ The demo uses **two separate CRDT documents** with different permissions:
 
 | Document | Purpose | Permissions |
 |----------|---------|-------------|
-| `username-rpc` | Askforce RPC queue | Client-writable |
+| `username-rpc` | Asks RPC queue | Client-writable |
 | `claimed-usernames` | List of claimed usernames | Server-only |
 
 This is configured via the Loro Extended permissions system:
@@ -237,7 +237,7 @@ const repo = new Repo({
 const rpcHandle = repo.get("username-rpc", RpcDocSchema, EphemeralDeclarations)
 const claimedHandle = repo.get("claimed-usernames", ClaimedUsernamesDocSchema)
 
-askforce.onAsk(async (askId, question) => {
+asks.onAsk(async (askId, question) => {
   const { username } = question
   
   // ... validation logic ...
@@ -261,8 +261,8 @@ const rpcHandle = useHandle("username-rpc", RpcDocSchema, EphemeralDeclarations)
 const claimedHandle = useHandle("claimed-usernames", ClaimedUsernamesDocSchema)
 const claimedDoc = useDoc(claimedHandle)
 
-// Askforce uses the RPC handle
-const askforce = new Askforce(rpcHandle.doc.rpc, rpcHandle.presence, { ... })
+// Asks uses the RPC handle
+const asks = new Asks(rpcHandle.doc.rpc, rpcHandle.presence, { ... })
 
 // Read claimed usernames from server-only document
 const claimedUsernames = claimedDoc.claimedUsernames
@@ -281,8 +281,8 @@ const claimUsername = async () => {
   }
   
   setClaimState({ status: "claiming", username: trimmedUsername })
-  const askId = askforce.ask({ username })
-  const answer = await askforce.waitFor(askId, TIMEOUTS.RPC_RESPONSE)
+  const askId = asks.ask({ username })
+  const answer = await asks.waitFor(askId, TIMEOUTS.RPC_RESPONSE)
   setClaimState({ status: "success", username: trimmedUsername, answer })
 }
 ```
@@ -302,5 +302,5 @@ The following usernames are reserved and cannot be claimed:
 
 ## Learn More
 
-- [Askforce README](../../packages/askforce/README.md) - Full API documentation
+- [Asks README](../../packages/asks/README.md) - Full API documentation
 - [Loro Extended Docs](../../docs/) - Architecture and concepts

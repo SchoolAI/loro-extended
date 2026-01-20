@@ -1,5 +1,5 @@
 ---
-"@loro-extended/askforce": minor
+"@loro-extended/asks": minor
 ---
 
 Engineering improvements for reliability and maintainability.
@@ -7,7 +7,7 @@ Engineering improvements for reliability and maintainability.
 **Changes:**
 - Ask IDs now use cryptographically secure UUIDs (via `generateUUID` from repo)
 - Errors now include context (askId, peerId, mode, timeoutMs) for easier debugging
-- New `AskforceError` class exported for structured error handling
+- New `AsksError` class exported for structured error handling
 - Reduced unsafe `any` type assertions with type guards
 
 **Removed from public API:**

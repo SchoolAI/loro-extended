@@ -1,10 +1,10 @@
-# @loro-extended/askforce
+# @loro-extended/asks
 
 P2P-native work exchange pattern using the question/answer metaphor.
 
 ## Overview
 
-Askforce provides a type-safe, composable pattern for P2P work exchange that:
+Asks provides a type-safe, composable pattern for P2P work exchange that:
 
 - Leverages CRDT primitives for coordination (not reinventing them)
 - Supports multiple independent queues per document
@@ -14,23 +14,23 @@ Askforce provides a type-safe, composable pattern for P2P work exchange that:
 ## Installation
 
 ```bash
-pnpm add @loro-extended/askforce
+pnpm add @loro-extended/asks
 ```
 
 ## Quick Start
 
 ```typescript
-import { Askforce, createAskforceSchema } from "@loro-extended/askforce"
+import { Asks, createAskSchema } from "@loro-extended/asks"
 import { Shape } from "@loro-extended/change"
 
 // Define your question and answer schemas
-const MyQueueSchema = createAskforceSchema(
+const MyQueueSchema = createAskSchema(
   Shape.plain.struct({ query: Shape.plain.string() }),   // Question
   Shape.plain.struct({ result: Shape.plain.string() })   // Answer
 )
 
-// Create an Askforce instance
-const askforce = new Askforce(
+// Create an Asks instance
+const asks = new Asks(
   recordRef,      // StructRef to the queue record
   ephemeral,      // TypedEphemeral for worker presence
   { 
@@ -40,10 +40,10 @@ const askforce = new Askforce(
 )
 
 // Ask a question
-const askId = askforce.ask({ query: "What is 2+2?" })
+const askId = asks.ask({ query: "What is 2+2?" })
 
 // Wait for an answer
-const answer = await askforce.waitFor(askId)
+const answer = await asks.waitFor(askId)
 console.log(answer.result) // "4"
 ```
 
@@ -54,7 +54,7 @@ console.log(answer.result) // "4"
 Use RPC mode when you have exactly one worker that will answer each question.
 
 ```typescript
-const askforce = new Askforce(recordRef, ephemeral, {
+const asks = new Asks(recordRef, ephemeral, {
   peerId: "client",
   mode: "rpc"
 })
@@ -71,7 +71,7 @@ const askforce = new Askforce(recordRef, ephemeral, {
 Use Pool mode when multiple workers may process the same question.
 
 ```typescript
-const askforce = new Askforce(recordRef, ephemeral, {
+const asks = new Asks(recordRef, ephemeral, {
   peerId: "worker-1",
   mode: "pool"
 })
@@ -86,7 +86,7 @@ const askforce = new Askforce(recordRef, ephemeral, {
 
 ### Pool Mode Efficiency
 
-In Pool mode, Askforce uses staggered claiming to minimize duplicate work:
+In Pool mode, Asks uses staggered claiming to minimize duplicate work:
 
 1. Each ask has a deterministic "priority worker" based on the ask ID
 2. The priority worker claims immediately
@@ -98,7 +98,7 @@ providing resilience if the priority worker is slow or unavailable.
 Configure the claim window:
 
 ```typescript
-const askforce = new Askforce(recordRef, ephemeral, {
+const asks = new Asks(recordRef, ephemeral, {
   peerId: "worker-1",
   mode: "pool",
   claimWindowMs: 1000, // Wait 1 second before non-priority workers claim
@@ -107,14 +107,14 @@ const askforce = new Askforce(recordRef, ephemeral, {
 
 ## API
 
-### `Askforce<Q, A>`
+### `Asks<Q, A>`
 
 The main class for work exchange.
 
 #### Constructor
 
 ```typescript
-new Askforce<QuestionShape, AnswerShape>(
+new Asks<QuestionShape, AnswerShape>(
   recordRef: RecordRef<StructRef<any>>,
   ephemeral: TypedEphemeral<WorkerPresence>,
   options: {
@@ -134,12 +134,12 @@ new Askforce<QuestionShape, AnswerShape>(
 - `allAnswers(askId): Array<{workerId, data, answeredAt}>` - Get all answers (Pool mode)
 - `dispose(): void` - Clean up resources
 
-### `createAskforceSchema<Q, A>(questionSchema, answerSchema)`
+### `createAskSchema<Q, A>(questionSchema, answerSchema)`
 
-Factory function to create a typed Askforce schema.
+Factory function to create a typed Asks schema.
 
 ```typescript
-const schema = createAskforceSchema(
+const schema = createAskSchema(
   Shape.plain.struct({ query: Shape.plain.string() }),
   Shape.plain.struct({ result: Shape.plain.string() })
 )
@@ -147,7 +147,7 @@ const schema = createAskforceSchema(
 
 ## Worker Presence
 
-Askforce uses EphemeralStore for worker presence and discovery.
+Asks uses EphemeralStore for worker presence and discovery.
 
 ```typescript
 interface WorkerPresence {

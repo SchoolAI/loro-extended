@@ -240,7 +240,7 @@ expect(mockAdapter.sentMessages.length).toBeGreaterThan(0)
 
 ### Server-Authoritative Data with Client-Writable RPC
 
-When building RPC-style patterns (like Askforce), you often need:
+When building RPC-style patterns (like Asks), you often need:
 - **Client-writable data**: RPC queue for questions/requests
 - **Server-authoritative data**: Results, state, or records that only the server should modify
 

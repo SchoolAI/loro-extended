@@ -26,7 +26,7 @@ export type WorkerAnswerShape<A extends ValueShape> = ReturnType<
 
 /**
  * The shape type for an ask entry struct.
- * This is the nested shape inside the record returned by createAskforceSchema.
+ * This is the nested shape inside the record returned by createAskSchema.
  */
 export type AskEntryShape<
   Q extends ValueShape,
@@ -36,7 +36,7 @@ export type AskEntryShape<
 /**
  * The plain (JSON) type for an ask entry.
  * Defined explicitly using Q["_plain"] and A["_plain"] to preserve type identity.
- * This enables cast-free type checking throughout the Askforce class.
+ * This enables cast-free type checking throughout the Asks class.
  */
 export interface PlainAskEntry<Q extends ValueShape, A extends ValueShape> {
   id: string
@@ -88,7 +88,7 @@ function createAskEntrySchema<Q extends ValueShape, A extends ValueShape>(
 }
 
 /**
- * Creates a typed Askforce schema with question and answer validation.
+ * Creates a typed Asks schema with question and answer validation.
  *
  * @param questionSchema - The shape for the question data
  * @param answerSchema - The shape for the answer data
@@ -96,25 +96,25 @@ function createAskEntrySchema<Q extends ValueShape, A extends ValueShape>(
  *
  * @example
  * ```typescript
- * const MyQueueSchema = createAskforceSchema(
+ * const MyQueueSchema = createAskSchema(
  *   Shape.plain.struct({ query: Shape.plain.string() }),   // Question
  *   Shape.plain.struct({ result: Shape.plain.string() })   // Answer
  * );
  * // MyQueueSchema is Record<string, AskEntry> - keyed by ask ID
  * ```
  */
-export function createAskforceSchema<
-  Q extends ValueShape,
-  A extends ValueShape,
->(questionSchema: Q, answerSchema: A) {
+export function createAskSchema<Q extends ValueShape, A extends ValueShape>(
+  questionSchema: Q,
+  answerSchema: A,
+) {
   const AskEntrySchema = createAskEntrySchema(questionSchema, answerSchema)
 
-  // Return the record directly - Askforce wraps a StructRef to this
+  // Return the record directly - Asks wraps a StructRef to this
   return Shape.record(AskEntrySchema)
 }
 
 /**
- * Infer the question type from an Askforce schema.
+ * Infer the question type from an Asks schema.
  */
 export type InferQuestion<T> = T extends RecordContainerShape<
   StructContainerShape<infer Shapes>
@@ -125,7 +125,7 @@ export type InferQuestion<T> = T extends RecordContainerShape<
   : never
 
 /**
- * Infer the answer type from an Askforce schema.
+ * Infer the answer type from an Asks schema.
  */
 export type InferAnswer<T> = T extends RecordContainerShape<
   StructContainerShape<infer Shapes>

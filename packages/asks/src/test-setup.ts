@@ -1,4 +1,4 @@
-// Test setup for Askforce package
+// Test setup for Asks package
 // This file is run before each test file
 
 import { configure } from "@logtape/logtape"

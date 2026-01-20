@@ -51,9 +51,9 @@ export interface AskEntry<Q, A> {
 }
 
 /**
- * Options for creating an Askforce instance.
+ * Options for creating an Asks instance.
  */
-export interface AskforceOptions {
+export interface AsksOptions {
   /**
    * The peer ID of this instance.
    */
@@ -98,9 +98,9 @@ export interface WorkerPresence {
 }
 
 /**
- * Context information for Askforce errors.
+ * Context information for Asks errors.
  */
-export interface AskforceErrorContext {
+export interface AsksErrorContext {
   askId?: string
   peerId?: string
   mode?: "rpc" | "pool"
@@ -109,20 +109,15 @@ export interface AskforceErrorContext {
 }
 
 /**
- * Error class for Askforce operations with structured context.
+ * Error class for Asks operations with structured context.
  * Enables better debugging and programmatic error handling.
  */
-export class AskforceError extends Error {
-  public readonly context: AskforceErrorContext
+export class AsksError extends Error {
+  public readonly context: AsksErrorContext
 
-  constructor(message: string, context: AskforceErrorContext = {}) {
-    const contextStr = Object.entries(context)
-      .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-      .join(", ")
-    const fullMessage = contextStr ? `${message} (${contextStr})` : message
-    super(fullMessage)
-    this.name = "AskforceError"
+  constructor(message: string, context: AsksErrorContext = {}) {
+    super(message)
+    this.name = "AsksError"
     this.context = context
   }
 }

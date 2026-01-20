@@ -132,7 +132,7 @@ h1 {
   font-size: 0.95rem;
 }
 
-.askforce-link {
+.asks-link {
   color: #667eea;
   font-weight: 600;
   text-decoration: none;
@@ -140,7 +140,7 @@ h1 {
   transition: all 0.2s;
 }
 
-.askforce-link:hover {
+.asks-link:hover {
   color: #5a6fd6;
   border-bottom-style: solid;
 }

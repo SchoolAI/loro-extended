@@ -3,7 +3,7 @@ import {
   createBunWebSocketHandlers,
 } from "@loro-extended/adapter-websocket/bun"
 import { WsServerNetworkAdapter } from "@loro-extended/adapter-websocket/server"
-import { Askforce } from "@loro-extended/askforce"
+import { Asks } from "@loro-extended/asks"
 import { Repo } from "@loro-extended/repo"
 import { LIMITS } from "./config"
 import {
@@ -115,10 +115,10 @@ const claimedHandle = repo.get(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Askforce RPC Handler - This replaces your REST endpoint!
+// Asks RPC Handler - This replaces your REST endpoint!
 // ═══════════════════════════════════════════════════════════════════════════
 
-const askforce = new Askforce(rpcHandle.doc.rpc, rpcHandle.presence, {
+const asks = new Asks(rpcHandle.doc.rpc, rpcHandle.presence, {
   peerId: rpcHandle.peerId, // Use the Repo's peerId for consistency
   mode: "rpc", // Single server answers each request
 })
@@ -127,7 +127,7 @@ const askforce = new Askforce(rpcHandle.doc.rpc, rpcHandle.presence, {
 //   app.post('/api/claim-username', (req, res) => { ... })
 //
 // But instead of HTTP, it uses CRDT sync!
-askforce.onAsk(async (_askId, question): Promise<Answer> => {
+asks.onAsk(async (_askId, question): Promise<Answer> => {
   const { username } = question
 
   // Validate format
@@ -211,10 +211,10 @@ Bun.serve<BunWsData>({
 })
 
 console.log(`
-🔍 Username Claimer - Askforce RPC Demo
+🔍 Username Claimer - Asks RPC Demo
    http://localhost:${port}
 
-   This demo shows how Askforce RPC replaces REST APIs.
+   This demo shows how Asks RPC replaces REST APIs.
    No HTTP endpoints - just CRDT sync!
    
    Reserved usernames: ${[...reservedUsernames].join(", ")}

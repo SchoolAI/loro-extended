@@ -1,5 +1,5 @@
 /**
- * Test utilities for Askforce.
+ * Test utilities for Asks.
  * This file is not exported from the package - it's for internal testing only.
  */
 import type { TypedEphemeral } from "@loro-extended/repo"

@@ -1,9 +1,9 @@
 import { createTypedDoc, loro, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { Askforce } from "./askforce.js"
-import { createAskforceSchema } from "./schema.js"
+import { Asks } from "./asks.js"
+import { createAskSchema } from "./schema.js"
 import { createMockEphemeral } from "./test-utils.js"
-import { AskforceError } from "./types.js"
+import { AsksError } from "./types.js"
 
 describe("RecordRef subscription", () => {
   it("supports subscribe() via loro(recordRef).subscribe()", () => {
@@ -34,14 +34,14 @@ describe("RecordRef subscription", () => {
   })
 })
 
-describe("Askforce", () => {
+describe("Asks", () => {
   // Create a typed schema for testing
   const questionSchema = Shape.plain.struct({ query: Shape.plain.string() })
   const answerSchema = Shape.plain.struct({ result: Shape.plain.string() })
-  const askforceSchema = createAskforceSchema(questionSchema, answerSchema)
+  const asksSchema = createAskSchema(questionSchema, answerSchema)
 
   const docSchema = Shape.doc({
-    asks: askforceSchema,
+    asks: asksSchema,
   })
 
   let doc: ReturnType<typeof createTypedDoc<typeof docSchema>>
@@ -59,7 +59,7 @@ describe("Askforce", () => {
 
   describe("ask()", () => {
     it("creates ask with unique ID", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -75,7 +75,7 @@ describe("Askforce", () => {
     })
 
     it("stores ask entry in recordRef", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -96,7 +96,7 @@ describe("Askforce", () => {
     })
 
     it("initializes answers as empty record", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -112,7 +112,7 @@ describe("Askforce", () => {
 
   describe("getStatus()", () => {
     it("returns pending when no answers exist", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -124,7 +124,7 @@ describe("Askforce", () => {
     })
 
     it("returns claimed when worker has pending answer", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -144,7 +144,7 @@ describe("Askforce", () => {
     })
 
     it("returns answered when worker has answered", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -165,7 +165,7 @@ describe("Askforce", () => {
     })
 
     it("returns failed when all answers have failed", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -186,7 +186,7 @@ describe("Askforce", () => {
     })
 
     it("returns answered if any answer succeeded even with failures", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -214,7 +214,7 @@ describe("Askforce", () => {
 
   describe("allAnswers()", () => {
     it("returns empty array when no answers", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -226,7 +226,7 @@ describe("Askforce", () => {
     })
 
     it("returns only answered results, not pending or failed", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -261,7 +261,7 @@ describe("Askforce", () => {
     })
 
     it("returns all answered results in pool mode", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -289,7 +289,7 @@ describe("Askforce", () => {
 
   describe("RPC mode", () => {
     it("creates ask with unique ID", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -303,7 +303,7 @@ describe("Askforce", () => {
     it("onAsk processes existing asks", async () => {
       vi.useRealTimers() // Need real timers for async handler
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -313,7 +313,7 @@ describe("Askforce", () => {
 
       // Create a worker askforce with its own ephemeral
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })
@@ -337,7 +337,7 @@ describe("Askforce", () => {
       vi.useRealTimers() // Need real timers for async handler
 
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })
@@ -349,7 +349,7 @@ describe("Askforce", () => {
 
       // Create an ask after subscribing
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
@@ -369,7 +369,7 @@ describe("Askforce", () => {
     it("waitFor resolves when answer is written", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -398,7 +398,7 @@ describe("Askforce", () => {
     it("waitFor times out if no answer", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -415,7 +415,7 @@ describe("Askforce", () => {
     it("waitFor rejects if all answers failed", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -446,7 +446,7 @@ describe("Askforce", () => {
       vi.useRealTimers()
 
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })
@@ -462,7 +462,7 @@ describe("Askforce", () => {
 
       // Create an ask
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
@@ -482,7 +482,7 @@ describe("Askforce", () => {
 
   describe("Pool mode", () => {
     it("creates ask with unique ID", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -498,7 +498,7 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
@@ -507,13 +507,13 @@ describe("Askforce", () => {
 
       // Create two workers with separate ephemeral stores
       const worker1Ephemeral = createMockEphemeral("worker-1")
-      const worker1 = new Askforce(doc.asks, worker1Ephemeral, {
+      const worker1 = new Asks(doc.asks, worker1Ephemeral, {
         peerId: "worker-1",
         mode: "pool",
       })
 
       const worker2Ephemeral = createMockEphemeral("worker-2")
-      const worker2 = new Askforce(doc.asks, worker2Ephemeral, {
+      const worker2 = new Asks(doc.asks, worker2Ephemeral, {
         peerId: "worker-2",
         mode: "pool",
       })
@@ -545,7 +545,7 @@ describe("Askforce", () => {
     it("waitFor uses pickOne for deterministic selection", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -578,7 +578,7 @@ describe("Askforce", () => {
     it("processes only asks created after checkpoint", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -597,7 +597,7 @@ describe("Askforce", () => {
 
       // Create worker with checkpoint
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })
@@ -619,7 +619,7 @@ describe("Askforce", () => {
     it("processes all asks when no checkpoint provided", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -630,7 +630,7 @@ describe("Askforce", () => {
 
       // Create worker without checkpoint
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })
@@ -655,14 +655,14 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
 
       // Create a single worker - it will always be priority
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "pool",
         claimWindowMs: 500,
@@ -690,7 +690,7 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
@@ -714,13 +714,13 @@ describe("Askforce", () => {
       // Use a longer claim window for testing
       const claimWindowMs = 300
 
-      const worker1Askforce = new Askforce(doc.asks, worker1Ephemeral, {
+      const worker1Askforce = new Asks(doc.asks, worker1Ephemeral, {
         peerId: "worker-1",
         mode: "pool",
         claimWindowMs,
       })
 
-      const worker2Askforce = new Askforce(doc.asks, worker2Ephemeral, {
+      const worker2Askforce = new Asks(doc.asks, worker2Ephemeral, {
         peerId: "worker-2",
         mode: "pool",
         claimWindowMs,
@@ -754,7 +754,7 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
@@ -778,13 +778,13 @@ describe("Askforce", () => {
       // Use a longer claim window for testing
       const claimWindowMs = 200
 
-      const worker1Askforce = new Askforce(doc.asks, worker1Ephemeral, {
+      const worker1Askforce = new Asks(doc.asks, worker1Ephemeral, {
         peerId: "worker-1",
         mode: "pool",
         claimWindowMs,
       })
 
-      const worker2Askforce = new Askforce(doc.asks, worker2Ephemeral, {
+      const worker2Askforce = new Asks(doc.asks, worker2Ephemeral, {
         peerId: "worker-2",
         mode: "pool",
         claimWindowMs,
@@ -821,14 +821,14 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
 
       // Create a single worker
       const workerEphemeral = createMockEphemeral("worker-1")
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "pool",
         claimWindowMs: 500,
@@ -856,7 +856,7 @@ describe("Askforce", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
@@ -872,7 +872,7 @@ describe("Askforce", () => {
 
       const claimWindowMs = 100
 
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-2",
         mode: "pool",
         claimWindowMs,
@@ -898,7 +898,7 @@ describe("Askforce", () => {
 
   describe("Staggered claiming internals", () => {
     it("hashString produces consistent results for same input", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -912,7 +912,7 @@ describe("Askforce", () => {
     })
 
     it("hashString produces different results for different inputs", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -933,7 +933,7 @@ describe("Askforce", () => {
         lastHeartbeat: Date.now(),
       })
 
-      const askforce = new Askforce(doc.asks, workerEphemeral, {
+      const askforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-2",
         mode: "pool",
       })
@@ -948,7 +948,7 @@ describe("Askforce", () => {
     })
 
     it("hasBeenClaimed returns false when no answers exist", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -961,7 +961,7 @@ describe("Askforce", () => {
     })
 
     it("hasBeenClaimed returns true when pending claim exists", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -980,7 +980,7 @@ describe("Askforce", () => {
     })
 
     it("hasBeenClaimed returns true when answered claim exists", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "pool",
       })
@@ -1005,7 +1005,7 @@ describe("Askforce", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const clientAskforce = new Askforce(doc.asks, clientEphemeral, {
+      const clientAskforce = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
@@ -1018,7 +1018,7 @@ describe("Askforce", () => {
         lastHeartbeat: Date.now(),
       })
 
-      const workerAskforce = new Askforce(doc.asks, workerEphemeral, {
+      const workerAskforce = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
         claimWindowMs: 5000, // Long window that should be ignored in RPC mode
@@ -1041,41 +1041,41 @@ describe("Askforce", () => {
     })
   })
 
-  describe("AskforceError context", () => {
+  describe("AsksError context", () => {
     it("timeout error includes context properties", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const asks = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
 
-      const askId = askforce.ask({ query: "What is 2+2?" })
+      const askId = asks.ask({ query: "What is 2+2?" })
 
       try {
-        await askforce.waitFor(askId, 50)
+        await asks.waitFor(askId, 50)
         expect.fail("Should have thrown")
       } catch (error) {
-        expect(error).toBeInstanceOf(AskforceError)
-        const askforceError = error as AskforceError
-        expect(askforceError.context.askId).toBe(askId)
-        expect(askforceError.context.peerId).toBe("peer-1")
-        expect(askforceError.context.mode).toBe("rpc")
-        expect(askforceError.context.timeoutMs).toBe(50)
+        expect(error).toBeInstanceOf(AsksError)
+        const asksError = error as AsksError
+        expect(asksError.context.askId).toBe(askId)
+        expect(asksError.context.peerId).toBe("peer-1")
+        expect(asksError.context.mode).toBe("rpc")
+        expect(asksError.context.timeoutMs).toBe(50)
       }
 
-      askforce.dispose()
+      asks.dispose()
     })
 
     it("all-failed error includes failure reasons", async () => {
       vi.useRealTimers()
 
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const asks = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
 
-      const askId = askforce.ask({ query: "What is 2+2?" })
+      const askId = asks.ask({ query: "What is 2+2?" })
 
       // Add a failed answer
       const entry = doc.asks.get(askId)
@@ -1086,24 +1086,22 @@ describe("Askforce", () => {
       })
 
       try {
-        await askforce.waitFor(askId, 5000)
+        await asks.waitFor(askId, 5000)
         expect.fail("Should have thrown")
       } catch (error) {
-        expect(error).toBeInstanceOf(AskforceError)
-        const askforceError = error as AskforceError
-        expect(askforceError.context.askId).toBe(askId)
-        expect(askforceError.context.failureReasons).toContain(
-          "computation error",
-        )
+        expect(error).toBeInstanceOf(AsksError)
+        const asksError = error as AsksError
+        expect(asksError.context.askId).toBe(askId)
+        expect(asksError.context.failureReasons).toContain("computation error")
       }
 
-      askforce.dispose()
+      asks.dispose()
     })
   })
 
   describe("dispose()", () => {
     it("stops heartbeat on dispose", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })
@@ -1123,7 +1121,7 @@ describe("Askforce", () => {
     })
 
     it("cleans up subscriptions on dispose", () => {
-      const askforce = new Askforce(doc.asks, mockEphemeral, {
+      const askforce = new Asks(doc.asks, mockEphemeral, {
         peerId: "peer-1",
         mode: "rpc",
       })

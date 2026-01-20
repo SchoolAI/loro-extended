@@ -1,23 +1,23 @@
 /**
- * Integration tests for Askforce.
+ * Integration tests for Asks.
  *
- * These tests verify the complete workflow of Askforce in realistic scenarios,
+ * These tests verify the complete workflow of Asks in realistic scenarios,
  * including RPC mode, Pool mode, and failure recovery.
  */
 import { createTypedDoc, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { Askforce } from "./askforce.js"
-import { createAskforceSchema } from "./schema.js"
+import { Asks } from "./asks.js"
+import { createAskSchema } from "./schema.js"
 import { createMockEphemeral } from "./test-utils.js"
 
-describe("Askforce Integration", () => {
+describe("Asks Integration", () => {
   // Create a typed schema for testing
   const questionSchema = Shape.plain.struct({ query: Shape.plain.string() })
   const answerSchema = Shape.plain.struct({ result: Shape.plain.string() })
-  const askforceSchema = createAskforceSchema(questionSchema, answerSchema)
+  const asksSchema = createAskSchema(questionSchema, answerSchema)
 
   const docSchema = Shape.doc({
-    asks: askforceSchema,
+    asks: asksSchema,
   })
 
   let doc: ReturnType<typeof createTypedDoc<typeof docSchema>>
@@ -37,14 +37,14 @@ describe("Askforce Integration", () => {
 
       // Create client
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
 
       // Create server
       const serverEphemeral = createMockEphemeral("server-1")
-      const server = new Askforce(doc.asks, serverEphemeral, {
+      const server = new Asks(doc.asks, serverEphemeral, {
         peerId: "server-1",
         mode: "rpc",
       })
@@ -76,13 +76,13 @@ describe("Askforce Integration", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
 
       const serverEphemeral = createMockEphemeral("server-1")
-      const server = new Askforce(doc.asks, serverEphemeral, {
+      const server = new Asks(doc.asks, serverEphemeral, {
         peerId: "server-1",
         mode: "rpc",
       })
@@ -118,13 +118,13 @@ describe("Askforce Integration", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
 
       const serverEphemeral = createMockEphemeral("server-1")
-      const server = new Askforce(doc.asks, serverEphemeral, {
+      const server = new Asks(doc.asks, serverEphemeral, {
         peerId: "server-1",
         mode: "rpc",
       })
@@ -149,26 +149,26 @@ describe("Askforce Integration", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
 
       // Create multiple workers
       const worker1Ephemeral = createMockEphemeral("worker-1")
-      const worker1 = new Askforce(doc.asks, worker1Ephemeral, {
+      const worker1 = new Asks(doc.asks, worker1Ephemeral, {
         peerId: "worker-1",
         mode: "pool",
       })
 
       const worker2Ephemeral = createMockEphemeral("worker-2")
-      const worker2 = new Askforce(doc.asks, worker2Ephemeral, {
+      const worker2 = new Asks(doc.asks, worker2Ephemeral, {
         peerId: "worker-2",
         mode: "pool",
       })
 
       const worker3Ephemeral = createMockEphemeral("worker-3")
-      const worker3 = new Askforce(doc.asks, worker3Ephemeral, {
+      const worker3 = new Asks(doc.asks, worker3Ephemeral, {
         peerId: "worker-3",
         mode: "pool",
       })
@@ -213,19 +213,19 @@ describe("Askforce Integration", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "pool",
       })
 
       const worker1Ephemeral = createMockEphemeral("worker-1")
-      const worker1 = new Askforce(doc.asks, worker1Ephemeral, {
+      const worker1 = new Asks(doc.asks, worker1Ephemeral, {
         peerId: "worker-1",
         mode: "pool",
       })
 
       const worker2Ephemeral = createMockEphemeral("worker-2")
-      const worker2 = new Askforce(doc.asks, worker2Ephemeral, {
+      const worker2 = new Asks(doc.asks, worker2Ephemeral, {
         peerId: "worker-2",
         mode: "pool",
       })
@@ -263,33 +263,33 @@ describe("Askforce Integration", () => {
 
       // Create a document with two queues
       const multiQueueSchema = Shape.doc({
-        mathQueue: askforceSchema,
-        textQueue: askforceSchema,
+        mathQueue: asksSchema,
+        textQueue: asksSchema,
       })
       const multiDoc = createTypedDoc(multiQueueSchema)
 
       // Create clients for each queue
       const mathClientEphemeral = createMockEphemeral("math-client")
-      const mathClient = new Askforce(multiDoc.mathQueue, mathClientEphemeral, {
+      const mathClient = new Asks(multiDoc.mathQueue, mathClientEphemeral, {
         peerId: "math-client",
         mode: "rpc",
       })
 
       const textClientEphemeral = createMockEphemeral("text-client")
-      const textClient = new Askforce(multiDoc.textQueue, textClientEphemeral, {
+      const textClient = new Asks(multiDoc.textQueue, textClientEphemeral, {
         peerId: "text-client",
         mode: "rpc",
       })
 
       // Create workers for each queue
       const mathWorkerEphemeral = createMockEphemeral("math-worker")
-      const mathWorker = new Askforce(multiDoc.mathQueue, mathWorkerEphemeral, {
+      const mathWorker = new Asks(multiDoc.mathQueue, mathWorkerEphemeral, {
         peerId: "math-worker",
         mode: "rpc",
       })
 
       const textWorkerEphemeral = createMockEphemeral("text-worker")
-      const textWorker = new Askforce(multiDoc.textQueue, textWorkerEphemeral, {
+      const textWorker = new Asks(multiDoc.textQueue, textWorkerEphemeral, {
         peerId: "text-worker",
         mode: "rpc",
       })
@@ -341,7 +341,7 @@ describe("Askforce Integration", () => {
       vi.useRealTimers()
 
       const clientEphemeral = createMockEphemeral("client-1")
-      const client = new Askforce(doc.asks, clientEphemeral, {
+      const client = new Asks(doc.asks, clientEphemeral, {
         peerId: "client-1",
         mode: "rpc",
       })
@@ -361,7 +361,7 @@ describe("Askforce Integration", () => {
 
       // Worker starts with checkpoint (simulating restart)
       const workerEphemeral = createMockEphemeral("worker-1")
-      const worker = new Askforce(doc.asks, workerEphemeral, {
+      const worker = new Asks(doc.asks, workerEphemeral, {
         peerId: "worker-1",
         mode: "rpc",
       })

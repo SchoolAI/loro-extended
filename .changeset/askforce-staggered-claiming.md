@@ -1,5 +1,5 @@
 ---
-"@loro-extended/askforce": minor
+"@loro-extended/asks": minor
 ---
 
 Improved Pool mode efficiency with staggered claiming.

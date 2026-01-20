@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@loro-extended/adapter-websocket": "workspace:^",
-    "@loro-extended/askforce": "workspace:^",
+    "@loro-extended/asks": "workspace:^",
     "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",

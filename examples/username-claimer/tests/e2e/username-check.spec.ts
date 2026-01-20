@@ -15,7 +15,7 @@ test.describe("Username Claimer RPC Sync", () => {
     page,
   }) => {
     // This test reproduces the sync issue where:
-    // 1. Client sends RPC request via Askforce
+    // 1. Client sends RPC request via Asks
     // 2. Server receives and processes the request
     // 3. Server writes answer to CRDT document
     // 4. Client should receive the sync update with the answer
@@ -27,7 +27,7 @@ test.describe("Username Claimer RPC Sync", () => {
     await claimUsername(page, "admin")
 
     // Wait for either a successful result OR an error
-    // The sync issue manifests as a timeout error from Askforce
+    // The sync issue manifests as a timeout error from Asks
     const resultSelector = ".result.claimed, .result.taken, .result.error"
     await page.waitForSelector(resultSelector, {
       state: "visible",

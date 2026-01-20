@@ -14,10 +14,10 @@ import {
 } from "./presence.js"
 import type { AskEntryShape, PlainAskEntry } from "./schema.js"
 import {
-  AskforceError,
-  type AskforceOptions,
   type AskHandler,
   type AskStatus,
+  AsksError,
+  type AsksOptions,
   type FailedAnswer,
   type OnAskOptions,
   type WorkerPresence,
@@ -31,24 +31,24 @@ function generateAskId(): string {
 }
 
 /**
- * Askforce - P2P-native work exchange using the question/answer metaphor.
+ * Asks - P2P-native work exchange using the question/answer metaphor.
  *
  * @typeParam Q - The question value shape
  * @typeParam A - The answer value shape
  *
  * @example
  * ```typescript
- * const askforce = new Askforce(
+ * const asks = new Asks(
  *   recordRef,
  *   ephemeral,
  *   { peerId: "peer-1", mode: "rpc" }
  * );
  *
  * // Ask a question
- * const askId = askforce.ask({ query: "What is 2+2?" });
+ * const askId = asks.ask({ query: "What is 2+2?" });
  *
  * // Wait for an answer
- * const answer = await askforce.waitFor(askId);
+ * const answer = await asks.waitFor(askId);
  * ```
  */
 /**
@@ -57,7 +57,7 @@ function generateAskId(): string {
  */
 export const DEFAULT_CLAIM_WINDOW_MS = 500
 
-export class Askforce<
+export class Asks<
   Q extends ValueShape = ValueShape,
   A extends ValueShape = ValueShape,
 > {
@@ -75,7 +75,7 @@ export class Askforce<
   constructor(
     recordRef: RecordRef<AskEntryShape<Q, A>>,
     ephemeral: TypedEphemeral<WorkerPresence>,
-    options: AskforceOptions,
+    options: AsksOptions,
   ) {
     this.recordRef = recordRef
     this.ephemeral = ephemeral
@@ -197,7 +197,7 @@ export class Askforce<
           resolved = true
           cleanup()
           reject(
-            new AskforceError("Ask not found", {
+            new AsksError("Ask not found", {
               askId,
               peerId: this.peerId,
               mode: this.mode,
@@ -231,7 +231,7 @@ export class Askforce<
           resolved = true
           cleanup()
           reject(
-            new AskforceError("All workers failed", {
+            new AsksError("All workers failed", {
               askId,
               peerId: this.peerId,
               mode: this.mode,
@@ -255,7 +255,7 @@ export class Askforce<
           resolved = true
           cleanup()
           reject(
-            new AskforceError("Timeout waiting for answer", {
+            new AsksError("Timeout waiting for answer", {
               askId,
               peerId: this.peerId,
               mode: this.mode,
@@ -342,7 +342,7 @@ export class Askforce<
   }
 
   /**
-   * Dispose of the Askforce instance.
+   * Dispose of the Asks instance.
    * Stops heartbeat and cleans up subscriptions.
    */
   dispose(): void {

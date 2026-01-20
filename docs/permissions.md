@@ -193,7 +193,7 @@ const repo = new Repo({
 
 ### Server-Authoritative with RPC (Split Documents)
 
-When using Askforce RPC, you may need clients to write to the RPC queue but not to authoritative data. Split into separate documents:
+When using Asks RPC, you may need clients to write to the RPC queue but not to authoritative data. Split into separate documents:
 
 ```typescript
 // Server

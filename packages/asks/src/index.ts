@@ -8,7 +8,7 @@ export {
   hasStatus,
   pickOne,
 } from "./aggregation.js"
-export { Askforce, DEFAULT_CLAIM_WINDOW_MS } from "./askforce.js"
+export { Asks, DEFAULT_CLAIM_WINDOW_MS } from "./asks.js"
 
 // Presence utilities (public API)
 export {
@@ -20,16 +20,16 @@ export {
 } from "./presence.js"
 export type { InferAnswer, InferQuestion } from "./schema.js"
 // Schema factory
-export { createAskforceSchema } from "./schema.js"
+export { createAskSchema } from "./schema.js"
 
 // Types
 export type {
   AnsweredAnswer,
   AskEntry,
-  AskforceErrorContext,
-  AskforceOptions,
   AskHandler,
   AskStatus,
+  AsksErrorContext,
+  AsksOptions,
   FailedAnswer,
   OnAskOptions,
   PendingAnswer,
@@ -39,4 +39,4 @@ export type {
 } from "./types.js"
 
 // Error class
-export { AskforceError } from "./types.js"
+export { AsksError } from "./types.js"

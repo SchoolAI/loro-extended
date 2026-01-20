@@ -1,5 +1,5 @@
 import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client"
-import { Askforce } from "@loro-extended/askforce"
+import { Asks } from "@loro-extended/asks"
 import { RepoProvider, useDoc, useHandle } from "@loro-extended/react"
 import {
   createContext,
@@ -305,10 +305,10 @@ function App() {
     inputRef.current?.focus()
   }, [])
 
-  // Create Askforce instance (memoized to avoid recreating on each render)
-  const askforce = useMemo(
+  // Create Asks instance (memoized to avoid recreating on each render)
+  const asks = useMemo(
     () =>
-      new Askforce(rpcHandle.doc.rpc, rpcHandle.presence, {
+      new Asks(rpcHandle.doc.rpc, rpcHandle.presence, {
         peerId: rpcHandle.peerId,
         mode: "rpc",
       }),
@@ -335,16 +335,16 @@ function App() {
         await rpcHandle.waitForSync({ timeout: TIMEOUTS.SYNC })
 
         // Instead of: fetch('/api/claim-username', { body: { username } })
-        // We use Askforce RPC:
-        const askId = askforce.ask({ username: usernameToProcess })
-        const answer = await askforce.waitFor(askId, TIMEOUTS.RPC_RESPONSE)
+        // We use Asks RPC:
+        const askId = asks.ask({ username: usernameToProcess })
+        const answer = await asks.waitFor(askId, TIMEOUTS.RPC_RESPONSE)
 
         return { answer }
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Claim failed" }
       }
     },
-    [rpcHandle, askforce],
+    [rpcHandle, asks],
   )
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -529,9 +529,9 @@ function App() {
             href="https://github.com/SchoolAI/loro-extended/tree/main/examples/username-claimer"
             target="_blank"
             rel="noopener noreferrer"
-            className="askforce-link"
+            className="asks-link"
           >
-            Askforce RPC
+            Asks RPC
           </a>{" "}
           — no REST API!
         </p>
@@ -576,9 +576,9 @@ function App() {
 const data = await res.json()`}</pre>
           </div>
           <div className="code-block">
-            <h4>✅ Askforce RPC</h4>
-            <pre>{`const askId = askforce.ask({ username })
-const answer = await askforce.waitFor(askId)`}</pre>
+            <h4>✅ Asks RPC</h4>
+            <pre>{`const askId = asks.ask({ username })
+const answer = await asks.waitFor(askId)`}</pre>
           </div>
         </div>
         <p className="benefits">

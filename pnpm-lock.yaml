@@ -938,9 +938,9 @@ importers:
       '@loro-extended/adapter-websocket':
         specifier: workspace:^
         version: link:../../adapters/websocket
-      '@loro-extended/askforce':
+      '@loro-extended/asks':
         specifier: workspace:^
-        version: link:../../packages/askforce
+        version: link:../../packages/asks
       '@loro-extended/change':
         specifier: workspace:^
         version: link:../../packages/change
@@ -1097,7 +1097,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.28)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.21.0)
 
-  packages/askforce:
+  packages/asks:
     devDependencies:
       '@logtape/logtape':
         specifier: ^1.1.1

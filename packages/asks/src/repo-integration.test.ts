@@ -1,23 +1,23 @@
 /**
- * Integration tests for Askforce with Repo.
+ * Integration tests for Asks with Repo.
  *
- * These tests verify that Askforce works correctly when used with
+ * These tests verify that Asks works correctly when used with
  * a Repo and network adapters (the real-world use case).
  */
 import { Shape } from "@loro-extended/change"
 import { Bridge, BridgeAdapter, Repo } from "@loro-extended/repo"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { Askforce } from "./askforce.js"
-import { createAskforceSchema } from "./schema.js"
+import { Asks } from "./asks.js"
+import { createAskSchema } from "./schema.js"
 
-describe("Askforce with Repo Integration", () => {
+describe("Asks with Repo Integration", () => {
   // Create a typed schema for testing
   const questionSchema = Shape.plain.struct({ query: Shape.plain.string() })
   const answerSchema = Shape.plain.struct({ result: Shape.plain.string() })
-  const askforceSchema = createAskforceSchema(questionSchema, answerSchema)
+  const asksSchema = createAskSchema(questionSchema, answerSchema)
 
   const docSchema = Shape.doc({
-    rpc: askforceSchema,
+    rpc: asksSchema,
   })
 
   const ephemeralDeclarations = {
@@ -54,25 +54,23 @@ describe("Askforce with Repo Integration", () => {
     const clientHandle = clientRepo.get(docId, docSchema, ephemeralDeclarations)
     const serverHandle = serverRepo.get(docId, docSchema, ephemeralDeclarations)
 
-    // Create Askforce instances
-    const clientAskforce = new Askforce(
-      clientHandle.doc.rpc,
-      clientHandle.presence,
-      { peerId: clientHandle.peerId, mode: "rpc" },
-    )
+    // Create Asks instances
+    const clientAsks = new Asks(clientHandle.doc.rpc, clientHandle.presence, {
+      peerId: clientHandle.peerId,
+      mode: "rpc",
+    })
 
-    const serverAskforce = new Askforce(
-      serverHandle.doc.rpc,
-      serverHandle.presence,
-      { peerId: serverHandle.peerId, mode: "rpc" },
-    )
+    const serverAsks = new Asks(serverHandle.doc.rpc, serverHandle.presence, {
+      peerId: serverHandle.peerId,
+      mode: "rpc",
+    })
 
     // Server starts listening
     const handler = vi.fn().mockResolvedValue({ result: "answer" })
-    const unsub = serverAskforce.onAsk(handler)
+    const unsub = serverAsks.onAsk(handler)
 
     // Client asks a question
-    const askId = clientAskforce.ask({ query: "test question" })
+    const askId = clientAsks.ask({ query: "test question" })
 
     // Wait for sync and processing
     await new Promise(resolve => setTimeout(resolve, 500))
@@ -82,8 +80,8 @@ describe("Askforce with Repo Integration", () => {
     expect(handler).toHaveBeenCalledWith(askId, { query: "test question" })
 
     unsub()
-    clientAskforce.dispose()
-    serverAskforce.dispose()
+    clientAsks.dispose()
+    serverAsks.dispose()
   })
 
   it("should sync answers from server back to client", async () => {
@@ -105,35 +103,33 @@ describe("Askforce with Repo Integration", () => {
     const clientHandle = clientRepo.get(docId, docSchema, ephemeralDeclarations)
     const serverHandle = serverRepo.get(docId, docSchema, ephemeralDeclarations)
 
-    // Create Askforce instances
-    const clientAskforce = new Askforce(
-      clientHandle.doc.rpc,
-      clientHandle.presence,
-      { peerId: clientHandle.peerId, mode: "rpc" },
-    )
+    // Create Asks instances
+    const clientAsks = new Asks(clientHandle.doc.rpc, clientHandle.presence, {
+      peerId: clientHandle.peerId,
+      mode: "rpc",
+    })
 
-    const serverAskforce = new Askforce(
-      serverHandle.doc.rpc,
-      serverHandle.presence,
-      { peerId: serverHandle.peerId, mode: "rpc" },
-    )
+    const serverAsks = new Asks(serverHandle.doc.rpc, serverHandle.presence, {
+      peerId: serverHandle.peerId,
+      mode: "rpc",
+    })
 
     // Server starts listening
-    const unsub = serverAskforce.onAsk(async () => {
+    const unsub = serverAsks.onAsk(async () => {
       return { result: "server response" }
     })
 
     // Client asks a question
-    const askId = clientAskforce.ask({ query: "test question" })
+    const askId = clientAsks.ask({ query: "test question" })
 
     // Client waits for answer - THIS IS THE KEY TEST
     // If answers don't sync back, this will timeout
-    const answer = await clientAskforce.waitFor(askId, 5000)
+    const answer = await clientAsks.waitFor(askId, 5000)
 
     expect(answer).toEqual({ result: "server response" })
 
     unsub()
-    clientAskforce.dispose()
-    serverAskforce.dispose()
+    clientAsks.dispose()
+    serverAsks.dispose()
   })
 })
