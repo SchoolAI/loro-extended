@@ -5,7 +5,6 @@ import {
 import { WsServerNetworkAdapter } from "@loro-extended/adapter-websocket/server"
 import { Asks } from "@loro-extended/asks"
 import { Repo } from "@loro-extended/repo"
-import { LIMITS } from "./config"
 import {
   type Answer,
   ClaimedUsernamesDocSchema,
@@ -76,7 +75,7 @@ function generateSuggestions(base: string): string[] {
   for (const candidate of candidates) {
     if (!isUsernameTaken(candidate) && isValidUsername(candidate)) {
       suggestions.push(candidate)
-      if (suggestions.length >= LIMITS.SUGGESTIONS_COUNT) break
+      if (suggestions.length >= 3) break
     }
   }
 
