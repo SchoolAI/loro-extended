@@ -235,3 +235,41 @@ channel.onReceive(syncRequest)
 await flushMicrotasks()
 expect(mockAdapter.sentMessages.length).toBeGreaterThan(0)
 ```
+
+## Permissions and Document Architecture
+
+### Server-Authoritative Data with Client-Writable RPC
+
+When building RPC-style patterns (like Askforce), you often need:
+- **Client-writable data**: RPC queue for questions/requests
+- **Server-authoritative data**: Results, state, or records that only the server should modify
+
+**Problem**: Permissions operate at the document level, not field level. You can't make one field writable and another read-only within the same document.
+
+**Solution**: Split into separate documents with different permissions:
+
+```typescript
+// Server configuration
+const repo = new Repo({
+  permissions: {
+    mutability: (doc, peer) => {
+      if (doc.id === "authoritative-data") {
+        return peer.channelKind === "storage"; // Server-only
+      }
+      return true; // RPC doc is client-writable
+    },
+  },
+});
+
+const rpcHandle = repo.get("rpc-queue", RpcDocSchema);
+const dataHandle = repo.get("authoritative-data", DataDocSchema);
+```
+
+**Benefits**:
+- Server restart = clean authoritative state (clients can't sync stale data)
+- Clear separation of concerns
+- Clients can still use RPC for requests
+
+**Caveat**: CRDT sync is bidirectional by default. Without permissions, a client with old data will sync it to a freshly restarted server. Always use `mutability` permissions for server-authoritative documents.
+
+See `examples/username-claimer` for a complete implementation and `docs/permissions.md` for the full permissions API.

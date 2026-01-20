@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test"
 
 // Use a unique port for e2e tests to avoid conflicts with other examples
-// Port allocation: todo-sse uses 8000/8001, username-checker uses 8002, todo-websocket uses 8003
+// Port allocation: todo-sse uses 8000/8001, username-claimer uses 8002, todo-websocket uses 8003
 const port = 8002
 
 export default defineConfig({

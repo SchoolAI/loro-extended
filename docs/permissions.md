@@ -191,6 +191,39 @@ const repo = new Repo({
 });
 ```
 
+### Server-Authoritative with RPC (Split Documents)
+
+When using Askforce RPC, you may need clients to write to the RPC queue but not to authoritative data. Split into separate documents:
+
+```typescript
+// Server
+const repo = new Repo({
+  identity: { name: "server", type: "service" },
+  permissions: {
+    mutability: (doc, peer) => {
+      // Authoritative data is server-only
+      if (doc.id === "authoritative-data") {
+        return peer.channelKind === "storage";
+      }
+      // RPC document is client-writable
+      return true;
+    },
+  },
+});
+
+// Two handles for different purposes
+const rpcHandle = repo.get("rpc-queue", RpcDocSchema, EphemeralDeclarations);
+const dataHandle = repo.get("authoritative-data", DataDocSchema);
+```
+
+**Why split documents?**
+- Permissions operate at the document level, not field level
+- Clients need to write to RPC queue to ask questions
+- Server needs exclusive write access to authoritative data
+- Server restart = clean authoritative state (no stale client data)
+
+See `examples/username-claimer` for a complete implementation.
+
 ### Public/Private Documents
 
 ```typescript

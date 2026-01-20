@@ -8,10 +8,13 @@ export async function waitForRepoConnected(page: Page): Promise<void> {
   // Wait for the app to render and establish WebSocket connection
   // The app calls handle.waitForSync() before making RPC calls
   // We wait for the form to be interactive as a proxy for connection
-  await page.waitForSelector('input[placeholder="Enter a username..."]', {
-    state: "visible",
-    timeout: 10000,
-  })
+  await page.waitForSelector(
+    'input[placeholder="Enter a username to claim..."]',
+    {
+      state: "visible",
+      timeout: 10000,
+    },
+  )
   // The button is disabled until username is entered, so just wait for it to exist
   await page.waitForSelector('button[type="submit"]', {
     state: "visible",
@@ -20,13 +23,15 @@ export async function waitForRepoConnected(page: Page): Promise<void> {
 }
 
 /**
- * Fill in a username and submit the form.
+ * Fill in a username and submit the form (claim it).
  */
-export async function checkUsername(
+export async function claimUsername(
   page: Page,
   username: string,
 ): Promise<void> {
-  const input = page.locator('input[placeholder="Enter a username..."]')
+  const input = page.locator(
+    'input[placeholder="Enter a username to claim..."]',
+  )
   await input.fill(username)
 
   const submitButton = page.locator('button[type="submit"]')
@@ -34,15 +39,15 @@ export async function checkUsername(
 }
 
 /**
- * Wait for a result to appear (either available or taken).
+ * Wait for a result to appear (either claimed or taken).
  * Returns the result element for further assertions.
  */
 export async function waitForResult(
   page: Page,
   timeout = 15000,
-): Promise<{ available: boolean; text: string }> {
-  // Wait for either the "available" or "taken" result to appear
-  const resultSelector = ".result.available, .result.taken"
+): Promise<{ claimed: boolean; text: string }> {
+  // Wait for either the "claimed" or "taken" result to appear
+  const resultSelector = ".result.claimed, .result.taken"
 
   await page.waitForSelector(resultSelector, {
     state: "visible",
@@ -50,12 +55,12 @@ export async function waitForResult(
   })
 
   const result = page.locator(resultSelector)
-  const isAvailable = await result.evaluate(el =>
-    el.classList.contains("available"),
+  const isClaimed = await result.evaluate(el =>
+    el.classList.contains("claimed"),
   )
   const text = (await result.textContent()) || ""
 
-  return { available: isAvailable, text }
+  return { claimed: isClaimed, text }
 }
 
 /**
@@ -75,10 +80,10 @@ export async function waitForError(
 }
 
 /**
- * Check if the "Checking..." state is shown (button disabled, loading).
+ * Check if the "Claiming..." state is shown (button disabled, loading).
  */
-export async function isChecking(page: Page): Promise<boolean> {
+export async function isClaiming(page: Page): Promise<boolean> {
   const button = page.locator('button[type="submit"]')
   const buttonText = await button.textContent()
-  return buttonText === "Checking..."
+  return buttonText === "Claiming..."
 }

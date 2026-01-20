@@ -75,11 +75,12 @@ Real-time collaborative rich text editor with ProseMirror. Features cursor prese
 
 **Additional Examples:**
 
-| Example                                           | Description                                                                                                  |
-| :------------------------------------------------ | :----------------------------------------------------------------------------------------------------------- |
-| **[`todo-minimal`](./examples/todo-minimal)**     | Minimal ~170 line example using Bun and WebSocket. No Vite, no concurrently—just Bun for server and bundling. |
-| **[`todo-websocket`](./examples/todo-websocket)** | Same as `todo-sse`, but uses WebSocket instead of SSE for real-time communication.                           |
-| **[`postgres`](./examples/postgres)**             | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database. |
+| Example                                               | Description                                                                                                  |
+| :---------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
+| **[`todo-minimal`](./examples/todo-minimal)**         | Minimal ~170 line example using Bun and WebSocket. No Vite, no concurrently—just Bun for server and bundling. |
+| **[`todo-websocket`](./examples/todo-websocket)**     | Same as `todo-sse`, but uses WebSocket instead of SSE for real-time communication.                           |
+| **[`postgres`](./examples/postgres)**                 | Demonstrates PostgreSQL storage adapter usage. Shows how to persist Loro documents to a PostgreSQL database. |
+| **[`username-claimer`](./examples/username-claimer)** | Askforce RPC demo with server-authoritative architecture. Shows permissions for read-only client documents.   |
 
 ---
 

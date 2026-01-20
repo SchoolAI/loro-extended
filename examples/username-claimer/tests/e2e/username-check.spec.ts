@@ -1,17 +1,17 @@
 import { expect, test } from "@playwright/test"
 import {
-  checkUsername,
+  claimUsername,
   waitForRepoConnected,
   waitForResult,
 } from "./fixtures/test-helpers"
 
-test.describe("Username Checker RPC Sync", () => {
+test.describe("Username Claimer RPC Sync", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/")
     await waitForRepoConnected(page)
   })
 
-  test("should receive response when checking 'admin' username", async ({
+  test("should receive response when claiming reserved 'admin' username", async ({
     page,
   }) => {
     // This test reproduces the sync issue where:
@@ -24,11 +24,11 @@ test.describe("Username Checker RPC Sync", () => {
     // The error message will show: "Timeout waiting for answer (askId=..., peerId=..., mode="rpc", timeoutMs=10000)"
 
     // Fill in "admin" and submit
-    await checkUsername(page, "admin")
+    await claimUsername(page, "admin")
 
     // Wait for either a successful result OR an error
     // The sync issue manifests as a timeout error from Askforce
-    const resultSelector = ".result.available, .result.taken, .result.error"
+    const resultSelector = ".result.claimed, .result.taken, .result.error"
     await page.waitForSelector(resultSelector, {
       state: "visible",
       timeout: 15000,
@@ -50,23 +50,21 @@ test.describe("Username Checker RPC Sync", () => {
     // If we get here, sync worked - verify the result
     const result = await waitForResult(page, 1000) // Short timeout since we already waited
 
-    // "admin" is in the takenUsernames set, so it should be taken
-    expect(result.available).toBe(false)
+    // "admin" is in the reservedUsernames set, so it should be taken
+    expect(result.claimed).toBe(false)
     expect(result.text).toContain("admin")
     expect(result.text).toContain("taken")
   })
 
-  test("should receive response when checking available username", async ({
-    page,
-  }) => {
+  test("should successfully claim available username", async ({ page }) => {
     // Test with a username that should be available
     // Use base36 encoding to keep username under 20 chars (e.g., "user_m5x7abc" = 12 chars)
     const uniqueUsername = `user_${Date.now().toString(36)}`
 
-    await checkUsername(page, uniqueUsername)
+    await claimUsername(page, uniqueUsername)
 
     // Wait for either a successful result OR an error
-    const resultSelector = ".result.available, .result.taken, .result.error"
+    const resultSelector = ".result.claimed, .result.taken, .result.error"
     await page.waitForSelector(resultSelector, {
       state: "visible",
       timeout: 15000,
@@ -82,19 +80,19 @@ test.describe("Username Checker RPC Sync", () => {
 
     const result = await waitForResult(page, 1000)
 
-    expect(result.available).toBe(true)
+    expect(result.claimed).toBe(true)
     expect(result.text).toContain(uniqueUsername)
-    expect(result.text).toContain("available")
+    expect(result.text).toContain("yours")
   })
 
-  test("should receive response when checking invalid username", async ({
+  test("should receive response when claiming invalid username", async ({
     page,
   }) => {
     // Test with an invalid username (too short)
-    await checkUsername(page, "ab")
+    await claimUsername(page, "ab")
 
     // Wait for either a successful result OR an error
-    const resultSelector = ".result.available, .result.taken, .result.error"
+    const resultSelector = ".result.claimed, .result.taken, .result.error"
     await page.waitForSelector(resultSelector, {
       state: "visible",
       timeout: 15000,
@@ -110,15 +108,15 @@ test.describe("Username Checker RPC Sync", () => {
 
     const result = await waitForResult(page, 1000)
 
-    expect(result.available).toBe(false)
+    expect(result.claimed).toBe(false)
     expect(result.text).toContain("invalid")
   })
 
-  test("should show suggestions for taken username", async ({ page }) => {
-    await checkUsername(page, "admin")
+  test("should show suggestions for reserved username", async ({ page }) => {
+    await claimUsername(page, "admin")
 
     // Wait for either a successful result OR an error
-    const resultSelector = ".result.available, .result.taken, .result.error"
+    const resultSelector = ".result.claimed, .result.taken, .result.error"
     await page.waitForSelector(resultSelector, {
       state: "visible",
       timeout: 15000,
@@ -134,7 +132,7 @@ test.describe("Username Checker RPC Sync", () => {
 
     const result = await waitForResult(page, 1000)
 
-    expect(result.available).toBe(false)
+    expect(result.claimed).toBe(false)
 
     // Check that suggestions are shown
     const suggestions = page.locator(".suggestion")

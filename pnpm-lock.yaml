@@ -933,7 +933,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.19.5)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.21.0)
 
-  examples/username-checker:
+  examples/username-claimer:
     dependencies:
       '@loro-extended/adapter-websocket':
         specifier: workspace:^
