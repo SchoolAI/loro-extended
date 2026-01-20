@@ -1,0 +1,35 @@
+{
+  "name": "example-task-card",
+  "description": "LEA (Loro-Extended Architecture) demo: discriminated union state machines with CRDTs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "test": "verify logic",
+    "verify": "verify # verifies everything including tests"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/change": "workspace:^",
+    "@loro-extended/react": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "loro-crdt": "^1.10.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "@types/node": "^22.15.29",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tsx": "^4.19.4",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-wasm": "^3.4.1",
+    "vite-plugin-top-level-await": "^1.5.0",
+    "vitest": "^3.2.4"
+  }
+}
