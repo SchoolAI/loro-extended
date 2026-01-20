@@ -1,22 +1,72 @@
-# Task Card — LEA Demo
+# Task Card - LEA Demo
 
-A demonstration of the **LEA (Loro-Extended Architecture)** pattern: discriminated union state machines with CRDTs.
+A demonstration of the **Loro Extended Architecture (LEA)** pattern using a task state machine.
 
-## Quick Start
+## What This Demonstrates
 
-```bash
-# From the repository root
-pnpm install
-pnpm --filter example-task-card dev
+This example showcases the core LEA principles:
+
+1. **Pure Interpret Function** - `interpret(doc, intention, frontier) → Operations[]`
+2. **Frontiers as Causal Context** - State AND timestamp derived from frontier
+3. **Discriminated Union State Machine** - 6 states with type-safe transitions
+4. **Guard Conditions** - Invalid transitions return empty operations
+5. **Isolated Mutation** - All mutation happens in `apply()`
+6. **CRDT Persistence & Sync** - State survives refresh and syncs across tabs
+
+## The Full LEA Pattern
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              LEA Data Flow                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   User Action                                                               │
+│       │                                                                     │
+│       ▼                                                                     │
+│   Intention (Pure Data)                                                     │
+│   { type: "START" }                                                         │
+│       │                                                                     │
+│       ▼                                                                     │
+│   dispatch(intention)                                                       │
+│   └── frontier = loro(doc).doc.frontiers()  // Capture causal context       │
+│       │                                                                     │
+│       ▼                                                                     │
+│   interpret(doc, intention, frontier) → Operations[]                        │
+│   └── PURE! Derives state AND timestamp from frontier                       │
+│       │                                                                     │
+│       ▼                                                                     │
+│   apply(draft, operations)                                                  │
+│   └── Isolated mutation step                                                │
+│       │                                                                     │
+│       ▼                                                                     │
+│   CRDT Layer (Loro)                                                         │
+│   └── Synced to other tabs/devices, persisted to storage                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Open http://localhost:5175 in your browser.
+## Why Frontiers?
 
-## What This Demo Shows
+The frontier is the key to LEA's purity. It provides:
 
-### 1. Discriminated Union State Machine
+1. **State derivation** - `doc.forkAt(frontier)` gives you state at that point
+2. **Logical timestamp** - Sum of counters gives monotonically increasing time
+3. **Time travel** - Interpret with any historical frontier
+4. **Determinism** - Same (doc, intention, frontier) always produces same operations
 
-The task has 6 states, each with different fields:
+```typescript
+// Derive state from frontier
+function getStateAtFrontier(doc, frontier) {
+  return doc.forkAt(frontier).task.state
+}
+
+// Derive timestamp from frontier
+function getTimestampFromFrontier(frontier) {
+  return frontier.reduce((sum, f) => sum + f.counter + 1, 0)
+}
+```
+
+## State Machine
 
 ```
 draft ──▶ todo ──▶ in_progress ──▶ done
@@ -27,90 +77,54 @@ draft ──▶ todo ──▶ in_progress ──▶ done
             └───────────┴──────────▶ archived
 ```
 
-Each state is a discriminated union variant:
+### States
 
-```typescript
-type TaskState =
-  | { status: "draft"; title: string; createdAt: number }
-  | { status: "todo"; title: string; description: string; createdAt: number }
-  | { status: "in_progress"; title: string; description: string; startedAt: number }
-  | { status: "blocked"; title: string; description: string; blockedReason: string; blockedAt: number }
-  | { status: "done"; title: string; description: string; completedAt: number }
-  | { status: "archived"; title: string; archivedAt: number }
-```
+| State       | Description                    | Fields                                          |
+| ----------- | ------------------------------ | ----------------------------------------------- |
+| draft       | Initial state, editing title   | status, title, createdAt                        |
+| todo        | Published, ready to start      | status, title, description, createdAt           |
+| in_progress | Work has begun                 | status, title, description, startedAt           |
+| blocked     | Waiting on something           | status, title, description, blockedReason, blockedAt |
+| done        | Work completed                 | status, title, description, completedAt         |
+| archived    | No longer active               | status, title, archivedAt                       |
 
-### 2. Intention-Based Dispatch
+### Intentions
 
-All state changes go through pure data "intentions":
+| Intention          | From State   | To State    |
+| ------------------ | ------------ | ----------- |
+| UPDATE_TITLE       | draft, todo, in_progress, blocked | (same) |
+| UPDATE_DESCRIPTION | todo, in_progress, blocked | (same) |
+| PUBLISH            | draft        | todo        |
+| START              | todo         | in_progress |
+| BLOCK              | in_progress  | blocked     |
+| UNBLOCK            | blocked      | in_progress |
+| COMPLETE           | in_progress  | done        |
+| REOPEN             | done         | todo        |
+| ARCHIVE            | any (except archived) | archived |
 
-```typescript
-type TaskIntention =
-  | { type: "UPDATE_TITLE"; title: string }
-  | { type: "UPDATE_DESCRIPTION"; description: string }
-  | { type: "PUBLISH" }     // draft → todo
-  | { type: "START" }       // todo → in_progress
-  | { type: "BLOCK"; reason: string }  // in_progress → blocked
-  | { type: "UNBLOCK" }     // blocked → in_progress
-  | { type: "COMPLETE" }    // in_progress → done
-  | { type: "REOPEN" }      // done → todo
-  | { type: "ARCHIVE" }     // any → archived
-```
-
-### 3. Guard Conditions
-
-The `interpret` function enforces valid transitions:
-
-```typescript
-function interpret(draft: Mutable<TaskDoc>, intention: TaskIntention) {
-  switch (intention.type) {
-    case "START":
-      // Guard: can only start from todo
-      if (draft.task.state.status !== "todo") return
-      draft.task.state = { status: "in_progress", ... }
-      break
-    // ...
-  }
-}
-```
-
-Invalid transitions are silently ignored (no-ops).
-
-### 4. CRDT Persistence & Sync
-
-- **Refresh persistence**: State survives page refresh
-- **Multi-tab sync**: Open two tabs and watch changes sync in real-time
-
-## The LEA Pattern
+## Key Files
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         LEA Pattern                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  User Action                                                    │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────┐                                                │
-│  │  Intention  │  Pure data describing what user wants          │
-│  └─────────────┘                                                │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────┐                                                │
-│  │  dispatch() │  Wraps change() with interpret()               │
-│  └─────────────┘                                                │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────┐                                                │
-│  │ interpret() │  Checks guards, mutates CRDT draft             │
-│  └─────────────┘                                                │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────┐                                                │
-│  │    CRDT     │  Persisted, synced, conflict-free              │
-│  └─────────────┘                                                │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+src/
+├── schema.ts         # TaskDocSchema with discriminated union
+├── intentions.ts     # TaskIntention type (9 intentions)
+├── operations.ts     # Operation type (pure data)
+├── interpret.ts      # PURE interpret(doc, intention, frontier) function
+├── apply.ts          # Isolated mutation step
+├── use-task.ts       # useTask hook with dispatch
+├── task-card.tsx     # TaskCard component with state views
+└── interpret.test.ts # 35 unit tests (pure function testing!)
 ```
+
+## Running
+
+```bash
+# From repo root
+pnpm install
+pnpm --filter example-task-card dev
+```
+
+Open http://localhost:5173
 
 ## Demo Scenarios
 
@@ -122,33 +136,34 @@ Invalid transitions are silently ignored (no-ops).
 6. **Refresh**: Refresh page, state persists
 7. **Multi-tab**: Open two tabs, make changes, both sync
 
-## File Structure
+## Why Pure Interpret?
 
+The `interpret` function is **pure**:
+
+```typescript
+function interpret(
+  doc: TypedDoc<typeof TaskDocSchema>,
+  intention: TaskIntention,
+  frontier: Frontiers,
+): Operation[] {
+  // Derive state from (doc, frontier) - PURE
+  const state = getStateAtFrontier(doc, frontier)
+
+  // Derive timestamp from frontier - PURE
+  const timestamp = getTimestampFromFrontier(frontier)
+
+  // No side effects, no Date.now(), no mutations
+  // Same inputs ALWAYS produce same outputs
+}
 ```
-src/
-├── app.tsx           # Main app with RepoProvider
-├── intentions.ts     # TaskIntention type
-├── interpret.ts      # interpret() function with guards
-├── interpret.test.ts # Unit tests for state transitions
-├── schema.ts         # TaskDocSchema with discriminated union
-├── server.ts         # Vite + WebSocket server
-├── styles.css        # Task card styling
-├── task-card.tsx     # TaskCard component with state views
-└── use-task.ts       # useTask hook with dispatch
-```
 
-## Running Tests
+Benefits:
 
-```bash
-pnpm --filter example-task-card verify
-```
+- **Testable** - No mocking needed, just pass inputs and check outputs
+- **Deterministic** - Replay intentions and get same results
+- **Debuggable** - Operations are data you can log and inspect
+- **Time travel** - Use any historical frontier to see what would have happened
 
-## Key Takeaways
+## Learn More
 
-1. **Discriminated unions work great with CRDTs** — The `Shape.plain.discriminatedUnion` schema handles state transitions cleanly.
-
-2. **Intentions provide a clear audit trail** — Every state change is a discrete, named action.
-
-3. **Guard conditions are simple** — Just check the current state and return early if invalid.
-
-4. **The pattern scales** — This same approach works for complex multi-entity state machines.
+See [docs/lea.md](../../docs/lea.md) for the full LEA architecture documentation.

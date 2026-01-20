@@ -1,105 +1,184 @@
-import { change, createTypedDoc } from "@loro-extended/change"
+import {
+  change,
+  createTypedDoc,
+  type Frontiers,
+  loro,
+} from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
-import { interpret } from "./interpret.js"
-import { TaskDocSchema } from "./schema.js"
+import {
+  getStateAtFrontier,
+  getTimestampFromFrontier,
+  interpret,
+} from "./interpret.js"
+import { TaskDocSchema, type TaskState } from "./schema.js"
 
-// Helper to create a fresh document with initial state
-function createDoc() {
-  return createTypedDoc(TaskDocSchema)
+// Helper to create a doc with a specific state and return (doc, frontier)
+function createDocWithState(state: TaskState) {
+  const doc = createTypedDoc(TaskDocSchema)
+  change(doc, draft => {
+    draft.task.state = state
+  })
+  const frontier = loro(doc).doc.frontiers()
+  return { doc, frontier }
 }
 
-describe("interpret", () => {
+// Helper states
+function draftState(title = ""): TaskState {
+  return { status: "draft", title, createdAt: 1000 }
+}
+
+function todoState(title = "Task", description = ""): TaskState {
+  return { status: "todo", title, description, createdAt: 1000 }
+}
+
+function inProgressState(title = "Task", description = ""): TaskState {
+  return { status: "in_progress", title, description, startedAt: 2000 }
+}
+
+function blockedState(
+  title = "Task",
+  description = "",
+  reason = "Waiting",
+): TaskState {
+  return {
+    status: "blocked",
+    title,
+    description,
+    blockedReason: reason,
+    blockedAt: 3000,
+  }
+}
+
+function doneState(title = "Task", description = ""): TaskState {
+  return { status: "done", title, description, completedAt: 4000 }
+}
+
+function archivedState(title = "Task"): TaskState {
+  return { status: "archived", title, archivedAt: 5000 }
+}
+
+describe("interpret (full LEA with frontiers)", () => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Helper function tests
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("getStateAtFrontier", () => {
+    it("returns state at the given frontier", () => {
+      const { doc, frontier } = createDocWithState(draftState("Hello"))
+      const state = getStateAtFrontier(doc, frontier)
+      expect(state.status).toBe("draft")
+      expect(state.title).toBe("Hello")
+    })
+
+    it("returns historical state when frontier is from the past", () => {
+      const doc = createTypedDoc(TaskDocSchema)
+      change(doc, draft => {
+        draft.task.state = draftState("First")
+      })
+      const oldFrontier = loro(doc).doc.frontiers()
+
+      change(doc, draft => {
+        draft.task.state = todoState("Second", "Description")
+      })
+
+      // Current state is "Second"
+      expect(doc.task.state.title).toBe("Second")
+
+      // But state at old frontier is "First"
+      const oldState = getStateAtFrontier(doc, oldFrontier)
+      expect(oldState.title).toBe("First")
+      expect(oldState.status).toBe("draft")
+    })
+  })
+
+  describe("getTimestampFromFrontier", () => {
+    it("returns 0 for empty frontier", () => {
+      const emptyFrontier: Frontiers = []
+      expect(getTimestampFromFrontier(emptyFrontier)).toBe(0)
+    })
+
+    it("increases monotonically as operations are added", () => {
+      const doc = createTypedDoc(TaskDocSchema)
+      const t0 = getTimestampFromFrontier(loro(doc).doc.frontiers())
+
+      change(doc, draft => {
+        draft.task.state = draftState("First")
+      })
+      const t1 = getTimestampFromFrontier(loro(doc).doc.frontiers())
+
+      change(doc, draft => {
+        draft.task.state = todoState("Second")
+      })
+      const t2 = getTimestampFromFrontier(loro(doc).doc.frontiers())
+
+      expect(t1).toBeGreaterThan(t0)
+      expect(t2).toBeGreaterThan(t1)
+    })
+  })
+
   // ═══════════════════════════════════════════════════════════════════════════
   // UPDATE_TITLE
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("UPDATE_TITLE", () => {
-    it("updates title in draft state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("New Title")
+    it("returns UPDATE_TITLE operation in draft state", () => {
+      const { doc, frontier } = createDocWithState(draftState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_TITLE", title: "New Title" }])
     })
 
-    it("updates title in todo state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Old Title",
-          description: "",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("New Title")
+    it("returns UPDATE_TITLE operation in todo state", () => {
+      const { doc, frontier } = createDocWithState(todoState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_TITLE", title: "New Title" }])
     })
 
-    it("updates title in in_progress state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Old Title",
-          description: "",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("New Title")
+    it("returns UPDATE_TITLE operation in in_progress state", () => {
+      const { doc, frontier } = createDocWithState(inProgressState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_TITLE", title: "New Title" }])
     })
 
-    it("updates title in blocked state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "blocked",
-          title: "Old Title",
-          description: "",
-          blockedReason: "Waiting",
-          blockedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("New Title")
+    it("returns UPDATE_TITLE operation in blocked state", () => {
+      const { doc, frontier } = createDocWithState(blockedState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_TITLE", title: "New Title" }])
     })
 
-    it("does NOT update title in done state (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "done",
-          title: "Old Title",
-          description: "",
-          completedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("Old Title")
+    it("returns empty operations in done state (guard)", () => {
+      const { doc, frontier } = createDocWithState(doneState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([])
     })
 
-    it("does NOT update title in archived state (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "archived",
-          title: "Old Title",
-          archivedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_TITLE", title: "New Title" })
-      })
-      expect(doc.task.state.title).toBe("Old Title")
+    it("returns empty operations in archived state (guard)", () => {
+      const { doc, frontier } = createDocWithState(archivedState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_TITLE", title: "New Title" },
+        frontier,
+      )
+      expect(ops).toEqual([])
     })
   })
 
@@ -108,90 +187,54 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("UPDATE_DESCRIPTION", () => {
-    it("updates description in todo state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Task",
-          description: "Old",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_DESCRIPTION", description: "New" })
-      })
-      const state = doc.task.state
-      if (state.status === "todo") {
-        expect(state.description).toBe("New")
-      }
+    it("returns UPDATE_DESCRIPTION operation in todo state", () => {
+      const { doc, frontier } = createDocWithState(todoState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_DESCRIPTION", description: "New" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_DESCRIPTION", description: "New" }])
     })
 
-    it("updates description in in_progress state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Task",
-          description: "Old",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_DESCRIPTION", description: "New" })
-      })
-      const state = doc.task.state
-      if (state.status === "in_progress") {
-        expect(state.description).toBe("New")
-      }
+    it("returns UPDATE_DESCRIPTION operation in in_progress state", () => {
+      const { doc, frontier } = createDocWithState(inProgressState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_DESCRIPTION", description: "New" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_DESCRIPTION", description: "New" }])
     })
 
-    it("updates description in blocked state", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "blocked",
-          title: "Task",
-          description: "Old",
-          blockedReason: "Waiting",
-          blockedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_DESCRIPTION", description: "New" })
-      })
-      const state = doc.task.state
-      if (state.status === "blocked") {
-        expect(state.description).toBe("New")
-      }
+    it("returns UPDATE_DESCRIPTION operation in blocked state", () => {
+      const { doc, frontier } = createDocWithState(blockedState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_DESCRIPTION", description: "New" },
+        frontier,
+      )
+      expect(ops).toEqual([{ type: "UPDATE_DESCRIPTION", description: "New" }])
     })
 
-    it("does NOT update description in draft state (no description field)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_DESCRIPTION", description: "New" })
-      })
-      // Draft state doesn't have description field
-      expect(doc.task.state.status).toBe("draft")
+    it("returns empty operations in draft state (no description field)", () => {
+      const { doc, frontier } = createDocWithState(draftState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_DESCRIPTION", description: "New" },
+        frontier,
+      )
+      expect(ops).toEqual([])
     })
 
-    it("does NOT update description in done state (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "done",
-          title: "Task",
-          description: "Old",
-          completedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UPDATE_DESCRIPTION", description: "New" })
-      })
-      const state = doc.task.state
-      if (state.status === "done") {
-        expect(state.description).toBe("Old")
-      }
+    it("returns empty operations in done state (guard)", () => {
+      const { doc, frontier } = createDocWithState(doneState())
+      const ops = interpret(
+        doc,
+        { type: "UPDATE_DESCRIPTION", description: "New" },
+        frontier,
+      )
+      expect(ops).toEqual([])
     })
   })
 
@@ -200,41 +243,26 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("PUBLISH", () => {
-    it("transitions from draft to todo", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "draft",
-          title: "My Task",
-          createdAt: 1000,
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "PUBLISH" })
-      })
-      expect(doc.task.state.status).toBe("todo")
-      expect(doc.task.state.title).toBe("My Task")
-      const state = doc.task.state
-      if (state.status === "todo") {
-        expect(state.description).toBe("")
-        expect(state.createdAt).toBe(1000)
-      }
+    it("returns SET_TASK_STATE operation from draft to todo", () => {
+      const { doc, frontier } = createDocWithState(draftState("My Task"))
+      const ops = interpret(doc, { type: "PUBLISH" }, frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "todo",
+            title: "My Task",
+            description: "",
+            createdAt: 1000,
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from todo (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Task",
-          description: "",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "PUBLISH" })
-      })
-      expect(doc.task.state.status).toBe("todo")
+    it("returns empty operations from todo (guard)", () => {
+      const { doc, frontier } = createDocWithState(todoState())
+      const ops = interpret(doc, { type: "PUBLISH" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -243,54 +271,35 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("START", () => {
-    it("transitions from todo to in_progress", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "My Task",
-          description: "Details",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "START" })
-      })
-      expect(doc.task.state.status).toBe("in_progress")
-      expect(doc.task.state.title).toBe("My Task")
-      const state = doc.task.state
-      if (state.status === "in_progress") {
-        expect(state.description).toBe("Details")
-        expect(state.startedAt).toBeGreaterThan(0)
-      }
+    it("returns SET_TASK_STATE operation from todo to in_progress", () => {
+      const { doc, frontier } = createDocWithState(
+        todoState("My Task", "Details"),
+      )
+      const ops = interpret(doc, { type: "START" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "in_progress",
+            title: "My Task",
+            description: "Details",
+            startedAt: timestamp, // Derived from frontier!
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from draft (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        interpret(draft, { type: "START" })
-      })
-      expect(doc.task.state.status).toBe("draft")
+    it("returns empty operations from draft (guard)", () => {
+      const { doc, frontier } = createDocWithState(draftState())
+      const ops = interpret(doc, { type: "START" }, frontier)
+      expect(ops).toEqual([])
     })
 
-    it("does NOT transition from in_progress (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Task",
-          description: "",
-          startedAt: 1000,
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "START" })
-      })
-      expect(doc.task.state.status).toBe("in_progress")
-      const state = doc.task.state
-      if (state.status === "in_progress") {
-        expect(state.startedAt).toBe(1000) // unchanged
-      }
+    it("returns empty operations from in_progress (guard)", () => {
+      const { doc, frontier } = createDocWithState(inProgressState())
+      const ops = interpret(doc, { type: "START" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -299,41 +308,34 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("BLOCK", () => {
-    it("transitions from in_progress to blocked with reason", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "My Task",
-          description: "Details",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "BLOCK", reason: "Waiting for API" })
-      })
-      expect(doc.task.state.status).toBe("blocked")
-      const state = doc.task.state
-      if (state.status === "blocked") {
-        expect(state.blockedReason).toBe("Waiting for API")
-        expect(state.blockedAt).toBeGreaterThan(0)
-      }
+    it("returns SET_TASK_STATE operation from in_progress to blocked", () => {
+      const { doc, frontier } = createDocWithState(
+        inProgressState("My Task", "Details"),
+      )
+      const ops = interpret(
+        doc,
+        { type: "BLOCK", reason: "Waiting for API" },
+        frontier,
+      )
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "blocked",
+            title: "My Task",
+            description: "Details",
+            blockedReason: "Waiting for API",
+            blockedAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from todo (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Task",
-          description: "",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "BLOCK", reason: "Test" })
-      })
-      expect(doc.task.state.status).toBe("todo")
+    it("returns empty operations from todo (guard)", () => {
+      const { doc, frontier } = createDocWithState(todoState())
+      const ops = interpret(doc, { type: "BLOCK", reason: "Test" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -342,41 +344,29 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("UNBLOCK", () => {
-    it("transitions from blocked to in_progress", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "blocked",
-          title: "My Task",
-          description: "Details",
-          blockedReason: "Waiting",
-          blockedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UNBLOCK" })
-      })
-      expect(doc.task.state.status).toBe("in_progress")
-      const state = doc.task.state
-      if (state.status === "in_progress") {
-        expect(state.startedAt).toBeGreaterThan(0)
-      }
+    it("returns SET_TASK_STATE operation from blocked to in_progress", () => {
+      const { doc, frontier } = createDocWithState(
+        blockedState("My Task", "Details"),
+      )
+      const ops = interpret(doc, { type: "UNBLOCK" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "in_progress",
+            title: "My Task",
+            description: "Details",
+            startedAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from in_progress (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Task",
-          description: "",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "UNBLOCK" })
-      })
-      expect(doc.task.state.status).toBe("in_progress")
+    it("returns empty operations from in_progress (guard)", () => {
+      const { doc, frontier } = createDocWithState(inProgressState())
+      const ops = interpret(doc, { type: "UNBLOCK" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -385,57 +375,35 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("COMPLETE", () => {
-    it("transitions from in_progress to done", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "My Task",
-          description: "Details",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "COMPLETE" })
-      })
-      expect(doc.task.state.status).toBe("done")
-      const state = doc.task.state
-      if (state.status === "done") {
-        expect(state.completedAt).toBeGreaterThan(0)
-      }
+    it("returns SET_TASK_STATE operation from in_progress to done", () => {
+      const { doc, frontier } = createDocWithState(
+        inProgressState("My Task", "Details"),
+      )
+      const ops = interpret(doc, { type: "COMPLETE" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "done",
+            title: "My Task",
+            description: "Details",
+            completedAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from todo (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Task",
-          description: "",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "COMPLETE" })
-      })
-      expect(doc.task.state.status).toBe("todo")
+    it("returns empty operations from todo (guard)", () => {
+      const { doc, frontier } = createDocWithState(todoState())
+      const ops = interpret(doc, { type: "COMPLETE" }, frontier)
+      expect(ops).toEqual([])
     })
 
-    it("does NOT transition from blocked (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "blocked",
-          title: "Task",
-          description: "",
-          blockedReason: "Waiting",
-          blockedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "COMPLETE" })
-      })
-      expect(doc.task.state.status).toBe("blocked")
+    it("returns empty operations from blocked (guard)", () => {
+      const { doc, frontier } = createDocWithState(blockedState())
+      const ops = interpret(doc, { type: "COMPLETE" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -444,41 +412,29 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("REOPEN", () => {
-    it("transitions from done to todo", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "done",
-          title: "My Task",
-          description: "Details",
-          completedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "REOPEN" })
-      })
-      expect(doc.task.state.status).toBe("todo")
-      const state = doc.task.state
-      if (state.status === "todo") {
-        expect(state.title).toBe("My Task")
-        expect(state.description).toBe("Details")
-      }
+    it("returns SET_TASK_STATE operation from done to todo", () => {
+      const { doc, frontier } = createDocWithState(
+        doneState("My Task", "Details"),
+      )
+      const ops = interpret(doc, { type: "REOPEN" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "todo",
+            title: "My Task",
+            description: "Details",
+            createdAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("does NOT transition from in_progress (guard)", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Task",
-          description: "",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "REOPEN" })
-      })
-      expect(doc.task.state.status).toBe("in_progress")
+    it("returns empty operations from in_progress (guard)", () => {
+      const { doc, frontier } = createDocWithState(inProgressState())
+      const ops = interpret(doc, { type: "REOPEN" }, frontier)
+      expect(ops).toEqual([])
     })
   })
 
@@ -487,112 +443,99 @@ describe("interpret", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("ARCHIVE", () => {
-    it("transitions from draft to archived", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
+    it("returns SET_TASK_STATE operation from draft to archived", () => {
+      const { doc, frontier } = createDocWithState(draftState("Task"))
+      const ops = interpret(doc, { type: "ARCHIVE" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "archived",
+            title: "Task",
+            archivedAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("transitions from todo to archived", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Task",
-          description: "",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
+    it("returns SET_TASK_STATE operation from todo to archived", () => {
+      const { doc, frontier } = createDocWithState(todoState("Task"))
+      const ops = interpret(doc, { type: "ARCHIVE" }, frontier)
+      const timestamp = getTimestampFromFrontier(frontier)
+      expect(ops).toEqual([
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "archived",
+            title: "Task",
+            archivedAt: timestamp,
+          },
+        },
+      ])
     })
 
-    it("transitions from in_progress to archived", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "in_progress",
-          title: "Task",
-          description: "",
-          startedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
+    it("returns empty operations from archived (guard - already archived)", () => {
+      const { doc, frontier } = createDocWithState(archivedState("Task"))
+      const ops = interpret(doc, { type: "ARCHIVE" }, frontier)
+      expect(ops).toEqual([])
+    })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Purity Tests
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("purity", () => {
+    it("is deterministic - same inputs produce same outputs", () => {
+      const { doc, frontier } = createDocWithState(
+        todoState("Task", "Description"),
+      )
+      const intention = { type: "START" as const }
+
+      const ops1 = interpret(doc, intention, frontier)
+      const ops2 = interpret(doc, intention, frontier)
+
+      expect(ops1).toEqual(ops2)
     })
 
-    it("transitions from blocked to archived", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "blocked",
-          title: "Task",
-          description: "",
-          blockedReason: "Waiting",
-          blockedAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
+    it("derives timestamp from frontier, not Date.now()", () => {
+      const { doc, frontier } = createDocWithState(
+        todoState("Task", "Description"),
+      )
+      const intention = { type: "START" as const }
+
+      // Call interpret multiple times - should always get same timestamp
+      const ops1 = interpret(doc, intention, frontier)
+      const ops2 = interpret(doc, intention, frontier)
+
+      expect(ops1[0]).toHaveProperty("value.startedAt")
+      expect(ops2[0]).toHaveProperty("value.startedAt")
+      expect((ops1[0] as any).value.startedAt).toBe(
+        (ops2[0] as any).value.startedAt,
+      )
     })
 
-    it("transitions from done to archived", () => {
-      const doc = createDoc()
+    it("uses historical state when given old frontier", () => {
+      const doc = createTypedDoc(TaskDocSchema)
       change(doc, draft => {
-        draft.task.state = {
-          status: "done",
-          title: "Task",
-          description: "",
-          completedAt: Date.now(),
-        }
+        draft.task.state = todoState("First", "Description")
       })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
-    })
+      const oldFrontier = loro(doc).doc.frontiers()
 
-    it("does NOT transition from archived (guard - already archived)", () => {
-      const doc = createDoc()
+      // Advance state
       change(doc, draft => {
-        draft.task.state = {
-          status: "archived",
-          title: "Task",
-          archivedAt: 1000,
-        }
+        draft.task.state = doneState("Second", "Done")
       })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.status).toBe("archived")
-      const state = doc.task.state
-      if (state.status === "archived") {
-        expect(state.archivedAt).toBe(1000) // unchanged
-      }
-    })
 
-    it("preserves title when archiving", () => {
-      const doc = createDoc()
-      change(doc, draft => {
-        draft.task.state = {
-          status: "todo",
-          title: "Important Task",
-          description: "Details",
-          createdAt: Date.now(),
-        }
-      })
-      change(doc, draft => {
-        interpret(draft, { type: "ARCHIVE" })
-      })
-      expect(doc.task.state.title).toBe("Important Task")
+      // Interpret with old frontier should use old state
+      const ops = interpret(doc, { type: "START" }, oldFrontier)
+
+      // Should succeed because at oldFrontier, state was "todo"
+      expect(ops.length).toBe(1)
+      expect(ops[0].type).toBe("SET_TASK_STATE")
+      expect((ops[0] as any).value.status).toBe("in_progress")
+      expect((ops[0] as any).value.title).toBe("First")
     })
   })
 })

@@ -1,10 +1,74 @@
-# LEA: Loro-Extended Architecture
+# LEA: The Loro Extended Architecture
 
-LEA is an architectural pattern for building applications with CRDT-backed state machines. It combines the predictability of The Elm Architecture (TEA) with the persistence and synchronization capabilities of CRDTs.
+LEA is a rigorous framework for building CRDT-native applications with pure functional principles. It extends The Elm Architecture (TEA) to work seamlessly with CRDTs while preserving purity and determinism.
 
-## Core Concepts
+## The Core Equation
 
-### The Problem
+```
+LEA:  (Frontier, AnchoredIntention) → Frontier'
+```
+
+Where:
+
+- **Frontier** = immutable model identifier (a point in causal history)
+- **AnchoredIntention** = (Intention, Frontier) — user intent + causal context
+- **Frontier'** = new immutable model identifier after state transition
+
+## The Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    The Loro Extended Architecture (LEA)                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  MODEL = Frontier                                                           │
+│  └── Immutable identifier for a point in causal history                     │
+│      Uniquely determines state: state(doc, frontier) → State                │
+│                              │                                              │
+│                              ▼                                              │
+│  VIEW = render(state(doc, frontier))                                        │
+│  └── Pure function from Frontier to UI                                      │
+│      Uses Refs for efficient lazy state access                              │
+│                              │                                              │
+│                              ▼                                              │
+│  INTENTION = pure data describing user intent                               │
+│  └── { type: "SUBMIT_ANSWER", challengeId: "q1", answer: "42" }             │
+│                              │                                              │
+│                              ▼                                              │
+│  ANCHORED INTENTION = (Intention, Frontier)                                 │
+│  └── Intent + causal context = the "Message" in TEA terms                   │
+│                              │                                              │
+│                              ▼                                              │
+│  INTERPRET = interpret(doc, intention, frontier) → Operations               │
+│  └── PURE FUNCTION! Same inputs always produce same outputs                 │
+│                              │                                              │
+│                              ▼                                              │
+│  APPLY = applyOperations(doc, operations) → Frontier'                       │
+│  └── Isolated mutation, returns new immutable frontier                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Mathematical Foundation
+
+```
+Let:
+  D = Document (complete causal history, append-only)
+  F = Set of all Frontiers
+  I = Set of all Intentions
+  O = Set of all Operations
+
+Functions:
+  state:     D × F → S           -- Derive state (pure)
+  interpret: D × I × F → O*      -- Compute operations (PURE!)
+  apply:     D × O* → F          -- Apply ops, get new frontier
+
+Key Property:
+  ∀ d ∈ D, ∀ i ∈ I, ∀ f ∈ F:
+    interpret(d, i, f) is deterministic
+```
+
+## The Problem LEA Solves
 
 Traditional web applications face these challenges:
 
@@ -12,57 +76,9 @@ Traditional web applications face these challenges:
 2. **Cross-device friction** - Continuing work on another device requires explicit "save" actions
 3. **Multi-tab confusion** - Multiple tabs can show inconsistent state
 4. **State machine complexity** - Managing transitions between states is error-prone
+5. **Impure update functions** - Side effects (like `Date.now()`) make testing and reasoning difficult
 
-CRDTs solve persistence and sync, but integrating them with application state machines requires a clear pattern.
-
-### The Solution: LEA
-
-LEA provides a structured approach:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              LEA Data Flow                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   User Action                                                               │
-│       │                                                                     │
-│       ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  Intention (Pure Data)                                              │   │
-│   │  { type: "START_TASK" }                                             │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│       │                                                                     │
-│       ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  dispatch(intention)                                                │   │
-│   │  └── handle.change(draft => interpret(draft, intention))            │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│       │                                                                     │
-│       ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  interpret(draft, intention)                                        │   │
-│   │  - Checks guard conditions                                          │   │
-│   │  - Mutates draft (CRDT operations)                                  │   │
-│   │  - Batches multiple field updates                                   │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│       │                                                                     │
-│       ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  CRDT Layer (Loro)                                                  │   │
-│   │  - Operations committed                                             │   │
-│   │  - Synced to other tabs/devices                                     │   │
-│   │  - Persisted to storage                                             │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│       │                                                                     │
-│       ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  React Re-render                                                    │   │
-│   │  - useRefValue triggers update                                      │   │
-│   │  - View reflects new state                                          │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+CRDTs solve persistence and sync, but integrating them with application state machines requires a clear pattern that preserves functional purity.
 
 ## The Four Pillars
 
@@ -76,7 +92,7 @@ type TaskIntention =
   | { type: "PUBLISH" }
   | { type: "START" }
   | { type: "BLOCK"; reason: string }
-  | { type: "COMPLETE" };
+  | { type: "COMPLETE" }
 ```
 
 **Why Intentions?**
@@ -86,104 +102,205 @@ type TaskIntention =
 - **Debuggable** - Clear audit trail of user actions
 - **Decoupled** - UI doesn't know about CRDT operations
 
-### 2. Interpret (State Transitions)
+### 2. Anchored Intentions (Intent + Context)
 
-The `interpret` function applies an intention to the CRDT state. It contains all state transition logic:
+An anchored intention pairs user intent with causal context:
 
 ```typescript
+type AnchoredIntention<I> = {
+  intention: I
+  frontier: Frontiers  // The causal context when intention was created
+  timestamp: number    // Wall-clock time (for display, not logic)
+}
+```
+
+The frontier captures "what state did the user see when they made this decision?" This is crucial for:
+
+- **Deterministic interpretation** - Same anchored intention always produces same operations
+- **Conflict detection** - Know if state changed between intent and application
+- **Time travel** - Replay intentions from any point in history
+
+### 3. Interpret (Pure State Transitions)
+
+The `interpret` function computes what operations to perform. It is **pure**:
+
+```typescript
+import { loro, type Frontiers, type TypedDoc } from "@loro-extended/change"
+
+/**
+ * Derive state at a given frontier using forkAt.
+ */
+function getStateAtFrontier(
+  doc: TypedDoc<typeof TaskDocSchema>,
+  frontier: Frontiers,
+): TaskState {
+  const forkedDoc = doc.forkAt(frontier)
+  return forkedDoc.task.state
+}
+
+/**
+ * Derive a logical timestamp from the frontier.
+ * Sum of counters gives monotonically increasing logical time.
+ */
+function getTimestampFromFrontier(frontier: Frontiers): number {
+  return frontier.reduce((sum, f) => sum + f.counter + 1, 0)
+}
+
+/**
+ * Pure interpret function - the heart of LEA.
+ */
 function interpret(
-  draft: Mutable<typeof TaskDocSchema>,
+  doc: TypedDoc<typeof TaskDocSchema>,
   intention: TaskIntention,
-): void {
-  const state = draft.task.state;
+  frontier: Frontiers,
+): Operation[] {
+  // Derive state from (doc, frontier) - PURE
+  const state = getStateAtFrontier(doc, frontier)
+
+  // Derive timestamp from frontier - PURE
+  const timestamp = getTimestampFromFrontier(frontier)
 
   switch (intention.type) {
     case "PUBLISH":
       // Guard condition: can only publish from draft
-      if (state.status !== "draft") return;
+      if (state.status !== "draft") return []
 
-      // Transition: draft → todo
-      draft.task.state = {
-        status: "todo",
-        title: state.title,
-        description: "",
-        createdAt: state.createdAt,
-      };
-      break;
+      // Return operations to perform (not mutations!)
+      return [
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "todo",
+            title: state.title,
+            description: "",
+            createdAt: state.createdAt,
+          },
+        },
+      ]
 
     case "START":
       // Guard condition: can only start from todo
-      if (state.status !== "todo") return;
+      if (state.status !== "todo") return []
 
-      // Transition: todo → in_progress
-      draft.task.state = {
-        status: "in_progress",
-        title: state.title,
-        description: state.description,
-        startedAt: Date.now(),
-      };
-      break;
+      return [
+        {
+          type: "SET_TASK_STATE",
+          value: {
+            status: "in_progress",
+            title: state.title,
+            description: state.description,
+            startedAt: timestamp, // Derived from frontier!
+          },
+        },
+      ]
 
     // ... other transitions
   }
+
+  return []
 }
 ```
 
 **Key Properties:**
 
-- **Guard conditions** - Invalid transitions are no-ops (return early)
-- **Batched mutations** - Multiple fields update atomically
-- **Impure but isolated** - Mutations happen only within `change()`
-- **Deterministic** - Same state + same intention = same result
+- **Pure** - No side effects, no mutations, no `Date.now()` calls
+- **Deterministic** - Same inputs always produce same outputs
+- **Guard conditions** - Invalid transitions return empty operations
+- **Returns operations** - Describes what to do, doesn't do it
+- **Time travel ready** - Uses frontier to derive both state AND timestamp
 
-### 3. Dispatch (The Bridge)
+### 4. Apply (Isolated Mutation)
 
-The `dispatch` function connects React to the CRDT layer:
+The `apply` function executes operations and returns a new frontier:
 
 ```typescript
+function apply(
+  doc: TypedDoc<Schema>,
+  operations: Operation[],
+): Frontiers {
+  doc.change(draft => {
+    for (const op of operations) {
+      switch (op.type) {
+        case "SET_TASK_STATE":
+          draft.task.state = op.value
+          break
+        // ... other operation types
+      }
+    }
+  })
+
+  return doc.frontiers()
+}
+```
+
+**Key Properties:**
+
+- **Isolated** - All mutation happens here, nowhere else
+- **Returns frontier** - New immutable model identifier
+- **Atomic** - All operations commit together
+
+## The Dispatch Bridge
+
+The `dispatch` function connects React to the LEA architecture:
+
+```typescript
+import { loro } from "@loro-extended/change"
+
 function useTask(handle: Handle<typeof TaskDocSchema>) {
-  const { value: task } = useRefValue(handle.doc.task.state);
+  const task = useDoc(handle, doc => doc.task.state) as TaskState
 
   const dispatch = useCallback(
     (intention: TaskIntention) => {
-      handle.change((draft) => {
-        interpret(draft, intention);
-      });
+      // Capture frontier at dispatch time (the "anchored" context)
+      // This gives us both state and logical timestamp
+      const frontier = loro(handle.doc).doc.frontiers()
+
+      // Pure interpretation: compute operations from (doc, intention, frontier)
+      const operations = interpret(handle.doc, intention, frontier)
+
+      // Isolated mutation: apply operations
+      if (operations.length > 0) {
+        handle.change(draft => {
+          apply(draft, operations)
+        })
+      }
     },
     [handle],
-  );
+  )
 
-  return { task, dispatch };
+  return { task, dispatch }
 }
 ```
 
 **What dispatch does:**
 
-1. Wraps the intention in `handle.change()`
-2. Calls `interpret()` with the draft
-3. Commits all changes atomically
-4. Triggers sync to other tabs/devices
+1. Captures the current frontier via `loro(doc).doc.frontiers()`
+2. Calls pure `interpret(doc, intention, frontier)` to compute operations
+3. Calls `apply(draft, operations)` inside `handle.change()` for isolated mutation
+4. CRDT layer handles sync automatically
 
-### 4. Refs as Model
+## Frontiers as Model
 
-In traditional TEA, the Model is an immutable snapshot. In LEA, the Model is a collection of **Refs** - live pointers into CRDT state:
+In traditional TEA, the Model is an immutable value that gets replaced on each update. In LEA, the Model is a **Frontier** - an immutable identifier for a point in causal history:
 
 ```typescript
+import { loro } from "@loro-extended/change"
+
 // Traditional TEA
-const model: { title: string; count: number } = { title: "Hello", count: 0 };
+const model: TaskState = { status: "draft", title: "Hello" }
 // Must replace entire model on each update
 
 // LEA
-const handle = useHandle(DOC_ID, TaskDocSchema);
-// handle.doc.task.state is a Ref - stable reference, value changes
-// Reading is O(1) per path, not O(N) for entire document
+const frontier: Frontiers = loro(doc).doc.frontiers()
+// Frontier is an identifier; state is derived: state(doc, frontier)
 ```
 
 **Benefits:**
 
-- **Lazy reading** - Only read what you need
-- **Fine-grained reactivity** - `useRefValue(ref)` subscribes to specific containers
-- **No serialization overhead** - No `toJSON()` on every render
+- **Immutable identity** - Frontiers never change; we get new ones
+- **Lazy state derivation** - Only compute state when needed
+- **Time travel** - Any frontier gives you that point in history
+- **Efficient comparison** - Compare frontiers, not deep state
 
 ## State Machines with Discriminated Unions
 
@@ -209,7 +326,7 @@ const TaskStateSchema = Shape.plain.discriminatedUnion("status", {
     startedAt: Shape.plain.number(),
   }),
   // ... more states
-});
+})
 ```
 
 **Why discriminated unions?**
@@ -219,282 +336,107 @@ const TaskStateSchema = Shape.plain.discriminatedUnion("status", {
 - **Clear transitions** - Each state has explicit entry/exit points
 - **Self-documenting** - State machine is visible in the schema
 
-## React Integration
+## LEA vs TEA
 
-### View Components
-
-Views render based on the current state:
-
-```typescript
-function TaskCard() {
-  const handle = useHandle(TASK_DOC_ID, TaskDocSchema);
-  const { task, dispatch } = useTask(handle);
-
-  switch (task.status) {
-    case "draft":
-      return (
-        <div className="task-card draft">
-          <input
-            value={task.title}
-            onChange={(e) =>
-              dispatch({ type: "UPDATE_TITLE", title: e.target.value })
-            }
-            placeholder="Task title..."
-          />
-          <button onClick={() => dispatch({ type: "PUBLISH" })}>Publish</button>
-        </div>
-      );
-
-    case "todo":
-      return (
-        <div className="task-card todo">
-          <h2>{task.title}</h2>
-          <button onClick={() => dispatch({ type: "START" })}>
-            Start Working
-          </button>
-        </div>
-      );
-
-    // ... other states
-  }
-}
-```
-
-### Conditional Actions
-
-Show only valid actions for the current state:
-
-```typescript
-function TaskActions({ task, dispatch }: TaskActionsProps) {
-  return (
-    <div className="actions">
-      {task.status === "draft" && (
-        <button onClick={() => dispatch({ type: "PUBLISH" })}>Publish</button>
-      )}
-      {task.status === "todo" && (
-        <button onClick={() => dispatch({ type: "START" })}>Start</button>
-      )}
-      {task.status === "in_progress" && (
-        <>
-          <button onClick={() => dispatch({ type: "COMPLETE" })}>
-            Complete
-          </button>
-          <button
-            onClick={() =>
-              dispatch({ type: "BLOCK", reason: "Waiting for review" })
-            }
-          >
-            Block
-          </button>
-        </>
-      )}
-      {/* Archive is available from any state except archived */}
-      {task.status !== "archived" && (
-        <button onClick={() => dispatch({ type: "ARCHIVE" })}>Archive</button>
-      )}
-    </div>
-  );
-}
-```
-
-## Comparison with TEA
-
-| Aspect       | TEA                               | LEA                            |
-| ------------ | --------------------------------- | ------------------------------ |
-| Model        | Immutable snapshot                | Live Refs into CRDT            |
-| Update       | Pure function returning new Model | Impure function mutating draft |
-| Persistence  | External (localStorage, server)   | Built-in (CRDT)                |
-| Sync         | External (WebSocket, polling)     | Built-in (CRDT sync)           |
-| Messages     | Trigger re-render                 | Trigger CRDT operations        |
-| Side effects | Via Cmd/Effect                    | Via Asks (RPC) or direct       |
+| Aspect           | TEA                   | LEA                                   |
+| ---------------- | --------------------- | ------------------------------------- |
+| Model            | Immutable value       | Immutable frontier (identifier)       |
+| Message          | Pure data             | Anchored intention (intent + context) |
+| Update           | Pure function         | Pure function (interpret)             |
+| Mutation         | Returns new model     | Separate apply step                   |
+| Persistence      | External              | Built-in (CRDT)                       |
+| Sync             | External              | Built-in (CRDT)                       |
+| Time travel      | Manual                | Built-in (frontiers)                  |
+| Offline          | External              | Built-in                              |
+| Concurrent edits | N/A                   | Built-in (CRDT merge)                 |
 
 ### What LEA Preserves from TEA
 
 - **Unidirectional data flow** - Actions flow down, state flows up
-- **Predictable updates** - Same intention + same state = same result
+- **Pure update function** - `interpret` is deterministic
 - **Centralized logic** - All transitions in `interpret()`
-- **Testable** - Intentions are pure data, interpret is deterministic
+- **Testable** - Intentions are pure data, interpret is pure
 
 ### What LEA Adds
 
 - **Automatic persistence** - State survives refresh
 - **Automatic sync** - Multi-tab, multi-device
-- **Lazy reading** - O(1) access to specific paths
+- **Causal context** - Anchored intentions capture "when"
 - **Conflict resolution** - CRDT handles concurrent edits
+- **Time travel** - Frontiers give you any point in history
 
 ## Testing
 
-### Unit Testing Interpret
+### Unit Testing Interpret (Pure!)
 
 ```typescript
-import { createTypedDoc } from "@loro-extended/change";
-import { interpret } from "./interpret";
-import { TaskDocSchema } from "./schema";
+import { change, createTypedDoc, loro } from "@loro-extended/change"
 
 describe("interpret", () => {
-  it("transitions from draft to todo on PUBLISH", () => {
-    const doc = createTypedDoc(TaskDocSchema);
-    doc.change((draft) => {
+  it("returns SET_TASK_STATE operation for PUBLISH from draft", () => {
+    const doc = createTypedDoc(TaskDocSchema)
+    change(doc, draft => {
       draft.task.state = {
         status: "draft",
         title: "My Task",
         createdAt: 1000,
-      };
-    });
+      }
+    })
+    const frontier = loro(doc).doc.frontiers()
 
-    doc.change((draft) => {
-      interpret(draft, { type: "PUBLISH" });
-    });
+    const operations = interpret(doc, { type: "PUBLISH" }, frontier)
 
-    const state = doc.task.state.toJSON();
-    expect(state.status).toBe("todo");
-    expect(state.title).toBe("My Task");
-    expect(state.description).toBe("");
-  });
+    expect(operations).toEqual([
+      {
+        type: "SET_TASK_STATE",
+        value: {
+          status: "todo",
+          title: "My Task",
+          description: "",
+          createdAt: 1000,
+        },
+      },
+    ])
+  })
 
-  it("ignores PUBLISH when not in draft state", () => {
-    const doc = createTypedDoc(TaskDocSchema);
-    doc.change((draft) => {
+  it("returns empty operations for PUBLISH when not in draft", () => {
+    const doc = createTypedDoc(TaskDocSchema)
+    change(doc, draft => {
       draft.task.state = {
         status: "todo",
         title: "My Task",
-        description: "Description",
+        description: "",
         createdAt: 1000,
-      };
-    });
-
-    doc.change((draft) => {
-      interpret(draft, { type: "PUBLISH" });
-    });
-
-    // State unchanged
-    expect(doc.task.state.toJSON().status).toBe("todo");
-  });
-});
-```
-
-### Integration Testing with React
-
-```typescript
-import { render, screen, fireEvent } from "@testing-library/react";
-import { RepoProvider } from "@loro-extended/react";
-import { TaskCard } from "./task-card";
-
-describe("TaskCard", () => {
-  it("shows Publish button in draft state", () => {
-    render(
-      <RepoProvider>
-        <TaskCard />
-      </RepoProvider>,
-    );
-
-    expect(screen.getByText("Publish")).toBeInTheDocument();
-  });
-
-  it("transitions to todo when Publish is clicked", async () => {
-    render(
-      <RepoProvider>
-        <TaskCard />
-      </RepoProvider>,
-    );
-
-    fireEvent.click(screen.getByText("Publish"));
-
-    // Now in todo state
-    expect(await screen.findByText("Start Working")).toBeInTheDocument();
-  });
-});
-```
-
-## Advanced Patterns
-
-### Async Operations with Asks
-
-For operations that require server-side processing, combine LEA with Asks:
-
-```typescript
-type TaskIntention =
-  | { type: "SUBMIT_FOR_REVIEW" }
-  | { type: "RECEIVE_REVIEW_RESULT"; approved: boolean; feedback: string }
-
-function interpret(draft, intention) {
-  switch (intention.type) {
-    case "SUBMIT_FOR_REVIEW":
-      if (state.status !== "in_progress") return
-
-      // Create an Ask for server-side review
-      const askId = crypto.randomUUID()
-      draft.rpc.asks.set(askId, {
-        question: { taskId: state.id, content: state.description },
-        answers: {},
-      })
-
-      // Transition to reviewing state
-      draft.task.state = {
-        status: "reviewing",
-        askId,
-        submittedAt: Date.now(),
-        // ... other fields
       }
-      break
+    })
+    const frontier = loro(doc).doc.frontiers()
 
-    case "RECEIVE_REVIEW_RESULT":
-      if (state.status !== "reviewing") return
+    const operations = interpret(doc, { type: "PUBLISH" }, frontier)
 
-      draft.task.state = intention.approved
-        ? { status: "approved", feedback: intention.feedback, ... }
-        : { status: "needs_changes", feedback: intention.feedback, ... }
-      break
-  }
-}
-```
-
-### Multiple State Machines
-
-For complex apps, compose multiple state machines:
-
-```typescript
-const AppDocSchema = Shape.doc({
-  // Each entity has its own state machine
-  tasks: Shape.record(TaskStateSchema),
-  projects: Shape.record(ProjectStateSchema),
-  user: Shape.struct({
-    auth: AuthStateSchema,
-    preferences: PreferencesSchema,
-  }),
+    expect(operations).toEqual([]) // Guard condition: no-op
+  })
 })
-
-// Separate interpret functions for each domain
-function interpretTask(draft, taskId, intention) { ... }
-function interpretProject(draft, projectId, intention) { ... }
-function interpretAuth(draft, intention) { ... }
 ```
 
-### Notifications for Async Results
-
-When async results arrive after the user has moved on:
+### Testing Apply (Isolated Mutation)
 
 ```typescript
-function interpret(draft, intention) {
-  switch (intention.type) {
-    case "RECEIVE_REVIEW_RESULT":
-      // Update the task state
-      draft.tasks.get(intention.taskId).state = { ... }
+describe("apply", () => {
+  it("applies SET_TASK_STATE operation", () => {
+    const doc = createTypedDoc(TaskDocSchema)
+    const operations: Operation[] = [
+      {
+        type: "SET_TASK_STATE",
+        value: { status: "todo", title: "Test", description: "", createdAt: 1000 },
+      },
+    ]
 
-      // Create a notification if user is viewing a different task
-      if (draft.ui.currentTaskId !== intention.taskId) {
-        draft.notifications.push({
-          id: crypto.randomUUID(),
-          type: "review_complete",
-          taskId: intention.taskId,
-          message: intention.approved ? "Task approved!" : "Changes requested",
-          createdAt: Date.now(),
-          acknowledged: false,
-        })
-      }
-      break
-  }
-}
+    const newFrontier = apply(doc, operations)
+
+    expect(doc.task.state.status).toBe("todo")
+    expect(newFrontier).not.toEqual([]) // New frontier returned
+  })
+})
 ```
 
 ## Best Practices
@@ -503,75 +445,81 @@ function interpret(draft, intention) {
 
 ```typescript
 // ❌ Too coarse
-type Intention = { type: "UPDATE_TASK"; task: Partial<Task> };
+type Intention = { type: "UPDATE_TASK"; task: Partial<Task> }
 
 // ✅ Granular
 type Intention =
   | { type: "UPDATE_TITLE"; title: string }
   | { type: "UPDATE_DESCRIPTION"; description: string }
-  | { type: "SET_PRIORITY"; priority: number };
+  | { type: "SET_PRIORITY"; priority: number }
 ```
 
-### 2. Guard Conditions First
+### 2. Interpret Must Be Pure
 
 ```typescript
-function interpret(draft, intention) {
+// ❌ Impure - uses Date.now()
+function interpret(doc, intention, frontier) {
+  return [{ type: "SET_STATE", value: { startedAt: Date.now() } }]
+}
+
+// ✅ Pure - timestamp from anchored intention
+function interpret(doc, intention, frontier, timestamp) {
+  return [{ type: "SET_STATE", value: { startedAt: timestamp } }]
+}
+```
+
+### 3. Guard Conditions Return Empty Operations
+
+```typescript
+function interpret(doc, intention, frontier) {
+  const state = getState(doc, frontier)
+
   switch (intention.type) {
     case "START":
-      // ✅ Guard first, then mutate
-      if (state.status !== "todo") return
+      // ✅ Guard returns empty, doesn't throw
+      if (state.status !== "todo") return []
 
-      draft.task.state = { status: "in_progress", ... }
-      break
+      return [{ type: "SET_STATE", value: { status: "in_progress", ... } }]
   }
 }
 ```
 
-### 3. Batch Related Mutations
+### 4. Operations Are Data
 
 ```typescript
-// ✅ All fields update atomically in one change()
-draft.task.state = {
-  status: "in_progress",
-  title: state.title,
-  description: state.description,
-  startedAt: Date.now(), // New field
-};
+// Operations are plain objects, easy to serialize/log
+type Operation =
+  | { type: "SET_TASK_STATE"; value: TaskState }
+  | { type: "ADD_COMMENT"; taskId: string; comment: Comment }
+  | { type: "DELETE_TASK"; taskId: string }
 ```
 
-### 4. Use TypeScript Exhaustiveness
+### 5. Use TypeScript Exhaustiveness
 
 ```typescript
-function TaskCard({ task, dispatch }) {
-  switch (task.status) {
-    case "draft": return <DraftView ... />
-    case "todo": return <TodoView ... />
-    case "in_progress": return <InProgressView ... />
-    case "blocked": return <BlockedView ... />
-    case "done": return <DoneView ... />
-    case "archived": return <ArchivedView ... />
+function interpret(doc, intention, frontier): Operation[] {
+  switch (intention.type) {
+    case "PUBLISH": return [...]
+    case "START": return [...]
+    case "COMPLETE": return [...]
     // TypeScript error if a case is missing
+    default:
+      const _exhaustive: never = intention
+      return []
   }
 }
-```
-
-### 5. Separate Read and Write Concerns
-
-```typescript
-// ✅ Read via useRefValue (reactive)
-const { value: task } = useRefValue(handle.doc.task.state);
-
-// ✅ Write via dispatch (batched)
-dispatch({ type: "START" });
 ```
 
 ## Summary
 
-LEA provides a structured approach to building CRDT-backed applications:
+LEA provides a rigorous, pure functional foundation for CRDT-native applications:
 
-1. **Intentions** - Pure data describing user actions
-2. **Interpret** - Centralized state transition logic with guard conditions
-3. **Dispatch** - Bridge between React and CRDT via `change()`
-4. **Refs as Model** - Live pointers into CRDT state for lazy, reactive reading
+1. **Intentions** - Pure data describing user intent
+2. **Anchored Intentions** - Intent + causal context (frontier)
+3. **Interpret** - Pure function computing operations from intent
+4. **Apply** - Isolated mutation returning new frontier
+5. **Frontiers as Model** - Immutable identifiers for points in history
 
-The pattern preserves TEA's predictability while adding automatic persistence, sync, and conflict resolution through CRDTs.
+The key insight: by separating **what to do** (interpret, pure) from **doing it** (apply, isolated), LEA preserves functional purity while gaining CRDT superpowers.
+
+**LEA** — The Loro Extended Architecture: Extending TEA principles to CRDT-native applications with mathematical rigor.
