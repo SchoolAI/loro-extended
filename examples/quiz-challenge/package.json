@@ -1,10 +1,10 @@
 {
-  "name": "example-task-card",
-  "description": "LEA (Loro-Extended Architecture) demo: discriminated union state machines with CRDTs",
+  "name": "example-quiz-challenge",
+  "description": "LEA 3.0 (Loro-Extended Architecture) demo: unified reactor pattern for CRDT-native apps",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "tsx src/server/server.ts",
     "test": "verify logic",
     "verify": "verify"
   },

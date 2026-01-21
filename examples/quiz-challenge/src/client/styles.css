@@ -1,0 +1,555 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEA 3.0 Quiz Challenge - Styles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --success: #22c55e;
+  --success-bg: #dcfce7;
+  --error: #ef4444;
+  --error-bg: #fee2e2;
+  --info: #3b82f6;
+  --info-bg: #dbeafe;
+  --warning: #f59e0b;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Connection Bar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.connection-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  z-index: 100;
+  transition: background-color 0.3s;
+}
+
+.connection-bar.connected {
+  background: var(--success-bg);
+  color: #166534;
+}
+
+.connection-bar.connecting,
+.connection-bar.reconnecting {
+  background: var(--info-bg);
+  color: #1e40af;
+}
+
+.connection-bar.disconnected {
+  background: var(--error-bg);
+  color: #991b1b;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Header
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.header {
+  text-align: center;
+  margin: 60px 0 30px;
+}
+
+.header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.header .subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Quiz Card
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-card {
+  max-width: 600px;
+  margin: 0 auto 30px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  padding: 32px;
+  position: relative;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Idle View
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-idle {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.quiz-idle h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+.quiz-idle p {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+}
+
+.quiz-idle .quiz-info {
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Quiz Header (Progress + Timer)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.progress-container {
+  flex: 1;
+  position: relative;
+  height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  z-index: 1;
+}
+
+.timer {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 8px 16px;
+  background: var(--border);
+  border-radius: 8px;
+  min-width: 80px;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.timer-low {
+  background: var(--warning);
+  color: white;
+}
+
+.timer-critical {
+  background: var(--error);
+  color: white;
+  animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Question
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.question {
+  margin-bottom: 24px;
+}
+
+.question h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Options
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-size: 16px;
+}
+
+.option:hover:not(.option-disabled) {
+  border-color: var(--primary);
+  background: white;
+}
+
+.option-selected {
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.option-disabled {
+  cursor: default;
+}
+
+.option-correct {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.option-incorrect {
+  border-color: var(--error);
+  background: var(--error-bg);
+}
+
+.option-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--border);
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.option-selected .option-letter {
+  background: var(--primary);
+  color: white;
+}
+
+.option-correct .option-letter {
+  background: var(--success);
+  color: white;
+}
+
+.option-incorrect .option-letter {
+  background: var(--error);
+  color: white;
+}
+
+.option-text {
+  flex: 1;
+}
+
+.option-badge {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Quiz Actions
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Buttons
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-large {
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Submitted View (Loading)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-submitted {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reviewing View
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.result-banner {
+  text-align: center;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.result-banner.correct {
+  background: var(--success-bg);
+  color: #166534;
+}
+
+.result-banner.incorrect {
+  background: var(--error-bg);
+  color: #991b1b;
+}
+
+.feedback {
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.feedback p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Complete View
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quiz-complete {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.result-emoji {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.quiz-complete h2 {
+  margin: 0 0 24px;
+  font-size: 28px;
+}
+
+.final-score {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.score-number {
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.score-divider {
+  font-size: 48px;
+  color: var(--text-muted);
+}
+
+.score-total {
+  font-size: 48px;
+  color: var(--text-muted);
+}
+
+.score-percentage {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin: 0 0 32px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Toast Notifications
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-success {
+  background: var(--success);
+  color: white;
+}
+
+.toast-error {
+  background: var(--error);
+  color: white;
+}
+
+.toast-info {
+  background: var(--info);
+  color: white;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Architecture Diagram
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.architecture-diagram {
+  max-width: 600px;
+  margin: 0 auto 30px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.architecture-diagram h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.architecture-diagram pre {
+  margin: 0;
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Help Footer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.help-footer {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.help-footer p {
+  margin: 8px 0;
+}

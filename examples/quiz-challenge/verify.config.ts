@@ -19,6 +19,11 @@ export default defineConfig({
       parser: parsers.vitest,
       reportingDependsOn: ["format", "types"],
     },
+    {
+      key: "test-e2e",
+      run: "playwright test",
+      reportingDependsOn: ["format", "types"],
+    },
   ],
   env: {
     NO_COLOR: "1",

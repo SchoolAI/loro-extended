@@ -6,79 +6,51 @@ LEA is a rigorous framework for building CRDT-native applications with pure func
 
 ### Before LEA: Understanding TEA
 
-TEA (The Elm Architecture) is a pattern for building user interfaces with pure functions and immutable state. The core loop is simple: a **Model** holds state, a **View** renders it, user actions produce **Messages**, and an **Update** function computes the next Model. If you're unfamiliar with TEA, the [Elm Guide's Architecture section](https://guide.elm-lang.org/architecture/) is the definitive resource—the concepts translate directly to LEA.
+TEA (The Elm Architecture) is a pattern for building user interfaces with pure functions and immutable state. The core loop is simple: a **Model** holds state, a **View** renders it, user actions produce **Messages**, and an **Update** function computes the next Model. If you're unfamiliar with TEA, the [Elm Guide's Architecture section](https://guide.elm-lang.org/architecture/) is the definitive resource--the concepts translate directly to LEA.
 
 ## The Grand Unification
 
-LEA and TEA share the same fundamental structure. The key insight is that **LEA is simply TEA where the Model is a pointer in time (Frontier), rather than a Value.**
+LEA and TEA share a similar fundamental structure. The key insights are:
 
-For those familiar with TEA, let's first show how both architectures can be unified. To make it less abstract, we'll use a "Timer" that keeps track of time as the model in the examples below.
+- **LEA is like TEA, but the Model is a pointer in time (Frontier), rather than a Value.**
+- **in LEA, everything is a reactor**. Views, subscriptions, and effects are all the same pattern--functions that react to state transitions.
+
+### The Core Architecture
 
 ```typescript
-// The Generic Architecture Interface (we can build both TEA and LEA with this)
-type Architecture<Version, State, Msg> = {
-  init: () => Version;
-  state: (v: Version) => State;
-  view: (s: State, dispatch: (m: Msg) => void) => UI;
-  subscriptions: (s: State, dispatch: (m: Msg) => void) => Unsubscribe[];
-  update: (v: Version, m: Msg) => Version;
+type Program<S, Msg> = {
+  doc: TypedDoc<S>;
+  state: (frontier: Frontiers) => Infer<S>;
+  update: (frontier: Frontiers, msg: Msg) => Frontiers;
+  reactors: Reactor<Infer<S>, Msg>[];
 };
+
+type Reactor<S, Msg> = (
+  transition: { before: S; after: S },
+  dispatch: (msg: Msg) => void,
+) => void | UI | Promise<void>;
 ```
 
-### TEA Instantiation
+That's it. **Doc, State, Update, Reactors.** Four concepts that handle everything:
 
-```typescript
-// TEA: Version = State (identity function)
-type TEA<Model, Msg> = Architecture<Model, Model, Msg>;
-
-const teaRuntime: TEA<TimerModel, TimerMsg> = {
-  init: () => initialModel,
-  state: (model) => model, // Identity function! Version IS State
-  view: (model, dispatch) => render(model, dispatch),
-  subscriptions: (model, dispatch) =>
-    model.status === "running"
-      ? [subscribeToTime(() => dispatch({ type: "TICK" }))]
-      : [],
-  update: (model, msg) => reducer(model, msg),
-};
-```
-
-### LEA Instantiation
-
-```typescript
-// LEA: Version = Frontier, State = Derived from Doc
-type LEA<Schema, Msg> = Architecture<Frontiers, Infer<Schema>, Msg>;
-
-// The document is created externally and passed to the LEA factory
-const doc = createTypedDoc(TimerSchema);
-
-const createLeaRuntime = (doc: TypedDoc<Schema>): LEA<Schema, TimerMsg> => ({
-  init: () => doc.frontiers(),
-  state: (frontier) => getStateAtFrontier(doc, frontier), // Derived!
-  view: (state, dispatch) => render(state, dispatch),
-  subscriptions: (state, dispatch) => deriveSubscriptions(state, dispatch),
-  update: (frontier, msg) => {
-    const state = getStateAtFrontier(doc, frontier);
-    doc.change((draft) => applyMsg(draft, state, msg));
-    return doc.frontiers();
-  },
-});
-
-// later:
-const leaRuntime = createLeaRuntime(doc);
-```
+| Component    | Type                                             | Purpose                            |
+| ------------ | ------------------------------------------------ | ---------------------------------- |
+| **Doc**      | `TypedDoc<Schema>`                               | The CRDT document (shared state)   |
+| **State**    | `(frontier) → S`                                 | Derive state from history          |
+| **Update**   | `(frontier, msg) → Frontier'`                    | Apply message, return new frontier |
+| **Reactors** | `(transition, dispatch) → void \| UI \| Promise` | React to transitions               |
 
 ### The Mapping
 
-| Concept           | TEA (In-Memory)                | LEA (CRDT-Native)                |
-| :---------------- | :----------------------------- | :------------------------------- |
-| **Version**       | `Model` (The value itself)     | `Frontier` (Pointer to history)  |
-| **State**         | `Model` (Model = State)        | `state(doc, frontier)` (Derived) |
-| **Msg**           | `Msg`                          | `Msg` (same concept)             |
-| **Update**        | `(Model, Msg) → Model'`        | `(Frontier, Msg) → Frontier'`    |
-| **Effect**        | `Cmd Msg` (Returned by update) | **State** (Written to CRDT)      |
-| **Subscriptions** | External events (time, ports)  | CRDT state changes (derived)     |
-| **History**       | Ephemeral / None               | **The Document** (Persistent)    |
+| Concept     | TEA (In-Memory)                | LEA (CRDT-Native)                |
+| :---------- | :----------------------------- | :------------------------------- |
+| **Version** | `Model` (The value itself)     | `Frontier` (Pointer to history)  |
+| **State**   | `Model` (identity fn; State)   | `state(doc, frontier)` (Derived) |
+| **Msg**     | `Msg`                          | `Msg` (same concept)             |
+| **Update**  | `(Model, Msg) → Model'`        | `(Frontier, Msg) → Frontier'`    |
+| **Effect**  | `Cmd Msg` (Returned by update) | **State** (Written to CRDT)      |
+| **View**    | `(Model) → UI`                 | Reactor that returns UI          |
+| **History** | Ephemeral / None               | **The Document** (Persistent)    |
 
 ## The Core Equation
 
@@ -91,6 +63,72 @@ Where:
 - **Frontier** = immutable model identifier (a point in causal history)
 - **Msg** = incoming message, e.g. a user action (pure data)
 - **Frontier'** = new immutable model identifier after state transition
+
+## Everything Is a Reactor
+
+The key insight that simplifies LEA: views, subscriptions, and effects are all **reactors**--functions that receive state transitions and can dispatch messages.
+
+```typescript
+type Reactor<S, Msg> = (
+  transition: { before: S; after: S },
+  dispatch: (msg: Msg) => void,
+) => void | UI | Promise<void>;
+```
+
+### View Reactor
+
+Renders UI, can detect edges for animations and toasts:
+
+```typescript
+const viewReactor: Reactor<State, Msg> = ({ before, after }, dispatch) => {
+  const justCompleted =
+    before.status !== "complete" && after.status === "complete";
+
+  return (
+    <>
+      {justCompleted && <Confetti />}
+      <App state={after} dispatch={dispatch} />
+    </>
+  );
+};
+```
+
+### Message Reactor (Replaces Subscriptions)
+
+Dispatches messages based on state transitions:
+
+```typescript
+const sensorReactor: Reactor<State, Msg> = ({ before, after }, dispatch) => {
+  if (after.status === "reviewing") {
+    const response = after.sensors.responses[after.requestId];
+    const wasNew = !before.sensors.responses[after.requestId];
+    if (response && wasNew) {
+      dispatch({ type: "RECEIVE_RESULT", feedback: response.feedback });
+    }
+  }
+};
+```
+
+### Effect Reactor
+
+Handles async I/O by writing results back to the document:
+
+```typescript
+const apiReactor: Reactor<State, Msg> = async ({ before, after }, dispatch) => {
+  if (before.status !== "submitting" && after.status === "submitting") {
+    const result = await fetch("/api/review", {
+      method: "POST",
+      body: JSON.stringify({ content: after.content }),
+    });
+    const data = await result.json();
+
+    // Write result to sensors namespace
+    doc.change((draft) => {
+      draft.sensors.responses[after.requestId] = data;
+    });
+  }
+};
+```
 
 ## The Spacetime Boundary
 
@@ -120,7 +158,7 @@ The LoroDoc serves as a **typed I/O boundary**--the meeting point between the pu
 
 ### The Frontier of Now
 
-Subscriptions only fire at the frontier of "now". This is a feature, not a limitation:
+Reactors only fire at the frontier of "now". This is a feature, not a limitation:
 
 ```
 Time ────────────────────────────────────────────────────────▶
@@ -129,12 +167,10 @@ Time ─────────────────────────
       │         │         │         │         │
       ▼         ▼         ▼         ▼         ▼
     ┌───┐     ┌───┐     ┌───┐     ┌───┐     ┌───┐
-    │ S │────▶│ S │────▶│ S │────▶│ S │────▶│ S │  ← Subscriptions ONLY here
+    │ S │────▶│ S │────▶│ S │────▶│ S │────▶│ S │  ← Reactors ONLY here
     └───┘     └───┘     └───┘     └───┘     └───┘
       ↑         ↑         ↑         ↑         ↑
    (history) (history) (history) (history)  (live)
-
-Time ────────────────────────────────────────────────────────▶
 ```
 
 **Key property**: Checking out a historical frontier does NOT trigger effects. Time travel is safe for debugging and inspection.
@@ -149,19 +185,19 @@ Let:
   S = Set of all States
 
 Functions:
-  state:         D × F → S              -- Derive state (pure)
-  subscriptions: S → Set<Subscription>  -- Derive subscriptions (pure)
-  update:        D × F × M → F          -- Transition to new frontier
+  state:    D × F → S              -- Derive state (pure)
+  update:   D × F × M → F          -- Transition to new frontier
+  reactor:  (S × S) × dispatch → * -- React to transitions
 
 Key Properties:
   1. Determinism:
      ∀ d ∈ D, ∀ f ∈ F: state(d, f) is deterministic
 
-  2. Subscription Determinism:
-     ∀ s₁, s₂ ∈ S: s₁ = s₂ ⟹ subscriptions(s₁) = subscriptions(s₂)
+  2. Replayability:
+     ∀ f ∈ F: state(d, f) can be computed at any time
 
-  3. Replayability:
-     ∀ f ∈ F: subscriptions(state(d, f)) can be computed at any time
+  3. Edge Detection:
+     Reactors receive (before, after), enabling transition detection
 ```
 
 ## The Problem LEA Solves
@@ -170,9 +206,9 @@ Key Properties:
 
 Today's web applications aren't just "user opens browser, talks to server." They're distributed systems:
 
-- **Multiple devices** - Phone, tablet, laptop, desktop—users expect their work to follow them
+- **Multiple devices** - Phone, tablet, laptop, desktop--users expect their work to follow them
 - **Multiple tabs** - Users open the same app in several tabs without thinking about it
-- **Multiple participants** - Collaboration isn't just "multiplayer"—it includes AI assistants editing alongside humans
+- **Multiple participants** - Collaboration isn't just "multiplayer"--it includes AI assistants editing alongside humans
 - **Intermittent connectivity** - School WiFi drops, mobile networks flake, and users expect things to just work
 
 ### The Traditional Approach: API Plumbing
@@ -201,7 +237,7 @@ CRDTs (like Loro) eliminate the plumbing for state synchronization:
 But CRDTs are a data structure, not an architecture. You still need to answer:
 
 - **How do I structure my app logic?** (State machines, valid transitions, guards)
-- **How do I trigger side effects?** (AI calls, notifications, timers—without duplicating them across tabs)
+- **How do I trigger side effects?** (AI calls, notifications, timers--without duplicating them across tabs)
 - **How do I keep my code testable?** (Pure functions, deterministic behavior)
 - **How do I debug problems?** (Understanding why the app is in a particular state)
 
@@ -222,7 +258,7 @@ In LEA, **writing state IS the effect**. When you write `{ status: "reviewing" }
 
 The CRDT becomes the coordination layer. No duplicate calls. No race conditions. No plumbing.
 
-## The Five Pillars
+## The Four Pillars
 
 ### 1. Messages (Pure Data)
 
@@ -248,7 +284,7 @@ type TimerMsg =
 State is derived from the document at a specific frontier:
 
 ```typescript
-function getStateAtFrontier<Schema>(
+function state<Schema>(
   doc: TypedDoc<Schema>,
   frontier: Frontiers,
 ): Infer<Schema> {
@@ -263,229 +299,178 @@ function getStateAtFrontier<Schema>(
 - **Lazy** - Only compute state when needed
 - **Time travel ready** - Any frontier gives you that point in history
 
-### 3. Subscriptions (Derived from State)
+### 3. Update (State Transition)
 
-Subscriptions are **derived from state**, not returned from update. This is the key insight that replaces TEA's `Cmd`:
+The update function transitions from one frontier to another. LEA uses a **fork-and-merge** pattern that provides a clean mental model: work on a single document object for both reading and writing.
+
+#### The createUpdate Factory (Recommended)
+
+Use `createUpdate` to create update functions with fork-and-merge semantics:
 
 ```typescript
-import {
-  PathSelector,
-  PathBuilder,
-  createPathBuilder,
-} from "@loro-extended/change";
+import { createUpdate, change, loro } from "@loro-extended/change";
 
-type Subscription<Msg> = {
-  selector: PathSelector<unknown>; // Type-safe path to watch
-  predicate: (value: unknown) => boolean; // When to fire
-  msg: Msg | ((value: unknown) => Msg); // What to dispatch
-};
-
-// Create a path builder for type-safe path construction
-const path = createPathBuilder(ChallengeSchema);
-
-function deriveSubscriptions(
-  state: ChallengeState,
-): Subscription<ChallengeMsg>[] {
-  // When reviewing, watch for the answer to arrive
-  if (state.challenge.status === "reviewing") {
-    return [
-      {
-        // Type-safe path using PathBuilder
-        selector: path.asks.$key(state.challenge.askId).answers,
-
-        // Fire when answers object has entries
-        predicate: (answers) => Object.keys(answers as object).length > 0,
-
-        // Derive message from the value
-        msg: (answers) => ({
-          type: "RECEIVE_RESULT",
-          ...pickFirstAnswer(answers),
-        }),
-      },
-    ];
-  }
-
-  return [];
+function createUpdate<Schema extends DocShape, Msg>(
+  handler: (doc: TypedDoc<Schema>, msg: Msg, timestamp: number) => void
+): (doc: TypedDoc<Schema>, frontier: Frontiers, msg: Msg) => Frontiers {
+  return (doc, frontier, msg) => {
+    // 1. Fork at the frontier - this becomes the "working doc"
+    const workingDoc = doc.forkAt(frontier);
+    
+    // 2. Set peer ID to match main doc (ensures consistent frontier)
+    loro(workingDoc).doc.setPeerId(loro(doc).doc.peerId);
+    
+    // 3. Compute timestamp from frontier
+    const timestamp = getTimestampFromFrontier(frontier);
+    
+    // 4. Let handler read/write to the working doc
+    handler(workingDoc, msg, timestamp);
+    
+    // 5. Merge changes back into main doc
+    const updateData = loro(workingDoc).doc.export({
+      mode: "update",
+      from: loro(doc).doc.version(),
+    });
+    if (updateData.byteLength > 0) {
+      loro(doc).doc.import(updateData);
+    }
+    
+    return loro(doc).doc.frontiers();
+  };
 }
 ```
 
-**Why Subscriptions Instead of Cmd?**
-
-In TEA, `update` returns `(Model, Cmd Msg)`. In LEA, `update` returns just `Frontier`. Where did `Cmd` go?
-
-**Effects are State.** When you write `{ status: "reviewing" }` to the CRDT, that state change _is_ the effect. The existence of that state triggers external systems (via sync) and internal subscriptions (via state derivation).
-
-**Why PathSelector?**
-
-The `PathSelector` from `@loro-extended/change` provides:
-
-1. **Type safety** - Paths are checked at compile time
-2. **Runtime optimization** - The `__segments` property enables efficient path-based watching
-3. **Dynamic paths** - Use `$key(id)` for dynamic keys, `$each` for wildcards
-4. **Composability** - Build complex paths: `path.asks.$key(askId).answers`
-
-**Formal Properties:**
-
-1. **Determinism**: `subscriptions(s₁) = subscriptions(s₂)` when `s₁ = s₂`
-2. **Replayability**: `subscriptions(state(doc, frontier))` computable at any frontier
-3. **Compositionality**: Subscriptions compose from sub-states
-4. **Efficiency**: Runtime only re-evaluates when watched paths change
-
-### 4. Update (State Transition)
-
-The update function transitions from one frontier to another:
+Now define your update logic with a single `doc` parameter:
 
 ```typescript
-function update(
-  doc: TypedDoc<Schema>,
-  frontier: Frontiers,
-  msg: TimerMsg,
-): Frontiers {
-  const state = getStateAtFrontier(doc, frontier);
-
-  doc.change((draft) => {
-    switch (msg.type) {
-      case "START":
-        if (state.status !== "stopped" && state.status !== "paused") return;
+const update = createUpdate<typeof TimerSchema, TimerMsg>((doc, msg, timestamp) => {
+  // Read and write to the same object - it's a fork!
+  const timer = doc.timer;
+  
+  switch (msg.type) {
+    case "START":
+      if (timer.status !== "stopped" && timer.status !== "paused") return;
+      change(doc, draft => {
         draft.timer.status = "running";
-        draft.timer.startedAt = getTimestampFromFrontier(frontier);
-        break;
+        draft.timer.startedAt = timestamp;
+      });
+      break;
 
-      case "PAUSE":
-        if (state.status !== "running") return;
+    case "PAUSE":
+      if (timer.status !== "running") return;
+      change(doc, draft => {
         draft.timer.status = "paused";
-        draft.timer.pausedAt = getTimestampFromFrontier(frontier);
-        break;
+        draft.timer.pausedAt = timestamp;
+      });
+      break;
 
-      case "RESET":
+    case "RESET":
+      change(doc, draft => {
         draft.timer.status = "stopped";
         draft.timer.elapsed = 0;
-        break;
+      });
+      break;
 
-      case "TICK":
-        if (state.status !== "running") return;
-        draft.timer.elapsed = state.elapsed + 1;
-        break;
-    }
-  });
-
-  return doc.frontiers();
-}
+    case "TICK":
+      if (timer.status !== "running") return;
+      change(doc, draft => {
+        draft.timer.elapsed = timer.elapsed + 1;
+      });
+      break;
+  }
+});
 ```
+
+**Why fork-and-merge?**
+
+- **Single object** - No confusion between `state` and `write` variables
+- **Natural mental model** - "Work on the doc, changes get applied"
+- **Impossible to misuse** - Read from `doc`, mutate via `change(doc, ...)`
+- **Automatic merge** - Changes flow back to the main document
 
 **Key Properties:**
 
-- **Guard conditions** - Invalid transitions are no-ops
+- **Guard conditions** - Read directly from the forked doc
 - **Deterministic timestamps** - Derived from frontier, not `Date.now()`
 - **Effects via state** - Writing to CRDT triggers external systems
+- **Peer ID preservation** - Fork uses same peer ID for consistent frontiers
 
-### 5. The Runtime (Imperative Shell)
+### 4. Reactors (Unified Response Pattern)
 
-The runtime is the only impure part. It manages subscriptions and dispatches messages. Following the elegant functional style of [raj](https://github.com/andrejewski/raj), we use a simple `runtime()` function rather than a class:
+Reactors respond to state transitions. They unify views, subscriptions, and effects:
 
 ```typescript
-import {
-  compileToJsonPath,
-  evaluatePath,
-  PathSelector,
-} from "@loro-extended/change";
+type Reactor<S, Msg> = (
+  transition: { before: S; after: S },
+  dispatch: (msg: Msg) => void,
+) => void | UI | Promise<void>;
+```
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Types
-// ═══════════════════════════════════════════════════════════════════════════
+**Why Reactors?**
 
+- **Edge detection** - Compare `before` and `after` to detect transitions
+- **Unified pattern** - Views, subscriptions, effects all work the same way
+- **Composable** - Add/remove reactors freely
+- **Testable** - Pure functions, easy to test in isolation
+
+## The Runtime (Imperative Shell)
+
+The runtime is the only impure part. It manages the document subscription and invokes reactors:
+
+```typescript
 export type Dispatch<Msg> = (msg: Msg) => void;
 export type Disposer = () => void;
 
 export type Program<Schema extends DocShape, Msg> = {
   doc: TypedDoc<Schema>;
   state: (frontier: Frontiers) => Infer<Schema>;
-  subscriptions: (state: Infer<Schema>) => Subscription<Msg>[];
   update: (frontier: Frontiers, msg: Msg) => Frontiers;
+  reactors: Reactor<Infer<Schema>, Msg>[];
   done?: (frontier: Frontiers) => void;
 };
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Runtime (functional, no classes)
-// ═══════════════════════════════════════════════════════════════════════════
 
 export function runtime<Schema extends DocShape, Msg>(
   program: Program<Schema, Msg>,
 ): { dispatch: Dispatch<Msg>; dispose: Disposer } {
-  const { doc, state, subscriptions, update, done } = program;
+  const { doc, state, update, reactors, done } = program;
 
-  let frontier = doc.frontiers();
   let isRunning = true;
-  const activeSubscriptions = new Map<string, () => void>();
+  let previousState = state(doc.frontiers());
 
+  // Dispatch only writes to the document. Reactors are invoked by the
+  // document subscription - this ensures reactors fire exactly once.
   function dispatch(msg: Msg): void {
-    if (isRunning) {
-      frontier = update(frontier, msg);
-      // Subscriptions reconcile via doc subscription, not here
-    }
+    if (!isRunning) return;
+    update(doc.frontiers(), msg);
+    // NO reactor invocation here - let the subscription handle it
   }
 
-  function reconcileSubscriptions(): void {
+  // Subscribe to document changes - this is the SINGLE path for reactor
+  // invocation. Both local dispatches and remote peer changes flow through here.
+  const unsubDoc = loro(doc).subscribe(() => {
     if (!isRunning) return;
 
-    const currentState = state(frontier);
-    const desired = subscriptions(currentState);
-    const newKeys = new Set<string>();
+    const before = previousState;
+    const after = state(doc.frontiers());
+    previousState = after;
 
-    // Subscribe to new
-    for (const sub of desired) {
-      const key = compileToJsonPath(sub.selector.__segments);
-      newKeys.add(key);
-
-      if (!activeSubscriptions.has(key)) {
-        const unsub = subscribeToPath(sub);
-        activeSubscriptions.set(key, unsub);
+    // Invoke all reactors with the transition
+    for (const reactor of reactors) {
+      const result = reactor({ before, after }, dispatch);
+      if (result instanceof Promise) {
+        result.catch(console.error);
       }
     }
-
-    // Unsubscribe from old
-    for (const [key, unsub] of activeSubscriptions) {
-      if (!newKeys.has(key)) {
-        unsub();
-        activeSubscriptions.delete(key);
-      }
-    }
-  }
-
-  function subscribeToPath(sub: Subscription<Msg>): () => void {
-    const jsonPath = compileToJsonPath(sub.selector.__segments);
-
-    return loro(doc).doc.subscribeJsonpath(jsonPath, () => {
-      const value = evaluatePath(doc, sub.selector);
-      if (sub.predicate(value)) {
-        const msg = typeof sub.msg === "function" ? sub.msg(value) : sub.msg;
-        dispatch(msg);
-      }
-    });
-  }
-
-  // Subscribe to doc changes to reconcile subscriptions
-  const unsubDoc = loro(doc).subscribe(() => {
-    frontier = doc.frontiers(); // Update frontier on external changes
-    reconcileSubscriptions();
   });
 
-  // Initial reconciliation
-  reconcileSubscriptions();
-
-  // Return dispatch and disposer
   return {
     dispatch,
     dispose(): void {
       if (isRunning) {
         isRunning = false;
         unsubDoc();
-        for (const unsub of activeSubscriptions.values()) {
-          unsub();
-        }
-        activeSubscriptions.clear();
         if (done) {
-          done(frontier);
+          done(doc.frontiers());
         }
       }
     },
@@ -496,10 +481,9 @@ export function runtime<Schema extends DocShape, Msg>(
 **Key Runtime Features:**
 
 1. **Functional, not class-based** - No `this`, no `new`, just closures
-2. **Path-based watching** - Uses `subscribeJsonpath` for efficient change detection
-3. **Automatic reconciliation** - Subscriptions are reconciled on every state change
-4. **Predicate filtering** - Only dispatches when the predicate returns true
-5. **Clean disposal** - Returns a `dispose` function for cleanup
+2. **Transition-based** - Reactors receive `{ before, after }` for edge detection
+3. **External change handling** - Document changes from other peers trigger reactors
+4. **Clean disposal** - Returns a `dispose` function for cleanup
 
 ## The Complete Picture
 
@@ -511,20 +495,36 @@ const doc = createTypedDoc(TimerSchema);
 const repo = new Repo({ doc });
 repo.connect(websocketAdapter);
 
-// 3. Define the LEA program (pure data)
+// 3. Define reactors
+const viewReactor: Reactor<TimerState, TimerMsg> = (
+  { before, after },
+  dispatch,
+) => {
+  return <TimerView state={after} dispatch={dispatch} />;
+};
+
+const tickReactor: Reactor<TimerState, TimerMsg> = (
+  { before, after },
+  dispatch,
+) => {
+  // When timer starts running, begin ticking
+  if (before.status !== "running" && after.status === "running") {
+    const intervalId = setInterval(() => dispatch({ type: "TICK" }), 1000);
+    // Store cleanup in document or external registry
+  }
+};
+
+// 4. Define the LEA program
 const timerProgram: Program<typeof TimerSchema, TimerMsg> = {
   doc,
-  state: (frontier) => getStateAtFrontier(doc, frontier),
-  subscriptions: deriveSubscriptions,
+  state: (frontier) => state(doc, frontier),
   update: (frontier, msg) => update(doc, frontier, msg),
+  reactors: [viewReactor, tickReactor],
   done: (frontier) => console.log("Timer stopped at", frontier),
 };
 
-// 4. Start the runtime (returns dispatch and dispose)
+// 5. Start the runtime
 const { dispatch, dispose } = runtime(timerProgram);
-
-// 5. External systems can interact with the doc
-timeAdapter(doc); // Provides TICK messages when running
 
 // 6. Use dispatch to send messages
 dispatch({ type: "START" });
@@ -544,28 +544,52 @@ The document must be created externally because:
 
 ## External Systems and the Document
 
-External systems (servers, browser APIs, other clients) can also read from and write to the document. LEA handles these external writes just like any other state change—they create new frontiers that flow through the same pure derivation pipeline.
+External systems (servers, browser APIs, other clients) interact with the document through a **sensors/actuators** pattern:
 
 ```typescript
-// Example: A time adapter that writes to the document
-function timeAdapter(doc: TypedDoc<Schema>) {
-  let intervalId: number | null = null;
+const Schema = Shape.doc({
+  // Application state (LEA manages this)
+  app: AppStateSchema,
 
-  // Watch the document for state changes
+  // Sensor namespace (external systems write here)
+  sensors: Shape.struct({
+    clipboard: Shape.plain.string().nullable(),
+    serverTime: Shape.plain.number(),
+    apiResponses: Shape.record(Shape.plain.any()),
+  }),
+
+  // Actuator namespace (LEA writes here, external systems read & act)
+  actuators: Shape.struct({
+    copyToClipboard: Shape.plain.string().nullable(),
+    showNotification: Shape.plain
+      .struct({ title: Shape.plain.string(), body: Shape.plain.string() })
+      .nullable(),
+  }),
+});
+```
+
+### External Adapter Example
+
+```typescript
+// Clipboard adapter - reads actuators, writes sensors
+function clipboardAdapter(doc: TypedDoc<Schema>) {
+  // Watch for copy requests (actuator)
   loro(doc).subscribe(() => {
-    const state = doc.timer;
-
-    if (state.status === "running" && !intervalId) {
-      // Start providing time updates
-      intervalId = setInterval(() => {
-        doc.change((d) => {
-          d.currentTime = Date.now();
-        });
-      }, 1000);
-    } else if (state.status !== "running" && intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
+    const toCopy = doc.actuators.copyToClipboard;
+    if (toCopy) {
+      navigator.clipboard.writeText(toCopy);
+      doc.change((d) => {
+        d.actuators.copyToClipboard = null;
+      }); // Clear after handling
     }
+  });
+
+  // Listen for paste events (sensor)
+  document.addEventListener("paste", async () => {
+    const text = await navigator.clipboard.readText();
+    doc.change((d) => {
+      d.sensors.clipboard = text;
+    });
   });
 }
 ```
@@ -575,10 +599,10 @@ function timeAdapter(doc: TypedDoc<Schema>) {
 LEA's purity is preserved because:
 
 - LEA only cares about **state derivation** (pure function of doc + frontier)
-- LEA only cares about **subscription derivation** (pure function of state)
 - LEA only cares about **update logic** (deterministic given frontier + msg)
+- LEA only cares about **reactor invocation** (pure function of transition)
 
-External writes just create new frontiers. LEA handles them like any other state change. The only invariant LEA requires is that the document history is append-only and causally consistent—which Loro enforces.
+External writes just create new frontiers. LEA handles them like any other state change. The only invariant LEA requires is that the document history is append-only and causally consistent--which Loro enforces.
 
 ## State Machines with Discriminated Unions
 
@@ -612,18 +636,19 @@ const TimerStateSchema = Shape.plain.discriminatedUnion("status", {
 
 ## LEA vs TEA
 
-| Aspect           | TEA                           | LEA                                       |
-| ---------------- | ----------------------------- | ----------------------------------------- |
-| Model            | Immutable value               | Immutable frontier (identifier)           |
-| Message          | Pure data                     | Pure data                                 |
-| Update           | `(Model, Msg) → (Model, Cmd)` | `(Frontier, Msg) → Frontier`              |
-| Effects          | Returned as `Cmd`             | Written as state (triggers subscriptions) |
-| Subscriptions    | External events (time, ports) | CRDT state changes                        |
-| Persistence      | External                      | Built-in (CRDT)                           |
-| Sync             | External                      | Built-in (CRDT)                           |
-| Time travel      | Manual                        | Built-in (frontiers)                      |
-| Offline          | External                      | Built-in                                  |
-| Concurrent edits | N/A                           | Built-in (CRDT merge)                     |
+| Aspect           | TEA                           | LEA                                   |
+| ---------------- | ----------------------------- | ------------------------------------- |
+| Model            | Immutable value               | Immutable frontier (identifier)       |
+| Message          | Pure data                     | Pure data                             |
+| Update           | `(Model, Msg) → (Model, Cmd)` | `(Frontier, Msg) → Frontier`          |
+| Effects          | Returned as `Cmd`             | Written as state (triggers reactors)  |
+| View             | `(Model) → UI`                | Reactor that returns UI               |
+| Subscriptions    | External events (time, ports) | Reactors that dispatch on transitions |
+| Persistence      | External                      | Built-in (CRDT)                       |
+| Sync             | External                      | Built-in (CRDT)                       |
+| Time travel      | Manual                        | Built-in (frontiers)                  |
+| Offline          | External                      | Built-in                              |
+| Concurrent edits | N/A                           | Built-in (CRDT merge)                 |
 
 ### What LEA Preserves from TEA
 
@@ -640,6 +665,7 @@ const TimerStateSchema = Shape.plain.discriminatedUnion("status", {
 - **Conflict resolution** - CRDT handles concurrent edits
 - **Time travel** - Frontiers give you any point in history
 - **Effects as state** - No separate effect system needed
+- **Edge detection** - Reactors see `{ before, after }` for transitions
 
 ## Testing
 
@@ -654,70 +680,10 @@ describe("state derivation", () => {
     });
     const frontier = doc.frontiers();
 
-    const state = getStateAtFrontier(doc, frontier);
+    const result = state(doc, frontier);
 
-    expect(state.timer.status).toBe("stopped");
-    expect(state.timer.elapsed).toBe(0);
-  });
-});
-```
-
-### Unit Testing Subscriptions (Pure!)
-
-```typescript
-import { compileToJsonPath } from "@loro-extended/change";
-
-describe("subscriptions", () => {
-  it("derives subscriptions when reviewing", () => {
-    const state: ChallengeState = {
-      challenge: {
-        status: "reviewing",
-        answer: "42",
-        askId: "ask_123",
-        submittedAt: 1000,
-      },
-      asks: {},
-    };
-
-    const subs = deriveSubscriptions(state);
-
-    expect(subs).toHaveLength(1);
-    // Verify the path is correct
-    const jsonPath = compileToJsonPath(subs[0].selector.__segments);
-    expect(jsonPath).toBe('$.asks["ask_123"].answers');
-  });
-
-  it("derives no subscriptions when complete", () => {
-    const state: ChallengeState = {
-      challenge: {
-        status: "complete",
-        answer: "42",
-        correct: true,
-        feedback: "Great!",
-        completedAt: 2000,
-      },
-      asks: {},
-    };
-
-    const subs = deriveSubscriptions(state);
-
-    expect(subs).toHaveLength(0);
-  });
-
-  it("predicate returns true when answer exists", () => {
-    const state: ChallengeState = {
-      challenge: { status: "reviewing", askId: "ask_123", ... },
-      asks: {},
-    };
-
-    const subs = deriveSubscriptions(state);
-    const predicate = subs[0].predicate;
-
-    // No answers yet
-    expect(predicate({})).toBe(false);
-
-    // Answer arrived
-    expect(predicate({ "peer_1": { result: { correct: true } } })).toBe(true);
+    expect(result.timer.status).toBe("stopped");
+    expect(result.timer.elapsed).toBe(0);
   });
 });
 ```
@@ -735,8 +701,8 @@ describe("update", () => {
 
     const newFrontier = update(doc, frontier, { type: "START" });
 
-    const state = getStateAtFrontier(doc, newFrontier);
-    expect(state.timer.status).toBe("running");
+    const result = state(doc, newFrontier);
+    expect(result.timer.status).toBe("running");
   });
 
   it("ignores START when already running", () => {
@@ -748,8 +714,60 @@ describe("update", () => {
 
     const newFrontier = update(doc, frontier, { type: "START" });
 
-    const state = getStateAtFrontier(doc, newFrontier);
-    expect(state.timer.status).toBe("running"); // Unchanged
+    const result = state(doc, newFrontier);
+    expect(result.timer.status).toBe("running"); // Unchanged
+  });
+});
+```
+
+### Unit Testing Reactors (Pure!)
+
+```typescript
+describe("reactors", () => {
+  it("dispatches RECEIVE_RESULT when response arrives", () => {
+    const before: State = {
+      status: "reviewing",
+      requestId: "req_123",
+      sensors: { responses: {} },
+    };
+
+    const after: State = {
+      status: "reviewing",
+      requestId: "req_123",
+      sensors: {
+        responses: {
+          req_123: { feedback: "Great work!" },
+        },
+      },
+    };
+
+    const dispatched: Msg[] = [];
+    sensorReactor({ before, after }, (msg) => dispatched.push(msg));
+
+    expect(dispatched).toEqual([
+      { type: "RECEIVE_RESULT", feedback: "Great work!" },
+    ]);
+  });
+
+  it("does not dispatch when response already existed", () => {
+    const response = { feedback: "Great work!" };
+
+    const before: State = {
+      status: "reviewing",
+      requestId: "req_123",
+      sensors: { responses: { req_123: response } },
+    };
+
+    const after: State = {
+      status: "reviewing",
+      requestId: "req_123",
+      sensors: { responses: { req_123: response } },
+    };
+
+    const dispatched: Msg[] = [];
+    sensorReactor({ before, after }, (msg) => dispatched.push(msg));
+
+    expect(dispatched).toEqual([]); // No dispatch - response wasn't new
   });
 });
 ```
@@ -809,7 +827,7 @@ function previewMessage(doc: TypedDoc<Schema>, msg: TimerMsg): TimerState {
   update(forkedDoc, frontier, msg);
 
   // Return the resulting state (original doc unchanged)
-  return getStateAtFrontier(forkedDoc, forkedDoc.frontiers());
+  return state(forkedDoc, forkedDoc.frontiers());
 }
 ```
 
@@ -828,7 +846,7 @@ dispatch({ type: "RESET" });
 // The final state depends on CRDT semantics
 ```
 
-**Key insight**: Messages don't need to commute—the _operations they generate_ commute, which Loro guarantees.
+**Key insight**: Messages don't need to commute--the _operations they generate_ commute, which Loro guarantees.
 
 ### Offline-First Patterns
 
@@ -838,43 +856,28 @@ LEA naturally supports offline-first applications:
 2. **Sync on reconnect** - CRDT operations sync automatically when connectivity returns
 3. **Conflicts resolve** - CRDT merge semantics handle any concurrent changes
 
-For "stale" messages (user intended X but state has changed):
-
-```typescript
-function dispatchWithStaleCheck(msg: TimerMsg): boolean {
-  const frontier = doc.frontiers();
-  const stateBefore = getStateAtFrontier(doc, frontier);
-
-  update(doc, frontier, msg);
-
-  const stateAfter = getStateAtFrontier(doc, doc.frontiers());
-
-  if (JSON.stringify(stateBefore) === JSON.stringify(stateAfter)) {
-    // Guard condition failed - state didn't change
-    console.warn("Message rejected: guard condition failed");
-    return false;
-  }
-
-  return true;
-}
-```
-
 ## React Integration
 
 ```typescript
 function useTimer(handle: Handle<typeof TimerSchema>) {
-  const state = useDoc(handle, (doc) => doc.timer) as TimerState;
+  const [timerState, setTimerState] = useState(() =>
+    state(handle.doc, handle.doc.frontiers()),
+  );
   const runtimeRef = useRef<{
     dispatch: Dispatch<TimerMsg>;
     dispose: Disposer;
   }>();
 
   useEffect(() => {
+    const viewReactor: Reactor<TimerState, TimerMsg> = ({ after }) => {
+      setTimerState(after);
+    };
+
     runtimeRef.current = runtime({
       doc: handle.doc,
-      state: (frontier) => getStateAtFrontier(handle.doc, frontier),
-      subscriptions: deriveSubscriptions,
+      state: (frontier) => state(handle.doc, frontier),
       update: (frontier, msg) => update(handle.doc, frontier, msg),
+      reactors: [viewReactor],
     });
 
     return () => runtimeRef.current?.dispose();
@@ -884,7 +887,7 @@ function useTimer(handle: Handle<typeof TimerSchema>) {
     runtimeRef.current?.dispatch(msg);
   }, []);
 
-  return { state, dispatch };
+  return { state: timerState, dispatch };
 }
 
 // Usage in component
@@ -916,25 +919,24 @@ function TimerView() {
 
 LEA provides a rigorous, pure functional foundation for CRDT-native applications:
 
-1. **Messages** - Pure data describing user intent
-2. **State Derivation** - Pure function from (doc, frontier) to state
-3. **Subscriptions** - Derived from state, replace TEA's Cmd
-4. **Update** - Deterministic state transition returning new frontier
-5. **Runtime** - Imperative shell managing subscriptions
+1. **Doc** - The CRDT document (shared state boundary)
+2. **State** - Pure function from (doc, frontier) to state
+3. **Update** - Deterministic state transition returning new frontier
+4. **Reactors** - Unified pattern for views, subscriptions, and effects
 
 The key insights:
 
 - **LEA is TEA where the Model is a Pointer** - Frontiers are immutable identifiers, not values
+- **Everything is a Reactor** - Views, subscriptions, and effects all use the same pattern
 - **Effects are State** - Writing to the CRDT _is_ the effect mechanism
-- **Subscriptions are Derived** - No separate effect system needed
 - **The Document is the I/O Boundary** - Both LEA and external systems read/write here
 - **The Frontier of Now** - Effects only happen at the edge of now, but understanding can reach into the past
 
-**LEA** — The Loro Extended Architecture: TEA + Time for CRDT-native applications.
+**LEA** -- The Loro Extended Architecture: TEA + Time for CRDT-native applications.
 
 ---
 
 ```
-Version: 2.0
-Published: 2026-01-20
+Version: 3.0
+Published: 2026-01-21
 ```

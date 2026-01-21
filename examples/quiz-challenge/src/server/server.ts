@@ -9,12 +9,49 @@ import { Repo } from "@loro-extended/repo"
 import { createServer as createViteServer } from "vite"
 import type { WebSocket } from "ws"
 import { WebSocketServer } from "ws"
+import { runtime } from "../shared/runtime.js"
+import { DEFAULT_QUESTIONS, QuizDocSchema } from "../shared/schema.js"
+import { createAiFeedbackReactor } from "./reactors.js"
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Server-side LEA Program
+// ═══════════════════════════════════════════════════════════════════════════
+// The server runs its own LEA Program with just the AI feedback reactor.
+// This ensures feedback is generated exactly once (on the server), not
+// duplicated across multiple client tabs.
+
+const QUIZ_DOC_ID = "demo-quiz"
 
 // 1. Create loro-extended repo with WebSocket adapter
 const wsAdapter = new WsServerNetworkAdapter()
-new Repo({ adapters: [wsAdapter] })
+const repo = new Repo({ adapters: [wsAdapter] })
+
+// 2. Get handle to the quiz document and start server-side LEA Program
+const handle = repo.get(QUIZ_DOC_ID, QuizDocSchema)
+
+// Create the AI feedback reactor (this is the server's only reactor)
+const aiFeedbackReactor = createAiFeedbackReactor(handle.doc, DEFAULT_QUESTIONS)
+
+// Start the server-side LEA Program
+const { dispose } = runtime({
+  doc: handle.doc,
+  questions: DEFAULT_QUESTIONS,
+  reactors: [aiFeedbackReactor],
+  done: () => console.log("[lea-server] Server-side LEA Program stopped"),
+})
+
+console.log(
+  "[lea-server] Server-side LEA Program started with AI feedback reactor",
+)
+
+// Cleanup on process exit
+process.on("SIGINT", () => {
+  console.log("[lea-server] Shutting down...")
+  dispose()
+  process.exit(0)
+})
 
 // 2. Create HTTP server
 const httpServer = http.createServer()

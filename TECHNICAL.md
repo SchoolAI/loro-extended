@@ -273,3 +273,28 @@ const dataHandle = repo.get("authoritative-data", DataDocSchema);
 **Caveat**: CRDT sync is bidirectional by default. Without permissions, a client with old data will sync it to a freshly restarted server. Always use `mutability` permissions for server-authoritative documents.
 
 See `examples/username-claimer` for a complete implementation and `docs/permissions.md` for the full permissions API.
+
+## LEA (Loro Extended Architecture)
+
+### Fork-and-Merge Update Pattern
+
+When building state machine transitions with LEA, use the **fork-and-merge** pattern to avoid confusion between read state and write draft:
+
+```typescript
+const update = createUpdate<Schema, Msg>((doc, msg, timestamp) => {
+  // Single object for both reading and writing
+  if (doc.status !== "idle") return     // Guard: read from doc
+  change(doc, d => d.status = "running") // Mutate: via change()
+})
+```
+
+**Critical**: Forks get new peer IDs by default. You must copy the main doc's peer ID to the fork:
+
+```typescript
+const workingDoc = doc.forkAt(frontier)
+loro(workingDoc).doc.setPeerId(loro(doc).doc.peerId)  // Required!
+```
+
+Without this, each update creates operations from a different peer, causing the frontier to not advance correctly (each peer starts at counter 0).
+
+See `examples/task-card/TECHNICAL.md` for the full implementation and `docs/lea.md` for the LEA architecture specification.

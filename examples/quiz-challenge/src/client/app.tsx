@@ -5,15 +5,15 @@ import {
 import { RepoProvider, useHandle } from "@loro-extended/react"
 import { useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
-import { TaskDocSchema } from "./schema.js"
+import { QuizDocSchema } from "../shared/schema.js"
 import "./styles.css"
-import { TaskCard } from "./task-card.js"
+import { QuizCard } from "./quiz-card.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Constants
+// LEA 3.0 Quiz Challenge - Main App
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TASK_DOC_ID = "demo-task"
+const QUIZ_DOC_ID = "demo-quiz"
 
 // Create WebSocket adapter at module scope
 const wsAdapter = createWsClient({
@@ -42,20 +42,26 @@ function ConnectionBar({ state }: { state: ConnectionState }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// State Diagram Component
+// Architecture Diagram
 // ═══════════════════════════════════════════════════════════════════════════
 
-function StateDiagram() {
+function ArchitectureDiagram() {
   return (
-    <div className="state-diagram">
-      <h3>State Machine</h3>
+    <div className="architecture-diagram">
+      <h3>LEA 3.0 Architecture</h3>
       <pre>{`
-  draft ──▶ todo ──▶ in_progress ──▶ done
-              │           │            │
-              │           ▼            │
-              │       blocked ─────────┘
-              │           │
-              └───────────┴──────────▶ archived
+  ┌─────────────────────────────────────────────────────┐
+  │                    LEA 3.0                          │
+  │                                                     │
+  │   Doc ──▶ State ──▶ Update ──▶ Reactors             │
+  │                                                     │
+  │   Reactors:                                         │
+  │   • View (renders UI)                               │
+  │   • Timer (dispatches TICK)                         │
+  │   • Sensor (dispatches on AI response)              │
+  │   • AI Effect (writes to sensors)                   │
+  │   • Toast (shows notifications)                     │
+  └─────────────────────────────────────────────────────┘
       `}</pre>
     </div>
   )
@@ -66,7 +72,7 @@ function StateDiagram() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function App() {
-  const handle = useHandle(TASK_DOC_ID, TaskDocSchema)
+  const handle = useHandle(QUIZ_DOC_ID, QuizDocSchema)
 
   // Connection status
   const [connectionState, setConnectionState] =
@@ -83,14 +89,17 @@ function App() {
 
       {/* Header */}
       <div className="header">
-        <h1>Task Card — LEA Demo</h1>
+        <h1>Quiz Challenge — LEA 3.0 Demo</h1>
+        <p className="subtitle">
+          Demonstrating the Reactor Architecture: Doc, State, Update, Reactors
+        </p>
       </div>
 
-      {/* Task Card */}
-      <TaskCard handle={handle} />
+      {/* Quiz Card */}
+      <QuizCard handle={handle} />
 
-      {/* State Diagram */}
-      <StateDiagram />
+      {/* Architecture Diagram */}
+      <ArchitectureDiagram />
 
       {/* Help Footer */}
       <div className="help-footer">
@@ -98,8 +107,8 @@ function App() {
           <strong>Open in another tab</strong> to see real-time collaboration
         </p>
         <p>
-          <span className="shortcut">⌘Z</span> undo{" "}
-          <span className="shortcut">⌘⇧Z</span> redo
+          This demo shows LEA 3.0's unified reactor pattern for views,
+          subscriptions, and effects.
         </p>
       </div>
     </>
