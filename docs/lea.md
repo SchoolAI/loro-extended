@@ -931,3 +931,10 @@ The key insights:
 - **The Frontier of Now** - Effects only happen at the edge of now, but understanding can reach into the past
 
 **LEA** — The Loro Extended Architecture: TEA + Time for CRDT-native applications.
+
+---
+
+```
+Version: 2.0
+Published: 2026-01-20
+```
