@@ -321,9 +321,10 @@ export function createTypedDoc<Shape extends DocShape>(
       return Reflect.has(target, prop)
     },
 
-    // Support Object.keys() - don't include change, forkAt, or LORO_SYMBOL in enumeration
+    // Support Object.keys() - filter out Symbol properties to allow proxies to be used
+    // in place of plain objects. This prevents React's "Object keys must be strings" error.
     ownKeys(target) {
-      return Reflect.ownKeys(target)
+      return Reflect.ownKeys(target).filter(key => typeof key === "string")
     },
 
     getOwnPropertyDescriptor(target, prop) {
