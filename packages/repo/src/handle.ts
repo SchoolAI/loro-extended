@@ -789,5 +789,39 @@ export function createHandle<
       }
       return Reflect.has(target, prop)
     },
+
+    // Support Object.keys() - filter out Symbol properties and include ephemeral stores
+    // This prevents React's "Object keys must be strings" error and ensures
+    // ephemeral stores appear in enumeration.
+    ownKeys(target) {
+      // Get string keys from the Handle class, filtering out Symbols
+      const handleKeys = Reflect.ownKeys(target).filter(
+        key => typeof key === "string",
+      )
+
+      // Add ephemeral store names if declared
+      if (params.ephemeralShapes) {
+        const ephemeralKeys = Object.keys(params.ephemeralShapes)
+        return [...new Set([...handleKeys, ...ephemeralKeys])]
+      }
+
+      return handleKeys
+    },
+
+    getOwnPropertyDescriptor(target, prop) {
+      // For ephemeral stores, return a descriptor that makes them enumerable
+      if (
+        typeof prop === "string" &&
+        params.ephemeralShapes &&
+        prop in params.ephemeralShapes
+      ) {
+        return {
+          configurable: true,
+          enumerable: true,
+          value: target.getTypedEphemeral(prop as keyof E),
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(target, prop)
+    },
   }) as HandleWithEphemerals<D, E>
 }
