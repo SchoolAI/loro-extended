@@ -7,7 +7,7 @@
     "dev": "vite",
     "build:all": "vite build --mode client && vite build",
     "test": "verify logic",
-    "verify": "verify # verifies everything including tests"
+    "verify": "verify"
   },
   "dependencies": {
     "@hono/node-server": "^1.12.2",

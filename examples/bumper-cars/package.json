@@ -13,7 +13,7 @@
     "serve:client": "vite preview",
     "serve:server": "node dist/src/server/server.js",
     "test": "verify logic",
-    "verify": "verify # verifies everything including tests"
+    "verify": "verify"
   },
   "dependencies": {
     "@logtape/logtape": "^1.1.1",

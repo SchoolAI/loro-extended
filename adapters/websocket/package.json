@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsup",
     "test": "verify logic",
-    "verify": "verify # verifies everything including tests"
+    "verify": "verify"
   },
   "dependencies": {
     "@levischuck/tiny-cbor": "^0.3.2",

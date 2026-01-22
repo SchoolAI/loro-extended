@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "test": "verify logic",
-    "verify": "verify # verifies everything including tests"
+    "verify": "verify"
   },
   "dependencies": {
     "@loro-extended/adapter-websocket": "workspace:^",

@@ -8,7 +8,7 @@
     "dev:client": "vite",
     "build": "tsc -b && vite build",
     "test": "verify logic",
-    "verify": "verify # verifies everything including tests"
+    "verify": "verify"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",
