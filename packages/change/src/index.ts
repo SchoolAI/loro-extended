@@ -32,7 +32,6 @@ export { mergeValue, overlayPlaceholder } from "./overlay.js"
 export { createPathBuilder } from "./path-builder.js"
 export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
 export { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
-
 export type {
   PathBuilder,
   PathNode,
@@ -40,6 +39,7 @@ export type {
   PathSelector,
 } from "./path-selector.js"
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
+export { replayDiff } from "./replay-diff.js"
 // Shape utilities
 // Container shapes
 // Value shapes
