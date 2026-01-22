@@ -1,11 +1,11 @@
-import type {
-  LoroCounter,
+import {
+  type LoroCounter,
   LoroDoc,
-  LoroList,
-  LoroMap,
-  LoroMovableList,
-  LoroText,
-  LoroTree,
+  type LoroList,
+  type LoroMap,
+  type LoroMovableList,
+  type LoroText,
+  type LoroTree,
 } from "loro-crdt"
 import { loro } from "./loro.js"
 import type {
@@ -308,4 +308,72 @@ export function forkAt<Shape extends DocShape>(
   const forkedLoroDoc = loroDoc.forkAt(frontiers)
   const shape = loro(doc).docShape as Shape
   return createTypedDoc(shape, forkedLoroDoc)
+}
+
+/**
+ * Creates a new TypedDoc at a specified version using a shallow snapshot.
+ * Unlike `forkAt`, this creates a "garbage-collected" snapshot that only
+ * contains the current state and history since the specified frontiers.
+ *
+ * This is more memory-efficient than `forkAt` for documents with long history,
+ * especially useful for the fork-and-merge pattern in LEA where we only need:
+ * 1. Read current state
+ * 2. Apply changes
+ * 3. Export delta and merge back
+ *
+ * The shallow fork has a different PeerID from the original by default.
+ * Use `preservePeerId: true` to copy the original's peer ID (useful for
+ * fork-and-merge patterns where you want consistent frontier progression).
+ *
+ * @param doc - The TypedDoc to fork
+ * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
+ * @param options - Optional settings
+ * @param options.preservePeerId - If true, copies the original doc's peer ID to the fork
+ * @returns A new TypedDoc with the same schema at the specified version (shallow)
+ *
+ * @example
+ * ```typescript
+ * import { shallowForkAt, loro } from "@loro-extended/change"
+ *
+ * const doc = createTypedDoc(schema);
+ * doc.title.update("Hello");
+ * const frontiers = loro(doc).doc.frontiers();
+ *
+ * // Create a shallow fork (memory-efficient)
+ * const shallowDoc = shallowForkAt(doc, frontiers, { preservePeerId: true });
+ *
+ * // Modify the shallow doc
+ * shallowDoc.title.update("World");
+ *
+ * // Merge changes back
+ * const update = loro(shallowDoc).doc.export({
+ *   mode: "update",
+ *   from: loro(doc).doc.version()
+ * });
+ * loro(doc).doc.import(update);
+ * ```
+ */
+export function shallowForkAt<Shape extends DocShape>(
+  doc: TypedDoc<Shape>,
+  frontiers: Frontiers,
+  options?: { preservePeerId?: boolean },
+): TypedDoc<Shape> {
+  const loroDoc = loro(doc).doc
+  const shape = loro(doc).docShape as Shape
+
+  // Export a shallow snapshot at the specified frontiers
+  const shallowBytes = loroDoc.export({
+    mode: "shallow-snapshot",
+    frontiers,
+  })
+
+  // Create a new LoroDoc from the shallow snapshot
+  const shallowLoroDoc = LoroDoc.fromSnapshot(shallowBytes)
+
+  // Optionally preserve the peer ID for consistent frontier progression
+  if (options?.preservePeerId) {
+    shallowLoroDoc.setPeerId(loroDoc.peerId)
+  }
+
+  return createTypedDoc(shape, shallowLoroDoc)
 }

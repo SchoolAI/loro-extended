@@ -11,6 +11,7 @@ export {
   forkAt,
   getLoroContainer,
   getLoroDoc,
+  shallowForkAt,
 } from "./functional-helpers.js"
 
 // The loro() escape hatch for CRDT internals
