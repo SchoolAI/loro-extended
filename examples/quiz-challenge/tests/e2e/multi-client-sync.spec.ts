@@ -10,6 +10,7 @@ import {
   submitAnswer,
   waitForConnectionState,
   waitForQuizState,
+  waitForResultsPage,
 } from "./fixtures/test-helpers"
 
 test.describe("Multi-Client Synchronization", () => {
@@ -21,9 +22,10 @@ test.describe("Multi-Client Synchronization", () => {
     const testDocId = generateTestDocumentId()
 
     // Both clients connect to the same document
+    // Navigate to quiz page with the test doc ID in the hash
     await Promise.all([
-      client1.goto(`/#${testDocId}`),
-      client2.goto(`/#${testDocId}`),
+      client1.goto(`/quiz/${testDocId}#${testDocId}`),
+      client2.goto(`/quiz/${testDocId}#${testDocId}`),
     ])
 
     // Wait for both clients to connect
@@ -32,7 +34,7 @@ test.describe("Multi-Client Synchronization", () => {
       waitForConnectionState(client2, "connected"),
     ])
 
-    // Both should start in idle state
+    // Both should start in idle state (quiz card visible)
     await Promise.all([
       waitForQuizState(client1, "idle"),
       waitForQuizState(client2, "idle"),
@@ -61,8 +63,8 @@ test.describe("Multi-Client Synchronization", () => {
     const testDocId = generateTestDocumentId()
 
     await Promise.all([
-      client1.goto(`/#${testDocId}`),
-      client2.goto(`/#${testDocId}`),
+      client1.goto(`/quiz/${testDocId}#${testDocId}`),
+      client2.goto(`/quiz/${testDocId}#${testDocId}`),
     ])
 
     await Promise.all([
@@ -93,8 +95,8 @@ test.describe("Multi-Client Synchronization", () => {
     const testDocId = generateTestDocumentId()
 
     await Promise.all([
-      client1.goto(`/#${testDocId}`),
-      client2.goto(`/#${testDocId}`),
+      client1.goto(`/quiz/${testDocId}#${testDocId}`),
+      client2.goto(`/quiz/${testDocId}#${testDocId}`),
     ])
 
     await Promise.all([
@@ -140,8 +142,8 @@ test.describe("Multi-Client Synchronization", () => {
     const testDocId = generateTestDocumentId()
 
     await Promise.all([
-      client1.goto(`/#${testDocId}`),
-      client2.goto(`/#${testDocId}`),
+      client1.goto(`/quiz/${testDocId}#${testDocId}`),
+      client2.goto(`/quiz/${testDocId}#${testDocId}`),
     ])
 
     await Promise.all([
@@ -188,8 +190,8 @@ test.describe("Multi-Client Synchronization", () => {
     const testDocId = generateTestDocumentId()
 
     await Promise.all([
-      client1.goto(`/#${testDocId}`),
-      client2.goto(`/#${testDocId}`),
+      client1.goto(`/quiz/${testDocId}#${testDocId}`),
+      client2.goto(`/quiz/${testDocId}#${testDocId}`),
     ])
 
     await Promise.all([
@@ -227,10 +229,11 @@ test.describe("Multi-Client Synchronization", () => {
       }
     }
 
-    // Both should be in complete state
+    // With the new routing, quiz completion navigates to the results page
+    // Wait for both clients to see the results page
     await Promise.all([
-      waitForQuizState(client1, "complete"),
-      waitForQuizState(client2, "complete"),
+      waitForResultsPage(client1),
+      waitForResultsPage(client2),
     ])
 
     // Both should show the same score

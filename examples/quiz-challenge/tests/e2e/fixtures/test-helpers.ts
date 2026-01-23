@@ -32,9 +32,35 @@ export async function waitForQuizState(
 }
 
 /**
+ * Navigate to the quiz page from home page.
+ * With the new routing, the app starts on home page.
+ */
+export async function navigateToQuizPage(page: Page): Promise<void> {
+  // Click the Quiz nav link or Start Quiz button
+  const quizNavLink = page.locator('.nav-link:has-text("Quiz")')
+  const startQuizBtn = page.locator('.start-quiz-btn:has-text("Start Quiz")')
+
+  // Try nav link first, then start button
+  if ((await quizNavLink.count()) > 0) {
+    await quizNavLink.click()
+  } else if ((await startQuizBtn.count()) > 0) {
+    await startQuizBtn.click()
+  }
+
+  // Wait for quiz card to appear
+  await page.waitForSelector(".quiz-card", { timeout: 10000 })
+}
+
+/**
  * Start the quiz by clicking the start button.
  */
 export async function startQuiz(page: Page): Promise<void> {
+  // First ensure we're on the quiz page
+  const quizCard = page.locator(".quiz-card")
+  if ((await quizCard.count()) === 0) {
+    await navigateToQuizPage(page)
+  }
+
   await page.click('button:has-text("Start Quiz")')
   await waitForQuizState(page, "answering")
 }
@@ -108,4 +134,12 @@ export async function getFinalScore(
     score: parseInt(scoreNumber || "0", 10),
     total: parseInt(scoreTotal || "0", 10),
   }
+}
+
+/**
+ * Wait for the results page to be visible.
+ * With the new routing, quiz completion navigates to the results page.
+ */
+export async function waitForResultsPage(page: Page): Promise<void> {
+  await page.waitForSelector(".results-page", { timeout: 30000 })
 }

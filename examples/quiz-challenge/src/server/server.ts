@@ -22,38 +22,84 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 // The server runs its own LEA Program with just the AI feedback reactor.
 // This ensures feedback is generated exactly once (on the server), not
 // duplicated across multiple client tabs.
-
-const QUIZ_DOC_ID = "demo-quiz"
+//
+// Dynamic Document Support:
+// The server now creates AI feedback reactors for ANY quiz document that
+// connects, not just "demo-quiz". This enables E2E tests with unique doc IDs.
 
 // 1. Create loro-extended repo with WebSocket adapter
 const wsAdapter = new WsServerNetworkAdapter()
 const repo = new Repo({ adapters: [wsAdapter] })
 
-// 2. Get handle to the quiz document and history document
-const handle = repo.get(QUIZ_DOC_ID, QuizDocSchema)
-const historyHandle = repo.get(getHistoryDocId(QUIZ_DOC_ID), HistoryDocSchema)
+// Track active runtimes for cleanup
+const activeRuntimes = new Map<string, { dispose: () => void }>()
 
-// Create the AI feedback reactor (this is the server's only reactor)
-const aiFeedbackReactor = createAiFeedbackReactor(handle.doc, DEFAULT_QUESTIONS)
+// Function to start a LEA runtime for a quiz document
+function startRuntimeForDoc(docId: string) {
+  // Skip if already running or if it's a history document
+  // History documents use `:history` suffix (see getHistoryDocId)
+  if (activeRuntimes.has(docId) || docId.includes(":history")) {
+    return
+  }
 
-// Start the server-side LEA Program with history document
-// The history document is NEVER checked out, ensuring subscriptions always fire
-const { dispose } = runtime({
-  doc: handle.doc,
-  questions: DEFAULT_QUESTIONS,
-  reactors: [aiFeedbackReactor],
-  historyDoc: historyHandle.doc,
-  done: () => console.log("[lea-server] Server-side LEA Program stopped"),
-})
+  // Mark as running immediately to prevent duplicate starts
+  // (the event can fire multiple times before the runtime is fully created)
+  activeRuntimes.set(docId, { dispose: () => {} })
+
+  console.log(`[lea-server] Starting runtime for document: ${docId}`)
+
+  try {
+    const handle = repo.get(docId, QuizDocSchema)
+    const historyHandle = repo.get(getHistoryDocId(docId), HistoryDocSchema)
+
+    // Create the AI feedback reactor for this document
+    const aiFeedbackReactor = createAiFeedbackReactor(
+      handle.doc,
+      DEFAULT_QUESTIONS,
+    )
+
+    // Start the server-side LEA Program with history document
+    const { dispose } = runtime({
+      doc: handle.doc,
+      questions: DEFAULT_QUESTIONS,
+      reactors: [aiFeedbackReactor],
+      historyDoc: historyHandle.doc,
+      done: () =>
+        console.log(`[lea-server] Runtime stopped for document: ${docId}`),
+    })
+
+    // Update with the real dispose function
+    activeRuntimes.set(docId, { dispose })
+  } catch (error) {
+    console.error(`[lea-server] Failed to start runtime for ${docId}:`, error)
+    activeRuntimes.delete(docId)
+  }
+}
+
+// Start runtime for the default demo document
+startRuntimeForDoc("demo-quiz")
 
 console.log(
-  "[lea-server] Server-side LEA Program started with AI feedback reactor and history document",
+  "[lea-server] Server-side LEA Program started with dynamic document support",
 )
+
+// Listen for new documents via ready-state-changed events
+repo.synchronizer.emitter.on("ready-state-changed", ({ docId }) => {
+  // Only start runtime for quiz documents (not history documents)
+  // History documents use `:history` suffix (see getHistoryDocId)
+  if (!docId.includes(":history")) {
+    startRuntimeForDoc(docId)
+  }
+})
 
 // Cleanup on process exit
 process.on("SIGINT", () => {
   console.log("[lea-server] Shutting down...")
-  dispose()
+  for (const [docId, { dispose }] of activeRuntimes) {
+    console.log(`[lea-server] Disposing runtime for: ${docId}`)
+    dispose()
+  }
+  activeRuntimes.clear()
   process.exit(0)
 })
 

@@ -298,3 +298,47 @@ loro(workingDoc).doc.setPeerId(loro(doc).doc.peerId)  // Required!
 Without this, each update creates operations from a different peer, causing the frontier to not advance correctly (each peer starts at counter 0).
 
 See `examples/task-card/TECHNICAL.md` for the full implementation and `docs/lea.md` for the LEA architecture specification.
+
+### UndoManager for Navigation History
+
+Browser back/forward navigation is conceptually equivalent to undo/redo of navigation operations. Instead of maintaining manual history stacks (`past`/`future` arrays), use Loro's UndoManager:
+
+```typescript
+const undoManager = new UndoManager(loro(viewDoc).doc, {
+  maxUndoSteps: 100,
+  mergeInterval: 0, // Each navigation is a separate step
+})
+```
+
+**Key patterns:**
+
+1. **Two-step NAVIGATE for proper undo**: To restore both scroll position AND route on undo, the NAVIGATE handler must use two separate `change()` calls:
+
+```typescript
+case "NAVIGATE": {
+  // Step 1: Save scroll to current route
+  change(doc, draft => {
+    draft.navigation.route.scrollY = msg.currentScrollY
+  })
+  // Step 2: Replace with new route
+  change(doc, draft => {
+    draft.navigation.route = { ...msg.route, scrollY: 0 }
+  })
+  break
+}
+```
+
+2. **Browser history position tracking**: Store position in `pushState` to determine undo/redo count on popstate:
+
+```typescript
+window.history.pushState({ position: historyPosition }, "", url)
+// On popstate: delta = newPosition - currentPosition
+// delta < 0 → call undo() |delta| times
+// delta > 0 → call redo() delta times
+```
+
+3. **Scroll position on route, not in separate map**: Store `scrollY` directly on each route variant for automatic restoration on undo.
+
+4. **NAVIGATE_BACK/FORWARD messages are unnecessary**: The browser history reactor calls `undoManager.undo()/redo()` directly on popstate events.
+
+See `examples/quiz-challenge/src/client/browser-history-reactor.ts` for the implementation and `plans/view-doc-undo-refactor.md` for the full design.

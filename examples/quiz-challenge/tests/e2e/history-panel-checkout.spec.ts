@@ -19,8 +19,8 @@ test.describe("History Panel Checkout", () => {
 
     const testDocId = generateTestDocumentId()
 
-    // Navigate to the quiz
-    await page.goto(`/#${testDocId}`)
+    // Navigate to the quiz page
+    await page.goto(`/quiz/${testDocId}#${testDocId}`)
     await waitForConnectionState(page, "connected")
     await waitForQuizState(page, "idle")
 
@@ -82,7 +82,7 @@ test.describe("History Panel Checkout", () => {
   }) => {
     const testDocId = generateTestDocumentId()
 
-    await page.goto(`/#${testDocId}`)
+    await page.goto(`/quiz/${testDocId}#${testDocId}`)
     await waitForConnectionState(page, "connected")
     await waitForQuizState(page, "idle")
 
@@ -120,13 +120,14 @@ test.describe("History Panel Checkout", () => {
     await waitForQuizState(page, "answering")
     await expect(page.locator(".option-selected")).not.toBeVisible()
 
-    // Now click restore on "Selected Option" entry
+    // Now click restore on "Selected Option" entry (which is the latest state)
     await selectedOptionEntry.locator(".history-restore-btn").click()
 
-    // Should still show detached banner
-    await expect(page.locator(".detached-banner")).toBeVisible()
+    // Since "Selected Option" is the latest state, clicking restore returns to live
+    // The detached banner should NOT be visible (we're back to live state)
+    await expect(page.locator(".detached-banner")).not.toBeVisible()
 
-    // Should be in answering state WITH selected option
+    // Should be in answering state WITH selected option (back to live state)
     await waitForQuizState(page, "answering")
     await expect(page.locator(".option-selected")).toBeVisible()
   })
@@ -137,7 +138,7 @@ test.describe("History Panel Checkout", () => {
   }) => {
     const testDocId = generateTestDocumentId()
 
-    await page.goto(`/#${testDocId}`)
+    await page.goto(`/quiz/${testDocId}#${testDocId}`)
     await waitForConnectionState(page, "connected")
     await waitForQuizState(page, "idle")
 
@@ -176,7 +177,7 @@ test.describe("History Panel Checkout", () => {
   }) => {
     const testDocId = generateTestDocumentId()
 
-    await page.goto(`/#${testDocId}`)
+    await page.goto(`/quiz/${testDocId}#${testDocId}`)
     await waitForConnectionState(page, "connected")
     await waitForQuizState(page, "idle")
 
