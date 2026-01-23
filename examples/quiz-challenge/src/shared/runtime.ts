@@ -1,4 +1,5 @@
 import { type Frontiers, loro, type TypedDoc } from "@loro-extended/change"
+import type { LoroEventBatch } from "loro-crdt"
 import type { QuizMsg } from "./messages.js"
 import type { Reactor, Transition } from "./reactor-types.js"
 import type { Question, QuizDocSchema } from "./schema.js"
@@ -69,11 +70,24 @@ export function runtime(program: Program): {
   // Dispatch only writes to the document. Reactors are invoked by the
   // document subscription - this is the "purest" LEA 3 approach where
   // the document change is the single source of truth for reactor invocation.
+  //
+  // HISTORY: Each dispatch stores the message as a commit annotation,
+  // enabling time travel debugging via getMessageHistory().
 
   function dispatch(msg: QuizMsg): void {
     if (!isRunning) return
 
     const frontier = loro(doc).doc.frontiers()
+
+    // Store the message as a commit annotation for history tracking
+    // This enables time travel debugging - see getMessageHistory()
+    loro(doc).doc.setNextCommitMessage(
+      JSON.stringify({
+        type: msg.type,
+        msg,
+        timestamp: Date.now(),
+      }),
+    )
 
     // Apply the update - this triggers the document subscription
     update(doc, frontier, msg, questions)
@@ -92,9 +106,23 @@ export function runtime(program: Program): {
   // OPTIMIZATION: We create lazy TypedDoc forks instead of calling toJSON().
   // The forks are snapshots at specific frontiers - values are only
   // evaluated when reactors access them.
+  //
+  // NOTE: Checkout events are skipped because they represent time travel
+  // operations that don't need reactor invocation - the UI will re-render
+  // based on the new state via useDoc's frontier-based version key.
 
-  const unsubDoc = loro(doc).subscribe(() => {
+  const unsubDoc = loro(doc).subscribe(rawEvent => {
     if (!isRunning) return
+
+    // Cast to LoroEventBatch to access the `by` property
+    const event = rawEvent as LoroEventBatch
+
+    // Skip checkout events - they represent time travel operations
+    // that don't need reactor invocation
+    if (event.by === "checkout") {
+      previousFrontier = loro(doc).doc.frontiers()
+      return
+    }
 
     const beforeFrontier = previousFrontier
     const afterFrontier = loro(doc).doc.frontiers()

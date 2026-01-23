@@ -310,6 +310,105 @@ case "RECEIVE_FEEDBACK": {
 }
 ```
 
+## Time Travel Debugging (History Panel)
+
+The quiz-challenge includes a history panel that demonstrates LEA's time travel capabilities using Loro's commit annotations and checkout mechanism.
+
+### Commit Message Storage
+
+Each `dispatch()` stores the message as a commit annotation before applying the update:
+
+```typescript
+function dispatch(msg: QuizMsg): void {
+  // Store the message as a commit annotation for history tracking
+  loro(doc).doc.setNextCommitMessage(
+    JSON.stringify({
+      type: msg.type,
+      msg,
+      timestamp: Date.now(),
+    }),
+  )
+
+  // Apply the update
+  update(doc, frontier, msg, questions)
+}
+```
+
+### History Retrieval
+
+The `getMessageHistory()` function traverses change ancestors to build a chronological history:
+
+```typescript
+export function getMessageHistory(doc, fromFrontiers?): HistoryEntry[] {
+  const entries: HistoryEntry[] = []
+  const frontiers = fromFrontiers ?? loro(doc).doc.frontiers()
+
+  loro(doc).doc.travelChangeAncestors(frontiers, change => {
+    if (change.message) {
+      try {
+        const data = JSON.parse(change.message)
+        if (data.type && data.msg) {
+          entries.push({
+            id: `${change.counter}@${change.peer}`,
+            msg: data.msg,
+            timestamp: data.timestamp,
+            frontier: [{ peer: change.peer, counter: change.counter }],
+          })
+        }
+      } catch {
+        // Skip malformed commit messages
+      }
+    }
+    return true // Continue traversing
+  })
+
+  // travelChangeAncestors returns reverse causal order, so reverse for chronological
+  return entries.reverse()
+}
+```
+
+### Checkout/Attach Flow
+
+Time travel uses Loro's `checkout()` and `checkoutToLatest()` methods:
+
+```typescript
+// Restore to historical state
+const handleRestoreState = (frontier: Frontiers) => {
+  loro(handle.doc).doc.checkout(frontier)
+  // Document is now "detached" - viewing history
+}
+
+// Return to live state
+const handleReturnToLive = () => {
+  loro(handle.doc).doc.checkoutToLatest()
+  // Document is now "attached" again
+}
+```
+
+### Detached Mode Behavior
+
+When the document is checked out to a historical frontier:
+
+| Aspect | Behavior |
+|--------|----------|
+| `isDetached()` | Returns `true` |
+| Editing | Disabled by default |
+| Imports | Update OpLog only, not visible state |
+| Reactors | Do NOT fire (LEA's "Frontier of Now" principle) |
+| React hooks | Automatically reflect checked-out state |
+
+### Why Reactors Don't Fire on Checkout
+
+This is a key LEA design principle: **Reactors only fire at the "Frontier of Now"**.
+
+When you checkout to a historical state:
+- No timers start
+- No AI calls trigger
+- No toasts appear
+- No side effects occur
+
+This makes time travel safe for debugging and inspection. The historical state is purely for viewing - all effects are tied to the live edge of the document.
+
 ## File Structure
 
 ```
@@ -318,11 +417,14 @@ src/
 │   ├── schema.ts     # Document schema and types
 │   ├── messages.ts   # Message types (discriminated union)
 │   ├── update.ts     # Update function with createUpdate factory
-│   ├── runtime.ts    # LEA runtime (imperative shell)
+│   ├── runtime.ts    # LEA runtime (stores commit messages)
+│   ├── history.ts    # History retrieval utilities
+│   ├── history.test.ts # Tests for history utilities
 │   └── reactor-types.ts  # Reactor type definitions
 ├── client/           # Browser-only code
-│   ├── app.tsx       # React app entry
+│   ├── app.tsx       # React app entry (history panel integration)
 │   ├── quiz-card.tsx # Quiz UI component
+│   ├── history-panel.tsx # Time travel debugging panel
 │   ├── reactors.ts   # Client reactors (timer, sensor watcher)
 │   └── use-quiz.ts   # React hook for quiz state
 └── server/           # Node.js-only code

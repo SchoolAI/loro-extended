@@ -392,7 +392,7 @@ export function QuizCard({ handle }: { handle: Handle<typeof QuizDocSchema> }) {
   }
 
   return (
-    <div className="quiz-card">
+    <div className="quiz-card" data-quiz-state={quizState.status}>
       {renderContent()}
       <ToastContainer toasts={toasts} />
     </div>

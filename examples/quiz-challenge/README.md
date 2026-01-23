@@ -99,6 +99,33 @@ idle → answering → submitted → reviewing → (next_question | complete)
          └─────────────────────────┘
 ```
 
+## History Panel (Time Travel Debugging)
+
+This demo includes a **History Panel** that demonstrates LEA's time travel capabilities:
+
+### Opening the Panel
+Click the **📜 History** button in the top-right corner to open the fly-out panel.
+
+### What You'll See
+- A chronological list of all state transitions (messages dispatched)
+- Each entry shows the message type (e.g., "🚀 Started Quiz", "👆 Selected Option")
+- Timestamps for when each action occurred
+
+### Restoring Historical State
+Click **Restore** on any entry to view the app at that point in time:
+- The document "checks out" to that historical frontier
+- A yellow banner appears: "📜 Viewing historical state"
+- The quiz card shows the exact state at that moment
+- Click **Return to Live** to go back to the current state
+
+### How It Works
+1. **Commit Messages**: Each `dispatch()` stores the message as a commit annotation via `setNextCommitMessage()`
+2. **History Retrieval**: `getMessageHistory()` traverses change ancestors using `travelChangeAncestors()`
+3. **Time Travel**: `checkout(frontier)` moves the document to a historical state (detached mode)
+4. **Return to Live**: `checkoutToLatest()` re-attaches the document to the latest version
+
+**Key LEA Principle**: Reactors only fire at the "Frontier of Now". Checking out historical states is safe for inspection--no timers start, no AI calls trigger, no side effects occur.
+
 ## Running the Demo
 
 ```bash
@@ -119,14 +146,17 @@ src/
 │   ├── update.ts              # State derivation + update function
 │   ├── update.test.ts         # Tests for update function
 │   ├── reactor-types.ts       # Reactor type definitions
-│   └── runtime.ts             # The imperative shell
+│   ├── runtime.ts             # The imperative shell (stores commit messages)
+│   ├── history.ts             # History retrieval utilities
+│   └── history.test.ts        # Tests for history utilities
 │
 ├── client/                    # Browser-only code
-│   ├── app.tsx                # Client app entry
+│   ├── app.tsx                # Client app entry (history panel integration)
 │   ├── quiz-card.tsx          # UI components
+│   ├── history-panel.tsx      # Time travel debugging panel
 │   ├── use-quiz.ts            # React hook integrating LEA 3.0
 │   ├── reactors.ts            # Client reactors (timer, sensor, toast)
-│   └── styles.css             # Styling
+│   └── styles.css             # Styling (includes history panel styles)
 │
 └── server/                    # Node.js-only code
     ├── server.ts              # Server entry with LEA Program

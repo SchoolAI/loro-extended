@@ -15,7 +15,7 @@ export async function waitForConnectionState(
   page: Page,
   state: "connected" | "connecting" | "reconnecting" | "disconnected",
 ): Promise<void> {
-  await page.waitForSelector(`.status-${state}`, { timeout: 30000 })
+  await page.waitForSelector(`.connection-bar.${state}`, { timeout: 30000 })
 }
 
 /**

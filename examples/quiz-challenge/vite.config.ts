@@ -9,6 +9,14 @@ export default defineConfig({
     target: "esnext",
   },
   optimizeDeps: {
+    // Exclude workspace packages from pre-bundling to ensure we always use the latest built versions
+    exclude: [
+      "@loro-extended/change",
+      "@loro-extended/react",
+      "@loro-extended/hooks-core",
+      "@loro-extended/repo",
+      "@loro-extended/adapter-websocket",
+    ],
     esbuildOptions: {
       target: "esnext",
     },

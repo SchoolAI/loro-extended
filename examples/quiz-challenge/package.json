@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server/server.ts",
+    "dev:server": "PORT=8004 tsx src/server/server.ts",
     "test": "verify logic",
+    "test:e2e": "playwright test",
     "verify": "verify"
   },
   "dependencies": {
@@ -13,23 +15,26 @@
     "@loro-extended/change": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",
-    "loro-crdt": "^1.10.3",
+    "loro-crdt": "link:/Users/duane/tools/loro/crates/loro-wasm",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^22.15.29",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
+    "@types/uuid": "^11.0.0",
     "@types/ws": "^8.5.13",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@vitejs/plugin-react": "^4.5.2",
     "tsx": "^4.19.4",
     "typescript": "~5.8.3",
+    "uuid": "^9.0.1",
     "vite": "^6.3.5",
-    "vite-plugin-wasm": "^3.4.1",
     "vite-plugin-top-level-await": "^1.5.0",
+    "vite-plugin-wasm": "^3.4.1",
     "vitest": "^3.2.4"
   }
 }

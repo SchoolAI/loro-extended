@@ -2,18 +2,26 @@ import {
   type ConnectionState,
   createWsClient,
 } from "@loro-extended/adapter-websocket/client"
+import { loro } from "@loro-extended/change"
 import { RepoProvider, useHandle } from "@loro-extended/react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { QuizDocSchema } from "../shared/schema.js"
 import "./styles.css"
+import { HistoryPanel } from "./history-panel.js"
 import { QuizCard } from "./quiz-card.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LEA 3.0 Quiz Challenge - Main App
 // ═══════════════════════════════════════════════════════════════════════════
 
-const QUIZ_DOC_ID = "demo-quiz"
+const DEFAULT_DOC_ID = "demo-quiz"
+
+// Get document ID from URL hash (for test isolation) or use default
+function getDocIdFromUrl(): string {
+  const hash = window.location.hash.slice(1) // Remove the '#'
+  return hash || DEFAULT_DOC_ID
+}
 
 // Create WebSocket adapter at module scope
 const wsAdapter = createWsClient({
@@ -72,20 +80,68 @@ function ArchitectureDiagram() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function App() {
-  const handle = useHandle(QUIZ_DOC_ID, QuizDocSchema)
+  // Get document ID from URL hash (for test isolation) or use default
+  const [docId] = useState(() => getDocIdFromUrl())
+  const handle = useHandle(docId, QuizDocSchema)
 
   // Connection status
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected")
 
+  // History panel state
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  // Detached state (viewing historical state)
+  const [isDetached, setIsDetached] = useState(false)
+
   useEffect(() => {
     return wsAdapter.subscribe(setConnectionState)
   }, [])
 
+  // Track detached state - fires when doc is checked out to historical frontier
+  useEffect(() => {
+    const checkDetached = () => {
+      setIsDetached(loro(handle.doc).doc.isDetached())
+    }
+    checkDetached()
+    return loro(handle.doc).subscribe(checkDetached)
+  }, [handle])
+
+  // Return to live state
+  const handleReturnToLive = useCallback(() => {
+    loro(handle.doc).doc.checkoutToLatest()
+  }, [handle])
+
   return (
     <>
+      {/* Detached State Banner */}
+      {isDetached && (
+        <div className="detached-banner">
+          <span>📜 Viewing historical state</span>
+          <button type="button" onClick={handleReturnToLive}>
+            Return to Live
+          </button>
+        </div>
+      )}
+
       {/* Connection Status */}
       <ConnectionBar state={connectionState} />
+
+      {/* History Toggle Button */}
+      <button
+        type="button"
+        className="history-toggle-btn"
+        onClick={() => setHistoryOpen(!historyOpen)}
+      >
+        📜 History
+      </button>
+
+      {/* History Panel */}
+      <HistoryPanel
+        handle={handle}
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      />
 
       {/* Header */}
       <div className="header">

@@ -753,6 +753,9 @@ importers:
         specifier: ^8.18.0
         version: 8.19.0
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.57.0
+        version: 1.57.0
       '@types/node':
         specifier: ^22.15.29
         version: 22.19.5
@@ -762,6 +765,9 @@ importers:
       '@types/react-dom':
         specifier: 19.1.6
         version: 19.1.6(@types/react@19.1.8)
+      '@types/uuid':
+        specifier: ^11.0.0
+        version: 11.0.0
       '@types/ws':
         specifier: ^8.5.13
         version: 8.18.1
@@ -777,6 +783,9 @@ importers:
       typescript:
         specifier: ~5.8.3
         version: 5.8.3
+      uuid:
+        specifier: ^9.0.1
+        version: 9.0.1
       vite:
         specifier: ^6.3.5
         version: 6.4.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
@@ -2697,6 +2706,10 @@ packages:
 
   '@types/simple-peer@9.11.9':
     resolution: {integrity: sha512-6Gdl7TSS5oh9nuwKD4Pl8cSmaxWycYeZz9HLnJBNvIwWjZuGVsmHe9RwW3+9RxfhC1aIR9Z83DvaJoMw6rhkbg==}
+
+  '@types/uuid@11.0.0':
+    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
+    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/uuid@9.0.8':
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
@@ -6193,6 +6206,10 @@ snapshots:
   '@types/simple-peer@9.11.9':
     dependencies:
       '@types/node': 20.19.28
+
+  '@types/uuid@11.0.0':
+    dependencies:
+      uuid: 9.0.1
 
   '@types/uuid@9.0.8': {}
 
