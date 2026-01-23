@@ -81,6 +81,21 @@ export function createHooks(framework: FrameworkHooks) {
   // useDoc - Get document JSON snapshot (reactive)
   // ============================================
 
+  // Helper to create a version key that changes on checkout
+  // This combines opCount (changes on edits) with frontiers (changes on checkout)
+  function getVersionKey(
+    loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"],
+  ): string {
+    const opCount = loroDoc.opCount()
+    const frontiers = loroDoc.frontiers()
+    // Serialize frontiers to a stable string
+    const frontiersKey = frontiers
+      .map(f => `${f.peer}:${f.counter}`)
+      .sort()
+      .join(",")
+    return `${opCount}|${frontiersKey}`
+  }
+
   // Overload: with selector (fine-grained)
   function useDoc<D extends DocShape, R>(
     handle: Handle<D, EphemeralDeclarations>,
@@ -99,15 +114,16 @@ export function createHooks(framework: FrameworkHooks) {
   ): R | Infer<D> {
     // Use a ref to cache the snapshot and track version
     const cacheRef = useRef<{
-      version: number
+      version: string
       value: R | Infer<D>
     } | null>(null)
 
     const store = useMemo(() => {
       // Compute the current snapshot value
       // Optimization: Check version first to avoid unnecessary toJSON() calls
-      const computeValue = (): { version: number; value: R | Infer<D> } => {
-        const newVersion = handle.loroDoc.opCount()
+      // Version includes both opCount and frontiers to detect checkout changes
+      const computeValue = (): { version: string; value: R | Infer<D> } => {
+        const newVersion = getVersionKey(handle.loroDoc)
 
         // If we have a cached value with the same version, return it
         // This avoids expensive toJSON() calls when the document hasn't changed
@@ -124,12 +140,11 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       // Subscribe to document changes
+      // Note: We always call onChange() and let createSyncStore handle the caching.
+      // The version check in computeValue() will prevent unnecessary re-renders.
       const subscribeToSource = (onChange: () => void) => {
         return handle.loroDoc.subscribe(() => {
-          const newVersion = handle.loroDoc.opCount()
-          if (!cacheRef.current || cacheRef.current.version !== newVersion) {
-            onChange()
-          }
+          onChange()
         })
       }
 

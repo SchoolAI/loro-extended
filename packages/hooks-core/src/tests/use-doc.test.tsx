@@ -148,4 +148,199 @@ describe("useDoc", () => {
     const handle2 = result.current.handle
     expect(handle2).toBe(handle1) // Same handle due to useState
   })
+
+  it("should re-render when document is checked out to historical frontier", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => {
+        const handle = useHandle(documentId, testSchema)
+        const doc = useDoc(handle)
+        return { handle, doc }
+      },
+      { wrapper: RepoWrapper },
+    )
+
+    // Initial state
+    expect(result.current.doc.title).toBe("Test Document")
+
+    // Make a change and capture the frontier
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "First Edit")
+      })
+    })
+    const frontier1 = result.current.handle.loroDoc.frontiers()
+    expect(result.current.doc.title).toBe("First Edit")
+
+    // Make another change
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "Second Edit")
+      })
+    })
+    expect(result.current.doc.title).toBe("Second Edit")
+
+    // Checkout to the first frontier
+    act(() => {
+      result.current.handle.loroDoc.checkout(frontier1)
+    })
+
+    // Should now show the state at frontier1
+    expect(result.current.doc.title).toBe("First Edit")
+  })
+
+  it("should re-render when checkoutToLatest is called", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => {
+        const handle = useHandle(documentId, testSchema)
+        const doc = useDoc(handle)
+        return { handle, doc }
+      },
+      { wrapper: RepoWrapper },
+    )
+
+    // Make a change and capture the frontier
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "First Edit")
+      })
+    })
+    const frontier1 = result.current.handle.loroDoc.frontiers()
+
+    // Make another change
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "Latest Edit")
+      })
+    })
+    expect(result.current.doc.title).toBe("Latest Edit")
+
+    // Checkout to historical state
+    act(() => {
+      result.current.handle.loroDoc.checkout(frontier1)
+    })
+    expect(result.current.doc.title).toBe("First Edit")
+
+    // Return to latest
+    act(() => {
+      result.current.handle.loroDoc.checkoutToLatest()
+    })
+
+    // Should show the latest state
+    expect(result.current.doc.title).toBe("Latest Edit")
+  })
+
+  it("should re-render with selector when document is checked out", () => {
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const { result } = renderHook(
+      () => {
+        const handle = useHandle(documentId, testSchema)
+        const title = useDoc(handle, d => d.title)
+        return { handle, title }
+      },
+      { wrapper: RepoWrapper },
+    )
+
+    // Make changes
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "Version 1")
+      })
+    })
+    const frontier1 = result.current.handle.loroDoc.frontiers()
+
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "Version 2")
+      })
+    })
+    expect(result.current.title).toBe("Version 2")
+
+    // Checkout to historical state
+    act(() => {
+      result.current.handle.loroDoc.checkout(frontier1)
+    })
+
+    // Selector should return the historical value
+    expect(result.current.title).toBe("Version 1")
+  })
+
+  it("should have different cache keys for different frontiers with same opCount", () => {
+    // This test verifies that the version key includes frontiers, not just opCount.
+    // Without frontiers in the key, checkout between two states with the same opCount
+    // would not trigger a re-render because the cache key would be identical.
+    const documentId = createTestDocumentId()
+    const RepoWrapper = createRepoWrapper()
+
+    const renderCounts = { count: 0 }
+
+    const { result } = renderHook(
+      () => {
+        const handle = useHandle(documentId, testSchema)
+        const doc = useDoc(handle)
+        renderCounts.count++
+        return { handle, doc }
+      },
+      { wrapper: RepoWrapper },
+    )
+
+    const initialRenderCount = renderCounts.count
+
+    // Make first change
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "State A")
+      })
+    })
+    const frontierA = result.current.handle.loroDoc.frontiers()
+    const renderCountAfterA = renderCounts.count
+
+    // Make second change
+    act(() => {
+      result.current.handle.change(d => {
+        d.title.delete(0, d.title.length)
+        d.title.insert(0, "State B")
+      })
+    })
+    const frontierB = result.current.handle.loroDoc.frontiers()
+    const renderCountAfterB = renderCounts.count
+
+    // Verify we rendered after each change
+    expect(renderCountAfterA).toBeGreaterThan(initialRenderCount)
+    expect(renderCountAfterB).toBeGreaterThan(renderCountAfterA)
+
+    // Now checkout to A - opCount stays the same, but frontiers change
+    act(() => {
+      result.current.handle.loroDoc.checkout(frontierA)
+    })
+    const renderCountAfterCheckoutA = renderCounts.count
+
+    // Should have re-rendered because frontiers changed
+    expect(renderCountAfterCheckoutA).toBeGreaterThan(renderCountAfterB)
+    expect(result.current.doc.title).toBe("State A")
+
+    // Checkout to B - opCount still the same, frontiers change again
+    act(() => {
+      result.current.handle.loroDoc.checkout(frontierB)
+    })
+    const renderCountAfterCheckoutB = renderCounts.count
+
+    // Should have re-rendered again
+    expect(renderCountAfterCheckoutB).toBeGreaterThan(renderCountAfterCheckoutA)
+    expect(result.current.doc.title).toBe("State B")
+  })
 })
