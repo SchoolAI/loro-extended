@@ -73,9 +73,11 @@ describe("getMessageHistory", () => {
     expect(entry.timestamp).toBeGreaterThanOrEqual(beforeDispatch)
     expect(entry.timestamp).toBeLessThanOrEqual(afterDispatch)
 
-    // Frontier should be defined
+    // Frontier should be defined for entries from getMessageHistory
     expect(entry.frontier).toBeDefined()
-    expect(entry.frontier.length).toBeGreaterThan(0)
+    if (entry.frontier) {
+      expect(entry.frontier.length).toBeGreaterThan(0)
+    }
 
     // ID should be in the format counter@peer
     expect(entry.id).toMatch(/^\d+@\d+$/)

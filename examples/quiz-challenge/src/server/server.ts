@@ -9,6 +9,7 @@ import { Repo } from "@loro-extended/repo"
 import { createServer as createViteServer } from "vite"
 import type { WebSocket } from "ws"
 import { WebSocketServer } from "ws"
+import { getHistoryDocId, HistoryDocSchema } from "../shared/history-schema.js"
 import { runtime } from "../shared/runtime.js"
 import { DEFAULT_QUESTIONS, QuizDocSchema } from "../shared/schema.js"
 import { createAiFeedbackReactor } from "./reactors.js"
@@ -28,22 +29,25 @@ const QUIZ_DOC_ID = "demo-quiz"
 const wsAdapter = new WsServerNetworkAdapter()
 const repo = new Repo({ adapters: [wsAdapter] })
 
-// 2. Get handle to the quiz document and start server-side LEA Program
+// 2. Get handle to the quiz document and history document
 const handle = repo.get(QUIZ_DOC_ID, QuizDocSchema)
+const historyHandle = repo.get(getHistoryDocId(QUIZ_DOC_ID), HistoryDocSchema)
 
 // Create the AI feedback reactor (this is the server's only reactor)
 const aiFeedbackReactor = createAiFeedbackReactor(handle.doc, DEFAULT_QUESTIONS)
 
-// Start the server-side LEA Program
+// Start the server-side LEA Program with history document
+// The history document is NEVER checked out, ensuring subscriptions always fire
 const { dispose } = runtime({
   doc: handle.doc,
   questions: DEFAULT_QUESTIONS,
   reactors: [aiFeedbackReactor],
+  historyDoc: historyHandle.doc,
   done: () => console.log("[lea-server] Server-side LEA Program stopped"),
 })
 
 console.log(
-  "[lea-server] Server-side LEA Program started with AI feedback reactor",
+  "[lea-server] Server-side LEA Program started with AI feedback reactor and history document",
 )
 
 // Cleanup on process exit

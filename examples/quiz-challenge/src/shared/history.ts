@@ -1,4 +1,5 @@
 import { type Frontiers, loro, type TypedDoc } from "@loro-extended/change"
+import type { HistoryDocSchema } from "./history-schema.js"
 import type { QuizMsg } from "./messages.js"
 import type { QuizDocSchema } from "./schema.js"
 
@@ -12,20 +13,25 @@ import type { QuizDocSchema } from "./schema.js"
 // Pattern: Each dispatch stores the message as a commit annotation via
 // setNextCommitMessage(). This module retrieves those annotations using
 // travelChangeAncestors() to build a chronological history.
+//
+// Separate History Document Pattern:
+// - The history panel can also read from a SEPARATE history document
+// - This document is NEVER checked out, ensuring subscriptions always fire
+// - Use getMessageHistoryFromHistoryDoc() to read from the history document
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type HistoryEntry = {
-  /** Unique identifier: `${counter}@${peer}` */
+  /** Unique identifier: `${counter}@${peer}` or `${timestamp}-${random}` */
   id: string
   /** The dispatched message */
   msg: QuizMsg
   /** When the message was dispatched (Date.now() at dispatch time) */
   timestamp: number
-  /** The frontier after this change was applied */
-  frontier: Frontiers
+  /** The frontier after this change was applied (only for commit-based history) */
+  frontier?: Frontiers
 }
 
 /** The format stored in commit messages */
@@ -82,13 +88,44 @@ export function getMessageHistory(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// getMessageHistoryFromHistoryDoc
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Retrieves the message history from a SEPARATE history document.
+// This document is NEVER checked out, ensuring subscriptions always fire
+// when new entries arrive from peers.
+//
+// The history document stores entries as a list of structs with:
+// - id: unique identifier
+// - msgType: the message type
+// - msgJson: JSON stringified message payload
+// - timestamp: when the message was dispatched
+
+export function getMessageHistoryFromHistoryDoc(
+  historyDoc: TypedDoc<typeof HistoryDocSchema>,
+): HistoryEntry[] {
+  const entries = historyDoc.toJSON().entries
+  return entries.map(entry => ({
+    id: entry.id,
+    msg: JSON.parse(entry.msgJson) as QuizMsg,
+    timestamp: entry.timestamp,
+    // No frontier for history doc entries - they don't support checkout
+  }))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // getFrontierForEntry
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Converts a history entry's frontier to the format needed for checkout.
 // The frontier stored in HistoryEntry is the OpId of the change itself.
 // For checkout, we need to include all concurrent changes up to that point.
+//
+// NOTE: This only works for entries from getMessageHistory(), not from
+// getMessageHistoryFromHistoryDoc() which doesn't have frontier information.
 
-export function getFrontierForEntry(entry: HistoryEntry): Frontiers {
+export function getFrontierForEntry(
+  entry: HistoryEntry,
+): Frontiers | undefined {
   return entry.frontier
 }

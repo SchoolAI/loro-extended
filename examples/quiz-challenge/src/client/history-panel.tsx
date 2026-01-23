@@ -2,10 +2,11 @@ import { loro } from "@loro-extended/change"
 import type { Handle } from "@loro-extended/react"
 import { useCallback, useEffect, useState } from "react"
 import {
-  getFrontierForEntry,
   getMessageHistory,
+  getMessageHistoryFromHistoryDoc,
   type HistoryEntry,
 } from "../shared/history.js"
+import type { HistoryDocSchema } from "../shared/history-schema.js"
 import type { QuizDocSchema } from "../shared/schema.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -20,9 +21,15 @@ import type { QuizDocSchema } from "../shared/schema.js"
 // - Uses checkout() to move the document to a historical frontier
 // - The document becomes "detached" when viewing history
 // - Use checkoutToLatest() to return to the live state
+//
+// Separate History Document Pattern:
+// - The history panel subscribes to a SEPARATE history document
+// - This document is NEVER checked out, ensuring subscriptions always fire
+// - The app document can be freely checked out for time travel
 
 type Props = {
-  handle: Handle<typeof QuizDocSchema>
+  appHandle: Handle<typeof QuizDocSchema>
+  historyHandle: Handle<typeof HistoryDocSchema>
   isOpen: boolean
   onClose: () => void
 }
@@ -64,10 +71,12 @@ function formatTime(timestamp: number): string {
 function HistoryEntryItem({
   entry,
   isSelected,
+  canRestore,
   onRestore,
 }: {
   entry: HistoryEntry
   isSelected: boolean
+  canRestore: boolean
   onRestore: () => void
 }) {
   return (
@@ -80,9 +89,15 @@ function HistoryEntryItem({
         </div>
         <div className="history-entry-time">{formatTime(entry.timestamp)}</div>
       </div>
-      <button type="button" className="history-restore-btn" onClick={onRestore}>
-        Restore
-      </button>
+      {canRestore && (
+        <button
+          type="button"
+          className="history-restore-btn"
+          onClick={onRestore}
+        >
+          Restore
+        </button>
+      )}
     </div>
   )
 }
@@ -91,49 +106,91 @@ function HistoryEntryItem({
 // History Panel Component
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function HistoryPanel({ handle, isOpen, onClose }: Props) {
-  const [history, setHistory] = useState<HistoryEntry[]>([])
+export function HistoryPanel({
+  appHandle,
+  historyHandle,
+  isOpen,
+  onClose,
+}: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // History entries from the separate history document
+  // This document is NEVER checked out, ensuring subscriptions always fire
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
+
+  // Also get entries from the app document's oplog for restore functionality
+  // These have frontier information needed for checkout
+  const [appHistoryEntries, setAppHistoryEntries] = useState<HistoryEntry[]>([])
+
+  // Subscribe to history document for real-time updates
+  // This document is NEVER checked out, so subscriptions always fire
+  useEffect(() => {
+    if (!isOpen) return
+
+    const refresh = () => {
+      setHistoryEntries(getMessageHistoryFromHistoryDoc(historyHandle.doc))
+    }
+
+    refresh()
+    const unsub = loro(historyHandle.doc).subscribe(refresh)
+    return unsub
+  }, [historyHandle, isOpen])
 
   // Track detached state to clear selection when returning to live
   useEffect(() => {
     if (!isOpen) return
 
     const checkDetached = () => {
-      const isDetached = loro(handle.doc).doc.isDetached()
+      const isDetached = loro(appHandle.doc).doc.isDetached()
       // Clear selection when returning to live state
       if (!isDetached) {
         setSelectedId(null)
       }
     }
 
-    return loro(handle.doc).subscribe(checkDetached)
-  }, [handle, isOpen])
+    return loro(appHandle.doc).subscribe(checkDetached)
+  }, [appHandle, isOpen])
 
-  // Refresh history when panel opens or doc changes
+  // Refresh app history entries when panel opens or app doc changes
+  // This is needed to get frontier information for restore functionality
   useEffect(() => {
     if (!isOpen) return
 
     const refresh = () => {
       // Get history from the oplog (not affected by checkout)
-      const oplogFrontiers = loro(handle.doc).doc.oplogFrontiers()
-      setHistory(getMessageHistory(handle.doc, oplogFrontiers))
+      const oplogFrontiers = loro(appHandle.doc).doc.oplogFrontiers()
+      setAppHistoryEntries(getMessageHistory(appHandle.doc, oplogFrontiers))
     }
 
     refresh()
-    const unsub = loro(handle.doc).subscribe(refresh)
+    const unsub = loro(appHandle.doc).subscribe(refresh)
     return unsub
-  }, [handle, isOpen])
+  }, [appHandle, isOpen])
+
+  // Find the corresponding app history entry for restore
+  const findAppEntry = useCallback(
+    (historyEntry: HistoryEntry): HistoryEntry | undefined => {
+      // Match by timestamp and message type
+      return appHistoryEntries.find(
+        appEntry =>
+          appEntry.msg.type === historyEntry.msg.type &&
+          Math.abs(appEntry.timestamp - historyEntry.timestamp) < 1000,
+      )
+    },
+    [appHistoryEntries],
+  )
 
   const handleRestore = useCallback(
     (entry: HistoryEntry) => {
-      const frontier = getFrontierForEntry(entry)
-      
-      // Checkout moves the document to the historical state
-      // The document becomes "detached" - viewing history
-      handle.loroDoc.checkout(frontier)
+      // Find the corresponding app entry with frontier information
+      const appEntry = findAppEntry(entry)
+      if (appEntry?.frontier) {
+        // Checkout moves the document to the historical state
+        // The document becomes "detached" - viewing history
+        appHandle.loroDoc.checkout(appEntry.frontier)
+      }
     },
-    [handle],
+    [appHandle, findAppEntry],
   )
 
   if (!isOpen) return null
@@ -153,7 +210,7 @@ export function HistoryPanel({ handle, isOpen, onClose }: Props) {
       </div>
 
       <div className="history-panel-content">
-        {history.length === 0 ? (
+        {historyEntries.length === 0 ? (
           <div className="history-empty">
             <p>No state transitions yet.</p>
             <p className="history-empty-hint">
@@ -162,17 +219,22 @@ export function HistoryPanel({ handle, isOpen, onClose }: Props) {
           </div>
         ) : (
           <div className="history-list">
-            {history.map(entry => (
-              <HistoryEntryItem
-                key={entry.id}
-                entry={entry}
-                isSelected={selectedId === entry.id}
-                onRestore={() => {
-                  setSelectedId(entry.id)
-                  handleRestore(entry)
-                }}
-              />
-            ))}
+            {historyEntries.map(entry => {
+              const appEntry = findAppEntry(entry)
+              const canRestore = !!appEntry?.frontier
+              return (
+                <HistoryEntryItem
+                  key={entry.id}
+                  entry={entry}
+                  isSelected={selectedId === entry.id}
+                  canRestore={canRestore}
+                  onRestore={() => {
+                    setSelectedId(entry.id)
+                    handleRestore(entry)
+                  }}
+                />
+              )
+            })}
           </div>
         )}
       </div>

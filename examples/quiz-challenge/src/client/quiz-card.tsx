@@ -1,5 +1,6 @@
 import type { Handle } from "@loro-extended/react"
 import { useEffect, useState } from "react"
+import type { HistoryDocSchema } from "../shared/history-schema.js"
 import type { Question, QuizDocSchema } from "../shared/schema.js"
 import { QUESTION_TIME_LIMIT } from "../shared/update.js"
 import { type Toast, useQuiz } from "./use-quiz.js"
@@ -325,9 +326,15 @@ function useTimeRemaining(startedAt: number | null): number {
 // Main Quiz Card Component
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function QuizCard({ handle }: { handle: Handle<typeof QuizDocSchema> }) {
+export function QuizCard({
+  handle,
+  historyHandle,
+}: {
+  handle: Handle<typeof QuizDocSchema>
+  historyHandle: Handle<typeof HistoryDocSchema>
+}) {
   const { quizState, currentQuestion, totalQuestions, dispatch, toasts } =
-    useQuiz(handle)
+    useQuiz(handle, historyHandle)
 
   // Calculate time remaining locally from startedAt
   const startedAt =

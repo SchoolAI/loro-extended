@@ -6,6 +6,7 @@ import { loro } from "@loro-extended/change"
 import { RepoProvider, useHandle } from "@loro-extended/react"
 import { useCallback, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
+import { getHistoryDocId, HistoryDocSchema } from "../shared/history-schema.js"
 import { QuizDocSchema } from "../shared/schema.js"
 import "./styles.css"
 import { HistoryPanel } from "./history-panel.js"
@@ -84,6 +85,10 @@ function App() {
   const [docId] = useState(() => getDocIdFromUrl())
   const handle = useHandle(docId, QuizDocSchema)
 
+  // History document - separate from app document, NEVER checked out
+  // This ensures the history panel always receives updates from peers
+  const historyHandle = useHandle(getHistoryDocId(docId), HistoryDocSchema)
+
   // Connection status
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected")
@@ -138,7 +143,8 @@ function App() {
 
       {/* History Panel */}
       <HistoryPanel
-        handle={handle}
+        appHandle={handle}
+        historyHandle={historyHandle}
         isOpen={historyOpen}
         onClose={() => setHistoryOpen(false)}
       />
@@ -152,7 +158,7 @@ function App() {
       </div>
 
       {/* Quiz Card */}
-      <QuizCard handle={handle} />
+      <QuizCard handle={handle} historyHandle={historyHandle} />
 
       {/* Architecture Diagram */}
       <ArchitectureDiagram />

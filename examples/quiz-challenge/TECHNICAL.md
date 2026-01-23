@@ -314,6 +314,45 @@ case "RECEIVE_FEEDBACK": {
 
 The quiz-challenge includes a history panel that demonstrates LEA's time travel capabilities using Loro's commit annotations and checkout mechanism.
 
+### Separate History Document Pattern
+
+**Problem**: When the app document is checked out to a historical frontier, the history panel (which reads from the same document) doesn't see new changes arriving from other peers. This is because subscriptions are tied to the document's **view state**, not the **oplog**.
+
+**Solution**: Use TWO separate documents:
+
+1. **App document** (`quiz-123`) - contains quiz state, can be checked out
+2. **History document** (`quiz-123:history`) - contains history entries only, NEVER checked out
+
+```typescript
+// App document - for quiz state
+const handle = useHandle(docId, QuizDocSchema)
+
+// History document - for history panel (never checked out)
+const historyHandle = useHandle(getHistoryDocId(docId), HistoryDocSchema)
+```
+
+When a message is dispatched:
+- App document: state is updated via the update function
+- History document: a new entry is appended via the runtime
+
+The history panel subscribes to the history document, which is completely independent of the app document's checkout state.
+
+### History Document Schema
+
+```typescript
+// src/shared/history-schema.ts
+export const HistoryEntrySchema = Shape.struct({
+  id: Shape.plain.string(),
+  msgType: Shape.plain.string(),
+  msgJson: Shape.plain.string(),
+  timestamp: Shape.plain.number(),
+})
+
+export const HistoryDocSchema = Shape.doc({
+  entries: Shape.list(HistoryEntrySchema),
+})
+```
+
 ### Commit Message Storage
 
 Each `dispatch()` stores the message as a commit annotation before applying the update:
@@ -331,14 +370,21 @@ function dispatch(msg: QuizMsg): void {
 
   // Apply the update
   update(doc, frontier, msg, questions)
+
+  // Append to history document if provided
+  appendHistoryEntry(msg, timestamp)
 }
 ```
 
 ### History Retrieval
 
-The `getMessageHistory()` function traverses change ancestors to build a chronological history:
+Two methods are available for retrieving history:
+
+1. **From commit annotations** (`getMessageHistory`) - includes frontier information for checkout
+2. **From history document** (`getMessageHistoryFromHistoryDoc`) - always up-to-date, even when app doc is checked out
 
 ```typescript
+// From commit annotations (supports checkout)
 export function getMessageHistory(doc, fromFrontiers?): HistoryEntry[] {
   const entries: HistoryEntry[] = []
   const frontiers = fromFrontiers ?? loro(doc).doc.frontiers()
@@ -362,8 +408,17 @@ export function getMessageHistory(doc, fromFrontiers?): HistoryEntry[] {
     return true // Continue traversing
   })
 
-  // travelChangeAncestors returns reverse causal order, so reverse for chronological
   return entries.reverse()
+}
+
+// From history document (always up-to-date)
+export function getMessageHistoryFromHistoryDoc(historyDoc): HistoryEntry[] {
+  const entries = historyDoc.toJSON().entries
+  return entries.map(entry => ({
+    id: entry.id,
+    msg: JSON.parse(entry.msgJson),
+    timestamp: entry.timestamp,
+  }))
 }
 ```
 
@@ -396,6 +451,7 @@ When the document is checked out to a historical frontier:
 | Imports | Update OpLog only, not visible state |
 | Reactors | Do NOT fire (LEA's "Frontier of Now" principle) |
 | React hooks | Automatically reflect checked-out state |
+| History panel | Still receives updates (uses separate document) |
 
 ### Why Reactors Don't Fire on Checkout
 
@@ -415,19 +471,21 @@ This makes time travel safe for debugging and inspection. The historical state i
 src/
 ├── shared/           # Shared between client and server
 │   ├── schema.ts     # Document schema and types
+│   ├── history-schema.ts # History document schema (separate from app)
 │   ├── messages.ts   # Message types (discriminated union)
 │   ├── update.ts     # Update function with createUpdate factory
-│   ├── runtime.ts    # LEA runtime (stores commit messages)
+│   ├── runtime.ts    # LEA runtime (stores commit messages, writes to history doc)
 │   ├── history.ts    # History retrieval utilities
 │   ├── history.test.ts # Tests for history utilities
+│   ├── shadow-doc-history.test.ts # Tests for separate history document pattern
 │   └── reactor-types.ts  # Reactor type definitions
 ├── client/           # Browser-only code
-│   ├── app.tsx       # React app entry (history panel integration)
+│   ├── app.tsx       # React app entry (creates both app and history handles)
 │   ├── quiz-card.tsx # Quiz UI component
-│   ├── history-panel.tsx # Time travel debugging panel
+│   ├── history-panel.tsx # Time travel debugging panel (reads from history doc)
 │   ├── reactors.ts   # Client reactors (timer, sensor watcher)
-│   └── use-quiz.ts   # React hook for quiz state
+│   └── use-quiz.ts   # React hook for quiz state (passes history doc to runtime)
 └── server/           # Node.js-only code
-    ├── server.ts     # Express server
+    ├── server.ts     # Express server (creates both app and history handles)
     └── reactors.ts   # Server reactors (AI feedback)
 ```
