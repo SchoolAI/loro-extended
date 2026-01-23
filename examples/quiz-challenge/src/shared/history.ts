@@ -23,7 +23,17 @@ import type { QuizDocSchema } from "./schema.js"
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type HistoryEntry = {
+/** Entry representing the initial state before any messages */
+export type HistoryInitialEntry = {
+  kind: "initial"
+  id: "__initial__"
+  timestamp: 0
+  frontier: [] // Empty frontier = document before any changes
+}
+
+/** Entry representing a dispatched message */
+export type HistoryMessageEntry = {
+  kind: "message"
   /** Unique identifier: `${counter}@${peer}` or `${timestamp}-${random}` */
   id: string
   /** The dispatched message */
@@ -32,6 +42,17 @@ export type HistoryEntry = {
   timestamp: number
   /** The frontier after this change was applied (only for commit-based history) */
   frontier?: Frontiers
+}
+
+/** Union of all history entry types */
+export type HistoryEntry = HistoryInitialEntry | HistoryMessageEntry
+
+/** The initial state entry - singleton constant */
+export const INITIAL_STATE_ENTRY: HistoryInitialEntry = {
+  kind: "initial",
+  id: "__initial__",
+  timestamp: 0,
+  frontier: [],
 }
 
 /** The format stored in commit messages */
@@ -56,8 +77,8 @@ type CommitMessageData = {
 export function getMessageHistory(
   doc: TypedDoc<typeof QuizDocSchema>,
   fromFrontiers?: Frontiers,
-): HistoryEntry[] {
-  const entries: HistoryEntry[] = []
+): HistoryMessageEntry[] {
+  const entries: HistoryMessageEntry[] = []
   const frontiers = fromFrontiers ?? loro(doc).doc.frontiers()
 
   loro(doc).doc.travelChangeAncestors(frontiers, change => {
@@ -70,6 +91,7 @@ export function getMessageHistory(
           // This ensures we include all operations in the change
           const endCounter = change.counter + change.length - 1
           entries.push({
+            kind: "message",
             id: `${change.counter}@${change.peer}`,
             msg: data.msg,
             timestamp: data.timestamp ?? change.timestamp * 1000,
@@ -103,9 +125,10 @@ export function getMessageHistory(
 
 export function getMessageHistoryFromHistoryDoc(
   historyDoc: TypedDoc<typeof HistoryDocSchema>,
-): HistoryEntry[] {
+): HistoryMessageEntry[] {
   const entries = historyDoc.toJSON().entries
   return entries.map(entry => ({
+    kind: "message" as const,
     id: entry.id,
     msg: JSON.parse(entry.msgJson) as QuizMsg,
     timestamp: entry.timestamp,

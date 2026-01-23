@@ -1,10 +1,13 @@
 import { loro } from "@loro-extended/change"
 import type { Handle } from "@loro-extended/react"
 import { useCallback, useEffect, useState } from "react"
+import { checkoutToFrontier } from "../shared/checkout-utils.js"
 import {
   getMessageHistory,
   getMessageHistoryFromHistoryDoc,
   type HistoryEntry,
+  type HistoryMessageEntry,
+  INITIAL_STATE_ENTRY,
 } from "../shared/history.js"
 import type { HistoryDocSchema } from "../shared/history-schema.js"
 import type { QuizDocSchema } from "../shared/schema.js"
@@ -48,8 +51,11 @@ const MESSAGE_LABELS: Record<string, string> = {
   RESTART_QUIZ: "🔄 Restarted Quiz",
 }
 
-function getMessageLabel(type: string): string {
-  return MESSAGE_LABELS[type] ?? type
+function getEntryLabel(entry: HistoryEntry): string {
+  if (entry.kind === "initial") {
+    return "🏁 Initial State"
+  }
+  return MESSAGE_LABELS[entry.msg.type] ?? entry.msg.type
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -84,10 +90,10 @@ function HistoryEntryItem({
       className={`history-entry ${isSelected ? "history-entry-selected" : ""}`}
     >
       <div className="history-entry-content">
-        <div className="history-entry-type">
-          {getMessageLabel(entry.msg.type)}
+        <div className="history-entry-type">{getEntryLabel(entry)}</div>
+        <div className="history-entry-time">
+          {entry.kind === "initial" ? "—" : formatTime(entry.timestamp)}
         </div>
-        <div className="history-entry-time">{formatTime(entry.timestamp)}</div>
       </div>
       {canRestore && (
         <button
@@ -114,13 +120,17 @@ export function HistoryPanel({
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // History entries from the separate history document
+  // History entries from the separate history document (message entries only)
   // This document is NEVER checked out, ensuring subscriptions always fire
-  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
+  const [historyEntries, setHistoryEntries] = useState<HistoryMessageEntry[]>(
+    [],
+  )
 
   // Also get entries from the app document's oplog for restore functionality
   // These have frontier information needed for checkout
-  const [appHistoryEntries, setAppHistoryEntries] = useState<HistoryEntry[]>([])
+  const [appHistoryEntries, setAppHistoryEntries] = useState<
+    HistoryMessageEntry[]
+  >([])
 
   // Subscribe to history document for real-time updates
   // This document is NEVER checked out, so subscriptions always fire
@@ -167,9 +177,9 @@ export function HistoryPanel({
     return unsub
   }, [appHandle, isOpen])
 
-  // Find the corresponding app history entry for restore
+  // Find the corresponding app history entry for restore (message entries only)
   const findAppEntry = useCallback(
-    (historyEntry: HistoryEntry): HistoryEntry | undefined => {
+    (historyEntry: HistoryMessageEntry): HistoryMessageEntry | undefined => {
       // Match by timestamp and message type
       return appHistoryEntries.find(
         appEntry =>
@@ -182,16 +192,25 @@ export function HistoryPanel({
 
   const handleRestore = useCallback(
     (entry: HistoryEntry) => {
+      // Initial state uses empty frontier directly
+      if (entry.kind === "initial") {
+        checkoutToFrontier(appHandle.loroDoc, entry.frontier)
+        return
+      }
       // Find the corresponding app entry with frontier information
       const appEntry = findAppEntry(entry)
       if (appEntry?.frontier) {
-        // Checkout moves the document to the historical state
-        // The document becomes "detached" - viewing history
-        appHandle.loroDoc.checkout(appEntry.frontier)
+        // Use checkoutToFrontier to properly handle latest vs historical
+        // - If latest: calls checkoutToLatest() to re-attach
+        // - If historical: calls checkout() to detach
+        checkoutToFrontier(appHandle.loroDoc, appEntry.frontier)
       }
     },
     [appHandle, findAppEntry],
   )
+
+  // Combine initial state entry with message entries for display
+  const allEntries: HistoryEntry[] = [INITIAL_STATE_ENTRY, ...historyEntries]
 
   if (!isOpen) return null
 
@@ -210,33 +229,26 @@ export function HistoryPanel({
       </div>
 
       <div className="history-panel-content">
-        {historyEntries.length === 0 ? (
-          <div className="history-empty">
-            <p>No state transitions yet.</p>
-            <p className="history-empty-hint">
-              Start the quiz to see history entries appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="history-list">
-            {historyEntries.map(entry => {
-              const appEntry = findAppEntry(entry)
-              const canRestore = !!appEntry?.frontier
-              return (
-                <HistoryEntryItem
-                  key={entry.id}
-                  entry={entry}
-                  isSelected={selectedId === entry.id}
-                  canRestore={canRestore}
-                  onRestore={() => {
-                    setSelectedId(entry.id)
-                    handleRestore(entry)
-                  }}
-                />
-              )
-            })}
-          </div>
-        )}
+        <div className="history-list">
+          {allEntries.map(entry => {
+            // Initial state always has a frontier (empty array)
+            // Message entries need to find the corresponding app entry
+            const canRestore =
+              entry.kind === "initial" || !!findAppEntry(entry)?.frontier
+            return (
+              <HistoryEntryItem
+                key={entry.id}
+                entry={entry}
+                isSelected={selectedId === entry.id}
+                canRestore={canRestore}
+                onRestore={() => {
+                  setSelectedId(entry.id)
+                  handleRestore(entry)
+                }}
+              />
+            )
+          })}
+        </div>
       </div>
 
       <div className="history-panel-footer">
