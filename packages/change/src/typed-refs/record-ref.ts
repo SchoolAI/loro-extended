@@ -61,14 +61,83 @@ export class RecordRef<
     return container.keys()
   }
 
-  values(): any[] {
-    const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
-    return container.values()
+  /**
+   * Returns an array of all values in the record.
+   * For container-valued records, returns properly typed refs.
+   */
+  values(): InferMutableType<NestedShape>[] {
+    // We know keys() only returns keys that exist, so get() will not return undefined
+    return this.keys().map(
+      key => this.get(key) as InferMutableType<NestedShape>,
+    )
+  }
+
+  /**
+   * Returns an array of [key, value] pairs.
+   * For container-valued records, values are properly typed refs.
+   */
+  entries(): [string, InferMutableType<NestedShape>][] {
+    // We know keys() only returns keys that exist, so get() will not return undefined
+    return this.keys().map(key => [
+      key,
+      this.get(key) as InferMutableType<NestedShape>,
+    ])
   }
 
   get size(): number {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.size
+  }
+
+  /**
+   * Replace entire contents with new values.
+   * Keys not in `values` are removed.
+   *
+   * @example
+   * ```typescript
+   * doc.change(draft => {
+   *   draft.players.replace({
+   *     alice: { score: 100 },
+   *     bob: { score: 50 }
+   *   })
+   * })
+   * ```
+   */
+  replace(values: Record<string, Infer<NestedShape>>): void {
+    this[INTERNAL_SYMBOL].replace(values)
+  }
+
+  /**
+   * Merge values into record.
+   * Existing keys not in `values` are kept.
+   *
+   * @example
+   * ```typescript
+   * doc.change(draft => {
+   *   // Adds charlie, updates alice, keeps bob unchanged
+   *   draft.players.merge({
+   *     alice: { score: 150 },
+   *     charlie: { score: 25 }
+   *   })
+   * })
+   * ```
+   */
+  merge(values: Record<string, Infer<NestedShape>>): void {
+    this[INTERNAL_SYMBOL].merge(values)
+  }
+
+  /**
+   * Remove all entries from the record.
+   *
+   * @example
+   * ```typescript
+   * doc.change(draft => {
+   *   draft.players.clear()
+   * })
+   * ```
+   */
+  clear(): void {
+    this[INTERNAL_SYMBOL].clear()
   }
 
   toJSON(): Record<string, Infer<NestedShape>> {

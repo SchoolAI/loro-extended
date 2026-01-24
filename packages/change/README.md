@@ -605,15 +605,18 @@ loro(doc).rawValue; // Unmerged CRDT value
 
 **RecordRef** (Map-like interface)
 
-| Direct Access        | Only via `loro()`              |
-| -------------------- | ------------------------------ |
-| `get(key)`           | `setContainer(key, container)` |
-| `set(key, value)`    | `subscribe(callback)`          |
-| `delete(key)`        | `doc`                          |
-| `has(key)`           | `container`                    |
-| `keys()`, `values()` |                                |
-| `size`               |                                |
-| `toJSON()`           |                                |
+| Direct Access                    | Only via `loro()`              |
+| -------------------------------- | ------------------------------ |
+| `get(key)`                       | `setContainer(key, container)` |
+| `set(key, value)`                | `subscribe(callback)`          |
+| `delete(key)`                    | `doc`                          |
+| `has(key)`                       | `container`                    |
+| `keys()`, `values()`, `entries()`|                                |
+| `size`                           |                                |
+| `replace(values)`                |                                |
+| `merge(values)`                  |                                |
+| `clear()`                        |                                |
+| `toJSON()`                       |                                |
 
 **TextRef**
 
@@ -905,6 +908,40 @@ draft.metadata.values();
 // Access nested values
 const value = draft.metadata.get("key");
 ```
+
+### Record Bulk Update Operations
+
+Records support bulk update methods for efficient batch operations:
+
+```typescript
+// Replace entire contents - keys not in the new object are removed
+draft.players.replace({
+  alice: { name: "Alice", score: 100 },
+  bob: { name: "Bob", score: 50 },
+});
+// Result: only alice and bob exist, any previous entries are removed
+
+// Merge values - existing keys not in the new object are kept
+draft.scores.merge({
+  alice: 150, // updates alice
+  charlie: 25, // adds charlie
+});
+// Result: alice=150, bob=50 (unchanged), charlie=25
+
+// Clear all entries
+draft.history.clear();
+// Result: empty record
+```
+
+**Method semantics:**
+
+| Method             | Adds new | Updates existing | Removes absent |
+| ------------------ | -------- | ---------------- | -------------- |
+| `replace(values)`  | ✅       | ✅               | ✅             |
+| `merge(values)`    | ✅       | ✅               | ❌             |
+| `clear()`          | ❌       | ❌               | ✅ (all)       |
+
+These methods batch all operations into a single commit, avoiding multiple subscription notifications.
 
 ### Tree Operations
 

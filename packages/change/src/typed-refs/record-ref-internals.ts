@@ -186,6 +186,106 @@ export class RecordRefInternals<
     this.commitIfAuto()
   }
 
+  /**
+   * Replace entire contents with new values.
+   * Keys not in `values` are removed.
+   */
+  replace(values: Record<string, any>): void {
+    const container = this.getContainer() as LoroMap
+    const currentKeys = new Set(container.keys())
+    const newKeys = new Set(Object.keys(values))
+
+    // Suppress auto-commit during batch operations
+    const wasSuppressed = this.isSuppressAutoCommit()
+    if (!wasSuppressed) {
+      this.setSuppressAutoCommit(true)
+    }
+
+    try {
+      // Delete keys that are not in the new values
+      for (const key of currentKeys) {
+        if (!newKeys.has(key)) {
+          container.delete(key)
+          this.refCache.delete(key)
+        }
+      }
+
+      // Set new/updated values
+      for (const key of newKeys) {
+        this.set(key, values[key])
+      }
+    } finally {
+      // Restore auto-commit state
+      if (!wasSuppressed) {
+        this.setSuppressAutoCommit(false)
+      }
+    }
+
+    // Commit once after all operations
+    this.commitIfAuto()
+  }
+
+  /**
+   * Merge values into record.
+   * Existing keys not in `values` are kept.
+   */
+  merge(values: Record<string, any>): void {
+    // Suppress auto-commit during batch operations
+    const wasSuppressed = this.isSuppressAutoCommit()
+    if (!wasSuppressed) {
+      this.setSuppressAutoCommit(true)
+    }
+
+    try {
+      // Set new/updated values (no deletions)
+      for (const key of Object.keys(values)) {
+        this.set(key, values[key])
+      }
+    } finally {
+      // Restore auto-commit state
+      if (!wasSuppressed) {
+        this.setSuppressAutoCommit(false)
+      }
+    }
+
+    // Commit once after all operations
+    this.commitIfAuto()
+  }
+
+  /**
+   * Remove all entries from the record.
+   */
+  clear(): void {
+    const container = this.getContainer() as LoroMap
+    const keys = container.keys()
+
+    if (keys.length === 0) {
+      return // No-op on empty record
+    }
+
+    // Suppress auto-commit during batch operations
+    const wasSuppressed = this.isSuppressAutoCommit()
+    if (!wasSuppressed) {
+      this.setSuppressAutoCommit(true)
+    }
+
+    try {
+      // Delete all keys
+      for (const key of keys) {
+        container.delete(key)
+        this.refCache.delete(key)
+      }
+    } finally {
+      // Restore auto-commit state
+      if (!wasSuppressed) {
+        this.setSuppressAutoCommit(false)
+      }
+    }
+
+    // Commit once after all operations
+    this.commitIfAuto()
+  }
+
   /** Absorb mutated plain values back into Loro containers */
   absorbPlainValues(): void {
     absorbCachedPlainValues(this.refCache, () => this.getContainer() as LoroMap)

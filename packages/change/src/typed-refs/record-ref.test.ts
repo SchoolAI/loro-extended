@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
-import { createTypedDoc, Shape } from "../index.js"
+import { createTypedDoc, loro, Shape } from "../index.js"
 
 describe("Record Types", () => {
   describe("Shape.record (Container)", () => {
@@ -403,6 +403,527 @@ describe("Record Types", () => {
         const result = showTip !== false
         return result
       }).not.toThrow()
+    })
+  })
+
+  describe("RecordRef values() and entries() methods", () => {
+    it("should return properly typed values for value-shaped records", () => {
+      const schema = Shape.doc({
+        scores: Shape.record(Shape.plain.number()),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      change(doc, draft => {
+        draft.scores.alice = 100
+        draft.scores.bob = 50
+      })
+
+      const values = doc.scores.values()
+      expect(values).toEqual([100, 50])
+
+      // Type check: values should be number[]
+      const _typeCheck: number[] = values
+    })
+
+    it("should return properly typed entries for value-shaped records", () => {
+      const schema = Shape.doc({
+        scores: Shape.record(Shape.plain.number()),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      change(doc, draft => {
+        draft.scores.alice = 100
+        draft.scores.bob = 50
+      })
+
+      const entries = doc.scores.entries()
+      expect(entries).toEqual([
+        ["alice", 100],
+        ["bob", 50],
+      ])
+
+      // Type check: entries should be [string, number][]
+      const _typeCheck: [string, number][] = entries
+    })
+
+    it("should return properly typed refs for container-shaped records", () => {
+      const schema = Shape.doc({
+        players: Shape.record(
+          Shape.struct({
+            name: Shape.plain.string(),
+            score: Shape.plain.number(),
+          }),
+        ),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      change(doc, draft => {
+        draft.players.alice = { name: "Alice", score: 100 }
+        draft.players.bob = { name: "Bob", score: 50 }
+      })
+
+      const values = doc.players.values()
+      expect(values.length).toBe(2)
+      // Values should be StructRefs that we can access properties on
+      expect(values[0].name).toBe("Alice")
+      expect(values[0].score).toBe(100)
+      expect(values[1].name).toBe("Bob")
+      expect(values[1].score).toBe(50)
+    })
+
+    it("should return properly typed entries for container-shaped records", () => {
+      const schema = Shape.doc({
+        players: Shape.record(
+          Shape.struct({
+            name: Shape.plain.string(),
+            score: Shape.plain.number(),
+          }),
+        ),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      change(doc, draft => {
+        draft.players.alice = { name: "Alice", score: 100 }
+        draft.players.bob = { name: "Bob", score: 50 }
+      })
+
+      const entries = doc.players.entries()
+      expect(entries.length).toBe(2)
+      expect(entries[0][0]).toBe("alice")
+      expect(entries[0][1].name).toBe("Alice")
+      expect(entries[1][0]).toBe("bob")
+      expect(entries[1][1].name).toBe("Bob")
+    })
+
+    it("should return empty arrays for empty records", () => {
+      const schema = Shape.doc({
+        scores: Shape.record(Shape.plain.number()),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      expect(doc.scores.values()).toEqual([])
+      expect(doc.scores.entries()).toEqual([])
+    })
+  })
+
+  describe("RecordRef bulk update methods", () => {
+    describe("replace()", () => {
+      it("should clear all entries when replacing with empty object", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 100, bob: 50 })
+
+        change(doc, draft => {
+          draft.scores.replace({})
+        })
+
+        expect(doc.toJSON().scores).toEqual({})
+      })
+
+      it("should add new entries", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.replace({
+            alice: 100,
+            bob: 50,
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 100, bob: 50 })
+      })
+
+      it("should update existing entries", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+        })
+
+        change(doc, draft => {
+          draft.scores.replace({
+            alice: 200,
+            bob: 75,
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 200, bob: 75 })
+      })
+
+      it("should remove entries not in the new object", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+          draft.scores.charlie = 25
+        })
+
+        change(doc, draft => {
+          draft.scores.replace({
+            alice: 150,
+            // bob and charlie are removed
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 150 })
+      })
+
+      it("should handle nested struct values", () => {
+        const schema = Shape.doc({
+          players: Shape.record(
+            Shape.struct({
+              name: Shape.plain.string(),
+              score: Shape.plain.number(),
+            }),
+          ),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.players.replace({
+            alice: { name: "Alice", score: 100 },
+            bob: { name: "Bob", score: 50 },
+          })
+        })
+
+        expect(doc.toJSON().players).toEqual({
+          alice: { name: "Alice", score: 100 },
+          bob: { name: "Bob", score: 50 },
+        })
+      })
+
+      it("should batch all operations into a single commit", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+        })
+
+        // Track subscription calls
+        let subscriptionCount = 0
+        const unsub = loro(doc.scores).subscribe(() => {
+          subscriptionCount++
+        })
+
+        change(doc, draft => {
+          draft.scores.replace({
+            charlie: 75,
+            dave: 25,
+          })
+        })
+
+        // Should only have one subscription notification for the batched operation
+        expect(subscriptionCount).toBe(1)
+        unsub()
+      })
+    })
+
+    describe("merge()", () => {
+      it("should add new entries", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.merge({
+            alice: 100,
+            bob: 50,
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 100, bob: 50 })
+      })
+
+      it("should update existing entries", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+        })
+
+        change(doc, draft => {
+          draft.scores.merge({
+            alice: 200,
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({ alice: 200, bob: 50 })
+      })
+
+      it("should NOT remove entries not in the new object", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+        })
+
+        change(doc, draft => {
+          draft.scores.merge({
+            charlie: 75,
+          })
+        })
+
+        expect(doc.toJSON().scores).toEqual({
+          alice: 100,
+          bob: 50,
+          charlie: 75,
+        })
+      })
+
+      it("should handle nested struct values", () => {
+        const schema = Shape.doc({
+          players: Shape.record(
+            Shape.struct({
+              name: Shape.plain.string(),
+              score: Shape.plain.number(),
+            }),
+          ),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.players.alice = { name: "Alice", score: 100 }
+        })
+
+        change(doc, draft => {
+          draft.players.merge({
+            bob: { name: "Bob", score: 50 },
+          })
+        })
+
+        expect(doc.toJSON().players).toEqual({
+          alice: { name: "Alice", score: 100 },
+          bob: { name: "Bob", score: 50 },
+        })
+      })
+
+      it("should batch all operations into a single commit", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        // Track subscription calls
+        let subscriptionCount = 0
+        const unsub = loro(doc.scores).subscribe(() => {
+          subscriptionCount++
+        })
+
+        change(doc, draft => {
+          draft.scores.merge({
+            alice: 100,
+            bob: 50,
+            charlie: 25,
+          })
+        })
+
+        // Should only have one subscription notification for the batched operation
+        expect(subscriptionCount).toBe(1)
+        unsub()
+      })
+    })
+
+    describe("clear()", () => {
+      it("should remove all entries", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+          draft.scores.charlie = 25
+        })
+
+        expect(doc.toJSON().scores).toEqual({
+          alice: 100,
+          bob: 50,
+          charlie: 25,
+        })
+
+        change(doc, draft => {
+          draft.scores.clear()
+        })
+
+        expect(doc.toJSON().scores).toEqual({})
+      })
+
+      it("should be a no-op on empty record", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        expect(doc.toJSON().scores).toEqual({})
+
+        // Should not throw
+        change(doc, draft => {
+          draft.scores.clear()
+        })
+
+        expect(doc.toJSON().scores).toEqual({})
+      })
+
+      it("should batch all operations into a single commit", () => {
+        const schema = Shape.doc({
+          scores: Shape.record(Shape.plain.number()),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.scores.alice = 100
+          draft.scores.bob = 50
+          draft.scores.charlie = 25
+        })
+
+        // Track subscription calls
+        let subscriptionCount = 0
+        const unsub = loro(doc.scores).subscribe(() => {
+          subscriptionCount++
+        })
+
+        change(doc, draft => {
+          draft.scores.clear()
+        })
+
+        // Should only have one subscription notification for the batched operation
+        expect(subscriptionCount).toBe(1)
+        unsub()
+      })
+    })
+
+    describe("container-valued records", () => {
+      it("should work with replace() on record of structs", () => {
+        const schema = Shape.doc({
+          players: Shape.record(
+            Shape.struct({
+              name: Shape.plain.string(),
+              score: Shape.counter(),
+            }),
+          ),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.players.alice = { name: "Alice", score: 100 }
+          draft.players.bob = { name: "Bob", score: 50 }
+        })
+
+        change(doc, draft => {
+          draft.players.replace({
+            charlie: { name: "Charlie", score: 75 },
+          })
+        })
+
+        expect(doc.toJSON().players).toEqual({
+          charlie: { name: "Charlie", score: 75 },
+        })
+      })
+
+      it("should work with merge() on record of structs", () => {
+        const schema = Shape.doc({
+          players: Shape.record(
+            Shape.struct({
+              name: Shape.plain.string(),
+              score: Shape.counter(),
+            }),
+          ),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.players.alice = { name: "Alice", score: 100 }
+        })
+
+        change(doc, draft => {
+          draft.players.merge({
+            bob: { name: "Bob", score: 50 },
+          })
+        })
+
+        expect(doc.toJSON().players).toEqual({
+          alice: { name: "Alice", score: 100 },
+          bob: { name: "Bob", score: 50 },
+        })
+      })
+
+      it("should work with clear() on record of structs", () => {
+        const schema = Shape.doc({
+          players: Shape.record(
+            Shape.struct({
+              name: Shape.plain.string(),
+              score: Shape.counter(),
+            }),
+          ),
+        })
+
+        const doc = createTypedDoc(schema)
+
+        change(doc, draft => {
+          draft.players.alice = { name: "Alice", score: 100 }
+          draft.players.bob = { name: "Bob", score: 50 }
+        })
+
+        change(doc, draft => {
+          draft.players.clear()
+        })
+
+        expect(doc.toJSON().players).toEqual({})
+      })
     })
   })
 })
