@@ -18,15 +18,15 @@ LEA and TEA share a similar fundamental structure. The key insights are:
 ### The Core Architecture
 
 ```typescript
-type Program<S, Msg> = {
-  doc: TypedDoc<S>;
-  state: (frontier: Frontiers) => Infer<S>;
+type Program<Schema, Msg> = {
+  doc: TypedDoc<Schema>;
+  state: (frontier: Frontiers) => Infer<Schema>;
   update: (frontier: Frontiers, msg: Msg) => Frontiers;
-  reactors: Reactor<Infer<S>, Msg>[];
+  reactors: Reactor<Infer<Schema>, Msg>[];
 };
 
-type Reactor<S, Msg> = (
-  transition: { before: S; after: S },
+type Reactor<State, Msg> = (
+  transition: { before: State; after: State },
   dispatch: (msg: Msg) => void,
 ) => void | UI | Promise<void>;
 ```
@@ -36,7 +36,7 @@ That's it. **Doc, State, Update, Reactors.** Four concepts that handle everythin
 | Component    | Type                                             | Purpose                            |
 | ------------ | ------------------------------------------------ | ---------------------------------- |
 | **Doc**      | `TypedDoc<Schema>`                               | The CRDT document (shared state)   |
-| **State**    | `(frontier) → S`                                 | Derive state from history          |
+| **State**    | `(frontier) → State`                             | Derive state from history          |
 | **Update**   | `(frontier, msg) → Frontier'`                    | Apply message, return new frontier |
 | **Reactors** | `(transition, dispatch) → void \| UI \| Promise` | React to transitions               |
 
@@ -69,8 +69,8 @@ Where:
 The key insight that simplifies LEA: views, subscriptions, and effects are all **reactors**--functions that receive state transitions and can dispatch messages.
 
 ```typescript
-type Reactor<S, Msg> = (
-  transition: { before: S; after: S },
+type Reactor<State, Msg> = (
+  transition: { before: State; after: State },
   dispatch: (msg: Msg) => void,
 ) => void | UI | Promise<void>;
 ```
@@ -402,8 +402,8 @@ const update = createUpdate<typeof TimerSchema, TimerMsg>(
 Reactors respond to state transitions. They unify views, subscriptions, and effects:
 
 ```typescript
-type Reactor<S, Msg> = (
-  transition: { before: S; after: S },
+type Reactor<State, Msg> = (
+  transition: { before: State; after: State },
   dispatch: (msg: Msg) => void,
 ) => void | UI | Promise<void>;
 ```
@@ -605,6 +605,160 @@ LEA's purity is preserved because:
 - LEA only cares about **reactor invocation** (pure function of transition)
 
 External writes just create new frontiers. LEA handles them like any other state change. The only invariant LEA requires is that the document history is append-only and causally consistent--which Loro enforces.
+
+## Stability Markers: Solving the Atomicity Problem
+
+### The Problem
+
+LEA reactors detect state transitions via `{before, after}`. This works perfectly when state changes atomically. But in distributed systems, a "logical unit" of state may arrive in fragments:
+
+- **Chunked data** from a streaming API (e.g., AI responses arriving token by token)
+- **Contributions from multiple peers** (e.g., all participants submitting their parts)
+- **Multi-step operations** that can't be batched into a single commit
+
+The reactor sees each fragment as a separate transition, but the application needs to react to the **complete logical unit**, not the fragments.
+
+### The Insight
+
+**Writers know when a logical unit is complete. Reactors don't.**
+
+The student knows when they've finished typing. The server knows when the AI has produced all its output. Each peer knows when their contribution is done. This knowledge exists at the point of writing—it just needs to be captured.
+
+### The Solution
+
+Writers explicitly mark semantic completeness in the document:
+
+```typescript
+const Schema = Shape.doc({
+  // The data itself (arrives in chunks from streaming API)
+  aiFeedback: Shape.struct({
+    score: Shape.plain.number().nullable(),
+    explanation: Shape.plain.string().nullable(),  // Streams in token by token
+    suggestions: Shape.list(Shape.plain.string()),
+  }),
+
+  // Stability marker (writer sets when ALL chunks have arrived)
+  stability: Shape.struct({
+    aiFeedbackComplete: Shape.plain.boolean(),
+  }),
+});
+```
+
+**Server writes chunks as they stream in, marks complete only at the end:**
+
+```typescript
+// Called repeatedly as tokens stream from the AI
+function appendExplanationChunk(doc: TypedDoc, chunk: string) {
+  doc.change((draft) => {
+    draft.aiFeedback.explanation = (draft.aiFeedback.explanation ?? "") + chunk;
+    // NOT setting aiFeedbackComplete - more chunks coming
+  });
+}
+
+// Called once when the AI finishes
+function finalizeAIFeedback(doc: TypedDoc, score: number, suggestions: string[]) {
+  doc.change((draft) => {
+    draft.aiFeedback.score = score;
+    draft.aiFeedback.suggestions = suggestions;
+    draft.stability.aiFeedbackComplete = true;  // ← NOW it's complete
+  });
+}
+```
+
+**Without the stability marker**, a reactor has no reliable way to know when feedback is complete:
+
+```typescript
+// PROBLEM: When should this fire?
+const problematicReactor: Reactor<State, Msg> = ({ before, after }, dispatch) => {
+  // Option A: Fire when explanation first appears?
+  // → Fires on first token, before score/suggestions exist
+  if (!before.aiFeedback.explanation && after.aiFeedback.explanation) { ... }
+
+  // Option B: Fire when explanation changes?
+  // → Fires on EVERY chunk
+  if (before.aiFeedback.explanation !== after.aiFeedback.explanation) { ... }
+
+  // Option C: Fire when all fields are non-null?
+  // → What if suggestions is intentionally empty? What if score arrives before explanation finishes?
+  if (after.aiFeedback.score && after.aiFeedback.explanation && after.aiFeedback.suggestions.length) { ... }
+};
+```
+
+**With the stability marker**, the reactor fires exactly once when the writer signals completion:
+
+```typescript
+// GOOD: Fires once when writer marks complete
+const feedbackReactor: Reactor<State, Msg> = ({ before, after }, dispatch) => {
+  if (!before.stability.aiFeedbackComplete && after.stability.aiFeedbackComplete) {
+    // Fires exactly once, after ALL chunks have arrived
+    dispatch({
+      type: "PROCESS_FEEDBACK",
+      score: after.aiFeedback.score,
+      explanation: after.aiFeedback.explanation,
+    });
+  }
+};
+```
+
+### Multi-Peer Coordination Without a Coordinator
+
+For scenarios where multiple peers contribute parts, each peer marks their own contribution as complete. The reactor computes aggregate stability:
+
+```typescript
+const Schema = Shape.doc({
+  expectedPeers: Shape.list(Shape.plain.string()),
+  contributions: Shape.record(
+    Shape.struct({
+      content: Shape.plain.string(),
+      complete: Shape.plain.boolean(), // ← Per-peer stability marker
+    }),
+  ),
+});
+
+// Each peer marks their own contribution
+function contribute(doc: TypedDoc, peerId: string, content: string) {
+  doc.change((draft) => {
+    draft.contributions[peerId] = { content, complete: true };
+  });
+}
+
+// Reactor computes aggregate stability from individual markers
+const allContributionsReactor: Reactor<State, Msg> = ({ before, after }, dispatch) => {
+  const wasComplete = before.expectedPeers.every(
+    (p) => before.contributions[p]?.complete,
+  );
+  const isComplete = after.expectedPeers.every(
+    (p) => after.contributions[p]?.complete,
+  );
+
+  if (!wasComplete && isComplete) {
+    dispatch({ type: "ALL_CONTRIBUTIONS_RECEIVED" });
+  }
+};
+```
+
+No coordinator is needed—each peer marks their part, and the reactor detects when all parts are present.
+
+### Why This Is Elegant
+
+1. **No new concepts** — Stability markers are just state. The document remains the single source of truth.
+
+2. **Reactors stay pure** — No hidden state, no history queries, no complex projections. Just `before`/`after`.
+
+3. **Writers own semantics** — The entity that knows when something is "done" is the one that marks it done.
+
+4. **Idempotent by construction** — A `false→true` transition fires exactly once, regardless of how many fragments preceded it.
+
+5. **Computed stability** — For multi-peer scenarios, individual markers can be aggregated without central coordination.
+
+### The Pattern
+
+```
+Writers mark completion    →    Document holds markers    →    Reactors detect edges
+     (semantic)                      (state)                      (syntactic)
+```
+
+**Stability markers transform the semantic question "is this logically complete?" into a syntactic question "did this boolean change from false to true?"**
 
 ## State Machines with Discriminated Unions
 
@@ -1572,6 +1726,7 @@ The key insights:
 - **Effects are State** - Writing to the CRDT _is_ the effect mechanism
 - **The Document is the I/O Boundary** - Both LEA and external systems read/write here
 - **The Frontier of Now** - Effects only happen at the edge of now, but understanding can reach into the past
+- **Stability Markers** - Writers mark semantic completeness; reactors detect edges on markers
 - **Orthogonal State Spaces** - App state (shared) and view state (per-peer) are separate documents
 - **Cross-Doc Reactors** - Programs coordinate by reacting to each other's state transitions
 
@@ -1581,5 +1736,5 @@ The key insights:
 
 ```
 Version: 3.1
-Published: 2026-01-23
+Published: 2026-01-24
 ```
