@@ -5,6 +5,7 @@ import type { ViewDispatch } from "../browser-history-reactor.js"
 // Settings Page
 // ═══════════════════════════════════════════════════════════════════════════
 // Per-peer preferences (theme, sound, etc.)
+// Time Travel UI is provided by PageLayout wrapper.
 
 export interface SettingsPageProps {
   viewDispatch: ViewDispatch

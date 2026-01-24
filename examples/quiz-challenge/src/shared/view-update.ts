@@ -14,27 +14,41 @@ import type { Route, ViewDocSchema } from "./view-schema.js"
 // 1. Update the current route's scrollY (so undo restores scroll position)
 // 2. Replace the route with the new route
 // This ensures UndoManager captures both operations for proper undo/redo.
+//
+// The view update uses a factory pattern: createViewUpdate(getAppFrontier)
+// This allows the dispatch layer to provide the appFrontier getter, which
+// is called when processing NAVIGATE/REPLACE_ROUTE messages.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // View Update Factory
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
-  (doc, msg, _timestamp) => {
+/**
+ * Create a view update function with the given appFrontier getter.
+ * The getAppFrontier function is called when processing navigation messages
+ * to capture the current App Doc frontier.
+ */
+export function createViewUpdate(getAppFrontier: () => string) {
+  return createUpdate<typeof ViewDocSchema, ViewMsg>((doc, msg, _timestamp) => {
     switch (msg.type) {
       // ═══════════════════════════════════════════════════════════════════════
       // NAVIGATE: Go to a new route (creates undo step for back/forward)
       // ═══════════════════════════════════════════════════════════════════════
       case "NAVIGATE": {
+        // Capture appFrontier at dispatch time
+        const appFrontier = getAppFrontier()
+
         // Step 1: Save scroll position to current route before leaving
         // This ensures undo restores both the route AND scroll position
         change(doc, draft => {
           ;(draft.navigation.route as Route).scrollY = msg.currentScrollY
         })
 
-        // Step 2: Navigate to new route with scrollY: 0
+        // Step 2: Apply the RouteBuilder with captured appFrontier
+        // scrollY=0 for new routes (we're starting fresh)
+        const newRoute = msg.route(appFrontier, 0)
         change(doc, draft => {
-          draft.navigation.route = msg.route
+          draft.navigation.route = newRoute
         })
         break
       }
@@ -44,8 +58,14 @@ export const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
       // Used for URL sync, redirects, and initial route setup
       // ═══════════════════════════════════════════════════════════════════════
       case "REPLACE_ROUTE": {
+        // Capture appFrontier at dispatch time
+        const appFrontier = getAppFrontier()
+
+        // Apply the RouteBuilder with captured appFrontier
+        // scrollY=0 for replaced routes
+        const newRoute = msg.route(appFrontier, 0)
         change(doc, draft => {
-          draft.navigation.route = msg.route
+          draft.navigation.route = newRoute
         })
         break
       }
@@ -161,8 +181,16 @@ export const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
         break
       }
     }
-  },
-)
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Default viewUpdate for backwards compatibility
+// ═══════════════════════════════════════════════════════════════════════════
+// This uses an empty string as the default appFrontier.
+// For proper appFrontier capture, use createViewUpdate(getAppFrontier) instead.
+
+export const viewUpdate = createViewUpdate(() => "")
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Wrapper function for explicit doc parameter

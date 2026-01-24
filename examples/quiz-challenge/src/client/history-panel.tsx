@@ -217,7 +217,7 @@ export function HistoryPanel({
   return (
     <div className="history-panel">
       <div className="history-panel-header">
-        <h3>📜 State History</h3>
+        <h3>⏱️ Time Travel</h3>
         <button
           type="button"
           className="history-close-btn"

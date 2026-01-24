@@ -1,4 +1,4 @@
-import type { Route } from "./view-schema.js"
+import { type Route, UNKNOWN_FRONTIER } from "./view-schema.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LEA 3.0 Quiz Challenge - URL ↔ Route Mapping
@@ -8,6 +8,10 @@ import type { Route } from "./view-schema.js"
 // - Deep linking (share a URL, land on the right page)
 // - Browser history integration (back/forward buttons)
 // - SEO-friendly URLs (with SSR)
+//
+// Note: appFrontier is NOT stored in URLs. When parsing a URL, we use
+// UNKNOWN_FRONTIER as a placeholder. The app should update the appFrontier
+// to the current frontier after initial route parsing.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Route → URL (for browser address bar)
@@ -83,31 +87,42 @@ export function urlToRoute(url: string): Route {
       quizId,
       viewingQuestionIndex: null,
       scrollY: 0,
+      appFrontier: UNKNOWN_FRONTIER,
     }
   }
 
   // Home page
   if (pathname === "/" || pathname === "") {
-    return { type: "home", scrollY: 0 }
+    return { type: "home", scrollY: 0, appFrontier: UNKNOWN_FRONTIER }
   }
 
   // Settings page
   if (pathname === "/settings") {
-    return { type: "settings", scrollY: 0 }
+    return { type: "settings", scrollY: 0, appFrontier: UNKNOWN_FRONTIER }
   }
 
   // Quiz results page: /quiz/:quizId/results
   const resultsMatch = pathname.match(/^\/quiz\/([^/]+)\/results$/)
   if (resultsMatch) {
     const quizId = decodeURIComponent(resultsMatch[1] ?? "")
-    return { type: "results", quizId, scrollY: 0 }
+    return {
+      type: "results",
+      quizId,
+      scrollY: 0,
+      appFrontier: UNKNOWN_FRONTIER,
+    }
   }
 
   // Quiz history page: /quiz/:quizId/history
   const historyMatch = pathname.match(/^\/quiz\/([^/]+)\/history$/)
   if (historyMatch) {
     const quizId = decodeURIComponent(historyMatch[1] ?? "")
-    return { type: "history", quizId, scrollY: 0 }
+    return {
+      type: "history",
+      quizId,
+      scrollY: 0,
+      appFrontier: UNKNOWN_FRONTIER,
+    }
   }
 
   // Quiz page: /quiz/:quizId
@@ -119,12 +134,13 @@ export function urlToRoute(url: string): Route {
       quizId,
       viewingQuestionIndex: null, // Always start in live mode
       scrollY: 0,
+      appFrontier: UNKNOWN_FRONTIER,
     }
   }
 
   // Unknown route - go home
   // In a production app, you might want a "not found" route
-  return { type: "home", scrollY: 0 }
+  return { type: "home", scrollY: 0, appFrontier: UNKNOWN_FRONTIER }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

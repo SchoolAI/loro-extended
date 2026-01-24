@@ -1,4 +1,4 @@
-import type { Route } from "./view-schema.js"
+import type { RouteBuilder } from "./view-schema.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LEA 3.0 Quiz Challenge - View Messages
@@ -13,6 +13,10 @@ import type { Route } from "./view-schema.js"
 //
 // Note: Back/forward navigation is handled by Loro's UndoManager, not messages.
 // The browser history reactor calls undoManager.undo()/redo() directly.
+//
+// Navigation messages use RouteBuilder instead of Route. The RouteBuilder
+// captures route-specific info (what page, what entity), while the dispatch
+// layer captures view info (appFrontier, scrollY) automatically.
 
 export type ViewMsg =
   // ═══════════════════════════════════════════════════════════════════════════
@@ -20,11 +24,13 @@ export type ViewMsg =
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Navigate to a new route (creates an undo step)
-  // currentScrollY captures the scroll position before leaving the current route
-  | { type: "NAVIGATE"; route: Route; currentScrollY: number }
+  // RouteBuilder describes "where to go" - the dispatch layer captures appFrontier
+  // currentScrollY is the scroll position to save to the CURRENT route before navigating
+  | { type: "NAVIGATE"; route: RouteBuilder; currentScrollY: number }
 
   // Replace current route without creating an undo step (for redirects, URL sync)
-  | { type: "REPLACE_ROUTE"; route: Route }
+  // RouteBuilder describes "where to go" - the dispatch layer captures appFrontier
+  | { type: "REPLACE_ROUTE"; route: RouteBuilder }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Question Review Mode Messages

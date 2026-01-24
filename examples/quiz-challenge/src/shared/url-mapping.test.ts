@@ -10,6 +10,7 @@ import {
   historyRoute,
   homeRoute,
   quizRoute,
+  type Route,
   resultsRoute,
   settingsRoute,
 } from "./view-schema.js"
@@ -17,34 +18,47 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // URL Mapping Tests
 // ═══════════════════════════════════════════════════════════════════════════
+// Note: Route helper functions are now RouteBuilders that return functions.
+// To get a Route, call the builder with (appFrontier, scrollY).
+// For tests, we use a test frontier and default scrollY of 0.
+
+const TEST_FRONTIER = "test-frontier"
+
+// Helper to convert RouteBuilder to Route for testing
+const toRoute = (builder: ReturnType<typeof homeRoute>): Route =>
+  builder(TEST_FRONTIER, 0)
 
 describe("routeToUrl", () => {
   it("converts home route to /", () => {
-    expect(routeToUrl(homeRoute())).toBe("/")
+    expect(routeToUrl(toRoute(homeRoute()))).toBe("/")
   })
 
   it("converts quiz route to /quiz/:quizId", () => {
-    expect(routeToUrl(quizRoute("my-quiz"))).toBe("/quiz/my-quiz")
+    expect(routeToUrl(toRoute(quizRoute("my-quiz")))).toBe("/quiz/my-quiz")
   })
 
   it("converts quiz route with review mode (ignores viewingQuestionIndex)", () => {
-    expect(routeToUrl(quizRoute("my-quiz", 2))).toBe("/quiz/my-quiz")
+    expect(routeToUrl(toRoute(quizRoute("my-quiz", 2)))).toBe("/quiz/my-quiz")
   })
 
   it("converts results route to /quiz/:quizId/results", () => {
-    expect(routeToUrl(resultsRoute("my-quiz"))).toBe("/quiz/my-quiz/results")
+    expect(routeToUrl(toRoute(resultsRoute("my-quiz")))).toBe(
+      "/quiz/my-quiz/results",
+    )
   })
 
   it("converts settings route to /settings", () => {
-    expect(routeToUrl(settingsRoute())).toBe("/settings")
+    expect(routeToUrl(toRoute(settingsRoute()))).toBe("/settings")
   })
 
   it("converts history route to /quiz/:quizId/history", () => {
-    expect(routeToUrl(historyRoute("my-quiz"))).toBe("/quiz/my-quiz/history")
+    expect(routeToUrl(toRoute(historyRoute("my-quiz")))).toBe(
+      "/quiz/my-quiz/history",
+    )
   })
 
   it("encodes special characters in quizId", () => {
-    expect(routeToUrl(quizRoute("quiz with spaces"))).toBe(
+    expect(routeToUrl(toRoute(quizRoute("quiz with spaces")))).toBe(
       "/quiz/quiz%20with%20spaces",
     )
   })
@@ -119,62 +133,82 @@ describe("urlToRoute", () => {
 
 describe("routesHaveSameUrl", () => {
   it("returns true for same routes", () => {
-    expect(routesHaveSameUrl(quizRoute("quiz-1"), quizRoute("quiz-1"))).toBe(
-      true,
-    )
+    expect(
+      routesHaveSameUrl(
+        toRoute(quizRoute("quiz-1")),
+        toRoute(quizRoute("quiz-1")),
+      ),
+    ).toBe(true)
   })
 
   it("returns true for quiz routes with different viewingQuestionIndex", () => {
     // viewingQuestionIndex is not reflected in URL
     expect(
-      routesHaveSameUrl(quizRoute("quiz-1", 0), quizRoute("quiz-1", 2)),
+      routesHaveSameUrl(
+        toRoute(quizRoute("quiz-1", 0)),
+        toRoute(quizRoute("quiz-1", 2)),
+      ),
     ).toBe(true)
   })
 
   it("returns false for different quiz IDs", () => {
-    expect(routesHaveSameUrl(quizRoute("quiz-1"), quizRoute("quiz-2"))).toBe(
-      false,
-    )
+    expect(
+      routesHaveSameUrl(
+        toRoute(quizRoute("quiz-1")),
+        toRoute(quizRoute("quiz-2")),
+      ),
+    ).toBe(false)
   })
 })
 
 describe("routesAreEqual", () => {
   it("returns true for identical routes", () => {
-    expect(routesAreEqual(quizRoute("quiz-1"), quizRoute("quiz-1"))).toBe(true)
+    expect(
+      routesAreEqual(
+        toRoute(quizRoute("quiz-1")),
+        toRoute(quizRoute("quiz-1")),
+      ),
+    ).toBe(true)
   })
 
   it("returns false for different viewingQuestionIndex", () => {
-    expect(routesAreEqual(quizRoute("quiz-1", 0), quizRoute("quiz-1", 2))).toBe(
-      false,
-    )
+    expect(
+      routesAreEqual(
+        toRoute(quizRoute("quiz-1", 0)),
+        toRoute(quizRoute("quiz-1", 2)),
+      ),
+    ).toBe(false)
   })
 
   it("returns false for different route types", () => {
-    expect(routesAreEqual(quizRoute("quiz-1"), resultsRoute("quiz-1"))).toBe(
-      false,
-    )
+    expect(
+      routesAreEqual(
+        toRoute(quizRoute("quiz-1")),
+        toRoute(resultsRoute("quiz-1")),
+      ),
+    ).toBe(false)
   })
 })
 
 describe("getQuizIdFromRoute", () => {
   it("returns quizId for quiz route", () => {
-    expect(getQuizIdFromRoute(quizRoute("my-quiz"))).toBe("my-quiz")
+    expect(getQuizIdFromRoute(toRoute(quizRoute("my-quiz")))).toBe("my-quiz")
   })
 
   it("returns quizId for results route", () => {
-    expect(getQuizIdFromRoute(resultsRoute("my-quiz"))).toBe("my-quiz")
+    expect(getQuizIdFromRoute(toRoute(resultsRoute("my-quiz")))).toBe("my-quiz")
   })
 
   it("returns quizId for history route", () => {
-    expect(getQuizIdFromRoute(historyRoute("my-quiz"))).toBe("my-quiz")
+    expect(getQuizIdFromRoute(toRoute(historyRoute("my-quiz")))).toBe("my-quiz")
   })
 
   it("returns null for home route", () => {
-    expect(getQuizIdFromRoute(homeRoute())).toBe(null)
+    expect(getQuizIdFromRoute(toRoute(homeRoute()))).toBe(null)
   })
 
   it("returns null for settings route", () => {
-    expect(getQuizIdFromRoute(settingsRoute())).toBe(null)
+    expect(getQuizIdFromRoute(toRoute(settingsRoute()))).toBe(null)
   })
 })
 
@@ -190,34 +224,35 @@ describe("urlToRoute scrollY", () => {
 
 describe("routesAreEqual with scrollY", () => {
   it("returns false for same route with different scrollY", () => {
-    expect(routesAreEqual(homeRoute(0), homeRoute(100))).toBe(false)
-    expect(
-      routesAreEqual(
-        quizRoute("quiz-1", null, 0),
-        quizRoute("quiz-1", null, 50),
-      ),
-    ).toBe(false)
+    // Create routes with different scrollY values
+    const homeRoute0 = homeRoute()(TEST_FRONTIER, 0)
+    const homeRoute100 = homeRoute()(TEST_FRONTIER, 100)
+    expect(routesAreEqual(homeRoute0, homeRoute100)).toBe(false)
+
+    const quizRoute0 = quizRoute("quiz-1")(TEST_FRONTIER, 0)
+    const quizRoute50 = quizRoute("quiz-1")(TEST_FRONTIER, 50)
+    expect(routesAreEqual(quizRoute0, quizRoute50)).toBe(false)
   })
 
   it("returns true for same route with same scrollY", () => {
-    expect(routesAreEqual(homeRoute(100), homeRoute(100))).toBe(true)
-    expect(
-      routesAreEqual(
-        quizRoute("quiz-1", null, 50),
-        quizRoute("quiz-1", null, 50),
-      ),
-    ).toBe(true)
+    const homeRoute100a = homeRoute()(TEST_FRONTIER, 100)
+    const homeRoute100b = homeRoute()(TEST_FRONTIER, 100)
+    expect(routesAreEqual(homeRoute100a, homeRoute100b)).toBe(true)
+
+    const quizRoute50a = quizRoute("quiz-1")(TEST_FRONTIER, 50)
+    const quizRoute50b = quizRoute("quiz-1")(TEST_FRONTIER, 50)
+    expect(routesAreEqual(quizRoute50a, quizRoute50b)).toBe(true)
   })
 })
 
 describe("routesHaveSameUrl ignores scrollY", () => {
   it("returns true for same route with different scrollY", () => {
-    expect(routesHaveSameUrl(homeRoute(0), homeRoute(100))).toBe(true)
-    expect(
-      routesHaveSameUrl(
-        quizRoute("quiz-1", null, 0),
-        quizRoute("quiz-1", null, 50),
-      ),
-    ).toBe(true)
+    const homeRoute0 = homeRoute()(TEST_FRONTIER, 0)
+    const homeRoute100 = homeRoute()(TEST_FRONTIER, 100)
+    expect(routesHaveSameUrl(homeRoute0, homeRoute100)).toBe(true)
+
+    const quizRoute0 = quizRoute("quiz-1")(TEST_FRONTIER, 0)
+    const quizRoute50 = quizRoute("quiz-1")(TEST_FRONTIER, 50)
+    expect(routesHaveSameUrl(quizRoute0, quizRoute50)).toBe(true)
   })
 })

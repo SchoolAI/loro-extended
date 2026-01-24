@@ -5,6 +5,7 @@ import type { ViewDispatch } from "../browser-history-reactor.js"
 // Home Page
 // ═══════════════════════════════════════════════════════════════════════════
 // Landing page with option to start a quiz.
+// Time Travel UI is provided by PageLayout wrapper.
 
 export interface HomePageProps {
   viewDispatch: ViewDispatch
@@ -37,7 +38,7 @@ export function HomePage({ viewDispatch }: HomePageProps) {
           <p>Collaborate with others in real-time</p>
         </div>
         <div className="feature-card">
-          <span className="feature-icon">📜</span>
+          <span className="feature-icon">⏱️</span>
           <h3>Time Travel</h3>
           <p>View and restore any historical state</p>
         </div>

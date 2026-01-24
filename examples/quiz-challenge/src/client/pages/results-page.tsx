@@ -8,6 +8,7 @@ import type { ViewDispatch } from "../browser-history-reactor.js"
 // Results Page
 // ═══════════════════════════════════════════════════════════════════════════
 // Shows quiz results after completion.
+// Time Travel UI is provided by PageLayout wrapper.
 
 export interface ResultsPageProps {
   quizId: string

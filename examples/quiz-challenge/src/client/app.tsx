@@ -5,18 +5,22 @@ import {
 import { change, createTypedDoc, loro } from "@loro-extended/change"
 import { RepoProvider, useDoc, useHandle } from "@loro-extended/react"
 import { UndoManager } from "loro-crdt"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { getHistoryDocId, HistoryDocSchema } from "../shared/history-schema.js"
 import { QuizDocSchema } from "../shared/schema.js"
 import { urlToRoute } from "../shared/url-mapping.js"
 import {
+  homeRoute,
   quizRoute,
   type Route,
+  resultsRoute,
+  serializeFrontier,
+  settingsRoute,
   type ViewDoc,
   ViewDocSchema,
 } from "../shared/view-schema.js"
-import { viewUpdate } from "../shared/view-update.js"
+import { createViewUpdate } from "../shared/view-update.js"
 import {
   createBrowserHistoryReactor,
   type ViewDispatch,
@@ -66,8 +70,9 @@ function ConnectionBar({ state }: { state: ConnectionState }) {
 // View Doc Hook
 // ═══════════════════════════════════════════════════════════════════════════
 // Creates and manages the View Doc (local-only, not synced)
+// Takes getAppFrontier so the viewUpdate can capture the frontier at dispatch time
 
-function useViewDoc() {
+function useViewDoc(getAppFrontier: () => string) {
   // Create View Doc once (local-only, not synced to server)
   const viewDocRef = useRef<ReturnType<
     typeof createTypedDoc<typeof ViewDocSchema>
@@ -100,12 +105,19 @@ function useViewDoc() {
   // Track route state for re-renders
   const [route, setRoute] = useState<Route>(() => viewDoc.navigation.route)
 
+  // Create viewUpdate with the getAppFrontier getter
+  // This is memoized so it doesn't recreate on every render
+  const viewUpdate = useMemo(
+    () => createViewUpdate(getAppFrontier),
+    [getAppFrontier],
+  )
+
   // Create viewDispatch function
   const viewDispatch: ViewDispatch = useCallback(
     msg => {
       viewUpdate(viewDoc, loro(viewDoc).doc.frontiers(), msg)
     },
-    [viewDoc],
+    [viewDoc, viewUpdate],
   )
 
   // Create browser history reactor
@@ -164,8 +176,15 @@ function App() {
   // History document - separate from app document, NEVER checked out
   const historyHandle = useHandle(getHistoryDocId(docId), HistoryDocSchema)
 
+  // Helper to get current app frontier as serialized string
+  // Defined early so it can be passed to useViewDoc
+  const getAppFrontier = useCallback(() => {
+    return serializeFrontier(loro(appHandle.doc).doc.frontiers())
+  }, [appHandle])
+
   // View Doc for routing (local-only)
-  const { route, viewDispatch } = useViewDoc()
+  // Pass getAppFrontier so viewUpdate can capture frontier at dispatch time
+  const { route, viewDispatch } = useViewDoc(getAppFrontier)
 
   // Connection status
   const [connectionState, setConnectionState] =
@@ -205,9 +224,11 @@ function App() {
     if (prevStatus !== "complete" && currentStatus === "complete") {
       // Only navigate if we're on the quiz page
       if (route.type === "quiz") {
+        // RouteBuilder pattern: just specify "where to go"
+        // The dispatch layer captures appFrontier automatically
         viewDispatch({
           type: "NAVIGATE",
-          route: { type: "results", quizId: route.quizId, scrollY: 0 },
+          route: resultsRoute(route.quizId),
           currentScrollY: window.scrollY,
         })
       }
@@ -216,6 +237,7 @@ function App() {
     // Quiz just started - navigate to quiz if on home
     if (prevStatus === "idle" && currentStatus === "answering") {
       if (route.type === "home") {
+        // RouteBuilder pattern: just specify "where to go"
         viewDispatch({
           type: "NAVIGATE",
           route: quizRoute(docId),
@@ -237,39 +259,42 @@ function App() {
           <button
             type="button"
             className={`nav-link ${route.type === "home" ? "active" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              // RouteBuilder pattern: just specify "where to go"
               viewDispatch({
                 type: "NAVIGATE",
-                route: { type: "home", scrollY: 0 },
+                route: homeRoute(),
                 currentScrollY: window.scrollY,
               })
-            }
+            }}
           >
             Home
           </button>
           <button
             type="button"
             className={`nav-link ${route.type === "quiz" ? "active" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              // RouteBuilder pattern: just specify "where to go"
               viewDispatch({
                 type: "NAVIGATE",
                 route: quizRoute(docId),
                 currentScrollY: window.scrollY,
               })
-            }
+            }}
           >
             Quiz
           </button>
           <button
             type="button"
             className={`nav-link ${route.type === "settings" ? "active" : ""}`}
-            onClick={() =>
+            onClick={() => {
+              // RouteBuilder pattern: just specify "where to go"
               viewDispatch({
                 type: "NAVIGATE",
-                route: { type: "settings", scrollY: 0 },
+                route: settingsRoute(),
                 currentScrollY: window.scrollY,
               })
-            }
+            }}
           >
             Settings
           </button>

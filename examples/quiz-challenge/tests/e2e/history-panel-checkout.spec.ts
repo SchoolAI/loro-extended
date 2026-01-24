@@ -35,7 +35,7 @@ test.describe("History Panel Checkout", () => {
     await page.waitForTimeout(500)
 
     // Now we have some history. Open the history panel.
-    await page.click('button:has-text("📜 History")')
+    await page.click('button:has-text("⏱️ Time Travel")')
 
     // Wait for history panel to be visible
     await page.waitForSelector(".history-panel", { timeout: 5000 })
@@ -95,7 +95,7 @@ test.describe("History Panel Checkout", () => {
     await page.waitForTimeout(500)
 
     // Open history panel
-    await page.click('button:has-text("📜 History")')
+    await page.click('button:has-text("⏱️ Time Travel")')
     await page.waitForSelector(".history-panel", { timeout: 5000 })
 
     // Find the "Selected Option" entry
@@ -149,7 +149,7 @@ test.describe("History Panel Checkout", () => {
     await page.waitForTimeout(500)
 
     // Open history panel and restore to earlier state
-    await page.click('button:has-text("📜 History")')
+    await page.click('button:has-text("⏱️ Time Travel")')
     await page.waitForSelector(".history-panel", { timeout: 5000 })
 
     const startedQuizEntry = page.locator(
@@ -188,7 +188,7 @@ test.describe("History Panel Checkout", () => {
     await page.waitForTimeout(500)
 
     // Open history panel
-    await page.click('button:has-text("📜 History")')
+    await page.click('button:has-text("⏱️ Time Travel")')
     await page.waitForSelector(".history-panel", { timeout: 5000 })
 
     // Click restore on "Started Quiz" entry

@@ -5,7 +5,7 @@ import {
   urlToRoute,
 } from "../shared/url-mapping.js"
 import type { ViewMsg } from "../shared/view-messages.js"
-import type { ViewDoc } from "../shared/view-schema.js"
+import { routeToBuilder, type ViewDoc } from "../shared/view-schema.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LEA 3.0 Quiz Challenge - Browser History Reactor
@@ -19,6 +19,11 @@ import type { ViewDoc } from "../shared/view-schema.js"
 //
 // Key insight: Browser back/forward is conceptually equivalent to undo/redo
 // of navigation operations. The UndoManager handles the state restoration.
+//
+// App Frontier Coordination:
+// Each route stores the App Doc frontier at navigation time. This enables
+// coordinated time travel: when viewing a historical view state, we can
+// also restore the corresponding app state.
 
 /**
  * View Doc transition type for reactors
@@ -160,18 +165,29 @@ export function createBrowserHistoryReactor(
  * Initialize the View Doc route from the current browser URL.
  * Call this once at app startup to sync initial state.
  *
+ * Note: With the RouteBuilder pattern, this function wraps the URL-parsed route
+ * in a RouteBuilder. The dispatch layer will call the builder with the current
+ * appFrontier, but since routeToBuilder ignores the parameters, the route's
+ * existing appFrontier (from URL parsing) is preserved.
+ *
  * @param dispatch The View Doc dispatch function
  */
 export function initializeRouteFromUrl(dispatch: ViewDispatch): void {
   const route = urlToRoute(window.location.href)
 
   // Use REPLACE_ROUTE to set initial route without creating an undo step
-  dispatch({ type: "REPLACE_ROUTE", route })
+  // routeToBuilder wraps the URL-parsed route so it can be dispatched
+  dispatch({ type: "REPLACE_ROUTE", route: routeToBuilder(route) })
 }
 
 /**
  * Programmatically navigate to a URL (for link clicks, etc.)
  * This is a convenience function that parses the URL and dispatches NAVIGATE.
+ *
+ * Note: With the RouteBuilder pattern, this function wraps the URL-parsed route
+ * in a RouteBuilder. The dispatch layer will call the builder with the current
+ * appFrontier, but since routeToBuilder ignores the parameters, the route's
+ * existing appFrontier (from URL parsing) is preserved.
  *
  * @param dispatch The View Doc dispatch function
  * @param url The URL to navigate to
@@ -183,5 +199,6 @@ export function navigateToUrl(
   currentScrollY: number = typeof window !== "undefined" ? window.scrollY : 0,
 ): void {
   const route = urlToRoute(url)
-  dispatch({ type: "NAVIGATE", route, currentScrollY })
+  // routeToBuilder wraps the URL-parsed route so it can be dispatched
+  dispatch({ type: "NAVIGATE", route: routeToBuilder(route), currentScrollY })
 }

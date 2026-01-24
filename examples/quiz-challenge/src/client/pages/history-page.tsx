@@ -9,6 +9,8 @@ import { HistoryPanel } from "../history-panel.js"
 // History Page
 // ═══════════════════════════════════════════════════════════════════════════
 // Full-page view of quiz history (time travel).
+// Note: This page also has the PageLayout Time Travel button, but shows
+// an embedded HistoryPanel for a full-page experience.
 
 export interface HistoryPageProps {
   quizId: string
@@ -51,7 +53,7 @@ export function HistoryPage({
       </div>
 
       <div className="history-page-content">
-        <h2>📜 Quiz History</h2>
+        <h2>⏱️ Time Travel</h2>
         <p>View and restore previous states of the quiz.</p>
 
         {/* Reuse the existing HistoryPanel component */}

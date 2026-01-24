@@ -99,17 +99,19 @@ describe("viewUpdate", () => {
       expect(state.navigation.route.scrollY).toBe(0)
     })
 
-    it("preserves scrollY from the provided route", () => {
+    it("sets scrollY to 0 for new routes", () => {
       const doc = createViewDoc()
 
+      // RouteBuilder pattern: scrollY is set by the dispatch layer, not the caller
+      // REPLACE_ROUTE always sets scrollY to 0 for the new route
       dispatch(doc, {
         type: "REPLACE_ROUTE",
-        route: resultsRoute("quiz-1", 200),
+        route: resultsRoute("quiz-1"),
       })
 
       const state = doc.toJSON()
       expect(state.navigation.route.type).toBe("results")
-      expect(state.navigation.route.scrollY).toBe(200)
+      expect(state.navigation.route.scrollY).toBe(0)
     })
   })
 

@@ -3,6 +3,7 @@ import type { HistoryDocSchema } from "../shared/history-schema.js"
 import type { QuizDocSchema } from "../shared/schema.js"
 import type { Route } from "../shared/view-schema.js"
 import type { ViewDispatch } from "./browser-history-reactor.js"
+import { PageLayout } from "./page-layout.js"
 import { HistoryPage } from "./pages/history-page.js"
 import { HomePage } from "./pages/home-page.js"
 import { QuizPage } from "./pages/quiz-page.js"
@@ -13,6 +14,10 @@ import { SettingsPage } from "./pages/settings-page.js"
 // Router Component
 // ═══════════════════════════════════════════════════════════════════════════
 // Renders the appropriate page based on the current route from View Doc.
+// Wraps all pages in PageLayout which provides the Time Travel UI.
+//
+// Note: With the RouteBuilder pattern, page components no longer need
+// getAppFrontier - the dispatch layer handles frontier capture automatically.
 
 export interface RouterProps {
   route: Route
@@ -31,43 +36,53 @@ export function Router({
   isDetached,
   onReturnToLive,
 }: RouterProps) {
+  // Wrap page content in PageLayout for shared Time Travel UI
+  const wrapInLayout = (content: React.ReactNode) => (
+    <PageLayout
+      appHandle={appHandle}
+      historyHandle={historyHandle}
+      isDetached={isDetached}
+      onReturnToLive={onReturnToLive}
+    >
+      {content}
+    </PageLayout>
+  )
+
   switch (route.type) {
     case "home":
-      return <HomePage viewDispatch={viewDispatch} />
+      return wrapInLayout(<HomePage viewDispatch={viewDispatch} />)
 
     case "quiz":
-      return (
+      return wrapInLayout(
         <QuizPage
           quizId={route.quizId}
           viewingQuestionIndex={route.viewingQuestionIndex}
           appHandle={appHandle}
           historyHandle={historyHandle}
           viewDispatch={viewDispatch}
-          isDetached={isDetached}
-          onReturnToLive={onReturnToLive}
-        />
+        />,
       )
 
     case "results":
-      return (
+      return wrapInLayout(
         <ResultsPage
           quizId={route.quizId}
           appHandle={appHandle}
           viewDispatch={viewDispatch}
-        />
+        />,
       )
 
     case "settings":
-      return <SettingsPage viewDispatch={viewDispatch} />
+      return wrapInLayout(<SettingsPage viewDispatch={viewDispatch} />)
 
     case "history":
-      return (
+      return wrapInLayout(
         <HistoryPage
           quizId={route.quizId}
           appHandle={appHandle}
           historyHandle={historyHandle}
           viewDispatch={viewDispatch}
-        />
+        />,
       )
 
     default: {
