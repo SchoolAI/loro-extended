@@ -1,12 +1,5 @@
-import type { DocShape } from "@loro-extended/change"
-import {
-  change,
-  type Frontiers,
-  loro,
-  replayDiff,
-  shallowForkAt,
-  type TypedDoc,
-} from "@loro-extended/change"
+import { change, type Frontiers, type TypedDoc } from "@loro-extended/change"
+import { createUpdate, getTimestampFromFrontier } from "@loro-extended/lea"
 import type { QuizMsg } from "./messages.js"
 import type { Question, QuizDoc, QuizDocSchema } from "./schema.js"
 
@@ -20,9 +13,15 @@ import type { Question, QuizDoc, QuizDocSchema } from "./schema.js"
 // 4. Returns the new frontier
 //
 // Key insight: This is deterministic. Same frontier + same message = same result.
+//
+// NOTE: The generic createUpdate factory is imported from @loro-extended/lea.
+// This file only contains quiz-specific update logic.
 
 // Exported for use in UI and reactors
 export const QUESTION_TIME_LIMIT = 30 // seconds
+
+// Re-export from @loro-extended/lea for backwards compatibility
+export { createUpdate, getTimestampFromFrontier }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State Derivation (Pure)
@@ -37,64 +36,6 @@ export function getState(
   // The forkedDoc is a TypedDoc proxy with Symbol properties.
   // React will fail if it tries to enumerate a proxy with Symbols.
   return forkedDoc.toJSON()
-}
-
-export function getTimestampFromFrontier(frontier: Frontiers): number {
-  return frontier.reduce((sum, f) => sum + f.counter + 1, 0)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// createUpdate - Fork-and-Merge Update Factory
-// ═══════════════════════════════════════════════════════════════════════════
-// Creates an update function with fork-and-merge semantics.
-//
-// The handler receives a mutable doc (actually a shallow fork at the frontier).
-// Read from it for guards, mutate it for changes. The fork-and-merge
-// is handled automatically - the user just thinks of it as "the doc".
-//
-// Benefits:
-// - Single object for both reading and writing (no state/write confusion)
-// - Impossible to accidentally read from wrong source
-// - Natural mental model: "work on the doc, changes get applied"
-//
-// OPTIMIZATION: Uses shallowForkAt instead of forkAt for memory efficiency.
-// Shallow forks only contain current state, not full history - perfect for
-// the fork-and-merge pattern where we only need to read state and apply changes.
-
-export function createUpdate<Schema extends DocShape, Msg>(
-  handler: (doc: TypedDoc<Schema>, msg: Msg, timestamp: number) => void,
-): (doc: TypedDoc<Schema>, frontier: Frontiers, msg: Msg) => Frontiers {
-  return (doc, frontier, msg) => {
-    // 1. Create a shallow fork at the frontier - memory efficient!
-    // Uses shallowForkAt with preservePeerId: true so operations appear
-    // to come from the same peer, maintaining consistent frontier progression.
-    const workingDoc = shallowForkAt(doc, frontier, { preservePeerId: true })
-
-    // 2. Compute timestamp from frontier
-    const timestamp = getTimestampFromFrontier(frontier)
-
-    // 3. Capture frontier before handler execution
-    const beforeFrontier = loro(workingDoc).doc.frontiers()
-
-    // 4. Let handler read/write to the working doc
-    handler(workingDoc, msg, timestamp)
-
-    // 5. Get frontier after handler execution
-    const afterFrontier = loro(workingDoc).doc.frontiers()
-
-    // 6. Merge changes back into main doc using diff-replay
-    // This creates LOCAL events (not import events), which:
-    // - Are captured by subscribeLocalUpdates() for synchronization
-    // - Are recorded by UndoManager for undo/redo support
-    const diff = loro(workingDoc).doc.diff(beforeFrontier, afterFrontier, false)
-    if (diff.length > 0) {
-      replayDiff(loro(doc).doc, diff)
-      // Commit to trigger subscriptions (subscribe() and subscribeLocalUpdates())
-      loro(doc).doc.commit()
-    }
-
-    return loro(doc).doc.frontiers()
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

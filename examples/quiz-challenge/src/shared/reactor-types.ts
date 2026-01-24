@@ -1,52 +1,33 @@
 import type { TypedDoc } from "@loro-extended/change"
+import type {
+  Dispatch as GenericDispatch,
+  Reactor as GenericReactor,
+  Transition as GenericTransition,
+} from "@loro-extended/lea"
 import type { QuizMsg } from "./messages.js"
 import type { QuizDocSchema } from "./schema.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LEA 3.0 - Reactor Types (Shared)
+// LEA 3.0 - Reactor Types (Quiz-Specific)
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Reactors are the unified pattern for responding to state transitions.
-// They receive { before, after } and can:
-//   - Return UI (view reactor)
-//   - Call dispatch (message reactor)
-//   - Perform async I/O and write to sensors (effect reactor)
-//   - Do nothing (observation reactor)
-//
-// Key insight: Everything is a reactor. Views, subscriptions, and effects
-// are all the same pattern.
-//
-// OPTIMIZATION: Transitions now use TypedDoc (lazy proxy) instead of plain
-// JSON. This avoids O(N) toJSON() serialization on every document change.
-// Values are only evaluated when reactors access them.
-//
-// IMPORTANT: The before and after TypedDocs are forks at specific frontiers.
-// They are read-only snapshots - do not mutate them. Effect reactors that
-// need to write should receive the doc separately via factory closure.
-
-export type Dispatch = (msg: QuizMsg) => void
+// This file re-exports generic LEA types with quiz-specific type parameters.
+// The generic types come from @loro-extended/lea.
 
 /**
- * A state transition with lazy TypedDoc proxies.
- *
- * - `before`: TypedDoc fork at the previous frontier (read-only)
- * - `after`: TypedDoc fork at the current frontier (read-only)
- *
- * Values are lazily evaluated - no toJSON() until you access a property.
+ * Quiz-specific dispatch function type.
  */
-export type Transition = {
-  before: TypedDoc<typeof QuizDocSchema>
-  after: TypedDoc<typeof QuizDocSchema>
-}
+export type Dispatch = GenericDispatch<QuizMsg>
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Reactor Type
-// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Quiz-specific state transition type.
+ */
+export type Transition = GenericTransition<typeof QuizDocSchema>
 
-export type Reactor = (
-  transition: Transition,
-  dispatch: Dispatch,
-) => void | Promise<void>
+/**
+ * Quiz-specific reactor type.
+ */
+export type Reactor = GenericReactor<typeof QuizDocSchema, QuizMsg>
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helper: Detect state transitions
@@ -63,6 +44,8 @@ export type QuizStatus =
 /**
  * Detects when the quiz enters a specific status.
  * Works with TypedDoc proxies - accesses status lazily.
+ *
+ * This is a quiz-specific wrapper around the generic `entered` helper.
  */
 export function entered(
   status: QuizStatus,
@@ -77,6 +60,8 @@ export function entered(
 /**
  * Detects when the quiz exits a specific status.
  * Works with TypedDoc proxies - accesses status lazily.
+ *
+ * This is a quiz-specific wrapper around the generic `exited` helper.
  */
 export function exited(
   status: QuizStatus,

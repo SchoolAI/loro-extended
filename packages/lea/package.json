@@ -1,0 +1,41 @@
+{
+  "name": "@loro-extended/lea",
+  "version": "0.1.0",
+  "description": "LEA 3.0 (Loro Extended Architecture) - Pure functional state management with reactive side effects for CRDT applications",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "verify logic",
+    "verify": "verify"
+  },
+  "dependencies": {
+    "@loro-extended/change": "workspace:^"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.17"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.3"
+  }
+}
