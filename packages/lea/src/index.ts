@@ -9,7 +9,7 @@
 //
 // Key Components:
 // - Doc: The CRDT document (shared state)
-// - Update: State transition function (doc, frontier, msg) → frontier'
+// - Update: State transition function (frontier, msg) → frontier'
 // - Reactors: Respond to transitions (before, after) → void | UI
 // - Runtime: Imperative shell that orchestrates everything
 
@@ -23,6 +23,7 @@ export type {
   Reactor,
   ReactorWithCleanup,
   Transition,
+  UpdateFn,
 } from "./reactor-types.js"
 
 // ═══════════════════════════════════════════════════════════════════════════

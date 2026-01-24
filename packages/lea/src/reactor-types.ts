@@ -68,17 +68,40 @@ export type ReactorWithCleanup<Schema extends DocShape, Msg> = {
 }
 
 /**
+ * Update function type.
+ *
+ * Conceptually: `(frontier, msg) → frontier'`
+ *
+ * The runtime binds the document internally. Users write update handlers
+ * via `createUpdate()` which provides a working document for reading
+ * guards and writing changes.
+ *
+ * @example
+ * ```typescript
+ * const update = createUpdate<Schema, Msg>((doc, msg) => {
+ *   if (doc.status !== "idle") return  // Guard
+ *   change(doc, d => { d.status = "running" })
+ * })
+ * ```
+ */
+export type UpdateFn<Schema extends DocShape, Msg> = (
+  doc: TypedDoc<Schema>,
+  frontier: Frontiers,
+  msg: Msg,
+) => Frontiers
+
+/**
  * Program configuration for the LEA runtime.
  *
  * @param doc The main CRDT document
- * @param update The update function: (doc, frontier, msg) → frontier'
+ * @param update The update function (see UpdateFn)
  * @param reactors Array of reactors to invoke on state transitions
  * @param historyDoc Optional history document for time travel debugging
  * @param done Optional callback when runtime is disposed
  */
 export type Program<Schema extends DocShape, Msg> = {
   doc: TypedDoc<Schema>
-  update: (doc: TypedDoc<Schema>, frontier: Frontiers, msg: Msg) => Frontiers
+  update: UpdateFn<Schema, Msg>
   reactors: Reactor<Schema, Msg>[]
   historyDoc?: TypedDoc<DocShape>
   done?: (frontier: Frontiers) => void
