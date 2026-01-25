@@ -1,4 +1,9 @@
-import type { LoroDoc, LoroTreeNode, Subscription } from "loro-crdt"
+import type {
+  LoroDoc,
+  LoroEventBatch,
+  LoroTreeNode,
+  Subscription,
+} from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type { LoroTreeNodeRef } from "../loro.js"
 import type { StructContainerShape } from "../shape.js"
@@ -136,7 +141,7 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
       get container(): LoroTreeNode {
         return self.getNode()
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         // LoroTreeNode doesn't have subscribe, but we can subscribe to the tree
         // However, LoroRefBase expects subscribe.
         // For now, we can throw or return a dummy subscription if LoroTreeNode doesn't support it.

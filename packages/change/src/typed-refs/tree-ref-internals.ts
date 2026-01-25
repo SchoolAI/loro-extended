@@ -1,5 +1,6 @@
 import type {
   LoroDoc,
+  LoroEventBatch,
   LoroTree,
   LoroTreeNode,
   Subscription,
@@ -102,7 +103,7 @@ export class TreeRefInternals<
       get container(): LoroTree {
         return self.getContainer() as LoroTree
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroTree).subscribe(callback)
       },
     }

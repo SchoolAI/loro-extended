@@ -1,6 +1,11 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
-import { LoroDoc, type PeerID, type Subscription } from "loro-crdt"
+import {
+  LoroDoc,
+  type LoroEventBatch,
+  type PeerID,
+  type Subscription,
+} from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import {
   type JsonPatch,
@@ -248,7 +253,7 @@ export function createTypedDoc<Shape extends DocShape>(
     get container(): LoroDoc {
       return internal.loroDoc
     },
-    subscribe(callback: (event: unknown) => void): Subscription {
+    subscribe(callback: (event: LoroEventBatch) => void): Subscription {
       return internal.loroDoc.subscribe(callback)
     },
     applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void {

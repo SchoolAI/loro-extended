@@ -1,6 +1,7 @@
 import type {
   Container,
   LoroDoc,
+  LoroEventBatch,
   LoroList,
   LoroMovableList,
   Subscription,
@@ -256,7 +257,7 @@ export class ListRefBaseInternals<
       get container(): LoroList | LoroMovableList {
         return self.getContainer() as LoroList | LoroMovableList
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroList | LoroMovableList).subscribe(
           callback,
         )

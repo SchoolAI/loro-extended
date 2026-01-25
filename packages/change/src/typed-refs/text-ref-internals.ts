@@ -1,4 +1,4 @@
-import type { LoroDoc, LoroText, Subscription } from "loro-crdt"
+import type { LoroDoc, LoroEventBatch, LoroText, Subscription } from "loro-crdt"
 import type { LoroTextRef } from "../loro.js"
 import type { TextContainerShape } from "../shape.js"
 import { BaseRefInternals } from "./base.js"
@@ -92,7 +92,7 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
       get container(): LoroText {
         return self.getContainer() as LoroText
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroText).subscribe(callback)
       },
     }

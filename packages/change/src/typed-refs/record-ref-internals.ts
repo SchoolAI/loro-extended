@@ -1,6 +1,7 @@
 import type {
   Container,
   LoroDoc,
+  LoroEventBatch,
   LoroMap,
   Subscription,
   Value,
@@ -301,7 +302,7 @@ export class RecordRefInternals<
       get container(): LoroMap {
         return self.getContainer() as LoroMap
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroMap).subscribe(callback)
       },
       setContainer(key: string, container: Container): Container {

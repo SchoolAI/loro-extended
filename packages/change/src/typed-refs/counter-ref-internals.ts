@@ -1,4 +1,9 @@
-import type { LoroCounter, LoroDoc, Subscription } from "loro-crdt"
+import type {
+  LoroCounter,
+  LoroDoc,
+  LoroEventBatch,
+  Subscription,
+} from "loro-crdt"
 import type { LoroCounterRef } from "../loro.js"
 import type { CounterContainerShape } from "../shape.js"
 import { BaseRefInternals } from "./base.js"
@@ -54,7 +59,7 @@ export class CounterRefInternals extends BaseRefInternals<CounterContainerShape>
       get container(): LoroCounter {
         return self.getContainer() as LoroCounter
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroCounter).subscribe(callback)
       },
     }

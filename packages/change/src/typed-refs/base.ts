@@ -1,4 +1,4 @@
-import type { LoroDoc, Subscription } from "loro-crdt"
+import type { LoroDoc, LoroEventBatch, Subscription } from "loro-crdt"
 import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
@@ -156,7 +156,7 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
       get container(): unknown {
         return self.getContainer()
       },
-      subscribe(callback: (event: unknown) => void): Subscription {
+      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as any).subscribe(callback)
       },
     }

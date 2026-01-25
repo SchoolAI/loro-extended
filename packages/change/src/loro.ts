@@ -28,6 +28,7 @@ import type {
   Container,
   LoroCounter,
   LoroDoc,
+  LoroEventBatch,
   LoroList,
   LoroMap,
   LoroMovableList,
@@ -85,7 +86,7 @@ export interface LoroRefBase {
    * @param callback - Function called when the container changes
    * @returns Subscription that can be used to unsubscribe
    */
-  subscribe(callback: (event: unknown) => void): Subscription
+  subscribe(callback: (event: LoroEventBatch) => void): Subscription
 }
 
 /**
