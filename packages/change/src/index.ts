@@ -8,6 +8,7 @@ export {
 // Functional helpers (recommended API)
 export {
   change,
+  fork,
   forkAt,
   getLoroContainer,
   getLoroDoc,

@@ -275,6 +275,52 @@ export function getLoroContainer(
 }
 
 /**
+ * Creates a new TypedDoc as a fork of the current document.
+ * The forked doc contains all history up to the current version.
+ * The forked doc has a different PeerID from the original by default.
+ *
+ * For raw LoroDoc access, use: `loro(doc).doc.fork()`
+ *
+ * @param doc - The TypedDoc to fork
+ * @param options - Optional settings
+ * @param options.preservePeerId - If true, copies the original doc's peer ID to the fork
+ * @returns A new TypedDoc with the same schema at the current version
+ *
+ * @example
+ * ```typescript
+ * import { fork, loro } from "@loro-extended/change"
+ *
+ * const doc = createTypedDoc(schema);
+ * doc.title.update("Hello");
+ *
+ * // Fork the document
+ * const forkedDoc = fork(doc);
+ * forkedDoc.title.update("World");
+ *
+ * console.log(doc.title.toString()); // "Hello"
+ * console.log(forkedDoc.title.toString()); // "World"
+ *
+ * // Fork with same peer ID (for World/Worldview pattern)
+ * const worldview = fork(world, { preservePeerId: true });
+ * ```
+ */
+export function fork<Shape extends DocShape>(
+  doc: TypedDoc<Shape>,
+  options?: { preservePeerId?: boolean },
+): TypedDoc<Shape> {
+  const loroDoc = loro(doc).doc
+  const forkedLoroDoc = loroDoc.fork()
+  const shape = loro(doc).docShape as Shape
+
+  // Optionally preserve the peer ID (useful for World/Worldview pattern)
+  if (options?.preservePeerId) {
+    forkedLoroDoc.setPeerId(loroDoc.peerId)
+  }
+
+  return createTypedDoc(shape, forkedLoroDoc)
+}
+
+/**
  * Creates a new TypedDoc at a specified version (frontiers).
  * The forked doc will only contain history before the specified frontiers.
  * The forked doc has a different PeerID from the original.
