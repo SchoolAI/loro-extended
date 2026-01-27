@@ -4,8 +4,8 @@
 
 ```bash
 pnpm --filter @loro-extended/change -- verify format
-pnpm --filter @loro-extended/repo -- verify test
-pnpm --filter @loro-extended/repo -- verify test -- -t 'specific test'
+pnpm --filter @loro-extended/repo -- verify logic
+pnpm --filter @loro-extended/repo -- verify logic -- -t 'specific test'
 pnpm --filter @loro-extended/adapter-websocket -- verify types
 ```
 
