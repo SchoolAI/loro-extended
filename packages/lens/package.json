@@ -1,0 +1,40 @@
+{
+  "name": "@loro-extended/lens",
+  "version": "0.1.0",
+  "description": "Composable bidirectional filtered synchronization for Loro TypedDoc",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "verify logic",
+    "verify": "verify"
+  },
+  "dependencies": {
+    "@loro-extended/change": "workspace:^"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.3"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.17"
+  }
+}
