@@ -1,0 +1,257 @@
+/* RPS Demo Styles */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.container {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 2rem;
+}
+
+.player-info {
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 1.1rem;
+}
+
+.player-name {
+  color: #667eea;
+  font-weight: bold;
+}
+
+/* Game Status */
+.game-status {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.phase {
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.phase-value {
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #667eea;
+}
+
+.result {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #28a745;
+}
+
+.result.draw {
+  color: #ffc107;
+}
+
+.result.lost {
+  color: #dc3545;
+}
+
+/* Players Status */
+.players-status {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 30px;
+}
+
+.player-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 15px 25px;
+  min-width: 120px;
+}
+
+.player-card.current {
+  background: #e8f4fd;
+  border: 2px solid #667eea;
+}
+
+.player-card h3 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.player-status {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.player-status.locked {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.player-choice {
+  font-size: 2rem;
+  margin-top: 10px;
+}
+
+/* Choice Buttons */
+.choices {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.choice-btn {
+  background: white;
+  border: 3px solid #ddd;
+  border-radius: 15px;
+  padding: 20px;
+  font-size: 2.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.choice-btn:hover:not(:disabled) {
+  border-color: #667eea;
+  transform: scale(1.1);
+}
+
+.choice-btn.selected {
+  border-color: #667eea;
+  background: #e8f4fd;
+}
+
+.choice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Lock Button */
+.lock-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 15px 40px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lock-btn:hover:not(:disabled) {
+  background: #5a6fd6;
+  transform: translateY(-2px);
+}
+
+.lock-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Reset Button */
+.reset-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 15px 40px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 20px;
+}
+
+.reset-btn:hover {
+  background: #218838;
+  transform: translateY(-2px);
+}
+
+/* Connection Status */
+.connection-status {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.connection-status.connected {
+  background: #d4edda;
+  color: #155724;
+}
+
+.connection-status.disconnected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.connection-status.connecting {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Loading State */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error State */
+.error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}

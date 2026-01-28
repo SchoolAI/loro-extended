@@ -1,0 +1,37 @@
+{
+  "name": "example-rps-demo",
+  "description": "LEA 4.0 Rock-Paper-Scissors demo with World/Worldview filtering",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server/server.ts",
+    "verify": "verify"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-websocket": "workspace:^",
+    "@loro-extended/change": "workspace:^",
+    "@loro-extended/lens": "workspace:^",
+    "@loro-extended/lea": "workspace:^",
+    "@loro-extended/react": "workspace:^",
+    "@loro-extended/repo": "workspace:^",
+    "loro-crdt": "link:/Users/duane/tools/loro/crates/loro-wasm",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "ws": "^8.18.0",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/ws": "^8.5.13",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tsx": "^4.19.4",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-top-level-await": "^1.5.0",
+    "vite-plugin-wasm": "^3.4.1",
+    "vitest": "^3.2.4"
+  }
+}
