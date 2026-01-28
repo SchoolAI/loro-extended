@@ -225,6 +225,12 @@ function validateRPSMove(changes: JsonChange[], peerId: string): boolean {
 }
 ```
 
+> **Note (RPS demo)**
+> The demo under `examples/rps-demo` now uses role-specific filters:
+> - `src/server/filters.ts` enforces authoritative fields (phase/result).
+> - `src/client/filters.ts` enforces per-player sovereignty.
+> Shared helpers live in `src/shared/filters.ts`, with unit/integration tests.
+
 ## Alignment with Problem Space Scenarios
 
 | Scenario | Needs Filtering? | Span-Level Works? | Notes |

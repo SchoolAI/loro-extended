@@ -396,4 +396,19 @@ window.history.pushState({ position: historyPosition }, "", url)
 
 4. **NAVIGATE_BACK/FORWARD messages are unnecessary**: The browser history reactor calls `undoManager.undo()/redo()` directly on popstate events.
 
-See `examples/quiz-challenge/src/client/browser-history-reactor.ts` for the implementation and `plans/view-doc-undo-refactor.md` for the full design.
+### Lens + Transition Shell (Runtime Alternative)
+
+Use [`useLens()`](packages/hooks-core/src/create-hooks.ts:162) in React/Hono integrations to manage lens lifecycle and snapshot caching when you need a lens-based worldview. The hook mirrors [`useDoc()`](packages/hooks-core/src/create-hooks.ts:99) behavior by caching snapshots based on opCount + frontiers, preventing infinite update loops when using `useSyncExternalStore`.
+
+For lightweight runtimes, the World/Worldview pattern can be implemented directly with:
+
+- `createLens(world, { filter })` for commit-level filtering into a worldview
+- `subscribe()` + `getTransition()` for reactors (before/after snapshots without checkout)
+
+This yields a minimal imperative shell:
+
+1. Subscribe to `lens.doc` changes
+2. Build `{ before, after }` via `getTransition()`
+3. Invoke reactors with `lens.change()` as the write path
+
+Role-specific filters should be isolated (e.g., server vs client) with shared helpers to prevent policy drift. Tests should assert that client filters enforce player sovereignty and server filters enforce authoritative fields.
