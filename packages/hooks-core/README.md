@@ -8,8 +8,9 @@ This package implements a "handle-first" pattern for working with Loro documents
 
 1. **`useHandle`** - Get a stable, typed document handle (never re-renders)
 2. **`useDoc`** - Subscribe to document changes with optional selectors
-3. **`useRefValue`** - Subscribe to a single typed ref (fine-grained reactivity)
-4. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
+3. **`useLens`** - Create a Lens and subscribe to worldview snapshots
+4. **`useRefValue`** - Subscribe to a single typed ref (fine-grained reactivity)
+5. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 ## Installation
 
@@ -39,6 +40,7 @@ export const {
   useRepo,
   useHandle,
   useDoc,
+  useLens,
   useEphemeral,
   usePresence, // deprecated
 } = createHooks(React)
@@ -126,6 +128,29 @@ const todoCount = useDoc(handle, d => d.todos.length)
 - `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector function
 
 **Returns:** The document value or selected value
+
+#### `useLens(world, options?, selector?)`
+
+Creates a Lens from a world `TypedDoc` and returns both the lens and a reactive JSON snapshot
+of the lens worldview. Uses the same snapshot caching behavior as `useDoc` to avoid
+unnecessary renders.
+
+```typescript
+const handle = useHandle(docId, DocSchema)
+const { lens, doc } = useLens(handle.doc, {
+  filter: info => info.message?.userId === myUserId,
+})
+
+// Optional selector form
+const { lens, doc: title } = useLens(handle.doc, undefined, d => d.title)
+```
+
+**Parameters:**
+- `world: TypedDoc<D>` - The world document (source) for the lens
+- `options?: LensOptions` - Optional lens configuration (e.g., filter)
+- `selector?: (doc: Infer<D>) => R` - Optional selector for fine-grained updates
+
+**Returns:** `{ lens: Lens<D>; doc: Infer<D> | R }`
 
 #### `useRefValue(ref)`
 

@@ -26,7 +26,8 @@
     "verify": "verify"
   },
   "dependencies": {
-    "@loro-extended/repo": "workspace:^"
+    "@loro-extended/repo": "workspace:^",
+    "@loro-extended/lens": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",

@@ -1,4 +1,6 @@
-import type { DocShape, Infer } from "@loro-extended/change"
+import { loro, type DocShape, type Infer, type TypedDoc } from "@loro-extended/change"
+import { createLens } from "@loro-extended/lens"
+import type { Lens, LensOptions } from "@loro-extended/lens"
 import type {
   DocId,
   EphemeralDeclarations,
@@ -83,9 +85,7 @@ export function createHooks(framework: FrameworkHooks) {
 
   // Helper to create a version key that changes on checkout
   // This combines opCount (changes on edits) with frontiers (changes on checkout)
-  function getVersionKey(
-    loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"],
-  ): string {
+  function getVersionKey(loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"]): string {
     const opCount = loroDoc.opCount()
     const frontiers = loroDoc.frontiers()
     // Serialize frontiers to a stable string
@@ -156,6 +156,75 @@ export function createHooks(framework: FrameworkHooks) {
   }
 
   // ============================================
+  // useLens - Create lens + Get worldview snapshot (reactive)
+  // ============================================
+
+  function useLens<D extends DocShape>(
+    world: TypedDoc<D>,
+    options?: LensOptions,
+  ): { lens: Lens<D>; doc: Infer<D> }
+
+  function useLens<D extends DocShape, R>(
+    world: TypedDoc<D>,
+    options: LensOptions | undefined,
+    selector: (doc: Infer<D>) => R,
+  ): { lens: Lens<D>; doc: R }
+
+  function useLens<D extends DocShape, R>(
+    world: TypedDoc<D>,
+    options?: LensOptions,
+    selector?: (doc: Infer<D>) => R,
+  ): { lens: Lens<D>; doc: R | Infer<D> } {
+    const lensRef = useRef<Lens<D> | null>(null)
+
+    const lens = useMemo(() => {
+      lensRef.current?.dispose()
+      const nextLens = createLens(world, options)
+      lensRef.current = nextLens
+      return nextLens
+    }, [world, options])
+
+    framework.useEffect(() => {
+      return () => {
+        lensRef.current?.dispose()
+        lensRef.current = null
+      }
+    }, [])
+
+    const cacheRef = useRef<{
+      version: string
+      value: R | Infer<D>
+    } | null>(null)
+
+    const store = useMemo(() => {
+      const computeValue = (): { version: string; value: R | Infer<D> } => {
+        const newVersion = getVersionKey(loro(lens.doc).doc)
+
+        if (cacheRef.current && cacheRef.current.version === newVersion) {
+          return cacheRef.current
+        }
+
+        const json = lens.doc.toJSON()
+        return {
+          version: newVersion,
+          value: selector ? selector(json) : json,
+        }
+      }
+
+      const subscribeToSource = (onChange: () => void) => {
+        return loro(lens.doc).doc.subscribe(() => {
+          onChange()
+        })
+      }
+
+      return createSyncStore(computeValue, subscribeToSource, cacheRef)
+    }, [lens, selector])
+
+    const result = useSyncExternalStore(store.subscribe, store.getSnapshot)
+    return { lens, doc: result.value }
+  }
+
+  // ============================================
   // useEphemeral - Get any ephemeral store state (reactive)
   // ============================================
 
@@ -208,6 +277,7 @@ export function createHooks(framework: FrameworkHooks) {
     useRepo,
     useHandle,
     useDoc,
+    useLens,
     useEphemeral,
   }
 }

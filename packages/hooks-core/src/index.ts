@@ -21,6 +21,8 @@
  * ```
  */
 
+// Types
+export type { Lens, LensOptions } from "@loro-extended/lens"
 // Core hooks factory
 export { createHooks } from "./create-hooks"
 export type { AnyTypedRef, UseRefValueReturn } from "./create-ref-hooks"
@@ -54,7 +56,6 @@ export {
 } from "./cursor-registry"
 // Cursor registry context factory
 export { createCursorRegistryContext } from "./cursor-registry-context"
-// Types
 export type { FrameworkHooks } from "./types"
 // Undo manager registry for namespace-based undo
 export {
