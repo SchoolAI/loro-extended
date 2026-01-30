@@ -1,12 +1,14 @@
 import {
   type LoroCounter,
   LoroDoc,
+  type LoroEventBatch,
   type LoroList,
   type LoroMap,
   type LoroMovableList,
   type LoroText,
   type LoroTree,
 } from "loro-crdt"
+import { createDiffOverlay } from "./diff-overlay.js"
 import { loro } from "./loro.js"
 import type {
   ContainerOrValueShape,
@@ -317,7 +319,7 @@ export function fork<Shape extends DocShape>(
     forkedLoroDoc.setPeerId(loroDoc.peerId)
   }
 
-  return createTypedDoc(shape, forkedLoroDoc)
+  return createTypedDoc(shape, { doc: forkedLoroDoc })
 }
 
 /**
@@ -353,7 +355,7 @@ export function forkAt<Shape extends DocShape>(
   const loroDoc = loro(doc).doc
   const forkedLoroDoc = loroDoc.forkAt(frontiers)
   const shape = loro(doc).docShape as Shape
-  return createTypedDoc(shape, forkedLoroDoc)
+  return createTypedDoc(shape, { doc: forkedLoroDoc })
 }
 
 /**
@@ -421,5 +423,33 @@ export function shallowForkAt<Shape extends DocShape>(
     shallowLoroDoc.setPeerId(loroDoc.peerId)
   }
 
-  return createTypedDoc(shape, shallowLoroDoc)
+  return createTypedDoc(shape, { doc: shallowLoroDoc })
+}
+
+export type Transition<Shape extends DocShape> = {
+  before: TypedDoc<Shape>
+  after: TypedDoc<Shape>
+}
+
+/**
+ * Build a `{ before, after }` transition from a TypedDoc and a Loro event batch.
+ * Uses a reverse diff overlay to compute the "before" view without checkout.
+ * Throws on checkout events to avoid time-travel transitions.
+ */
+export function getTransition<Shape extends DocShape>(
+  doc: TypedDoc<Shape>,
+  event: LoroEventBatch,
+): Transition<Shape> {
+  if (event.by === "checkout") {
+    throw new Error("getTransition does not support checkout events")
+  }
+
+  const loroDoc = getLoroDoc(doc)
+  const shape = loro(doc).docShape as Shape
+  const overlay = createDiffOverlay(loroDoc, event)
+
+  return {
+    before: createTypedDoc(shape, { doc: loroDoc, overlay }),
+    after: createTypedDoc(shape, { doc: loroDoc }),
+  }
 }

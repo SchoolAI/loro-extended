@@ -7,7 +7,13 @@ import {
   LoroTree,
 } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import { change, getLoroContainer, getLoroDoc } from "./functional-helpers.js"
+import type { LoroEventBatch } from "loro-crdt"
+import {
+  change,
+  getLoroContainer,
+  getLoroDoc,
+  getTransition,
+} from "./functional-helpers.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -481,6 +487,49 @@ describe("functional helpers", () => {
       loro(doc2).doc.import(snapshot)
 
       expect(capturedValue).toBe("Remote text")
+
+      unsubscribe()
+    })
+  })
+
+  describe("getTransition()", () => {
+    it("should return before/after using reverse diff overlay", () => {
+      const doc = createTypedDoc(schema)
+
+      const transitions: Array<{ beforeCount: number; afterCount: number }> = []
+      const unsubscribe = loro(doc).subscribe(event => {
+        const { before, after } = getTransition(doc, event)
+        transitions.push({
+          beforeCount: before.count.value,
+          afterCount: after.count.value,
+        })
+      })
+
+      doc.count.increment(2)
+      loro(doc).doc.commit()
+
+      expect(transitions).toEqual([{ beforeCount: 0, afterCount: 2 }])
+      unsubscribe()
+    })
+
+    it("should throw on checkout events", () => {
+      const doc = createTypedDoc(schema)
+      const frontiers = loro(doc).doc.frontiers()
+
+      doc.count.increment(1)
+      loro(doc).doc.commit()
+
+      let checkoutEvent: LoroEventBatch | undefined
+      const unsubscribe = loro(doc).subscribe(event => {
+        checkoutEvent = event
+      })
+
+      loro(doc).doc.checkout(frontiers)
+
+      expect(checkoutEvent).toBeDefined()
+      expect(() => getTransition(doc, checkoutEvent as LoroEventBatch)).toThrow(
+        "getTransition does not support checkout events",
+      )
 
       unsubscribe()
     })

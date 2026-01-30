@@ -10,6 +10,7 @@ export {
   change,
   fork,
   forkAt,
+  getTransition,
   getLoroContainer,
   getLoroDoc,
   shallowForkAt,
@@ -96,5 +97,6 @@ export type {
   InferRaw,
   Mutable,
 } from "./types.js"
+export type { Transition } from "./functional-helpers.js"
 // Utility exports
 export { validatePlaceholder } from "./validation.js"
