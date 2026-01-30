@@ -395,3 +395,16 @@ Core hook tests are located in `@loro-extended/hooks-core`. This package provide
 ## License
 
 MIT
+### `useLens(world, options?, selector?)`
+
+Create a Lens from a world `TypedDoc` and subscribe to its worldview snapshot.
+
+```tsx
+const handle = useHandle(docId, DocSchema)
+const { lens, doc } = useLens(handle.doc, {
+  filter: info => info.message?.userId === myUserId,
+})
+
+// Optional selector
+const { lens, doc: title } = useLens(handle.doc, undefined, d => d.title)
+```

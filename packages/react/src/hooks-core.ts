@@ -1,3 +1,5 @@
+import type { DocShape, Infer, TypedDoc } from "@loro-extended/change"
+import type { Lens, LensOptions } from "@loro-extended/hooks-core"
 import {
   CursorRegistry,
   createCursorRegistryContext,
@@ -16,8 +18,32 @@ const { CursorRegistryContext, useCursorRegistry } =
 export { CursorRegistry, CursorRegistryContext, useCursorRegistry }
 
 // Create core hooks
+const coreHooks = createHooks(React)
 export const { RepoContext, useRepo, useHandle, useDoc, useEphemeral } =
-  createHooks(React)
+  coreHooks
+
+export function useLens<D extends DocShape>(
+  world: TypedDoc<D>,
+  options?: LensOptions,
+): { lens: Lens<D>; doc: Infer<D> }
+export function useLens<D extends DocShape, R>(
+  world: TypedDoc<D>,
+  options: LensOptions | undefined,
+  selector: (doc: Infer<D>) => R,
+): { lens: Lens<D>; doc: R }
+export function useLens<D extends DocShape, R>(
+  world: TypedDoc<D>,
+  options?: LensOptions,
+  selector?: (doc: Infer<D>) => R,
+): { lens: Lens<D>; doc: R | Infer<D> } {
+  const useLensInternal = coreHooks.useLens as <D extends DocShape, R>(
+    world: TypedDoc<D>,
+    options?: LensOptions,
+    selector?: (doc: Infer<D>) => R,
+  ) => { lens: Lens<D>; doc: R | Infer<D> }
+
+  return useLensInternal(world, options, selector)
+}
 
 // Create ref hooks
 export const { useRefValue } = createRefHooks(React)

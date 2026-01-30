@@ -14,6 +14,8 @@ export type {
 export { change, getLoroDoc, Shape } from "@loro-extended/change"
 // Re-export hook types from @loro-extended/hooks-core
 export type {
+  Lens,
+  LensOptions,
   UseCollaborativeTextOptions,
   UseCollaborativeTextReturn,
   UseRefValueReturn,
@@ -33,6 +35,7 @@ export {
   useDoc,
   useEphemeral,
   useHandle,
+  useLens,
   useRefValue,
   useRepo,
   useUndoManager,

@@ -6,7 +6,7 @@ import {
 } from "@loro-extended/hooks-core"
 import * as Hono from "hono/jsx"
 
-export const { RepoContext, useRepo, useHandle, useDoc, useEphemeral } =
+export const { RepoContext, useRepo, useHandle, useDoc, useLens, useEphemeral } =
   createHooks(Hono)
 
 export const { useCollaborativeText } = createTextHooks(Hono)
