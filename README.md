@@ -165,6 +165,9 @@ const schema = Shape.doc({
 
 const doc = createTypedDoc(schema);
 
+// If you already have a LoroDoc instance, wrap it with options:
+// const doc = createTypedDoc(schema, { doc: existingLoroDoc });
+
 // Get full intellisense and type checking
 change(doc, (draft) => {
   draft.todos.push({ text: "Buy milk", done: false }); // ✅ Type-safe

@@ -1,4 +1,5 @@
 import type {
+  CounterDiff,
   LoroCounter,
   LoroDoc,
   LoroEventBatch,
@@ -33,6 +34,14 @@ export class CounterRefInternals extends BaseRefInternals<CounterContainerShape>
   getValue(): number {
     const container = this.getContainer() as LoroCounter
     const containerValue = container.value
+    const overlay = this.getOverlay()
+    if (overlay) {
+      const diff = overlay.get((container as any).id)
+      if (diff && diff.type === "counter") {
+        const counterDiff = diff as CounterDiff
+        return containerValue + counterDiff.increment
+      }
+    }
     if (containerValue !== 0 || this.materialized) {
       return containerValue
     }

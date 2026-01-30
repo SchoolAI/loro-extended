@@ -185,7 +185,7 @@ describe("JSON Compatibility", () => {
 
   it("should be efficient (not access unrelated parts)", () => {
     const loroDoc = new LoroDoc()
-    const doc = createTypedDoc(ChatSchema, loroDoc)
+    const doc = createTypedDoc(ChatSchema, { doc: loroDoc })
 
     change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 1 })

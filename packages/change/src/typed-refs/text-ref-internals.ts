@@ -1,4 +1,11 @@
-import type { LoroDoc, LoroEventBatch, LoroText, Subscription } from "loro-crdt"
+import type {
+  Delta,
+  LoroDoc,
+  LoroEventBatch,
+  LoroText,
+  Subscription,
+  TextDiff,
+} from "loro-crdt"
 import type { LoroTextRef } from "../loro.js"
 import type { TextContainerShape } from "../shape.js"
 import { BaseRefInternals } from "./base.js"
@@ -55,6 +62,14 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
   /** Get the text as a string */
   getStringValue(): string {
     const container = this.getContainer() as LoroText
+    const overlay = this.getOverlay()
+    if (overlay) {
+      const diff = overlay.get(container.id)
+      if (diff && diff.type === "text") {
+        const containerValue = container.toString()
+        return applyTextDelta(containerValue, (diff as TextDiff).diff)
+      }
+    }
     const containerValue = container.toString()
     if (containerValue !== "" || this.materialized) {
       return containerValue
@@ -69,12 +84,30 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
 
   /** Get the text as a delta */
   toDelta(): any[] {
-    return (this.getContainer() as LoroText).toDelta()
+    const container = this.getContainer() as LoroText
+    const overlay = this.getOverlay()
+    if (overlay) {
+      const diff = overlay.get(container.id)
+      if (diff && diff.type === "text") {
+        const base = container.toDelta() as Delta<string>[]
+        return applyDeltaToDelta(base, (diff as TextDiff).diff)
+      }
+    }
+    return container.toDelta()
   }
 
   /** Get the length of the text */
   getLength(): number {
-    return (this.getContainer() as LoroText).length
+    const container = this.getContainer() as LoroText
+    const overlay = this.getOverlay()
+    if (overlay) {
+      const diff = overlay.get(container.id)
+      if (diff && diff.type === "text") {
+        return applyTextDelta(container.toString(), (diff as TextDiff).diff)
+          .length
+      }
+    }
+    return container.length
   }
 
   /** No plain values in text */
@@ -97,4 +130,37 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
       },
     }
   }
+}
+
+function applyTextDelta(text: string, delta: Delta<string>[]): string {
+  let result = ""
+  let index = 0
+
+  for (const op of delta) {
+    if (op.retain !== undefined) {
+      result += text.slice(index, index + op.retain)
+      index += op.retain
+    } else if (op.delete !== undefined) {
+      index += op.delete
+    } else if (op.insert !== undefined) {
+      result += op.insert
+    }
+  }
+
+  if (index < text.length) {
+    result += text.slice(index)
+  }
+
+  return result
+}
+
+function applyDeltaToDelta(
+  base: Delta<string>[],
+  diff: Delta<string>[],
+): Delta<string>[] {
+  const baseText = base
+    .map(op => (op.insert !== undefined ? op.insert : ""))
+    .join("")
+  const nextText = applyTextDelta(baseText, diff)
+  return nextText ? [{ insert: nextText }] : []
 }

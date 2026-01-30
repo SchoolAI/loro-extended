@@ -1,5 +1,7 @@
 import type {
   Container,
+  Delta,
+  ListDiff,
   LoroDoc,
   LoroEventBatch,
   LoroList,
@@ -38,6 +40,39 @@ export class ListRefBaseInternals<
   MutableItem = NestedShape["_mutable"],
 > extends BaseRefInternals<any> {
   private itemCache = new Map<number, any>()
+  private overlayListCache?: Item[]
+
+  getOverlayList(): Item[] | undefined {
+    const overlay = this.getOverlay()
+    if (!overlay) {
+      return undefined
+    }
+
+    const shape = this.getShape()
+    if (!isValueShape(shape.shape)) {
+      return undefined
+    }
+
+    if (!this.overlayListCache) {
+      const container = this.getContainer() as LoroList | LoroMovableList
+      const diff = overlay.get(container.id)
+      if (!diff || diff.type !== "list") {
+        return undefined
+      }
+
+      const afterValues: Item[] = []
+      for (let i = 0; i < container.length; i++) {
+        afterValues.push(container.get(i) as Item)
+      }
+
+      this.overlayListCache = applyListDelta(
+        afterValues,
+        (diff as ListDiff).diff as Delta<Item[]>[],
+      )
+    }
+
+    return this.overlayListCache
+  }
 
   /** Get typed ref params for creating child refs at an index */
   getChildTypedRefParams(
@@ -58,6 +93,7 @@ export class ListRefBaseInternals<
       autoCommit: this.getAutoCommit(),
       batchedMutation: this.getBatchedMutation(),
       getDoc: () => this.getDoc(),
+      overlay: this.getOverlay(),
     }
   }
 
@@ -65,6 +101,7 @@ export class ListRefBaseInternals<
   getPredicateItem(index: number): Item | undefined {
     const shape = this.getShape()
     const container = this.getContainer() as LoroList | LoroMovableList
+    const overlayList = this.getOverlayList()
 
     // CRITICAL FIX: For predicates to work correctly with mutations,
     // we need to check if there's a cached (mutated) version first
@@ -72,6 +109,10 @@ export class ListRefBaseInternals<
     if (cachedItem && isValueShape(shape.shape)) {
       // For value shapes, if we have a cached item, use it so predicates see mutations
       return cachedItem as Item
+    }
+
+    if (overlayList && isValueShape(shape.shape)) {
+      return overlayList[index]
     }
 
     const containerItem = container.get(index)
@@ -114,9 +155,12 @@ export class ListRefBaseInternals<
   getMutableItem(index: number): MutableItem | undefined {
     const shape = this.getShape()
     const container = this.getContainer() as LoroList | LoroMovableList
+    const overlayList = this.getOverlayList()
 
     // Get the raw container item
-    const containerItem = container.get(index)
+    const containerItem = overlayList
+      ? (overlayList[index] as Item | undefined)
+      : (container.get(index) as Item | undefined)
     if (containerItem === undefined) {
       return undefined as MutableItem
     }
@@ -462,6 +506,10 @@ export abstract class ListRefBase<
   }
 
   toArray(): Item[] {
+    const overlayList = this[INTERNAL_SYMBOL].getOverlayList()
+    if (overlayList) {
+      return [...overlayList]
+    }
     const result: Item[] = []
     for (let i = 0; i < this.length; i++) {
       result.push(this[INTERNAL_SYMBOL].getPredicateItem(i) as Item)
@@ -471,10 +519,11 @@ export abstract class ListRefBase<
 
   toJSON(): Item[] {
     const shape = this[INTERNAL_SYMBOL].getShape()
+    const overlayList = this[INTERNAL_SYMBOL].getOverlayList()
     const container = this[INTERNAL_SYMBOL].getContainer() as
       | LoroList
       | LoroMovableList
-    const nativeJson = container.toJSON() as any[]
+    const nativeJson = overlayList ?? (container.toJSON() as any[])
 
     // If the nested shape is a container shape (map, record, etc.) or an object value shape,
     // we need to overlay placeholders for each item
@@ -511,9 +560,35 @@ export abstract class ListRefBase<
   }
 
   get length(): number {
+    const overlayList = this[INTERNAL_SYMBOL].getOverlayList()
+    if (overlayList) {
+      return overlayList.length
+    }
     const container = this[INTERNAL_SYMBOL].getContainer() as
       | LoroList
       | LoroMovableList
     return container.length
   }
+}
+
+function applyListDelta<T>(input: T[], delta: Delta<T[]>[]): T[] {
+  const result: T[] = []
+  let index = 0
+
+  for (const op of delta) {
+    if (op.retain !== undefined) {
+      result.push(...input.slice(index, index + op.retain))
+      index += op.retain
+    } else if (op.delete !== undefined) {
+      index += op.delete
+    } else if (op.insert !== undefined) {
+      result.push(...op.insert)
+    }
+  }
+
+  if (index < input.length) {
+    result.push(...input.slice(index))
+  }
+
+  return result
 }

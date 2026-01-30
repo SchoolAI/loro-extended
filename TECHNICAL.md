@@ -63,6 +63,61 @@ When `batchedMutation: false` (direct access):
 - Values are read fresh from Loro on each access
 - No caching overhead for simple reads
 
+### TypedDoc Diff Overlay (Before/After Without Checkout)
+
+TypedDoc now supports a **read-only diff overlay** that lets you compute a
+"before" view without copying or checking out the document. This is used when a
+subscription provides a `LoroEventBatch` and you want to read `{ before, after }`
+from the **same** `LoroDoc`.
+
+**Key APIs:**
+
+```ts
+export type CreateTypedDocOptions = {
+  doc?: LoroDoc
+  overlay?: DiffOverlay
+}
+
+export function createTypedDoc<Shape extends DocShape>(
+  shape: Shape,
+  options: CreateTypedDocOptions = {},
+): TypedDoc<Shape>
+```
+
+```ts
+export type DiffOverlay = ReadonlyMap<ContainerID, Diff>
+
+export function createDiffOverlay(
+  doc: LoroDoc,
+  batch: LoroEventBatch,
+): DiffOverlay {
+  return new Map(doc.diff(batch.to, batch.from, false))
+}
+```
+
+**How it works:**
+
+1. Build a `DiffOverlay` from the **reverse diff** (`doc.diff(to, from)`).
+2. Pass `{ overlay }` into `createTypedDoc` for the "before" view.
+3. All ref read paths check the overlay to synthesize the old value:
+   - **Counters**: add reverse `increment`.
+   - **Struct/Record**: use `updated[key]` from map diffs.
+   - **List/Text**: apply reverse deltas to current values.
+
+**Design constraints:**
+
+- Overlay is **read-only** and does not mutate Loro containers.
+- Unsupported types (e.g., tree) are currently ignored.
+- The overlay is stored in ref params and propagated through `getChildTypedRefParams()`.
+ - The overlay is stored in ref params and propagated through `getChildTypedRefParams()`.
+
+### `getTransition()` Helper (Strict Checkout Guard)
+
+The `getTransition(doc, event)` helper builds `{ before, after }` from a
+`LoroEventBatch` using the diff overlay, and **throws** on checkout events to
+avoid interpreting time-travel as a state transition. This is intentionally
+strict so callers must handle checkout events explicitly if they want them.
+
 ### Batch Assignment and Subscription Timing
 
 When assigning a plain object to a struct/record via `ref.set(key, value)` or property assignment, `assignPlainValueToTypedRef()` handles the assignment atomically:

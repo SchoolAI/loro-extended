@@ -1,4 +1,10 @@
-import type { LoroDoc, LoroEventBatch, Subscription } from "loro-crdt"
+import type {
+  ContainerID,
+  Diff,
+  LoroDoc,
+  LoroEventBatch,
+  Subscription,
+} from "loro-crdt"
 import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
@@ -31,6 +37,8 @@ export interface RefInternalsBase {
 // TypedRefParams and TypedRef Base Class
 // ============================================================================
 
+export type DiffOverlay = ReadonlyMap<ContainerID, Diff>
+
 export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
   placeholder?: Infer<Shape>
@@ -38,6 +46,7 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   autoCommit?: boolean // Auto-commit after mutations
   batchedMutation?: boolean // True when inside change() block - enables value shape caching for find-and-mutate patterns
   getDoc: () => LoroDoc // Needed for auto-commit
+  overlay?: DiffOverlay // Optional reverse diff overlay for "before" reads
 }
 
 // ============================================================================
@@ -112,6 +121,11 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this.params.getDoc()
   }
 
+  /** Get the diff overlay map (if provided) */
+  getOverlay(): DiffOverlay | undefined {
+    return this.params.overlay
+  }
+
   /**
    * Get the TypedRefParams needed to recreate this ref.
    * Used by change() to create draft refs with modified params.
@@ -127,6 +141,7 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
       autoCommit: this.params.autoCommit,
       batchedMutation: this.params.batchedMutation,
       getDoc: this.params.getDoc,
+      overlay: this.params.overlay,
     }
   }
 

@@ -342,7 +342,7 @@ export class Handle<
     const docState = synchronizer.getOrCreateDocumentState(docId)
 
     // Create TypedDoc wrapper around the LoroDoc
-    this._doc = createTypedDoc(docShape, docState.doc)
+    this._doc = createTypedDoc(docShape, { doc: docState.doc })
 
     // Pre-create stores in Synchronizer for declared ephemeral shapes
     // This ensures the stores exist and are subscribed for network sync

@@ -37,7 +37,7 @@ const schema = Shape.doc({
   users: Shape.record(
     Shape.plain.struct({
       name: Shape.plain.string(),
-    })
+    }),
   ),
 });
 
@@ -103,7 +103,7 @@ const blogSchema = Shape.doc({
       heading: Shape.text(), // Collaborative headings
       content: Shape.text(), // Collaborative content
       order: Shape.plain.number(), // Plain metadata
-    })
+    }),
   ),
 });
 ```
@@ -141,7 +141,7 @@ const blogSchemaWithDefaults = Shape.doc({
       heading: Shape.text(),
       content: Shape.text(),
       order: Shape.plain.number(),
-    })
+    }),
   ),
 });
 
@@ -228,7 +228,7 @@ import { change } from "@loro-extended/change";
 // Library code - expose only the ref, not the doc
 class StateMachine {
   private doc: TypedDoc<...>;
-  
+
   get states(): TreeRef<StateNodeShape> {
     return this.doc.states;
   }
@@ -239,7 +239,7 @@ function addStates(states: TreeRef<StateNodeShape>) {
   change(states, draft => {
     const idle = draft.createNode();
     idle.data.name.insert(0, "idle");
-    
+
     const running = draft.createNode();
     running.data.name.insert(0, "running");
   });
@@ -251,6 +251,7 @@ addStates(machine.states); // No access to the underlying doc needed!
 ```
 
 This pattern is useful for:
+
 - **Library APIs**: Expose typed refs without leaking document structure
 - **Component isolation**: Pass refs to components that only need partial access
 - **Testing**: Mock or stub individual refs without full document setup
@@ -259,37 +260,37 @@ All ref types support `change()`:
 
 ```typescript
 // ListRef
-change(doc.items, draft => {
+change(doc.items, (draft) => {
   draft.push("item1");
   draft.push("item2");
 });
 
 // TextRef
-change(doc.title, draft => {
+change(doc.title, (draft) => {
   draft.insert(0, "Hello ");
   draft.insert(6, "World");
 });
 
 // CounterRef
-change(doc.count, draft => {
+change(doc.count, (draft) => {
   draft.increment(5);
   draft.decrement(2);
 });
 
 // StructRef
-change(doc.profile, draft => {
+change(doc.profile, (draft) => {
   draft.bio.insert(0, "Hello");
   draft.age.increment(1);
 });
 
 // RecordRef
-change(doc.users, draft => {
+change(doc.users, (draft) => {
   draft.set("alice", { name: "Alice" });
   draft.set("bob", { name: "Bob" });
 });
 
 // TreeRef
-change(doc.tree, draft => {
+change(doc.tree, (draft) => {
   const node = draft.createNode();
   node.data.name.insert(0, "root");
 });
@@ -298,14 +299,14 @@ change(doc.tree, draft => {
 Nested `change()` calls are safe - Loro's commit is idempotent:
 
 ```typescript
-change(doc.items, outer => {
+change(doc.items, (outer) => {
   outer.push("from outer");
-  
+
   // Nested change on a different ref - works correctly
-  change(doc.count, inner => {
+  change(doc.count, (inner) => {
     inner.increment(10);
   });
-  
+
   outer.push("still in outer");
 });
 // All mutations are committed
@@ -336,7 +337,7 @@ const ServerPresenceShape = Shape.plain.struct({
     Shape.plain.struct({
       x: Shape.plain.number(),
       y: Shape.plain.number(),
-    })
+    }),
   ),
   tick: Shape.plain.number(),
 });
@@ -516,7 +517,7 @@ handle.subscribe(
   (titles, prev) => {
     // titles: string[], prev: string[] | undefined
     console.log("Titles changed:", titles);
-  }
+  },
 );
 
 // DSL constructs:
@@ -605,18 +606,18 @@ loro(doc).rawValue; // Unmerged CRDT value
 
 **RecordRef** (Map-like interface)
 
-| Direct Access                    | Only via `loro()`              |
-| -------------------------------- | ------------------------------ |
-| `get(key)`                       | `setContainer(key, container)` |
-| `set(key, value)`                | `subscribe(callback)`          |
-| `delete(key)`                    | `doc`                          |
-| `has(key)`                       | `container`                    |
-| `keys()`, `values()`, `entries()`|                                |
-| `size`                           |                                |
-| `replace(values)`                |                                |
-| `merge(values)`                  |                                |
-| `clear()`                        |                                |
-| `toJSON()`                       |                                |
+| Direct Access                     | Only via `loro()`              |
+| --------------------------------- | ------------------------------ |
+| `get(key)`                        | `setContainer(key, container)` |
+| `set(key, value)`                 | `subscribe(callback)`          |
+| `delete(key)`                     | `doc`                          |
+| `has(key)`                        | `container`                    |
+| `keys()`, `values()`, `entries()` |                                |
+| `size`                            |                                |
+| `replace(values)`                 |                                |
+| `merge(values)`                   |                                |
+| `clear()`                         |                                |
+| `toJSON()`                        |                                |
 
 **TextRef**
 
@@ -666,6 +667,25 @@ function TextEditor({ textRef }: { textRef: TextRef }) {
 
   return <div>...</div>;
 }
+```
+
+### Subscribing to Document Transitions
+
+Use `getTransition()` to build `{ before, after }` TypedDocs from a
+subscription event using the diff overlay (no checkout or fork required):
+
+```typescript
+import { getTransition, loro } from "@loro-extended/change";
+
+const unsubscribe = loro(doc).subscribe((event) => {
+  if (event.by === "checkout") return;
+
+  const { before, after } = getTransition(doc, event);
+
+  if (!before.users.has("alice") && after.users.has("alice")) {
+    console.log("Alice just joined");
+  }
+});
 ```
 
 ### Schema Builders
@@ -935,11 +955,11 @@ draft.history.clear();
 
 **Method semantics:**
 
-| Method             | Adds new | Updates existing | Removes absent |
-| ------------------ | -------- | ---------------- | -------------- |
-| `replace(values)`  | ✅       | ✅               | ✅             |
-| `merge(values)`    | ✅       | ✅               | ❌             |
-| `clear()`          | ❌       | ❌               | ✅ (all)       |
+| Method            | Adds new | Updates existing | Removes absent |
+| ----------------- | -------- | ---------------- | -------------- |
+| `replace(values)` | ✅       | ✅               | ✅             |
+| `merge(values)`   | ✅       | ✅               | ❌             |
+| `clear()`         | ❌       | ❌               | ✅ (all)       |
 
 These methods batch all operations into a single commit, avoiding multiple subscription notifications.
 
@@ -957,7 +977,7 @@ const StateNodeDataShape = Shape.struct({
       name: Shape.plain.string(),
       rego: Shape.plain.string(),
       description: Shape.plain.string().nullable(),
-    })
+    }),
   ),
 });
 
@@ -1099,7 +1119,7 @@ const todoSchema = Shape.doc({
       id: Shape.plain.string(),
       text: Shape.plain.string(),
       done: Shape.plain.boolean(),
-    })
+    }),
   ),
 });
 

@@ -205,7 +205,7 @@ describe("shallow fork", () => {
       shallowLoroDoc.setPeerId(loro(doc).doc.peerId)
 
       // Wrap in TypedDoc
-      const shallowDoc = createTypedDoc(TestSchema, shallowLoroDoc)
+      const shallowDoc = createTypedDoc(TestSchema, { doc: shallowLoroDoc })
 
       // Verify state is correct
       expect(shallowDoc.counter.value).toBe(5)

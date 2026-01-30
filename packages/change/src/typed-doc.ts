@@ -16,7 +16,7 @@ import {
 import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
 import { overlayPlaceholder } from "./overlay.js"
 import type { DocShape } from "./shape.js"
-import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
+import { type DiffOverlay, INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc-ref.js"
 import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { validatePlaceholder } from "./validation.js"
@@ -29,14 +29,20 @@ class TypedDocInternal<Shape extends DocShape> {
   private shape: Shape
   private placeholder: InferPlaceholderType<Shape>
   private doc: LoroDoc
+  private overlay?: DiffOverlay
   private valueRef: DocRef<Shape> | null = null
   // Reference to the proxy for returning from change()
   proxy: TypedDoc<Shape> | null = null
 
-  constructor(shape: Shape, doc: LoroDoc = new LoroDoc()) {
+  constructor(
+    shape: Shape,
+    doc: LoroDoc = new LoroDoc(),
+    overlay?: DiffOverlay,
+  ) {
     this.shape = shape
     this.placeholder = derivePlaceholder(shape)
     this.doc = doc
+    this.overlay = overlay
 
     validatePlaceholder(this.placeholder, this.shape)
   }
@@ -48,6 +54,7 @@ class TypedDocInternal<Shape extends DocShape> {
         placeholder: this.placeholder as any,
         doc: this.doc,
         autoCommit: true,
+        overlay: this.overlay,
       })
     }
     return this.valueRef as unknown as Mutable<Shape>
@@ -69,6 +76,7 @@ class TypedDocInternal<Shape extends DocShape> {
       doc: this.doc,
       autoCommit: false,
       batchedMutation: true, // Enable value shape caching for find-and-mutate patterns
+      overlay: this.overlay,
     })
     fn(draft as unknown as Mutable<Shape>)
     draft[INTERNAL_SYMBOL].absorbPlainValues()
@@ -140,6 +148,11 @@ class TypedDocInternal<Shape extends DocShape> {
  */
 export type Frontiers = { peer: PeerID; counter: number }[]
 
+export type CreateTypedDocOptions = {
+  doc?: LoroDoc
+  overlay?: DiffOverlay
+}
+
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
   /**
    * The primary method of mutating typed documents.
@@ -208,7 +221,7 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  * Returns a proxied document where schema properties are accessed directly.
  *
  * @param shape - The document schema (with optional .placeholder() values)
- * @param existingDoc - Optional existing LoroDoc to wrap
+ * @param options - Optional existing LoroDoc or diff overlay
  * @returns A proxied TypedDoc with direct schema access
  *
  * @example
@@ -241,9 +254,13 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  */
 export function createTypedDoc<Shape extends DocShape>(
   shape: Shape,
-  existingDoc?: LoroDoc,
+  options: CreateTypedDocOptions = {},
 ): TypedDoc<Shape> {
-  const internal = new TypedDocInternal(shape, existingDoc || new LoroDoc())
+  const internal = new TypedDocInternal(
+    shape,
+    options.doc || new LoroDoc(),
+    options.overlay,
+  )
 
   // Create the loro() namespace for this doc
   const loroNamespace: LoroTypedDocRef = {
@@ -278,7 +295,7 @@ export function createTypedDoc<Shape extends DocShape>(
   // Create the forkAt() function that returns a new TypedDoc at the specified version
   const forkAtFunction = (frontiers: Frontiers): TypedDoc<Shape> => {
     const forkedLoroDoc = internal.loroDoc.forkAt(frontiers)
-    return createTypedDoc(internal.docShape, forkedLoroDoc)
+    return createTypedDoc(internal.docShape, { doc: forkedLoroDoc })
   }
 
   // Create a proxy that delegates schema properties to the DocRef

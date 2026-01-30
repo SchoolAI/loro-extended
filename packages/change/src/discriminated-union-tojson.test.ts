@@ -64,7 +64,7 @@ describe("Record with Map entries - placeholder required bug", () => {
     // Note: authorColor is NOT set - this should fall back to placeholder
 
     // Now wrap it with TypedDoc
-    const typedDoc = createTypedDoc(AiStateSchema, loroDoc)
+    const typedDoc = createTypedDoc(AiStateSchema, { doc: loroDoc })
 
     // This should not throw "placeholder required"
     // BUG: Currently throws because the nested MapRef has placeholder: undefined
@@ -107,7 +107,7 @@ describe("Record with Map entries - placeholder required bug", () => {
     // Only set peerId - other fields are missing
     studentMap.set("peerId", "peer-456")
 
-    const typedDoc = createTypedDoc(AiStateSchema, loroDoc)
+    const typedDoc = createTypedDoc(AiStateSchema, { doc: loroDoc })
 
     // This should not throw - missing fields should use placeholder defaults
     expect(() => {

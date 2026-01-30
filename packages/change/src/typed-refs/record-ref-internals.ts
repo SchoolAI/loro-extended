@@ -3,6 +3,7 @@ import type {
   LoroDoc,
   LoroEventBatch,
   LoroMap,
+  MapDiff,
   Subscription,
   Value,
 } from "loro-crdt"
@@ -94,6 +95,17 @@ export class RecordRefInternals<
     const container = this.getContainer() as LoroMap
 
     if (isValueShape(shape)) {
+      const overlay = this.getOverlay()
+      if (overlay) {
+        const containerId = (container as any).id
+        const diff = overlay.get(containerId)
+        if (diff && diff.type === "map") {
+          const mapDiff = diff as MapDiff
+          if (key in mapDiff.updated) {
+            return mapDiff.updated[key] as Value
+          }
+        }
+      }
       // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
       // from container (NEVER cache). This ensures we always get the latest value
       // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())

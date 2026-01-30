@@ -74,6 +74,7 @@ export class DocRefInternals<
       autoCommit: this.getAutoCommit(),
       batchedMutation: this.getBatchedMutation(),
       getDoc: () => this.doc,
+      overlay: this.getOverlay(),
     }
   }
 

@@ -4,7 +4,7 @@ export {
   derivePlaceholder,
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
-
+export { createDiffOverlay } from "./diff-overlay.js"
 // Functional helpers (recommended API)
 export {
   change,
@@ -14,7 +14,6 @@ export {
   getLoroDoc,
   shallowForkAt,
 } from "./functional-helpers.js"
-
 // The loro() escape hatch for CRDT internals
 export {
   LORO_SYMBOL,
@@ -27,7 +26,6 @@ export {
   type LoroTypedDocRef,
   loro,
 } from "./loro.js"
-
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"
@@ -75,11 +73,11 @@ export type {
   // WithPlaceholder type for shapes that support .placeholder()
   WithPlaceholder,
 } from "./shape.js"
-
 // Schema and type exports
 export { Shape } from "./shape.js"
 export type { Frontiers, TypedDoc } from "./typed-doc.js"
 export { createTypedDoc } from "./typed-doc.js"
+export type { DiffOverlay } from "./typed-refs/base.js"
 // Typed ref types - for specifying types with the loro() function
 export type { CounterRef } from "./typed-refs/counter-ref.js"
 export type { ListRef } from "./typed-refs/list-ref.js"

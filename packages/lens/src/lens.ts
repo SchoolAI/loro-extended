@@ -12,6 +12,7 @@ import {
   type DocShape,
   loro,
   type Mutable,
+  type TypedDoc,
 } from "@loro-extended/change"
 import type { Frontiers, JsonChange } from "loro-crdt"
 import type { CommitInfo, Lens, LensFilter, LensOptions } from "./types.js"
@@ -117,7 +118,7 @@ export function parseCommitInfo(commit: JsonChange): CommitInfo {
  * ```
  */
 export function createLens<D extends DocShape>(
-  source: import("@loro-extended/change").TypedDoc<D>,
+  source: TypedDoc<D>,
   options?: LensOptions,
 ): Lens<D> {
   // Get filter from options, default to accept all
@@ -135,7 +136,7 @@ export function createLens<D extends DocShape>(
   docLoroDoc.setPeerId(sourceLoroDoc.peerId)
 
   // Create TypedDoc wrapper for worldview
-  const doc = createTypedDoc(docShape, docLoroDoc)
+  const doc = createTypedDoc(docShape, { doc: docLoroDoc })
 
   // Explicit processing state for self-documenting control flow
   let processingState: ProcessingState = "idle"

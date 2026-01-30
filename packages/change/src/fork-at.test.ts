@@ -197,7 +197,7 @@ describe("forkAt", () => {
       expect(rawForkedDoc.toJSON()).toEqual({ text: "Hello" })
 
       // Can wrap it manually if needed
-      const typedForkedDoc = createTypedDoc(schema, rawForkedDoc)
+      const typedForkedDoc = createTypedDoc(schema, { doc: rawForkedDoc })
       expect(typedForkedDoc.text.toString()).toBe("Hello")
     })
   })

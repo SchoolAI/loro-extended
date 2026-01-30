@@ -2248,7 +2248,7 @@ describe("Edge Cases and Error Handling", () => {
       // Note: authorColor is NOT set - this should fall back to placeholder default
 
       // Wrap with TypedDoc
-      const typedDoc = createTypedDoc(DocSchema, loroDoc)
+      const typedDoc = createTypedDoc(DocSchema, { doc: loroDoc })
 
       // This should not throw "placeholder required"
       expect(() => {
