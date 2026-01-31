@@ -74,6 +74,30 @@ export interface CommitInfo {
 export type LensFilter = (info: CommitInfo) => boolean
 
 /**
+ * Options for the change() method.
+ */
+export interface ChangeOptions {
+  /**
+   * Commit message to attach to the change.
+   *
+   * This message will be propagated to the world commit and is available
+   * in server-side filters via `CommitInfo.message`.
+   *
+   * If an object is provided, it will be automatically JSON-serialized.
+   *
+   * @example
+   * ```typescript
+   * // String message
+   * lens.change(draft => { ... }, { commitMessage: "player-move" })
+   *
+   * // Object message (auto-serialized to JSON)
+   * lens.change(draft => { ... }, { commitMessage: { playerId: "alice" } })
+   * ```
+   */
+  commitMessage?: string | object
+}
+
+/**
  * Options for creating a Lens.
  */
 export interface LensOptions {
@@ -135,7 +159,7 @@ export interface Lens<D extends DocShape> {
    * UI components should read from this document.
    * It contains only the commits that passed the filter.
    */
-  readonly doc: TypedDoc<D>
+  readonly worldview: TypedDoc<D>
 
   /**
    * The world (shared, converging state).
@@ -144,7 +168,7 @@ export interface Lens<D extends DocShape> {
    * It receives all commits (for CRDT convergence) and is
    * typically synced externally (e.g., via Repo).
    */
-  readonly source: TypedDoc<D>
+  readonly world: TypedDoc<D>
 
   /**
    * Apply a local change to the worldview.
@@ -156,16 +180,23 @@ export interface Lens<D extends DocShape> {
    * Local changes bypass the filter (they're trusted local code).
    *
    * @param fn - Mutation function that modifies the draft
+   * @param options - Optional configuration including commit message
    *
    * @example
    * ```typescript
+   * // Basic change
    * lens.change(draft => {
    *   draft.game.players.alice.choice = "rock"
    *   draft.game.players.alice.locked = true
    * })
+   *
+   * // With commit message for identity-based filtering
+   * lens.change(draft => {
+   *   draft.game.players.alice.choice = "rock"
+   * }, { commitMessage: { playerId: "alice" } })
    * ```
    */
-  change(fn: (draft: Mutable<D>) => void): void
+  change(fn: (draft: Mutable<D>) => void, options?: ChangeOptions): void
 
   /**
    * Clean up resources and stop the lens.

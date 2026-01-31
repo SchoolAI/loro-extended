@@ -17,8 +17,8 @@ describe("createLens", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
-      expect(lens.doc).toBeDefined()
-      expect(lens.source).toBe(source)
+      expect(lens.worldview).toBeDefined()
+      expect(lens.world).toBe(source)
       expect(lens.change).toBeInstanceOf(Function)
       expect(lens.dispose).toBeInstanceOf(Function)
 
@@ -35,9 +35,9 @@ describe("createLens", () => {
 
       const lens = createLens(source)
 
-      expect(lens.doc.counter.value).toBe(5)
-      expect(lens.doc.text.toString()).toBe("Hello")
-      expect(lens.doc.data.get("key")).toBe("value")
+      expect(lens.worldview.counter.value).toBe(5)
+      expect(lens.worldview.text.toString()).toBe("Hello")
+      expect(lens.worldview.data.get("key")).toBe("value")
 
       lens.dispose()
     })
@@ -47,7 +47,7 @@ describe("createLens", () => {
       const lens = createLens(source)
 
       const sourcePeerId = loro(source).doc.peerId
-      const docPeerId = loro(lens.doc).doc.peerId
+      const docPeerId = loro(lens.worldview).doc.peerId
 
       expect(docPeerId).toBe(sourcePeerId)
 
@@ -65,8 +65,8 @@ describe("createLens", () => {
         d.text.insert(0, "World")
       })
 
-      expect(lens.doc.counter.value).toBe(10)
-      expect(lens.doc.text.toString()).toBe("World")
+      expect(lens.worldview.counter.value).toBe(10)
+      expect(lens.worldview.text.toString()).toBe("World")
 
       lens.dispose()
     })
@@ -96,7 +96,7 @@ describe("createLens", () => {
         d.counter.increment(5)
       })
 
-      expect(lens.doc.counter.value).toBe(5)
+      expect(lens.worldview.counter.value).toBe(5)
       expect(source.counter.value).toBe(5)
 
       lens.dispose()
@@ -111,9 +111,162 @@ describe("createLens", () => {
         // No changes
       })
 
-      expect(lens.doc.counter.value).toBe(0)
+      expect(lens.worldview.counter.value).toBe(0)
 
       lens.dispose()
+    })
+
+    it("propagates commit messages from worldview to world", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      const worldLoroDoc = loro(world).doc
+      const frontiersBefore = worldLoroDoc.frontiers()
+
+      const commitMessage = "client-identity-message"
+      lens.change(
+        d => {
+          d.counter.increment(1)
+        },
+        { commitMessage },
+      )
+
+      const frontiersAfter = worldLoroDoc.frontiers()
+      const spans = worldLoroDoc.findIdSpansBetween(
+        frontiersBefore,
+        frontiersAfter,
+      )
+      const changes = spans.forward.flatMap(span =>
+        worldLoroDoc.exportJsonInIdSpan({
+          peer: span.peer,
+          counter: span.counter,
+          length: span.length,
+        }),
+      )
+
+      expect(changes).toHaveLength(1)
+      expect(changes[0].msg).toBe(commitMessage)
+
+      lens.dispose()
+    })
+
+    it("serializes object commit messages to JSON", () => {
+      const source = createTypedDoc(TestSchema)
+      const lens = createLens(source)
+
+      const sourceLoroDoc = loro(source).doc
+      const frontiersBefore = sourceLoroDoc.frontiers()
+
+      const commitMessage = { playerId: "alice", action: "move" }
+      lens.change(
+        d => {
+          d.counter.increment(1)
+        },
+        { commitMessage },
+      )
+
+      const frontiersAfter = sourceLoroDoc.frontiers()
+      const spans = sourceLoroDoc.findIdSpansBetween(
+        frontiersBefore,
+        frontiersAfter,
+      )
+      const changes = spans.forward.flatMap(span =>
+        sourceLoroDoc.exportJsonInIdSpan({
+          peer: span.peer,
+          counter: span.counter,
+          length: span.length,
+        }),
+      )
+
+      expect(changes).toHaveLength(1)
+      expect(changes[0].msg).toBe(JSON.stringify(commitMessage))
+
+      lens.dispose()
+    })
+
+    it("propagates commit messages through chained lenses", () => {
+      const source = createTypedDoc(TestSchema)
+      const lens1 = createLens(source)
+      const lens2 = createLens(lens1.worldview)
+
+      const sourceLoroDoc = loro(source).doc
+      const frontiersBefore = sourceLoroDoc.frontiers()
+
+      const commitMessage = "chained-message"
+      lens2.change(
+        d => {
+          d.counter.increment(1)
+        },
+        { commitMessage },
+      )
+
+      const frontiersAfter = sourceLoroDoc.frontiers()
+      const spans = sourceLoroDoc.findIdSpansBetween(
+        frontiersBefore,
+        frontiersAfter,
+      )
+      const changes = spans.forward.flatMap(span =>
+        sourceLoroDoc.exportJsonInIdSpan({
+          peer: span.peer,
+          counter: span.counter,
+          length: span.length,
+        }),
+      )
+
+      expect(changes).toHaveLength(1)
+      expect(changes[0].msg).toBe(commitMessage)
+
+      // Verify the change propagated through the chain
+      expect(source.counter.value).toBe(1)
+      expect(lens1.worldview.counter.value).toBe(1)
+      expect(lens2.worldview.counter.value).toBe(1)
+
+      lens2.dispose()
+      lens1.dispose()
+    })
+
+    it("propagates commit messages through three-level chain", () => {
+      const source = createTypedDoc(TestSchema)
+      const lens1 = createLens(source)
+      const lens2 = createLens(lens1.worldview)
+      const lens3 = createLens(lens2.worldview)
+
+      const sourceLoroDoc = loro(source).doc
+      const frontiersBefore = sourceLoroDoc.frontiers()
+
+      const commitMessage = { level: 3, action: "deep-change" }
+      lens3.change(
+        d => {
+          d.counter.increment(1)
+        },
+        { commitMessage },
+      )
+
+      const frontiersAfter = sourceLoroDoc.frontiers()
+      const spans = sourceLoroDoc.findIdSpansBetween(
+        frontiersBefore,
+        frontiersAfter,
+      )
+      const changes = spans.forward.flatMap(span =>
+        sourceLoroDoc.exportJsonInIdSpan({
+          peer: span.peer,
+          counter: span.counter,
+          length: span.length,
+        }),
+      )
+
+      expect(changes).toHaveLength(1)
+      expect(changes[0].msg).toBe(JSON.stringify(commitMessage))
+
+      // Verify the change propagated through the entire chain
+      expect(source.counter.value).toBe(1)
+      expect(lens1.worldview.counter.value).toBe(1)
+      expect(lens2.worldview.counter.value).toBe(1)
+      expect(lens3.worldview.counter.value).toBe(1)
+
+      lens3.dispose()
+      lens2.dispose()
+      lens1.dispose()
     })
   })
 
@@ -132,7 +285,7 @@ describe("createLens", () => {
       loro(source).doc.import(bytes)
 
       // Should reach doc
-      expect(lens.doc.counter.value).toBe(7)
+      expect(lens.worldview.counter.value).toBe(7)
 
       lens.dispose()
     })
@@ -152,7 +305,7 @@ describe("createLens", () => {
 
       // Source has it, but doc should not
       expect(source.counter.value).toBe(7)
-      expect(lens.doc.counter.value).toBe(0)
+      expect(lens.worldview.counter.value).toBe(0)
 
       lens.dispose()
     })
@@ -180,12 +333,12 @@ describe("createLens", () => {
 
       // Import allowed
       loro(source).doc.import(allowedDoc.export({ mode: "update" }))
-      expect(lens.doc.counter.value).toBe(5)
+      expect(lens.worldview.counter.value).toBe(5)
 
       // Import disallowed
       loro(source).doc.import(disallowedDoc.export({ mode: "update" }))
       // Doc should still be 5 (disallowed was rejected)
-      expect(lens.doc.counter.value).toBe(5)
+      expect(lens.worldview.counter.value).toBe(5)
       // But source has both
       expect(source.counter.value).toBe(15)
 
@@ -228,7 +381,7 @@ describe("createLens", () => {
       // Source has all changes (1+2+3=6)
       expect(source.counter.value).toBe(6)
       // Doc should have none (first was rejected, subsequent skipped)
-      expect(lens.doc.counter.value).toBe(0)
+      expect(lens.worldview.counter.value).toBe(0)
 
       lens.dispose()
     })
@@ -261,7 +414,7 @@ describe("createLens", () => {
       // Source has both (10+5=15)
       expect(source.counter.value).toBe(15)
       // Doc only has accepted (5)
-      expect(lens.doc.counter.value).toBe(5)
+      expect(lens.worldview.counter.value).toBe(5)
 
       lens.dispose()
     })
@@ -279,7 +432,7 @@ describe("createLens", () => {
         d.counter.increment(10)
       })
 
-      expect(lens.doc.counter.value).toBe(0)
+      expect(lens.worldview.counter.value).toBe(0)
       expect(source.counter.value).toBe(0)
     })
 
@@ -300,7 +453,7 @@ describe("createLens", () => {
       // Source has it
       expect(source.counter.value).toBe(7)
       // Doc should not (subscription was removed)
-      expect(lens.doc.counter.value).toBe(0)
+      expect(lens.worldview.counter.value).toBe(0)
     })
 
     it("can be called multiple times safely", () => {
@@ -333,7 +486,7 @@ describe("createLens", () => {
       loro(source).doc.import(externalDoc.export({ mode: "update" }))
 
       // Both should be present
-      expect(lens.doc.counter.value).toBe(8)
+      expect(lens.worldview.counter.value).toBe(8)
       expect(source.counter.value).toBe(8)
 
       lens.dispose()
@@ -426,7 +579,7 @@ describe("createLens", () => {
       loro(source).doc.import(untrustedDoc.export({ mode: "update" }))
 
       // Only trusted peer's changes should reach doc
-      expect(lens.doc.counter.value).toBe(10)
+      expect(lens.worldview.counter.value).toBe(10)
       expect(source.counter.value).toBe(30)
 
       lens.dispose()
@@ -457,7 +610,7 @@ describe("createLens", () => {
       loro(source).doc.import(disallowedDoc.export({ mode: "update" }))
 
       // Only allowed changes should reach doc
-      expect(lens.doc.counter.value).toBe(5)
+      expect(lens.worldview.counter.value).toBe(5)
       expect(source.counter.value).toBe(15)
 
       lens.dispose()

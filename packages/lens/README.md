@@ -4,7 +4,7 @@ Composable bidirectional filtered synchronization for Loro TypedDoc.
 
 ## Overview
 
-A **Lens** creates a **worldview** (`lens.doc`) from a **world** (`lens.source`). The worldview is your filtered perspective on the shared world—you see only the changes you've chosen to accept.
+A **Lens** creates a **worldview** (`lens.worldview`) from a **world** (`lens.world`). The worldview is your filtered perspective on the shared world—you see only the changes you've chosen to accept.
 
 Changes flow bidirectionally:
 
@@ -19,7 +19,7 @@ This enables **local sovereignty**—the ability to filter out unwanted peer cha
 │                               │                                 │
 │                               ▼                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │                  lens.source (TypedDoc)                 │   │
+│   │                  lens.world (TypedDoc)                  │   │
 │   │                     World (shared)                      │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │            │                                    ▲               │
@@ -29,7 +29,7 @@ This enables **local sovereignty**—the ability to filter out unwanted peer cha
 │            │ → import accepted                  │               │
 │            ▼                                    │               │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │                    lens.doc (TypedDoc)                  │   │
+│   │                 lens.worldview (TypedDoc)               │   │
 │   │                  Worldview (filtered)                   │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                               │                                 │
@@ -74,7 +74,7 @@ const lens = createLens(world, {
 });
 
 // Read from the worldview (filtered)
-const players = lens.doc.players.toJSON();
+const players = lens.worldview.players.toJSON();
 
 // Write through the lens (propagates to world)
 lens.change((draft) => {
@@ -100,7 +100,7 @@ const lens = createLens(handle.doc, {
   },
 });
 
-// UI reads from lens.doc (worldview)
+// UI reads from lens.worldview (worldview)
 // Writes go through lens.change()
 ```
 
@@ -123,16 +123,25 @@ Creates a Lens from a world TypedDoc.
 ```typescript
 interface Lens<D extends DocShape> {
   /** The worldview (filtered) - UI reads from here */
-  readonly doc: TypedDoc<D>;
+  readonly worldview: TypedDoc<D>;
 
   /** The world (shared) - for reference/sync */
-  readonly source: TypedDoc<D>;
+  readonly world: TypedDoc<D>;
 
   /** Apply changes to worldview, propagate to world via applyDiff */
-  change(fn: (draft: Mutable<D>) => void): void;
+  change(fn: (draft: Mutable<D>) => void, options?: ChangeOptions): void;
 
   /** Cleanup subscriptions */
   dispose(): void;
+}
+```
+
+### `ChangeOptions`
+
+```typescript
+interface ChangeOptions {
+  /** Commit message to attach (string or object, auto-serialized) */
+  commitMessage?: string | object;
 }
 ```
 
@@ -199,7 +208,7 @@ Reject all external commits (read-only for external changes).
 import { filterAll } from "@loro-extended/lens";
 
 const lens = createLens(world, { filter: filterAll });
-// External changes won't reach the worldview (lens.doc)
+// External changes won't reach the worldview (lens.worldview)
 // Local changes via lens.change() still work
 ```
 
@@ -274,6 +283,32 @@ const lens = createLens(world, {
 });
 ```
 
+## Commit Messages
+
+When using lens-based filtering, you can attach commit messages that will be visible to server-side filters:
+
+```typescript
+// String message
+lens.change(
+  (draft) => {
+    draft.game.players.get(playerId).choice = "rock";
+  },
+  { commitMessage: "player-move" },
+);
+
+// Object message (auto-serialized to JSON)
+lens.change(
+  (draft) => {
+    draft.game.players.get(playerId).choice = "rock";
+  },
+  { commitMessage: { playerId, action: "move" } },
+);
+```
+
+The message is automatically JSON-serialized and available in the filter's `CommitInfo.message`. This enables identity-based filtering where the server can verify who made each change.
+
+Commit messages also propagate through chained lenses, so a change made in a deeply nested lens will have its message available at the root world.
+
 ## Lens Composition
 
 Lenses can be chained for multi-level filtering:
@@ -285,11 +320,11 @@ const adminLens = createLens(world, {
 });
 
 // Second lens: further filter by timestamp
-const recentLens = createLens(adminLens.doc, {
+const recentLens = createLens(adminLens.worldview, {
   filter: (info) => info.timestamp > Date.now() / 1000 - 3600,
 });
 
-// recentLens.doc only contains recent admin commits
+// recentLens.worldview only contains recent admin commits
 ```
 
 ## Key Design Decisions
@@ -314,12 +349,12 @@ The worldview is created via `world.fork()` with the same peer ID as the world. 
 
 ```typescript
 // World has counter=100 from filtered peer
-// Worldview (lens.doc) has counter=0 (filtered)
+// Worldview (lens.worldview) has counter=0 (filtered)
 lens.change((d) => d.counter.increment(5));
 
 // Result:
-// - lens.doc.counter = 5 (worldview)
-// - lens.source.counter = 105 (world: 100 + 5, NOT 5!)
+// - lens.worldview.counter = 5 (worldview)
+// - lens.world.counter = 105 (world: 100 + 5, NOT 5!)
 ```
 
 This is intentional—the world maintains complete history, the worldview provides a filtered perspective.
@@ -352,7 +387,7 @@ Filters only apply to **inbound** changes (world → worldview). Outbound writes
 
 ### Undo/Redo
 
-- `lens.doc` and `source` are separate documents with independent undo stacks
+- `lens.worldview` and `lens.world` are separate documents with independent undo stacks
 - Changes via `applyDiff` create new commits, not replayed operations
 
 See [TECHNICAL.md](./TECHNICAL.md) for detailed documentation.

@@ -7,15 +7,56 @@
  */
 
 import {
-  change as applyChange,
   createTypedDoc,
   type DocShape,
   loro,
   type Mutable,
   type TypedDoc,
 } from "@loro-extended/change"
-import type { Frontiers, JsonChange } from "loro-crdt"
-import type { CommitInfo, Lens, LensFilter, LensOptions } from "./types.js"
+import type { Frontiers, JsonChange, LoroDoc } from "loro-crdt"
+import type {
+  ChangeOptions,
+  CommitInfo,
+  Lens,
+  LensFilter,
+  LensOptions,
+} from "./types.js"
+
+/**
+ * Module-level WeakMap for inter-lens message passing.
+ *
+ * This enables commit messages to propagate through chained lenses.
+ * When a child lens commits to its world (parent's worldview), it stores
+ * the message here. The parent lens's subscription retrieves it synchronously.
+ *
+ * WeakMap is safe because:
+ * 1. Loro subscriptions fire synchronously during commit()
+ * 2. JavaScript is single-threaded, so each lens.change() completes fully
+ *    (including all subscription callbacks) before the next one starts
+ * 3. The entry is set before commit() and retrieved/deleted during the
+ *    synchronous subscription callback
+ */
+const pendingMessages = new WeakMap<LoroDoc, string>()
+
+/**
+ * Serialize a commit message to a string.
+ *
+ * - String messages are returned as-is
+ * - Object messages are JSON-serialized
+ * - Handles serialization errors gracefully (returns undefined)
+ */
+function serializeMessage(
+  message: string | object | undefined,
+): string | undefined {
+  if (message === undefined) return undefined
+  if (typeof message === "string") return message
+  try {
+    return JSON.stringify(message)
+  } catch {
+    // Handle circular references, BigInt, etc.
+    return undefined
+  }
+}
 
 /**
  * Processing state for the lens.
@@ -70,14 +111,14 @@ export function parseCommitInfo(commit: JsonChange): CommitInfo {
 /**
  * Create a Lens from a world TypedDoc.
  *
- * The Lens creates a worldview (`doc`) from a world (`source`).
+ * The Lens creates a worldview from a world.
  * Changes flow bidirectionally:
  * - External imports to the world are filtered before reaching the worldview
  * - Local changes via `change()` propagate to the world via state-based diff
  *
  * @param world - The world TypedDoc (shared, converging state) to create a lens from
  * @param options - Optional configuration including filter function
- * @returns A Lens with doc (worldview), source (world), change(), and dispose()
+ * @returns A Lens with worldview, world, change(), and dispose()
  *
  * @example
  * ```typescript
@@ -118,7 +159,7 @@ export function parseCommitInfo(commit: JsonChange): CommitInfo {
  * ```
  */
 export function createLens<D extends DocShape>(
-  source: TypedDoc<D>,
+  world: TypedDoc<D>,
   options?: LensOptions,
 ): Lens<D> {
   // Get filter from options, default to accept all
@@ -126,33 +167,33 @@ export function createLens<D extends DocShape>(
 
   // Extract LoroDoc and shape from world TypedDoc
   // (internally we use sourceLoroDoc/docLoroDoc for the underlying LoroDoc instances)
-  const sourceLoroDoc = loro(source).doc
-  const docShape = loro(source).docShape as D
+  const worldLoroDoc = loro(world).doc
+  const worldShape = loro(world).docShape as D
 
   // Create worldview as a fork with preserved peer ID
   // This keeps the version vector small and ensures local writes
   // appear as the same peer in both documents.
-  const docLoroDoc = sourceLoroDoc.fork()
-  docLoroDoc.setPeerId(sourceLoroDoc.peerId)
+  const worldviewLoroDoc = worldLoroDoc.fork()
+  worldviewLoroDoc.setPeerId(worldLoroDoc.peerId)
 
   // Create TypedDoc wrapper for worldview
-  const doc = createTypedDoc(docShape, { doc: docLoroDoc })
+  const worldviewDoc = createTypedDoc(worldShape, { doc: worldviewLoroDoc })
 
   // Explicit processing state for self-documenting control flow
   let processingState: ProcessingState = "idle"
   let isDisposed = false
 
   // Track last known frontiers for detecting changes
-  let lastKnownSourceFrontiers = sourceLoroDoc.frontiers()
-  let lastKnownDocFrontiers = docLoroDoc.frontiers()
+  let lastKnownWorldFrontiers = worldLoroDoc.frontiers()
+  let lastKnownWorldviewFrontiers = worldviewLoroDoc.frontiers()
 
   /**
    * Centralized frontier synchronization.
    * Call this after any operation that modifies either document.
    */
   function syncFrontiers(): void {
-    lastKnownSourceFrontiers = sourceLoroDoc.frontiers()
-    lastKnownDocFrontiers = docLoroDoc.frontiers()
+    lastKnownWorldFrontiers = worldLoroDoc.frontiers()
+    lastKnownWorldviewFrontiers = worldviewLoroDoc.frontiers()
   }
 
   /**
@@ -179,7 +220,7 @@ export function createLens<D extends DocShape>(
     worldFrontiersBefore: Frontiers,
     worldFrontiersAfter: Frontiers,
   ): void {
-    const spans = sourceLoroDoc.findIdSpansBetween(
+    const spans = worldLoroDoc.findIdSpansBetween(
       worldFrontiersBefore,
       worldFrontiersAfter,
     )
@@ -197,7 +238,7 @@ export function createLens<D extends DocShape>(
 
     for (const span of spans.forward) {
       // Get all changes (commits) in this span
-      const changes = sourceLoroDoc.exportJsonInIdSpan({
+      const changes = worldLoroDoc.exportJsonInIdSpan({
         peer: span.peer,
         counter: span.counter,
         length: span.length,
@@ -285,11 +326,11 @@ export function createLens<D extends DocShape>(
     }
 
     // Export valid changes and import to worldview
-    const validBytes = sourceLoroDoc.export({
+    const validBytes = worldLoroDoc.export({
       mode: "updates-in-range",
       spans: validSpans,
     })
-    docLoroDoc.import(validBytes)
+    worldviewLoroDoc.import(validBytes)
   }
 
   /**
@@ -305,19 +346,19 @@ export function createLens<D extends DocShape>(
   function processWorldChange(): void {
     if (isDisposed || processingState !== "idle") return
 
-    const worldFrontiersAfter = sourceLoroDoc.frontiers()
+    const worldFrontiersAfter = worldLoroDoc.frontiers()
 
     // Check if frontiers actually changed
-    if (frontiersEqual(lastKnownSourceFrontiers, worldFrontiersAfter)) return
+    if (frontiersEqual(lastKnownWorldFrontiers, worldFrontiersAfter)) return
 
-    const worldFrontiersBefore = lastKnownSourceFrontiers
-    lastKnownSourceFrontiers = worldFrontiersAfter
+    const worldFrontiersBefore = lastKnownWorldFrontiers
+    lastKnownWorldFrontiers = worldFrontiersAfter
 
     filterWorldToWorldview(worldFrontiersBefore, worldFrontiersAfter)
   }
 
   // Subscribe to world for changes (external imports and parent lens changes)
-  const unsubscribeWorld = sourceLoroDoc.subscribe(event => {
+  const unsubscribeWorld = worldLoroDoc.subscribe(event => {
     // Process import events from external peers
     // AND local events from parent lens's change() method
     if (event.by === "import" || event.by === "local") {
@@ -326,47 +367,59 @@ export function createLens<D extends DocShape>(
   })
 
   /**
-   * Process changes to worldview from a chained lens.
+   * Unified propagation from worldview to world.
    *
-   * When a chained lens (lens2) applies changes to this lens's worldview via applyDiff,
-   * we need to propagate those changes to our world.
+   * Propagates the delta (new changes only) from worldview to world,
+   * preserving the world's state that was filtered out from the worldview.
    *
-   * Important: We only propagate the NEW changes (delta), not the entire state.
-   * This preserves the world's state that was filtered out from the worldview.
+   * @param worldviewFrontiersBefore - Frontiers before the change
+   * @param commitMessage - Optional commit message to attach
    */
-  function processWorldviewChange(): void {
-    if (isDisposed || processingState !== "idle") return
-
-    const worldviewFrontiersAfter = docLoroDoc.frontiers()
+  function propagateToWorld(
+    worldviewFrontiersBefore: Frontiers,
+    commitMessage?: string,
+  ): void {
+    const worldviewFrontiersAfter = worldviewLoroDoc.frontiers()
 
     // Check if worldview frontiers actually changed
-    if (frontiersEqual(lastKnownDocFrontiers, worldviewFrontiersAfter)) return
+    if (frontiersEqual(worldviewFrontiersBefore, worldviewFrontiersAfter))
+      return
 
-    const worldviewFrontiersBefore = lastKnownDocFrontiers
+    // Get the diff of just the NEW changes to worldview (not the entire state)
+    const diff = worldviewLoroDoc.diff(
+      worldviewFrontiersBefore,
+      worldviewFrontiersAfter,
+      false,
+    )
+    worldLoroDoc.applyDiff(diff)
 
-    processingState = "propagating-worldview-to-world"
-    try {
-      // Get the diff of just the NEW changes to worldview (not the entire state)
-      const diff = docLoroDoc.diff(
-        worldviewFrontiersBefore,
-        worldviewFrontiersAfter,
-        false,
-      )
-      sourceLoroDoc.applyDiff(diff)
-      sourceLoroDoc.commit()
-
-      // Centralized frontier sync
-      syncFrontiers()
-    } finally {
-      processingState = "idle"
+    if (commitMessage) {
+      worldLoroDoc.setNextCommitMessage(commitMessage)
+      // Store for parent lens to pick up (for chained lenses)
+      pendingMessages.set(worldLoroDoc, commitMessage)
     }
+    worldLoroDoc.commit()
+
+    // Centralized frontier sync
+    syncFrontiers()
   }
 
   // Subscribe to worldview for changes from chained lenses
-  const unsubscribeWorldview = docLoroDoc.subscribe(event => {
+  const unsubscribeWorldview = worldviewLoroDoc.subscribe(event => {
     // Process local events (from chained lens applyDiff)
     if (event.by === "local") {
-      processWorldviewChange()
+      if (isDisposed || processingState !== "idle") return
+
+      // Retrieve pending message from child lens (if any)
+      const pendingMessage = pendingMessages.get(worldviewLoroDoc)
+      pendingMessages.delete(worldviewLoroDoc)
+
+      processingState = "propagating-worldview-to-world"
+      try {
+        propagateToWorld(lastKnownWorldviewFrontiers, pendingMessage)
+      } finally {
+        processingState = "idle"
+      }
     }
   })
 
@@ -376,48 +429,40 @@ export function createLens<D extends DocShape>(
    * Uses applyDiff (state-based) instead of op-based import to avoid
    * causal history issues. This ensures local changes "win" regardless
    * of concurrent peer changes that were filtered out.
+   *
+   * @param fn - Mutation function that modifies the draft
+   * @param options - Optional configuration including commit message
    */
-  function processLocalChange(fn: (draft: Mutable<D>) => void): void {
+  function processLocalChange(
+    fn: (draft: Mutable<D>) => void,
+    options?: ChangeOptions,
+  ): void {
     if (isDisposed) return
 
     processingState = "applying-local-change"
     try {
       // Capture frontiers before change
-      const worldviewFrontiersBefore = docLoroDoc.frontiers()
+      const worldviewFrontiersBefore = worldviewLoroDoc.frontiers()
 
       // Apply change to worldview
-      applyChange(doc, fn)
+      worldviewDoc.change(fn)
 
-      // Capture frontiers after change
-      const worldviewFrontiersAfter = docLoroDoc.frontiers()
+      // Serialize commit message (handles string/object)
+      const serializedMessage = serializeMessage(options?.commitMessage)
 
-      // Check if anything changed
-      if (frontiersEqual(worldviewFrontiersBefore, worldviewFrontiersAfter))
-        return
-
-      // Use applyDiff (state-based) to propagate to world
-      // This avoids causal history issues - local changes "win"
-      const diff = docLoroDoc.diff(
-        worldviewFrontiersBefore,
-        worldviewFrontiersAfter,
-        false,
-      )
-      sourceLoroDoc.applyDiff(diff)
-      sourceLoroDoc.commit()
-
-      // Centralized frontier sync
-      syncFrontiers()
+      // Propagate to world with commit message
+      propagateToWorld(worldviewFrontiersBefore, serializedMessage)
     } finally {
       processingState = "idle"
     }
   }
 
   return {
-    get doc() {
-      return doc
+    get worldview() {
+      return worldviewDoc
     },
-    get source() {
-      return source
+    get world() {
+      return world
     },
     change: processLocalChange,
     dispose() {

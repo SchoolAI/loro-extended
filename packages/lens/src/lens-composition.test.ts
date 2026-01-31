@@ -17,12 +17,12 @@ describe("lens composition", () => {
     // First lens: accept all
     const lens1 = createLens(source)
 
-    // Second lens: chain from first lens's doc
-    const lens2 = createLens(lens1.doc)
+    // Second lens: chain from first lens's worldview
+    const lens2 = createLens(lens1.worldview)
 
     // Verify chain structure
-    expect(lens1.source).toBe(source)
-    expect(lens2.source).toBe(lens1.doc)
+    expect(lens1.world).toBe(source)
+    expect(lens2.world).toBe(lens1.worldview)
 
     lens2.dispose()
     lens1.dispose()
@@ -31,7 +31,7 @@ describe("lens composition", () => {
   it("propagates local changes through chain", () => {
     const source = createTypedDoc(TestSchema)
     const lens1 = createLens(source)
-    const lens2 = createLens(lens1.doc)
+    const lens2 = createLens(lens1.worldview)
 
     // Change through innermost lens
     lens2.change(d => {
@@ -39,8 +39,8 @@ describe("lens composition", () => {
     })
 
     // Should propagate all the way to source
-    expect(lens2.doc.counter.value).toBe(5)
-    expect(lens1.doc.counter.value).toBe(5)
+    expect(lens2.worldview.counter.value).toBe(5)
+    expect(lens1.worldview.counter.value).toBe(5)
     expect(source.counter.value).toBe(5)
 
     lens2.dispose()
@@ -56,7 +56,7 @@ describe("lens composition", () => {
     })
 
     // Second lens: accept commits with "allowed" in message
-    const lens2 = createLens(lens1.doc, {
+    const lens2 = createLens(lens1.worldview, {
       filter: info => {
         const msg = info.message as { allowed?: boolean } | undefined
         return msg?.allowed === true
@@ -90,10 +90,10 @@ describe("lens composition", () => {
     expect(source.counter.value).toBe(60)
 
     // Lens1 only has peers starting with "1" (10+20=30)
-    expect(lens1.doc.counter.value).toBe(30)
+    expect(lens1.worldview.counter.value).toBe(30)
 
     // Lens2 only has peers starting with "1" with allowed=true (10)
-    expect(lens2.doc.counter.value).toBe(10)
+    expect(lens2.worldview.counter.value).toBe(10)
 
     lens2.dispose()
     lens1.dispose()
@@ -102,15 +102,15 @@ describe("lens composition", () => {
   it("handles dispose in chain correctly", () => {
     const source = createTypedDoc(TestSchema)
     const lens1 = createLens(source)
-    const lens2 = createLens(lens1.doc)
+    const lens2 = createLens(lens1.worldview)
 
     // Make a change BEFORE dispose
     lens1.change(d => {
       d.counter.increment(5)
     })
 
-    expect(lens1.doc.counter.value).toBe(5)
-    expect(lens2.doc.counter.value).toBe(5)
+    expect(lens1.worldview.counter.value).toBe(5)
+    expect(lens2.worldview.counter.value).toBe(5)
     expect(source.counter.value).toBe(5)
 
     // Dispose inner lens
@@ -121,7 +121,7 @@ describe("lens composition", () => {
       d.counter.increment(3)
     })
 
-    expect(lens1.doc.counter.value).toBe(8)
+    expect(lens1.worldview.counter.value).toBe(8)
     expect(source.counter.value).toBe(8)
 
     // Inner lens should not receive updates after dispose
@@ -134,11 +134,11 @@ describe("lens composition", () => {
 
     // Source and lens1 have it
     expect(source.counter.value).toBe(18)
-    expect(lens1.doc.counter.value).toBe(18)
+    expect(lens1.worldview.counter.value).toBe(18)
 
     // lens2 should still have value from before dispose (5)
     // It doesn't receive the +3 or +10 changes
-    expect(lens2.doc.counter.value).toBe(5)
+    expect(lens2.worldview.counter.value).toBe(5)
 
     lens1.dispose()
   })
@@ -146,8 +146,8 @@ describe("lens composition", () => {
   it("supports three-level chain", () => {
     const source = createTypedDoc(TestSchema)
     const lens1 = createLens(source)
-    const lens2 = createLens(lens1.doc)
-    const lens3 = createLens(lens2.doc)
+    const lens2 = createLens(lens1.worldview)
+    const lens3 = createLens(lens2.worldview)
 
     // Change through deepest lens
     lens3.change(d => {
@@ -155,9 +155,9 @@ describe("lens composition", () => {
     })
 
     // Should propagate all the way
-    expect(lens3.doc.counter.value).toBe(7)
-    expect(lens2.doc.counter.value).toBe(7)
-    expect(lens1.doc.counter.value).toBe(7)
+    expect(lens3.worldview.counter.value).toBe(7)
+    expect(lens2.worldview.counter.value).toBe(7)
+    expect(lens1.worldview.counter.value).toBe(7)
     expect(source.counter.value).toBe(7)
 
     lens3.dispose()
