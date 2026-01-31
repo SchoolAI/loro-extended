@@ -1,6 +1,11 @@
-import { loro, type DocShape, type Infer, type TypedDoc } from "@loro-extended/change"
-import { createLens } from "@loro-extended/lens"
+import {
+  type DocShape,
+  type Infer,
+  loro,
+  type TypedDoc,
+} from "@loro-extended/change"
 import type { Lens, LensOptions } from "@loro-extended/lens"
+import { createLens } from "@loro-extended/lens"
 import type {
   DocId,
   EphemeralDeclarations,
@@ -85,7 +90,9 @@ export function createHooks(framework: FrameworkHooks) {
 
   // Helper to create a version key that changes on checkout
   // This combines opCount (changes on edits) with frontiers (changes on checkout)
-  function getVersionKey(loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"]): string {
+  function getVersionKey(
+    loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"],
+  ): string {
     const opCount = loroDoc.opCount()
     const frontiers = loroDoc.frontiers()
     // Serialize frontiers to a stable string
@@ -198,13 +205,13 @@ export function createHooks(framework: FrameworkHooks) {
 
     const store = useMemo(() => {
       const computeValue = (): { version: string; value: R | Infer<D> } => {
-        const newVersion = getVersionKey(loro(lens.doc).doc)
+        const newVersion = getVersionKey(loro(lens.worldview).doc)
 
         if (cacheRef.current && cacheRef.current.version === newVersion) {
           return cacheRef.current
         }
 
-        const json = lens.doc.toJSON()
+        const json = lens.worldview.toJSON()
         return {
           version: newVersion,
           value: selector ? selector(json) : json,
@@ -212,7 +219,7 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       const subscribeToSource = (onChange: () => void) => {
-        return loro(lens.doc).doc.subscribe(() => {
+        return loro(lens.worldview).doc.subscribe(() => {
           onChange()
         })
       }

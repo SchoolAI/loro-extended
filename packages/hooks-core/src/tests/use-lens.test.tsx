@@ -25,7 +25,7 @@ describe("useLens", () => {
     expect(result.current.lens).toBe(initialLens)
     expect(result.current.doc.title).toBe("Lens Doc")
     expect(result.current.doc.count).toBe(0)
-    expect(result.current.lens.doc).toBeDefined()
+    expect(result.current.lens.worldview).toBeDefined()
   })
 
   it("should update when lens changes are applied", () => {

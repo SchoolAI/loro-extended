@@ -22,8 +22,14 @@ import type { UndoManagerRegistry } from "./undo-manager-registry"
 // ============================================================================
 
 const coreHooks = createHooks(React)
-export const { RepoContext, useRepo, useHandle, useDoc, useLens, useEphemeral } =
-  coreHooks
+export const {
+  RepoContext,
+  useRepo,
+  useHandle,
+  useDoc,
+  useLens,
+  useEphemeral,
+} = coreHooks
 
 // Create ref hooks
 const refHooks = createRefHooks(React)
