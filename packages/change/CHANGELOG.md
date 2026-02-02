@@ -1,5 +1,66 @@
 # @loro-extended/change
 
+## 5.4.0
+
+### Minor Changes
+
+- e66f01c: Add `replayDiff()` utility for replaying diffs as local operations.
+
+  This enables the fork-and-merge pattern to work with synchronization and undo:
+
+  - Changes are replayed as LOCAL events (not import events)
+  - `subscribeLocalUpdates()` fires for replayed changes
+  - UndoManager records replayed changes
+
+  The `createUpdate()` function in the quiz-challenge example has been updated to use `replayDiff()` instead of `export/import`, fixing the incompatibility between fork-and-merge and the synchronizer.
+
+- 0266dfb: Add bulk update methods to `RecordRef`: `replace()`, `merge()`, and `clear()`.
+
+  These methods provide type-safe bulk operations on records:
+
+  ```typescript
+  doc.change((draft) => {
+    // Replace entire contents (removes keys not in new object)
+    draft.game.players.replace({
+      alice: { choice: null, locked: false },
+      bob: { choice: null, locked: false },
+    });
+
+    // Merge values (keeps existing keys not in new object)
+    draft.game.scores.merge({
+      alice: 100,
+      charlie: 50,
+    });
+
+    // Clear all entries
+    draft.game.history.clear();
+  });
+  ```
+
+  **Method semantics:**
+
+  - `replace(values)` - Sets record to exactly these entries (removes absent keys)
+  - `merge(values)` - Adds/updates entries without removing existing ones
+  - `clear()` - Removes all entries
+
+  This provides a type-safe alternative to direct object assignment, which TypeScript cannot support due to limitations in mapped type getter/setter typing.
+
+  Also improved `RecordRef` type safety:
+
+  - `values()` now returns `InferMutableType<NestedShape>[]` instead of `any[]`
+  - Added `entries()` method returning `[string, InferMutableType<NestedShape>][]`
+  - Both methods return properly typed refs for container-valued records
+
+### Patch Changes
+
+- cab74a3: Externalize `loro-crdt` from bundle output to fix Bun compatibility
+
+  Added `external: ["loro-crdt"]` to tsup configs for all core packages. This prevents `loro-crdt` from being bundled into the dist output, allowing bundlers like Bun to resolve it separately and handle WASM initialization correctly.
+
+  This fixes the `examples/todo-minimal` example which uses Bun's bundler and was failing due to top-level await issues when `loro-crdt` was bundled inline.
+
+- cf2b22c: Fix nested container materialization bug where empty nested containers were not created, causing CRDT sync issues.
+
 ## 5.3.0
 
 ## 5.2.0

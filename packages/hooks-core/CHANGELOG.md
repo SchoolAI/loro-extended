@@ -1,5 +1,25 @@
 # @loro-extended/hooks-core
 
+## 5.4.0
+
+### Patch Changes
+
+- cab74a3: Externalize `loro-crdt` from bundle output to fix Bun compatibility
+
+  Added `external: ["loro-crdt"]` to tsup configs for all core packages. This prevents `loro-crdt` from being bundled into the dist output, allowing bundlers like Bun to resolve it separately and handle WASM initialization correctly.
+
+  This fixes the `examples/todo-minimal` example which uses Bun's bundler and was failing due to top-level await issues when `loro-crdt` was bundled inline.
+
+- a532f43: fix(useDoc): properly detect checkout changes by including frontiers in version key
+
+  The `useDoc` hook now correctly re-renders when the document is checked out to a historical state. Previously, the version key only used `opCount`, which doesn't change during checkout operations. Now the version key includes both `opCount` and `frontiers`, ensuring the hook detects checkout changes.
+
+  This enables time travel debugging features like the History Panel in the quiz-challenge example.
+
+- Updated dependencies [b2614e6]
+- Updated dependencies [cab74a3]
+  - @loro-extended/repo@5.4.0
+
 ## 5.3.0
 
 ### Minor Changes

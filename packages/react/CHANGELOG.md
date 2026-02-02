@@ -1,5 +1,21 @@
 # @loro-extended/react
 
+## 5.4.0
+
+### Patch Changes
+
+- cab74a3: Externalize `loro-crdt` from bundle output to fix Bun compatibility
+
+  Added `external: ["loro-crdt"]` to tsup configs for all core packages. This prevents `loro-crdt` from being bundled into the dist output, allowing bundlers like Bun to resolve it separately and handle WASM initialization correctly.
+
+  This fixes the `examples/todo-minimal` example which uses Bun's bundler and was failing due to top-level await issues when `loro-crdt` was bundled inline.
+
+- Updated dependencies [b2614e6]
+- Updated dependencies [cab74a3]
+- Updated dependencies [a532f43]
+  - @loro-extended/repo@5.4.0
+  - @loro-extended/hooks-core@5.4.0
+
 ## 5.3.0
 
 ### Minor Changes

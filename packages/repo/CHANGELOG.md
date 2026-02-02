@@ -1,5 +1,46 @@
 # @loro-extended/repo
 
+## 5.4.0
+
+### Minor Changes
+
+- b2614e6: BridgeAdapter now delivers messages asynchronously via `queueMicrotask()` to better simulate real network adapter behavior.
+
+  This change ensures that tests using BridgeAdapter exercise the same async codepaths as production adapters (WebSocket, SSE, etc.), helping catch race conditions and async state management bugs that would otherwise only surface in production.
+
+  **Migration**: Tests using BridgeAdapter should use `waitForSync()` or `waitUntilReady()` to await synchronization:
+
+  ```typescript
+  // Before (may have worked due to synchronous delivery)
+  handleA.change((draft) => {
+    draft.text.insert(0, "hello");
+  });
+  expect(handleB.doc.toJSON().text).toBe("hello");
+
+  // After (correct async pattern)
+  handleA.change((draft) => {
+    draft.text.insert(0, "hello");
+  });
+  await handleB.waitForSync();
+  expect(handleB.doc.toJSON().text).toBe("hello");
+  ```
+
+  Most existing tests already follow this pattern and will continue to work without changes.
+
+### Patch Changes
+
+- cab74a3: Externalize `loro-crdt` from bundle output to fix Bun compatibility
+
+  Added `external: ["loro-crdt"]` to tsup configs for all core packages. This prevents `loro-crdt` from being bundled into the dist output, allowing bundlers like Bun to resolve it separately and handle WASM initialization correctly.
+
+  This fixes the `examples/todo-minimal` example which uses Bun's bundler and was failing due to top-level await issues when `loro-crdt` was bundled inline.
+
+- Updated dependencies [cab74a3]
+- Updated dependencies [e66f01c]
+- Updated dependencies [cf2b22c]
+- Updated dependencies [0266dfb]
+  - @loro-extended/change@5.4.0
+
 ## 5.3.0
 
 ### Minor Changes

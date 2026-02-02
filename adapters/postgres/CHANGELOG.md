@@ -1,5 +1,13 @@
 # @loro-extended/adapter-postgres
 
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [b2614e6]
+- Updated dependencies [cab74a3]
+  - @loro-extended/repo@5.4.0
+
 ## 5.3.0
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @loro-extended/hono
 
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [b2614e6]
+- Updated dependencies [cab74a3]
+- Updated dependencies [a532f43]
+  - @loro-extended/repo@5.4.0
+  - @loro-extended/hooks-core@5.4.0
+
 ## 5.3.0
 
 ### Patch Changes
