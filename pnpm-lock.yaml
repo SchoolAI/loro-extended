@@ -14,10 +14,6 @@ packageExtensionsChecksum: sha256-0j/G9R4nW6bplfJI2ElkSyVk6gJXJMpKbd4+Z1PY5AU=
 importers:
 
   .:
-    dependencies:
-      loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.3.7

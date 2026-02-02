@@ -27,8 +27,5 @@
         "module": "nodejs/index.js"
       }
     }
-  },
-  "dependencies": {
-    "loro-crdt": "link:../../tools/loro/crates/loro-wasm"
   }
 }
