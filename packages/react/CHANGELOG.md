@@ -1,5 +1,12 @@
 # @loro-extended/react
 
+## 5.4.1
+
+### Patch Changes
+
+- @loro-extended/hooks-core@5.4.1
+- @loro-extended/repo@5.4.1
+
 ## 5.4.0
 
 ### Patch Changes

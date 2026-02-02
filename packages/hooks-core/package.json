@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/hooks-core",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "Core logic for Loro hooks, shared between React and Hono",
   "author": "Duane Johnson",
   "license": "MIT",

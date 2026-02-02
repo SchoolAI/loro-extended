@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/lens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Composable bidirectional filtered synchronization for Loro TypedDoc",
   "author": "Duane Johnson",
   "license": "MIT",

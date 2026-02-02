@@ -1,5 +1,18 @@
 # @loro-extended/change
 
+## 5.4.1
+
+### Patch Changes
+
+- e1588f2: fix: export all \*ValueShape types
+
+  Newly exported:
+
+  - BooleanValueShape
+  - NullValueShape
+  - UndefinedValueShape
+  - Uint8ArrayValueShape
+
 ## 5.4.0
 
 ### Minor Changes

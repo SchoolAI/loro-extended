@@ -1,5 +1,12 @@
 # @loro-extended/repo
 
+## 5.4.1
+
+### Patch Changes
+
+- Updated dependencies [e1588f2]
+  - @loro-extended/change@5.4.1
+
 ## 5.4.0
 
 ### Minor Changes

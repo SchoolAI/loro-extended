@@ -1,5 +1,13 @@
 # @loro-extended/hooks-core
 
+## 5.4.1
+
+### Patch Changes
+
+- Updated dependencies [a00b155]
+  - @loro-extended/lens@0.2.0
+  - @loro-extended/repo@5.4.1
+
 ## 5.4.0
 
 ### Patch Changes
