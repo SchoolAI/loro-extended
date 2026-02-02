@@ -5,14 +5,15 @@ export {
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
 export { createDiffOverlay } from "./diff-overlay.js"
+export type { Transition } from "./functional-helpers.js"
 // Functional helpers (recommended API)
 export {
   change,
   fork,
   forkAt,
-  getTransition,
   getLoroContainer,
   getLoroDoc,
+  getTransition,
   shallowForkAt,
 } from "./functional-helpers.js"
 // The loro() escape hatch for CRDT internals
@@ -97,6 +98,5 @@ export type {
   InferRaw,
   Mutable,
 } from "./types.js"
-export type { Transition } from "./functional-helpers.js"
 // Utility exports
 export { validatePlaceholder } from "./validation.js"

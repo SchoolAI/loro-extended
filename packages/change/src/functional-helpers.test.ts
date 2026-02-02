@@ -1,3 +1,4 @@
+import type { LoroEventBatch } from "loro-crdt"
 import {
   LoroCounter,
   LoroList,
@@ -7,7 +8,6 @@ import {
   LoroTree,
 } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import type { LoroEventBatch } from "loro-crdt"
 import {
   change,
   getLoroContainer,
