@@ -385,17 +385,17 @@ export interface AnyValueShape extends Shape<Value, Value, undefined> {
 // Union of all ValueShapes - these can only contain other ValueShapes, not ContainerShapes
 export type ValueShape =
   | AnyValueShape
-  | StringValueShape
-  | NumberValueShape
-  | BooleanValueShape
-  | NullValueShape
-  | UndefinedValueShape
-  | Uint8ArrayValueShape
-  | StructValueShape
-  | RecordValueShape
   | ArrayValueShape
-  | UnionValueShape
+  | BooleanValueShape
   | DiscriminatedUnionValueShape
+  | NullValueShape
+  | NumberValueShape
+  | RecordValueShape
+  | StringValueShape
+  | StructValueShape
+  | Uint8ArrayValueShape
+  | UndefinedValueShape
+  | UnionValueShape
 
 export type ContainerOrValueShape = ContainerShape | ValueShape
 

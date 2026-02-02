@@ -4,6 +4,7 @@ export {
   derivePlaceholder,
   deriveShapePlaceholder,
 } from "./derive-placeholder.js"
+// Diff overlay--make the TypedDoc return values as if a diff is applied
 export { createDiffOverlay } from "./diff-overlay.js"
 export type { Transition } from "./functional-helpers.js"
 // Functional helpers (recommended API)
@@ -28,35 +29,47 @@ export {
   type LoroTypedDocRef,
   loro,
 } from "./loro.js"
+// Regular placeholder overlay
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
+
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"
+
 export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
+
 export { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
+
 export type {
   PathBuilder,
   PathNode,
   PathSegment,
   PathSelector,
 } from "./path-selector.js"
+
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
+
 export { replayDiff } from "./replay-diff.js"
-// Shape utilities
+// Doc shapes
 // Container shapes
 // Value shapes
+// Shape utilities
 export type {
   AnyContainerShape,
   AnyValueShape,
   ArrayValueShape,
+  BooleanValueShape,
+  // A shape type representing any container-type or value-type shape (excludes DocShape)
   ContainerOrValueShape,
+  // A shape type representing any container-type shape
   ContainerShape,
   ContainerType as RootContainerType,
   CounterContainerShape,
-  // Tagged union
+  // Tagged union of two or more plain value types
   DiscriminatedUnionValueShape,
   DocShape,
   ListContainerShape,
   MovableListContainerShape,
+  NullValueShape,
   NumberValueShape,
   RecordContainerShape,
   RecordValueShape,
@@ -67,28 +80,38 @@ export type {
   TreeContainerShape,
   TreeNodeJSON,
   TreeRefInterface,
+  Uint8ArrayValueShape,
+  UndefinedValueShape,
   // Union of two or more plain value types
   UnionValueShape,
+  // A shape type representing any value-type shape
   ValueShape,
   // WithNullable type for shapes that support .nullable()
   WithNullable,
   // WithPlaceholder type for shapes that support .placeholder()
   WithPlaceholder,
 } from "./shape.js"
+
 // Schema and type exports
 export { Shape } from "./shape.js"
+
 export type { Frontiers, TypedDoc } from "./typed-doc.js"
+
 export { createTypedDoc } from "./typed-doc.js"
-export type { DiffOverlay } from "./typed-refs/base.js"
+
 // Typed ref types - for specifying types with the loro() function
-export type { CounterRef } from "./typed-refs/counter-ref.js"
-export type { ListRef } from "./typed-refs/list-ref.js"
-export type { MovableListRef } from "./typed-refs/movable-list-ref.js"
-export type { RecordRef } from "./typed-refs/record-ref.js"
-export type { StructRef } from "./typed-refs/struct-ref.js"
-export type { TextRef } from "./typed-refs/text-ref.js"
-export type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
-export type { TreeRef } from "./typed-refs/tree-ref.js"
+export type {
+  CounterRef,
+  DiffOverlay,
+  ListRef,
+  MovableListRef,
+  RecordRef,
+  StructRef,
+  TextRef,
+  TreeNodeRef,
+  TreeRef,
+} from "./typed-refs/index.js"
+
 export type {
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
@@ -98,5 +121,6 @@ export type {
   InferRaw,
   Mutable,
 } from "./types.js"
+
 // Utility exports
 export { validatePlaceholder } from "./validation.js"
