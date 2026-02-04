@@ -15,7 +15,7 @@ import {
   WsServerNetworkAdapter,
   wrapWsSocket,
 } from "@loro-extended/adapter-websocket/server"
-import { getTransition, loro } from "@loro-extended/change"
+import { change, getTransition, loro } from "@loro-extended/change"
 import { createLens } from "@loro-extended/lens"
 import { Repo } from "@loro-extended/repo"
 import { createServer as createViteServer } from "vite"
@@ -57,7 +57,7 @@ const gameFilter = makeGameFilter(handle.doc)
 const lens = createLens<GameDocShape>(handle.doc, { filter: gameFilter })
 
 function changeAsServer(fn: GameChangeFn) {
-  lens.change(fn, { commitMessage: createIdentityMessage(SERVER_PLAYER_ID) })
+  change(lens, fn, { commitMessage: createIdentityMessage(SERVER_PLAYER_ID) })
 }
 
 const unsubscribe = loro(lens.worldview).subscribe(event => {

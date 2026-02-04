@@ -1,4 +1,4 @@
-import { type Mutable, Shape } from "@loro-extended/change"
+import { change, type Mutable, Shape } from "@loro-extended/change"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { createRepoWrapper, useHandle, useLens } from "../test-utils"
@@ -41,7 +41,8 @@ describe("useLens", () => {
     )
 
     act(() => {
-      result.current.lensState.lens.change(
+      change(
+        result.current.lensState.lens,
         (d: Mutable<typeof testSchema>): void => {
           d.title.delete(0, d.title.length)
           d.title.insert(0, "Updated Lens Doc")

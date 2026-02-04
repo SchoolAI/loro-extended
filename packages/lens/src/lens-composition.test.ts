@@ -1,4 +1,4 @@
-import { createTypedDoc, loro, Shape } from "@loro-extended/change"
+import { change, createTypedDoc, loro, Shape } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { createLens } from "./lens.js"
@@ -34,7 +34,7 @@ describe("lens composition", () => {
     const lens2 = createLens(lens1.worldview)
 
     // Change through innermost lens
-    lens2.change(d => {
+    change(lens2, d => {
       d.counter.increment(5)
     })
 
@@ -105,7 +105,7 @@ describe("lens composition", () => {
     const lens2 = createLens(lens1.worldview)
 
     // Make a change BEFORE dispose
-    lens1.change(d => {
+    change(lens1, d => {
       d.counter.increment(5)
     })
 
@@ -117,7 +117,7 @@ describe("lens composition", () => {
     lens2.dispose()
 
     // Outer lens should still work after inner dispose
-    lens1.change(d => {
+    change(lens1, d => {
       d.counter.increment(3)
     })
 
@@ -150,7 +150,7 @@ describe("lens composition", () => {
     const lens3 = createLens(lens2.worldview)
 
     // Change through deepest lens
-    lens3.change(d => {
+    change(lens3, d => {
       d.counter.increment(7)
     })
 

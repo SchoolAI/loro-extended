@@ -19,7 +19,6 @@ describe("createLens", () => {
 
       expect(lens.worldview).toBeDefined()
       expect(lens.world).toBe(source)
-      expect(lens.change).toBeInstanceOf(Function)
       expect(lens.dispose).toBeInstanceOf(Function)
 
       lens.dispose()
@@ -60,7 +59,7 @@ describe("createLens", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
-      lens.change(d => {
+      change(lens, d => {
         d.counter.increment(10)
         d.text.insert(0, "World")
       })
@@ -75,7 +74,7 @@ describe("createLens", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
-      lens.change(d => {
+      change(lens, d => {
         d.counter.increment(10)
         d.text.insert(0, "World")
       })
@@ -92,7 +91,7 @@ describe("createLens", () => {
       const lens = createLens(source, { filter: filterAll }) // Reject all external
 
       // Local change should still work
-      lens.change(d => {
+      change(lens, d => {
         d.counter.increment(5)
       })
 
@@ -107,7 +106,7 @@ describe("createLens", () => {
       const lens = createLens(source)
 
       // This should not throw
-      lens.change(() => {
+      change(lens, () => {
         // No changes
       })
 
@@ -124,7 +123,8 @@ describe("createLens", () => {
       const frontiersBefore = worldLoroDoc.frontiers()
 
       const commitMessage = "client-identity-message"
-      lens.change(
+      change(
+        lens,
         d => {
           d.counter.increment(1)
         },
@@ -158,9 +158,10 @@ describe("createLens", () => {
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = { playerId: "alice", action: "move" }
-      lens.change(
+      change(
+        lens,
         d => {
-          d.counter.increment(1)
+          ;(d as any).counter.increment(1)
         },
         { commitMessage },
       )
@@ -193,9 +194,10 @@ describe("createLens", () => {
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = "chained-message"
-      lens2.change(
+      change(
+        lens2,
         d => {
-          d.counter.increment(1)
+          ;(d as any).counter.increment(1)
         },
         { commitMessage },
       )
@@ -235,9 +237,10 @@ describe("createLens", () => {
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = { level: 3, action: "deep-change" }
-      lens3.change(
+      change(
+        lens3,
         d => {
-          d.counter.increment(1)
+          ;(d as any).counter.increment(1)
         },
         { commitMessage },
       )
@@ -428,7 +431,7 @@ describe("createLens", () => {
       lens.dispose()
 
       // Changes after dispose should be no-ops
-      lens.change(d => {
+      change(lens, d => {
         d.counter.increment(10)
       })
 
@@ -473,7 +476,7 @@ describe("createLens", () => {
       const lens = createLens(source)
 
       // Make a local change
-      lens.change(d => {
+      change(lens, d => {
         d.counter.increment(5)
       })
 

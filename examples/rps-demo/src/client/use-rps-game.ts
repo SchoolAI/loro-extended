@@ -5,7 +5,7 @@
  * methods for making choices and locking in.
  */
 
-import { loro, type Mutable } from "@loro-extended/change"
+import { change, loro, type Mutable } from "@loro-extended/change"
 import { useHandle, useLens } from "@loro-extended/react"
 import { useEffect } from "react"
 import { createIdentityMessage } from "../shared/identity.js"
@@ -53,7 +53,8 @@ export function useRpsGame(playerId: string) {
   const makeChoice = (choice: Choice) => {
     if (myLocked || phase !== "choosing") return
 
-    lens.change(
+    change(
+      lens,
       (d: Mutable<GameDocShape>): void => {
         const player = d.game.players.get(playerId)
         if (player) {
@@ -73,7 +74,8 @@ export function useRpsGame(playerId: string) {
   const lockIn = () => {
     if (!myChoice || myLocked || phase !== "choosing") return
 
-    lens.change(
+    change(
+      lens,
       (d: Mutable<GameDocShape>): void => {
         const player = d.game.players.get(playerId)
         if (player) {

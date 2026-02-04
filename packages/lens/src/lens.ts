@@ -7,22 +7,19 @@
  */
 
 import {
+  type ChangeOptions,
   change,
   createTypedDoc,
   type DocShape,
+  EXT_SYMBOL,
   ext,
   loro,
   type Mutable,
+  serializeCommitMessage,
   type TypedDoc,
 } from "@loro-extended/change"
 import type { Frontiers, JsonChange, LoroDoc } from "loro-crdt"
-import type {
-  ChangeOptions,
-  CommitInfo,
-  Lens,
-  LensFilter,
-  LensOptions,
-} from "./types.js"
+import type { CommitInfo, Lens, LensFilter, LensOptions } from "./types.js"
 
 /**
  * Module-level WeakMap for inter-lens message passing.
@@ -39,26 +36,6 @@ import type {
  *    synchronous subscription callback
  */
 const pendingMessages = new WeakMap<LoroDoc, string>()
-
-/**
- * Serialize a commit message to a string.
- *
- * - String messages are returned as-is
- * - Object messages are JSON-serialized
- * - Handles serialization errors gracefully (returns undefined)
- */
-function serializeMessage(
-  message: string | object | undefined,
-): string | undefined {
-  if (message === undefined) return undefined
-  if (typeof message === "string") return message
-  try {
-    return JSON.stringify(message)
-  } catch {
-    // Handle circular references, BigInt, etc.
-    return undefined
-  }
-}
 
 /**
  * Processing state for the lens.
@@ -452,7 +429,7 @@ export function createLens<D extends DocShape>(
       change(worldviewDoc, fn)
 
       // Serialize commit message (handles string/object)
-      const serializedMessage = serializeMessage(options?.commitMessage)
+      const serializedMessage = serializeCommitMessage(options?.commitMessage)
 
       // Propagate to world with commit message
       propagateToWorld(worldviewFrontiersBefore, serializedMessage)
@@ -461,14 +438,16 @@ export function createLens<D extends DocShape>(
     }
   }
 
-  return {
+  // Create the lens object with EXT_SYMBOL for change() detection
+  const lens: Lens<D> & {
+    [EXT_SYMBOL]: { change: typeof processLocalChange }
+  } = {
     get worldview() {
       return worldviewDoc
     },
     get world() {
       return world
     },
-    change: processLocalChange,
     dispose() {
       if (!isDisposed) {
         isDisposed = true
@@ -476,5 +455,11 @@ export function createLens<D extends DocShape>(
         unsubscribeWorldview()
       }
     },
+    // Expose change via EXT_SYMBOL for unified change() API detection
+    [EXT_SYMBOL]: {
+      change: processLocalChange,
+    },
   }
+
+  return lens
 }

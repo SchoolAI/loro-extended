@@ -29,6 +29,7 @@ import type {
   LoroEventBatch,
   Subscription,
 } from "loro-crdt"
+import type { ChangeOptions } from "./change-options.js"
 import type { JsonPatch } from "./json-patch.js"
 import type {
   ContainerOrValueShape,
@@ -187,13 +188,17 @@ export interface ExtDocRef<Shape extends DocShape> {
    * Batch mutations into a single transaction.
    * All changes commit together at the end.
    *
-   * Note: The `change(doc, fn)` functional helper is the recommended API.
+   * Note: The `change(doc, fn, options?)` functional helper is the recommended API.
    * This method exists for internal use and method-chaining scenarios.
    *
    * @param fn - Function that performs mutations on the draft
+   * @param options - Optional configuration including commit message
    * @returns The same TypedDoc for chaining
    */
-  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
+  change(
+    fn: (draft: Mutable<Shape>) => void,
+    options?: ChangeOptions,
+  ): TypedDoc<Shape>
 }
 
 // ============================================================================

@@ -7,6 +7,7 @@ import {
   type Subscription,
   type Value,
 } from "loro-crdt"
+import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import { EXT_SYMBOL, type ExtDocRef } from "./ext.js"
 import {
@@ -276,7 +277,7 @@ class TypedDocInternal<Shape extends DocShape> {
     ) as Infer<Shape>
   }
 
-  change(fn: (draft: Mutable<Shape>) => void): void {
+  change(fn: (draft: Mutable<Shape>) => void, options?: ChangeOptions): void {
     const draft = new DocRef({
       shape: this.shape,
       placeholder: this.placeholder as any,
@@ -288,6 +289,13 @@ class TypedDocInternal<Shape extends DocShape> {
     })
     fn(draft as unknown as Mutable<Shape>)
     draft[INTERNAL_SYMBOL].absorbPlainValues()
+
+    // Set commit message if provided
+    const serializedMessage = serializeCommitMessage(options?.commitMessage)
+    if (serializedMessage) {
+      this.doc.setNextCommitMessage(serializedMessage)
+    }
+
     this.doc.commit()
 
     // Invalidate cached value ref since doc changed
@@ -513,8 +521,11 @@ export function createTypedDoc<Shape extends DocShape>(
     subscribe(callback: (event: LoroEventBatch) => void): Subscription {
       return internal.loroDoc.subscribe(callback)
     },
-    change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
-      internal.change(fn)
+    change(
+      fn: (draft: Mutable<Shape>) => void,
+      options?: ChangeOptions,
+    ): TypedDoc<Shape> {
+      internal.change(fn, options)
       return proxy
     },
   }

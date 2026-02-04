@@ -1,4 +1,5 @@
 import type { LoroEventBatch } from "loro-crdt"
+import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { createDiffOverlay } from "./diff-overlay.js"
 import { EXT_SYMBOL, ext } from "./ext.js"
 import { loro } from "./loro.js"
@@ -16,6 +17,15 @@ import type { TreeRef } from "./typed-refs/tree-ref.js"
 import { createContainerTypedRef } from "./typed-refs/utils.js"
 import type { Mutable } from "./types.js"
 
+// Helper type to extract the draft type from an object with [EXT_SYMBOL].change()
+type ExtractDraft<T> = T extends {
+  [EXT_SYMBOL]: {
+    change: (fn: (draft: infer D) => void, options?: ChangeOptions) => void
+  }
+}
+  ? D
+  : never
+
 /**
  * The primary method of mutating typed documents and refs.
  * Batches multiple mutations into a single transaction.
@@ -28,8 +38,9 @@ import type { Mutable } from "./types.js"
  *
  * Returns the doc/ref for chaining.
  *
- * @param target - The TypedDoc or TypedRef to mutate
+ * @param target - The TypedDoc, TypedRef, or any object with [EXT_SYMBOL].change() to mutate
  * @param fn - Function that performs mutations on the draft
+ * @param options - Optional configuration including commit message
  * @returns The same target for chaining
  *
  * @example
@@ -43,6 +54,11 @@ import type { Mutable } from "./types.js"
  * })
  *   .count.increment(5)  // Optional: continue mutating
  *   .toJSON()            // Optional: get snapshot
+ *
+ * // With commit message for identity-based filtering
+ * change(doc, draft => {
+ *   draft.count.increment(10)
+ * }, { commitMessage: { userId: "alice" } })
  *
  * // Ref-level change - enables encapsulation
  * function addItems(list: ListRef<...>) {
@@ -59,24 +75,32 @@ import type { Mutable } from "./types.js"
  *     draft.createNode({ name: "running" })
  *   })
  * }
+ *
+ * // Lens example - works with any object that has [EXT_SYMBOL].change()
+ * change(lens, draft => {
+ *   draft.counter.increment(5)
+ * }, { commitMessage: { playerId: "alice" } })
  * ```
  */
 // Overload for TypedDoc
 export function change<Shape extends DocShape>(
   doc: TypedDoc<Shape>,
   fn: (draft: Mutable<Shape>) => void,
+  options?: ChangeOptions,
 ): TypedDoc<Shape>
 
 // Overload for TreeRef (special case - not a TypedRef<ContainerShape>)
 export function change<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape>,
   fn: (draft: TreeRef<DataShape>) => void,
+  options?: ChangeOptions,
 ): TreeRef<DataShape>
 
 // Overload for TreeRefInterface (the mutable type from TreeContainerShape)
 export function change<DataShape extends StructContainerShape>(
   ref: TreeRefInterface<DataShape>,
   fn: (draft: TreeRefInterface<DataShape>) => void,
+  options?: ChangeOptions,
 ): TreeRefInterface<DataShape>
 
 // Overload for StructRef (special case - uses Proxy, not a class extending TypedRef)
@@ -86,13 +110,26 @@ export function change<
 >(
   ref: StructRef<NestedShapes>,
   fn: (draft: StructRef<NestedShapes>) => void,
+  options?: ChangeOptions,
 ): StructRef<NestedShapes>
 
 // Overload for TypedRef (all container refs) - preserves concrete ref type
 export function change<T extends TypedRef<ContainerShape>>(
   ref: T,
   fn: (draft: T) => void,
+  options?: ChangeOptions,
 ): T
+
+// Generic overload for any object with [EXT_SYMBOL].change() (e.g., Lens)
+// This enables change(lens, fn, options) without importing Lens type
+// The draft type is extracted from the [EXT_SYMBOL].change signature
+export function change<
+  T extends {
+    [EXT_SYMBOL]: {
+      change: (fn: (draft: any) => void, options?: ChangeOptions) => void
+    }
+  },
+>(target: T, fn: (draft: ExtractDraft<T>) => void, options?: ChangeOptions): T
 
 // Implementation
 export function change(
@@ -101,23 +138,26 @@ export function change(
     | TypedRef<any>
     | TreeRef<any>
     | TreeRefInterface<any>
-    | StructRef<any>,
+    | StructRef<any>
+    | { [EXT_SYMBOL]: { change: unknown } },
   fn: (draft: any) => void,
+  options?: ChangeOptions,
 ):
   | TypedDoc<any>
   | TypedRef<any>
   | TreeRef<any>
   | TreeRefInterface<any>
   | StructRef<any> {
-  // Check if it's a TypedDoc by checking for EXT_SYMBOL with change method
+  // Check if it's a TypedDoc or Lens by checking for EXT_SYMBOL with change method
+  // This handles both TypedDoc and any object that implements [EXT_SYMBOL].change()
   const extNs = (target as any)[EXT_SYMBOL]
   if (extNs && "change" in extNs) {
-    // It's a TypedDoc - use ext().change()
-    return extNs.change(fn)
+    // It's a TypedDoc or Lens - use ext().change() with options
+    return extNs.change(fn, options)
   }
 
   // It's a TypedRef or TreeRef - use ref-level change logic
-  return changeRef(target as TypedRef<any> | TreeRef<any>, fn)
+  return changeRef(target as TypedRef<any> | TreeRef<any>, fn, options)
 }
 
 /**
@@ -128,6 +168,7 @@ export function change(
 function changeRef<T extends TypedRef<any> | TreeRef<any>>(
   ref: T,
   fn: (draft: T) => void,
+  options?: ChangeOptions,
 ): T {
   // Get internals via INTERNAL_SYMBOL
   const internals = (ref as any)[INTERNAL_SYMBOL]
@@ -158,9 +199,16 @@ function changeRef<T extends TypedRef<any> | TreeRef<any>>(
   const draftInternals = (draft as any)[INTERNAL_SYMBOL]
   draftInternals.absorbPlainValues()
 
+  // Set commit message if provided
+  const loroDoc = internals.getDoc()
+  const serializedMessage = serializeCommitMessage(options?.commitMessage)
+  if (serializedMessage) {
+    loroDoc.setNextCommitMessage(serializedMessage)
+  }
+
   // Commit the changes
   // Note: Loro's commit() is idempotent, so nested calls are safe
-  internals.getDoc().commit()
+  loroDoc.commit()
 
   // Return the original ref for chaining
   return ref

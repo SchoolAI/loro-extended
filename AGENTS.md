@@ -13,4 +13,3 @@ pnpm turbo run verify --filter=@loro-extended/adapter-websocket -- types
 
 - For exploratory debugging, create a .test.ts file rather than a .js or .mjs file, as it will integrate with typescript.
 - When fixing a bug, it's important to write a test that replicates the problem, and that you run the test to prove it fails. Then fix the bug, run the test, and prove it works.
-- Instead of deleting markdown files used for planning, assessing, todos, etc. stash them. For example, instead of `rm packages/repo/src/binary-serialization-fix.md`, use `git add packages/repo/src/binary-serialization-fix.md && git stash push -m "binary-serialization-fix plan" packages/repo/src/binary-serialization-fix.md`.

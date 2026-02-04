@@ -1,5 +1,11 @@
 // Main API exports
 
+// Change options for commit messages
+export {
+  type ChangeOptions,
+  serializeCommitMessage,
+} from "./change-options.js"
+
 export {
   derivePlaceholder,
   deriveShapePlaceholder,

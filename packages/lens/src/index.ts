@@ -10,7 +10,7 @@
  *
  * @example
  * ```typescript
- * import { createLens, filterByMessage } from "@loro-extended/lens"
+ * import { createLens, change, filterByMessage } from "@loro-extended/lens"
  *
  * // Create a lens with filtering
  * const lens = createLens(worldDoc, {
@@ -21,7 +21,7 @@
  * const state = lens.worldview.toJSON()
  *
  * // Write through the lens with commit message (propagates to world)
- * lens.change(draft => {
+ * change(lens, draft => {
  *   draft.game.players.alice.choice = "rock"
  * }, { commitMessage: { playerId: "alice" } })
  *
@@ -32,6 +32,8 @@
  * @packageDocumentation
  */
 
+// Re-export change and ChangeOptions from @loro-extended/change for convenience
+export { type ChangeOptions, change } from "@loro-extended/change"
 // Filters
 export {
   anyFilter,
@@ -45,10 +47,4 @@ export {
 // Core
 export { createLens, parseCommitInfo } from "./lens.js"
 // Types
-export type {
-  ChangeOptions,
-  CommitInfo,
-  Lens,
-  LensFilter,
-  LensOptions,
-} from "./types.js"
+export type { CommitInfo, Lens, LensFilter, LensOptions } from "./types.js"

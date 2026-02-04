@@ -9,8 +9,17 @@
  * - Worldview → World: State-based applyDiff (avoids causal history issues)
  */
 
-import type { DocShape, Mutable, TypedDoc } from "@loro-extended/change"
+import type {
+  ChangeOptions,
+  DocShape,
+  EXT_SYMBOL,
+  Mutable,
+  TypedDoc,
+} from "@loro-extended/change"
 import type { JsonChange } from "loro-crdt"
+
+// Re-export ChangeOptions from @loro-extended/change for convenience
+export type { ChangeOptions } from "@loro-extended/change"
 
 /**
  * Commit information with convenient access to common fields.
@@ -74,30 +83,6 @@ export interface CommitInfo {
 export type LensFilter = (info: CommitInfo) => boolean
 
 /**
- * Options for the change() method.
- */
-export interface ChangeOptions {
-  /**
-   * Commit message to attach to the change.
-   *
-   * This message will be propagated to the world commit and is available
-   * in server-side filters via `CommitInfo.message`.
-   *
-   * If an object is provided, it will be automatically JSON-serialized.
-   *
-   * @example
-   * ```typescript
-   * // String message
-   * lens.change(draft => { ... }, { commitMessage: "player-move" })
-   *
-   * // Object message (auto-serialized to JSON)
-   * lens.change(draft => { ... }, { commitMessage: { playerId: "alice" } })
-   * ```
-   */
-  commitMessage?: string | object
-}
-
-/**
  * Options for creating a Lens.
  */
 export interface LensOptions {
@@ -127,12 +112,14 @@ export interface LensOptions {
  *
  * Changes flow bidirectionally:
  * - External imports to the world are filtered before reaching the worldview
- * - Local changes via `change()` propagate to the world via state-based diff
+ * - Local changes via `change(lens, fn, options?)` propagate to the world via state-based diff
  *
  * @typeParam D - The document shape
  *
  * @example
  * ```typescript
+ * import { createLens, change } from "@loro-extended/lens"
+ *
  * const lens = createLens(world, {
  *   filter: (info) => {
  *     const msg = info.message as { userId?: string } | undefined
@@ -141,12 +128,12 @@ export interface LensOptions {
  * })
  *
  * // Read from the worldview (filtered)
- * const state = lens.doc.toJSON()
+ * const state = lens.worldview.toJSON()
  *
  * // Write through the lens (propagates to world)
- * lens.change(draft => {
+ * change(lens, draft => {
  *   draft.game.players.alice.choice = "rock"
- * })
+ * }, { commitMessage: { playerId: "alice" } })
  *
  * // Cleanup when done
  * lens.dispose()
@@ -171,34 +158,6 @@ export interface Lens<D extends DocShape> {
   readonly world: TypedDoc<D>
 
   /**
-   * Apply a local change to the worldview.
-   *
-   * The change is applied to the worldview first, then propagated to the world
-   * via state-based diff (applyDiff). This ensures local changes
-   * "win" regardless of concurrent peer changes that were filtered out.
-   *
-   * Local changes bypass the filter (they're trusted local code).
-   *
-   * @param fn - Mutation function that modifies the draft
-   * @param options - Optional configuration including commit message
-   *
-   * @example
-   * ```typescript
-   * // Basic change
-   * lens.change(draft => {
-   *   draft.game.players.alice.choice = "rock"
-   *   draft.game.players.alice.locked = true
-   * })
-   *
-   * // With commit message for identity-based filtering
-   * lens.change(draft => {
-   *   draft.game.players.alice.choice = "rock"
-   * }, { commitMessage: { playerId: "alice" } })
-   * ```
-   */
-  change(fn: (draft: Mutable<D>) => void, options?: ChangeOptions): void
-
-  /**
    * Clean up resources and stop the lens.
    *
    * After disposal:
@@ -208,4 +167,13 @@ export interface Lens<D extends DocShape> {
    * Always call dispose() when the lens is no longer needed.
    */
   dispose(): void
+
+  /**
+   * Internal symbol for change() detection.
+   * Use `change(lens, fn, options?)` instead of accessing this directly.
+   * @internal
+   */
+  readonly [EXT_SYMBOL]: {
+    change: (fn: (draft: Mutable<D>) => void, options?: ChangeOptions) => void
+  }
 }

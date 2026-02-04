@@ -35,7 +35,7 @@ This enables **local sovereignty**—the ability to filter out unwanted peer cha
 │                               │                                 │
 │                               ▼                                 │
 │                      UI Components read                         │
-│                      lens.change() writes                       │
+│                   change(lens, ...) writes                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -49,7 +49,7 @@ pnpm add @loro-extended/lens @loro-extended/change loro-crdt
 
 ```typescript
 import { createTypedDoc, Shape } from "@loro-extended/change";
-import { createLens, filterByMessage } from "@loro-extended/lens";
+import { createLens, change, filterByMessage } from "@loro-extended/lens";
 
 // Define your schema
 const GameSchema = Shape.doc({
@@ -77,7 +77,7 @@ const lens = createLens(world, {
 const players = lens.worldview.players.toJSON();
 
 // Write through the lens (propagates to world)
-lens.change((draft) => {
+change(lens, (draft) => {
   draft.players.set("alice", { name: "Alice", score: 0 });
 });
 
@@ -88,7 +88,7 @@ lens.dispose();
 ## With Repo Handle
 
 ```typescript
-import { createLens } from "@loro-extended/lens";
+import { createLens, change } from "@loro-extended/lens";
 
 const handle = repo.get("game-doc", GameSchema);
 
@@ -101,7 +101,7 @@ const lens = createLens(handle.doc, {
 });
 
 // UI reads from lens.worldview (worldview)
-// Writes go through lens.change()
+// Writes go through change(lens, ...)
 ```
 
 ## API Reference
@@ -128,12 +128,21 @@ interface Lens<D extends DocShape> {
   /** The world (shared) - for reference/sync */
   readonly world: TypedDoc<D>;
 
-  /** Apply changes to worldview, propagate to world via applyDiff */
-  change(fn: (draft: Mutable<D>) => void, options?: ChangeOptions): void;
-
   /** Cleanup subscriptions */
   dispose(): void;
 }
+```
+
+### `change(lens, fn, options?)`
+
+Apply changes to the lens worldview and propagate to world via applyDiff.
+
+```typescript
+import { change } from "@loro-extended/lens";
+
+change(lens, (draft) => {
+  draft.counter.increment(5);
+}, { commitMessage: { playerId: "alice" } });
 ```
 
 ### `ChangeOptions`
@@ -288,8 +297,11 @@ const lens = createLens(world, {
 When using lens-based filtering, you can attach commit messages that will be visible to server-side filters:
 
 ```typescript
+import { change } from "@loro-extended/lens";
+
 // String message
-lens.change(
+change(
+  lens,
   (draft) => {
     draft.game.players.get(playerId).choice = "rock";
   },
@@ -297,7 +309,8 @@ lens.change(
 );
 
 // Object message (auto-serialized to JSON)
-lens.change(
+change(
+  lens,
   (draft) => {
     draft.game.players.get(playerId).choice = "rock";
   },
