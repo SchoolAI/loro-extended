@@ -59,7 +59,7 @@ describe("TypedDoc Metadata Integration", () => {
     expect(meta.mergeable).toBe(true)
   })
 
-  it("does not write metadata for non-mergeable docs", () => {
+  it("writes metadata for all docs by default", () => {
     const schema = Shape.doc({
       title: Shape.text(),
     })
@@ -67,8 +67,58 @@ describe("TypedDoc Metadata Integration", () => {
     const loroDoc = new LoroDoc()
     createTypedDoc(schema, { doc: loroDoc })
 
-    // Non-mergeable docs don't need metadata (avoids adding operations)
+    // All docs now write metadata by default
+    expect(hasMetadata(loroDoc)).toBe(true)
+    const meta = readMetadata(loroDoc)
+    expect(meta.mergeable).toBe(false)
+  })
+
+  it("skips metadata write when skipInitialize is true", () => {
+    const schema = Shape.doc({
+      title: Shape.text(),
+    })
+
+    const loroDoc = new LoroDoc()
+    createTypedDoc(schema, { doc: loroDoc, skipInitialize: true })
+
+    // No metadata written
     expect(hasMetadata(loroDoc)).toBe(false)
+    expect(loroDoc.opCount()).toBe(0)
+  })
+
+  it("allows manual initialization after skipInitialize", () => {
+    const schema = Shape.doc({
+      title: Shape.text(),
+    })
+
+    const loroDoc = new LoroDoc()
+    const doc = createTypedDoc(schema, { doc: loroDoc, skipInitialize: true })
+
+    // No metadata yet
+    expect(hasMetadata(loroDoc)).toBe(false)
+
+    // Manually initialize
+    doc.initialize()
+
+    // Now has metadata
+    expect(hasMetadata(loroDoc)).toBe(true)
+    const meta = readMetadata(loroDoc)
+    expect(meta.mergeable).toBe(false)
+  })
+
+  it("initialize() is idempotent", () => {
+    const schema = Shape.doc({
+      title: Shape.text(),
+    })
+
+    const loroDoc = new LoroDoc()
+    const doc = createTypedDoc(schema, { doc: loroDoc, skipInitialize: true })
+
+    doc.initialize()
+    const opCountAfterFirst = loroDoc.opCount()
+
+    doc.initialize() // Second call should be no-op
+    expect(loroDoc.opCount()).toBe(opCountAfterFirst)
   })
 
   it("reads metadata on subsequent access", () => {

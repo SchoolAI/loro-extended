@@ -342,7 +342,14 @@ export class Handle<
     const docState = synchronizer.getOrCreateDocumentState(docId)
 
     // Create TypedDoc wrapper around the LoroDoc
-    this._doc = createTypedDoc(docShape, { doc: docState.doc })
+    // Skip auto-initialization because:
+    // 1. If doc already has metadata (from sync), it won't write anyway
+    // 2. If doc is new, user can call handle.doc.initialize() when ready
+    // 3. This preserves the initializeIfEmpty pattern
+    this._doc = createTypedDoc(docShape, {
+      doc: docState.doc,
+      skipInitialize: true,
+    })
 
     // Pre-create stores in Synchronizer for declared ephemeral shapes
     // This ensures the stores exist and are subscribed for network sync

@@ -229,11 +229,26 @@ const schema = Shape.doc({
   players: Shape.record(Shape.struct({ score: Shape.plain.number() })),
 }, { mergeable: true })
 
-// Metadata is automatically written on first access
+// Metadata is automatically written on creation (default)
 const doc = createTypedDoc(schema)
 ```
 
-**Peer Agreement**: When a peer receives a document, it reads the metadata and validates against its local schema. If there's a mismatch (e.g., local schema says `mergeable: true` but metadata says `false`), a warning is logged and the metadata value is used. This ensures all peers use consistent settings.
+**Initialization Control**: By default, `createTypedDoc()` writes metadata immediately. Use `skipInitialize: true` to defer:
+
+```typescript
+// Skip auto-initialization for advanced use cases
+const doc = createTypedDoc(schema, { skipInitialize: true })
+
+// Later, when ready to write metadata:
+doc.initialize()
+```
+
+Use `skipInitialize: true` when:
+- Receiving a synced document (it already has metadata)
+- You need to control when the metadata commit happens (e.g., for signing)
+- Testing scenarios where you need an empty document
+
+**Peer Agreement**: When a peer receives a document, it reads the metadata and uses it (metadata takes precedence over schema). This ensures all peers use consistent settings.
 
 **Priority Order**: `options.mergeable` > `schema.mergeable` > existing metadata > `false`
 

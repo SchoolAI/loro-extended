@@ -188,6 +188,7 @@ class TypedDocInternal<Shape extends DocShape> {
   private doc: LoroDoc
   private overlay?: DiffOverlay
   private _mergeable: boolean
+  private _initialized: boolean
   private valueRef: DocRef<Shape> | null = null
   // Reference to the proxy for returning from change()
   proxy: TypedDoc<Shape> | null = null
@@ -197,6 +198,7 @@ class TypedDocInternal<Shape extends DocShape> {
     doc: LoroDoc = new LoroDoc(),
     overlay?: DiffOverlay,
     schemaMergeable = false,
+    skipInitialize = false,
   ) {
     this.shape = shape
     this.placeholder = derivePlaceholder(shape)
@@ -209,17 +211,34 @@ class TypedDocInternal<Shape extends DocShape> {
       // Document has metadata - use it (metadata takes precedence over schema)
       const meta = readMetadata(doc)
       this._mergeable = meta.mergeable ?? false
+      this._initialized = true
     } else {
       // No metadata - this is a new document or legacy document
-      // Use schema setting and write metadata only for mergeable docs
-      // (to avoid adding operations to non-mergeable docs)
       this._mergeable = schemaMergeable
-      if (schemaMergeable) {
-        writeMetadata(doc, { mergeable: schemaMergeable })
+      this._initialized = false
+
+      // Auto-initialize unless skipInitialize is true
+      if (!skipInitialize) {
+        this.initialize()
       }
     }
 
     validatePlaceholder(this.placeholder, this.shape)
+  }
+
+  /**
+   * Initialize the document by writing metadata.
+   * This is called automatically unless `skipInitialize: true` was passed.
+   * Call this manually if you skipped initialization and want to write metadata later.
+   */
+  initialize(): void {
+    if (this._initialized) return
+    writeMetadata(this.doc, { mergeable: this._mergeable })
+    this._initialized = true
+  }
+
+  get initialized(): boolean {
+    return this._initialized
   }
 
   get mergeable(): boolean {
@@ -357,6 +376,16 @@ export type CreateTypedDocOptions = {
    * @default false
    */
   mergeable?: boolean
+  /**
+   * When true, skip automatic metadata initialization.
+   * Use this when:
+   * - Receiving a synced document (it already has metadata)
+   * - You want to control when metadata is written (call `initialize()` later)
+   * - Testing scenarios where you need an empty document
+   *
+   * @default false
+   */
+  skipInitialize?: boolean
 }
 
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
@@ -420,6 +449,24 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
    * ```
    */
   forkAt(frontiers: Frontiers): TypedDoc<Shape>
+
+  /**
+   * Initialize the document by writing metadata.
+   * This is called automatically unless `skipInitialize: true` was passed to createTypedDoc.
+   * Call this manually if you skipped initialization and want to write metadata later.
+   *
+   * This is idempotent - calling it multiple times has no effect after the first call.
+   *
+   * @example
+   * ```typescript
+   * // Create doc without auto-initialization
+   * const doc = createTypedDoc(schema, { skipInitialize: true });
+   *
+   * // Later, when ready to write metadata
+   * doc.initialize();
+   * ```
+   */
+  initialize(): void
 }
 
 /**
@@ -470,6 +517,7 @@ export function createTypedDoc<Shape extends DocShape>(
     options.doc || new LoroDoc(),
     options.overlay,
     effectiveMergeable,
+    options.skipInitialize ?? false,
   )
 
   // Create the loro() namespace for this doc
@@ -514,6 +562,11 @@ export function createTypedDoc<Shape extends DocShape>(
     })
   }
 
+  // Create the initialize() function
+  const initializeFunction = (): void => {
+    internal.initialize()
+  }
+
   // Create a proxy that delegates schema properties to the DocRef
   // and provides change() and forkAt() methods
   const proxy = new Proxy(internal.value as object, {
@@ -533,6 +586,11 @@ export function createTypedDoc<Shape extends DocShape>(
         return forkAtFunction
       }
 
+      // initialize() method directly on doc
+      if (prop === "initialize") {
+        return initializeFunction
+      }
+
       // toJSON() should always read fresh from the CRDT
       if (prop === "toJSON") {
         return () => internal.toJSON()
@@ -543,8 +601,13 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     set(target, prop, value, receiver) {
-      // Don't allow setting change, forkAt, or LORO_SYMBOL
-      if (prop === LORO_SYMBOL || prop === "change" || prop === "forkAt") {
+      // Don't allow setting change, forkAt, initialize, or LORO_SYMBOL
+      if (
+        prop === LORO_SYMBOL ||
+        prop === "change" ||
+        prop === "forkAt" ||
+        prop === "initialize"
+      ) {
         return false
       }
 
@@ -554,7 +617,12 @@ export function createTypedDoc<Shape extends DocShape>(
 
     // Support 'in' operator
     has(target, prop) {
-      if (prop === LORO_SYMBOL || prop === "change" || prop === "forkAt")
+      if (
+        prop === LORO_SYMBOL ||
+        prop === "change" ||
+        prop === "forkAt" ||
+        prop === "initialize"
+      )
         return true
       return Reflect.has(target, prop)
     },

@@ -132,16 +132,17 @@ Subsequent Peer (Receiver):
 - ✅ Update `TypedDocInternal` constructor to:
   - Read existing metadata from doc
   - Determine effective mergeable setting (metadata > options > schema > false)
-  - Write metadata if not present
-  - Log warning if metadata doesn't match schema
+  - Write metadata if not present (unless `skipInitialize: true`)
 - ✅ Add `isLoroExtendedReservedKey(key: string): boolean` utility
 - ✅ Update `toJSON()` to exclude all `_loro_extended*` prefixed keys from output
 - ✅ Update `reconstructDocFromFlattened()` to skip reserved keys
 - ✅ Add integration tests for metadata flow
+- ✅ Add `skipInitialize` option to `CreateTypedDocOptions`
+- ✅ Add `initialize()` method to `TypedDoc` for manual initialization
 
 ### Phase 4: Repo Handle Integration - ✅
 
-- ✅ Update `Handle` constructor to pass schema to `createTypedDoc()` (already done - uses schema.mergeable)
+- ✅ Update `Handle` constructor to pass `skipInitialize: true` to `createTypedDoc()`
 - ✅ Add `isMergeable` getter to Handle
 - ⏭️ Add tests for Handle metadata behavior (skipped - existing tests cover the behavior)
 
