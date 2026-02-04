@@ -1,5 +1,11 @@
 import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client"
-import { RepoProvider, Shape, useDoc, useHandle } from "@loro-extended/react"
+import {
+  change,
+  RepoProvider,
+  Shape,
+  useDoc,
+  useHandle,
+} from "@loro-extended/react"
 import { generateUUID } from "@loro-extended/repo"
 import { createRoot } from "react-dom/client"
 import "./styles.css"
@@ -25,14 +31,14 @@ function App() {
   }
 
   const toggle = (id: string) => {
-    handle.change(d => {
+    change(handle.doc, d => {
       const todo = d.todos.find(t => t.id === id)
       if (todo) todo.done = !todo.done
     })
   }
 
   const remove = (id: string) => {
-    handle.change(d => {
+    change(handle.doc, d => {
       const idx = d.todos.findIndex(t => t.id === id)
       if (idx !== -1) d.todos.delete(idx, 1)
     })
