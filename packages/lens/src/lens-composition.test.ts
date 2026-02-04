@@ -82,9 +82,9 @@ describe("lens composition", () => {
     wrongPeerDoc.commit({ message: JSON.stringify({ allowed: true }) })
 
     // Import all to source
-    loro(source).doc.import(allowedDoc.export({ mode: "update" }))
-    loro(source).doc.import(notAllowedDoc.export({ mode: "update" }))
-    loro(source).doc.import(wrongPeerDoc.export({ mode: "update" }))
+    loro(source).import(allowedDoc.export({ mode: "update" }))
+    loro(source).import(notAllowedDoc.export({ mode: "update" }))
+    loro(source).import(wrongPeerDoc.export({ mode: "update" }))
 
     // Source has all (10+20+30=60)
     expect(source.counter.value).toBe(60)
@@ -130,7 +130,7 @@ describe("lens composition", () => {
     externalDoc.getCounter("counter").increment(10)
     externalDoc.commit()
 
-    loro(source).doc.import(externalDoc.export({ mode: "update" }))
+    loro(source).import(externalDoc.export({ mode: "update" }))
 
     // Source and lens1 have it
     expect(source.counter.value).toBe(18)

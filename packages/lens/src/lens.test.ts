@@ -1,4 +1,4 @@
-import { createTypedDoc, loro, Shape } from "@loro-extended/change"
+import { change, createTypedDoc, loro, Shape } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { filterAll, filterNone } from "./filters.js"
@@ -27,7 +27,7 @@ describe("createLens", () => {
 
     it("doc starts with same state as source", () => {
       const source = createTypedDoc(TestSchema)
-      source.change(d => {
+      change(source, d => {
         d.counter.increment(5)
         d.text.insert(0, "Hello")
         d.data.set("key", "value")
@@ -46,8 +46,8 @@ describe("createLens", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
-      const sourcePeerId = loro(source).doc.peerId
-      const docPeerId = loro(lens.worldview).doc.peerId
+      const sourcePeerId = loro(source).peerId
+      const docPeerId = loro(lens.worldview).peerId
 
       expect(docPeerId).toBe(sourcePeerId)
 
@@ -120,7 +120,7 @@ describe("createLens", () => {
       const world = createTypedDoc(TestSchema)
       const lens = createLens(world)
 
-      const worldLoroDoc = loro(world).doc
+      const worldLoroDoc = loro(world)
       const frontiersBefore = worldLoroDoc.frontiers()
 
       const commitMessage = "client-identity-message"
@@ -154,7 +154,7 @@ describe("createLens", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
-      const sourceLoroDoc = loro(source).doc
+      const sourceLoroDoc = loro(source)
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = { playerId: "alice", action: "move" }
@@ -189,7 +189,7 @@ describe("createLens", () => {
       const lens1 = createLens(source)
       const lens2 = createLens(lens1.worldview)
 
-      const sourceLoroDoc = loro(source).doc
+      const sourceLoroDoc = loro(source)
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = "chained-message"
@@ -231,7 +231,7 @@ describe("createLens", () => {
       const lens2 = createLens(lens1.worldview)
       const lens3 = createLens(lens2.worldview)
 
-      const sourceLoroDoc = loro(source).doc
+      const sourceLoroDoc = loro(source)
       const frontiersBefore = sourceLoroDoc.frontiers()
 
       const commitMessage = { level: 3, action: "deep-change" }
@@ -282,7 +282,7 @@ describe("createLens", () => {
       externalDoc.commit()
 
       const bytes = externalDoc.export({ mode: "update" })
-      loro(source).doc.import(bytes)
+      loro(source).import(bytes)
 
       // Should reach doc
       expect(lens.worldview.counter.value).toBe(7)
@@ -301,7 +301,7 @@ describe("createLens", () => {
       externalDoc.commit()
 
       const bytes = externalDoc.export({ mode: "update" })
-      loro(source).doc.import(bytes)
+      loro(source).import(bytes)
 
       // Source has it, but doc should not
       expect(source.counter.value).toBe(7)
@@ -332,11 +332,11 @@ describe("createLens", () => {
       disallowedDoc.commit({ message: JSON.stringify({ allowed: false }) })
 
       // Import allowed
-      loro(source).doc.import(allowedDoc.export({ mode: "update" }))
+      loro(source).import(allowedDoc.export({ mode: "update" }))
       expect(lens.worldview.counter.value).toBe(5)
 
       // Import disallowed
-      loro(source).doc.import(disallowedDoc.export({ mode: "update" }))
+      loro(source).import(disallowedDoc.export({ mode: "update" }))
       // Doc should still be 5 (disallowed was rejected)
       expect(lens.worldview.counter.value).toBe(5)
       // But source has both
@@ -376,7 +376,7 @@ describe("createLens", () => {
       externalDoc.commit()
 
       const bytes = externalDoc.export({ mode: "update" })
-      loro(source).doc.import(bytes)
+      loro(source).import(bytes)
 
       // Source has all changes (1+2+3=6)
       expect(source.counter.value).toBe(6)
@@ -408,8 +408,8 @@ describe("createLens", () => {
       acceptedDoc.commit()
 
       // Import both
-      loro(source).doc.import(rejectedDoc.export({ mode: "update" }))
-      loro(source).doc.import(acceptedDoc.export({ mode: "update" }))
+      loro(source).import(rejectedDoc.export({ mode: "update" }))
+      loro(source).import(acceptedDoc.export({ mode: "update" }))
 
       // Source has both (10+5=15)
       expect(source.counter.value).toBe(15)
@@ -448,7 +448,7 @@ describe("createLens", () => {
       externalDoc.getCounter("counter").increment(7)
       externalDoc.commit()
 
-      loro(source).doc.import(externalDoc.export({ mode: "update" }))
+      loro(source).import(externalDoc.export({ mode: "update" }))
 
       // Source has it
       expect(source.counter.value).toBe(7)
@@ -483,7 +483,7 @@ describe("createLens", () => {
       externalDoc.getCounter("counter").increment(3)
       externalDoc.commit()
 
-      loro(source).doc.import(externalDoc.export({ mode: "update" }))
+      loro(source).import(externalDoc.export({ mode: "update" }))
 
       // Both should be present
       expect(lens.worldview.counter.value).toBe(8)
@@ -521,7 +521,7 @@ describe("createLens", () => {
         message: JSON.stringify({ role: "admin", userId: "abc" }),
       })
 
-      loro(source).doc.import(externalDoc.export({ mode: "update" }))
+      loro(source).import(externalDoc.export({ mode: "update" }))
 
       // Verify the filter received parsed info
       expect(receivedInfos.length).toBe(1)
@@ -549,7 +549,7 @@ describe("createLens", () => {
       externalDoc.getCounter("counter").increment(3)
       externalDoc.commit({ message: "not valid json" })
 
-      loro(source).doc.import(externalDoc.export({ mode: "update" }))
+      loro(source).import(externalDoc.export({ mode: "update" }))
 
       // Message should be undefined (not parseable)
       expect(receivedMessage).toBeUndefined()
@@ -575,8 +575,8 @@ describe("createLens", () => {
       untrustedDoc.getCounter("counter").increment(20)
       untrustedDoc.commit()
 
-      loro(source).doc.import(trustedDoc.export({ mode: "update" }))
-      loro(source).doc.import(untrustedDoc.export({ mode: "update" }))
+      loro(source).import(trustedDoc.export({ mode: "update" }))
+      loro(source).import(untrustedDoc.export({ mode: "update" }))
 
       // Only trusted peer's changes should reach doc
       expect(lens.worldview.counter.value).toBe(10)
@@ -606,8 +606,8 @@ describe("createLens", () => {
       disallowedDoc.getCounter("counter").increment(10)
       disallowedDoc.commit({ message: JSON.stringify({ allowed: false }) })
 
-      loro(source).doc.import(allowedDoc.export({ mode: "update" }))
-      loro(source).doc.import(disallowedDoc.export({ mode: "update" }))
+      loro(source).import(allowedDoc.export({ mode: "update" }))
+      loro(source).import(disallowedDoc.export({ mode: "update" }))
 
       // Only allowed changes should reach doc
       expect(lens.worldview.counter.value).toBe(5)

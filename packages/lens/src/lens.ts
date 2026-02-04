@@ -9,6 +9,7 @@
 import {
   createTypedDoc,
   type DocShape,
+  ext,
   loro,
   type Mutable,
   type TypedDoc,
@@ -167,8 +168,8 @@ export function createLens<D extends DocShape>(
 
   // Extract LoroDoc and shape from world TypedDoc
   // (internally we use sourceLoroDoc/docLoroDoc for the underlying LoroDoc instances)
-  const worldLoroDoc = loro(world).doc
-  const worldShape = loro(world).docShape as D
+  const worldLoroDoc = loro(world)
+  const worldShape = ext(world).docShape as D
 
   // Create worldview as a fork with preserved peer ID
   // This keeps the version vector small and ensures local writes
@@ -358,7 +359,7 @@ export function createLens<D extends DocShape>(
   }
 
   // Subscribe to world for changes (external imports and parent lens changes)
-  const unsubscribeWorld = worldLoroDoc.subscribe(event => {
+  const unsubscribeWorld = worldLoroDoc.subscribe((event: { by: string }) => {
     // Process import events from external peers
     // AND local events from parent lens's change() method
     if (event.by === "import" || event.by === "local") {
@@ -405,23 +406,25 @@ export function createLens<D extends DocShape>(
   }
 
   // Subscribe to worldview for changes from chained lenses
-  const unsubscribeWorldview = worldviewLoroDoc.subscribe(event => {
-    // Process local events (from chained lens applyDiff)
-    if (event.by === "local") {
-      if (isDisposed || processingState !== "idle") return
+  const unsubscribeWorldview = worldviewLoroDoc.subscribe(
+    (event: { by: string }) => {
+      // Process local events (from chained lens applyDiff)
+      if (event.by === "local") {
+        if (isDisposed || processingState !== "idle") return
 
-      // Retrieve pending message from child lens (if any)
-      const pendingMessage = pendingMessages.get(worldviewLoroDoc)
-      pendingMessages.delete(worldviewLoroDoc)
+        // Retrieve pending message from child lens (if any)
+        const pendingMessage = pendingMessages.get(worldviewLoroDoc)
+        pendingMessages.delete(worldviewLoroDoc)
 
-      processingState = "propagating-worldview-to-world"
-      try {
-        propagateToWorld(lastKnownWorldviewFrontiers, pendingMessage)
-      } finally {
-        processingState = "idle"
+        processingState = "propagating-worldview-to-world"
+        try {
+          propagateToWorld(lastKnownWorldviewFrontiers, pendingMessage)
+        } finally {
+          processingState = "idle"
+        }
       }
-    }
-  })
+    },
+  )
 
   /**
    * Process local change: worldview → applyDiff → world
@@ -445,7 +448,7 @@ export function createLens<D extends DocShape>(
       const worldviewFrontiersBefore = worldviewLoroDoc.frontiers()
 
       // Apply change to worldview
-      worldviewDoc.change(fn)
+      ext(worldviewDoc).change(fn)
 
       // Serialize commit message (handles string/object)
       const serializedMessage = serializeMessage(options?.commitMessage)
