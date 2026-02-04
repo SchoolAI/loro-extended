@@ -1,5 +1,5 @@
 import { PostgresStorageAdapter } from "@loro-extended/adapter-postgres/server"
-import { Repo, Shape } from "@loro-extended/repo"
+import { change, Repo, Shape } from "@loro-extended/repo"
 import { Pool } from "pg"
 
 // Define the document schema
@@ -36,7 +36,7 @@ async function main() {
   // Create and modify a document
   console.log("\n📝 Creating document...")
   const handle = repo.get("my-doc", DocSchema)
-  handle.change(doc => {
+  change(handle.doc, doc => {
     doc.root.message = "Hello from PostgreSQL!"
     doc.root.timestamp = Date.now()
   })
@@ -60,7 +60,7 @@ async function main() {
 
   // Make another change
   console.log("\n📝 Making another change...")
-  handle.change(doc => {
+  change(handle.doc, doc => {
     doc.root.updated = true
     doc.root.updateTime = Date.now()
   })
