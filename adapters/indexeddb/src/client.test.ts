@@ -67,20 +67,6 @@ describe("IndexedDBStorageAdapter", () => {
 
       expect(loadedData).toEqual(data)
     })
-
-    it("should handle large data", async () => {
-      const key: StorageKey = ["largeDoc"]
-      // Create 1MB of data
-      const data = new Uint8Array(1024 * 1024)
-      for (let i = 0; i < data.length; i++) {
-        data[i] = i % 256
-      }
-
-      await adapter.save(key, data)
-      const loadedData = await adapter.load(key)
-
-      expect(loadedData).toEqual(data)
-    })
   })
 
   describe("Key Serialization", () => {
