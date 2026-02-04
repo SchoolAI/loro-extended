@@ -1,4 +1,10 @@
-import { useDoc, useEphemeral, useHandle, useRepo } from "@loro-extended/react"
+import {
+  change,
+  useDoc,
+  useEphemeral,
+  useHandle,
+  useRepo,
+} from "@loro-extended/react"
 import { type DocId, generateUUID, type ReadyState } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
@@ -140,7 +146,7 @@ function ChatApp() {
       localStorage.removeItem(PREVIOUS_NAME_KEY) // Fulfill the responsibility
     }
 
-    handle.change(d => {
+    change(handle.doc, d => {
       d.messages.push({
         id: generateUUID(),
         role: "user",
@@ -183,7 +189,7 @@ function ChatApp() {
       : "none"
 
   const dismissTip = () => {
-    handle.change(d => {
+    change(handle.doc, d => {
       const prefs = d.preferences.get(myPeerId)
       if (prefs) {
         prefs.showTip = false

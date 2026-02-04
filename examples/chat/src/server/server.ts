@@ -3,6 +3,7 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/express"
+import { change } from "@loro-extended/change"
 import {
   type DocId,
   generateUUID,
@@ -73,7 +74,7 @@ async function streamLLMResponse(
 
     for await (const chunk of textStream) {
       // Stream directly into the mutable reference - no find() needed!
-      handle.change(() => {
+      change(handle.doc, () => {
         targetMessage.content.insert(targetMessage.content.length, chunk)
       })
     }
@@ -94,7 +95,7 @@ function appendAssistantMessage(
 ): MutableMessage {
   const id = generateUUID()
 
-  handle.change((draft: MutableChatDoc) => {
+  change(handle.doc, (draft: MutableChatDoc) => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -136,7 +137,7 @@ function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
     if (!lastMsg.needsAiReply) return
 
     // Check this off as taken care of
-    handle.change(() => {
+    change(handle.doc, () => {
       lastMsg.needsAiReply = false
     })
 
