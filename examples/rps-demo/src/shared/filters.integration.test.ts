@@ -12,16 +12,14 @@ describe("lens sovereignty integration", () => {
       filter: createClientLensFilter("alice"),
     })
 
-    loro(world).doc.setNextCommitMessage(
-      createIdentityMessage(SERVER_PLAYER_ID),
-    )
+    loro(world).setNextCommitMessage(createIdentityMessage(SERVER_PLAYER_ID))
     change(world, (d: any) => {
       d.game.phase = "reveal"
     })
 
     expect(aliceLens.worldview.game.phase).toBe("reveal")
 
-    loro(world).doc.setNextCommitMessage(createIdentityMessage("bob"))
+    loro(world).setNextCommitMessage(createIdentityMessage("bob"))
     change(world, d => {
       d.game.players.set("bob", { choice: "rock", locked: true })
     })

@@ -60,7 +60,7 @@ function changeAsServer(fn: GameChangeFn) {
   lens.change(fn, { commitMessage: createIdentityMessage(SERVER_PLAYER_ID) })
 }
 
-const unsubscribe = loro(lens.worldview).doc.subscribe(event => {
+const unsubscribe = loro(lens.worldview).subscribe(event => {
   console.log("subscribe event", event)
 
   if (event.by === "checkout") return
@@ -87,7 +87,7 @@ console.log(
 console.log("[lea-server] Game initialized with players: alice, bob")
 
 // Log world state for debugging
-const worldDoc = loro(lens.world).doc
+const worldDoc = loro(lens.world)
 console.log("[lea-server] World peer ID:", worldDoc.peerIdStr)
 
 // ═══════════════════════════════════════════════════════════════════════════
