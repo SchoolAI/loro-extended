@@ -53,6 +53,47 @@ export class StructRefInternals<
       )
     }
 
+    // For mergeable documents, use flattened root containers
+    if (this.isMergeable()) {
+      const doc = this.getDoc()
+      const rootName = this.computeChildRootContainerName(key)
+      const pathPrefix = this.getPathPrefix() || []
+      const newPathPrefix = [...pathPrefix, key]
+
+      // Set null marker in parent map to indicate child container reference
+      const container = this.getContainer() as LoroMap
+      if (container.get(key) !== null) {
+        container.set(key, null)
+      }
+
+      // Use the appropriate root container getter based on shape type
+      const containerGetter = {
+        counter: "getCounter",
+        list: "getList",
+        movableList: "getMovableList",
+        record: "getMap",
+        struct: "getMap",
+        text: "getText",
+        tree: "getTree",
+      } as const
+
+      const getterName =
+        containerGetter[shape._type as keyof typeof containerGetter]
+      const getter = (doc as any)[getterName].bind(doc)
+
+      return {
+        shape,
+        placeholder,
+        getContainer: () => getter(rootName),
+        autoCommit: this.getAutoCommit(),
+        batchedMutation: this.getBatchedMutation(),
+        getDoc: () => doc,
+        pathPrefix: newPathPrefix,
+        mergeable: true,
+      }
+    }
+
+    // Non-mergeable: use standard nested container storage
     const LoroContainer = containerConstructor[shape._type]
     const container = this.getContainer() as LoroMap
 

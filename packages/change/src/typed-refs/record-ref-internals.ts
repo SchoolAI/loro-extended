@@ -56,6 +56,48 @@ export class RecordRefInternals<
       )
     }
 
+    // For mergeable documents, use flattened root containers
+    // Record keys may contain hyphens, which are properly escaped by computeChildRootContainerName
+    if (this.isMergeable()) {
+      const doc = this.getDoc()
+      const rootName = this.computeChildRootContainerName(key)
+      const pathPrefix = this.getPathPrefix() || []
+      const newPathPrefix = [...pathPrefix, key]
+
+      // Set null marker in parent map to indicate child container reference
+      const container = this.getContainer() as LoroMap
+      if (container.get(key) !== null) {
+        container.set(key, null)
+      }
+
+      // Use the appropriate root container getter based on shape type
+      const containerGetter = {
+        counter: "getCounter",
+        list: "getList",
+        movableList: "getMovableList",
+        record: "getMap",
+        struct: "getMap",
+        text: "getText",
+        tree: "getTree",
+      } as const
+
+      const getterName =
+        containerGetter[shape._type as keyof typeof containerGetter]
+      const getter = (doc as any)[getterName].bind(doc)
+
+      return {
+        shape,
+        placeholder,
+        getContainer: () => getter(rootName),
+        autoCommit: this.getAutoCommit(),
+        batchedMutation: this.getBatchedMutation(),
+        getDoc: () => doc,
+        pathPrefix: newPathPrefix,
+        mergeable: true,
+      }
+    }
+
+    // Non-mergeable: use standard nested container storage
     const LoroContainer = containerConstructor[shape._type]
     const container = this.getContainer() as LoroMap
 
@@ -80,9 +122,13 @@ export class RecordRefInternals<
     // This allows optional chaining (?.) to work correctly for non-existent keys
     if (isContainerShape(shape)) {
       const existing = container.get(key)
+      // For mergeable containers, null is a marker indicating a child container exists
+      // For non-mergeable, undefined means the key doesn't exist
       if (existing === undefined) {
         return undefined
       }
+      // For mergeable containers, null is valid (it's a marker)
+      // For non-mergeable, null would be an actual null value stored
     }
 
     return this.getOrCreateRef(key)

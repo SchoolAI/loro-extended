@@ -5,6 +5,7 @@ import {
   type LoroEventBatch,
   type PeerID,
   type Subscription,
+  type Value,
 } from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import {
@@ -15,11 +16,141 @@ import {
 } from "./json-patch.js"
 import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
 import { overlayPlaceholder } from "./overlay.js"
-import type { DocShape } from "./shape.js"
+import { buildRootContainerName } from "./path-encoding.js"
+import type {
+  ContainerOrValueShape,
+  ContainerShape,
+  DocShape,
+  RecordContainerShape,
+  StructContainerShape,
+} from "./shape.js"
 import { type DiffOverlay, INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc-ref.js"
 import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
+import { isValueShape } from "./utils/type-guards.js"
 import { validatePlaceholder } from "./validation.js"
+
+/**
+ * Reconstructs hierarchical structure from flattened root container storage.
+ * Used when `mergeable: true` to convert the flat storage back to nested objects.
+ *
+ * @param flatValue - The raw flattened value from doc.toJSON()
+ * @param shape - The document shape
+ * @param pathPrefix - Current path prefix for looking up child containers
+ * @returns Reconstructed hierarchical value
+ */
+function reconstructFromFlattened(
+  flatValue: Record<string, Value>,
+  shape: ContainerShape,
+  pathPrefix: string[],
+): Value {
+  switch (shape._type) {
+    case "struct": {
+      const structShape = shape as StructContainerShape
+      const result: Record<string, Value> = {}
+
+      for (const [key, nestedShape] of Object.entries(structShape.shapes)) {
+        if (isValueShape(nestedShape)) {
+          // Value shapes are stored directly in the container
+          const containerName = buildRootContainerName(pathPrefix)
+          const container = flatValue[containerName] as Record<string, Value>
+          if (container && key in container) {
+            result[key] = container[key]
+          }
+        } else {
+          // Container shapes are stored as separate root containers
+          const childPath = [...pathPrefix, key]
+          result[key] = reconstructFromFlattened(
+            flatValue,
+            nestedShape as ContainerShape,
+            childPath,
+          )
+        }
+      }
+
+      return result
+    }
+
+    case "record": {
+      const recordShape = shape as RecordContainerShape<ContainerOrValueShape>
+      const containerName = buildRootContainerName(pathPrefix)
+      const container = flatValue[containerName] as Record<string, Value>
+
+      if (!container) {
+        return {}
+      }
+
+      const result: Record<string, Value> = {}
+
+      for (const key of Object.keys(container)) {
+        const value = container[key]
+
+        if (isValueShape(recordShape.shape)) {
+          // Value shapes are stored directly
+          result[key] = value
+        } else if (value === null) {
+          // null marker indicates a child container
+          const childPath = [...pathPrefix, key]
+          result[key] = reconstructFromFlattened(
+            flatValue,
+            recordShape.shape as ContainerShape,
+            childPath,
+          )
+        } else {
+          // Non-null value (shouldn't happen for container shapes, but handle gracefully)
+          result[key] = value
+        }
+      }
+
+      return result
+    }
+
+    case "list":
+    case "movableList": {
+      // Lists store their items directly in the root container
+      const containerName = buildRootContainerName(pathPrefix)
+      const container = flatValue[containerName]
+      return container ?? []
+    }
+
+    case "text": {
+      const containerName = buildRootContainerName(pathPrefix)
+      const container = flatValue[containerName]
+      return container ?? ""
+    }
+
+    case "counter": {
+      const containerName = buildRootContainerName(pathPrefix)
+      const container = flatValue[containerName]
+      return container ?? 0
+    }
+
+    case "tree": {
+      const containerName = buildRootContainerName(pathPrefix)
+      const container = flatValue[containerName]
+      return container ?? []
+    }
+
+    default:
+      return {}
+  }
+}
+
+/**
+ * Reconstructs the full document hierarchy from flattened storage.
+ */
+function reconstructDocFromFlattened(
+  flatValue: Record<string, Value>,
+  docShape: DocShape,
+): Record<string, Value> {
+  const result: Record<string, Value> = {}
+
+  for (const [key, containerShape] of Object.entries(docShape.shapes)) {
+    result[key] = reconstructFromFlattened(flatValue, containerShape, [key])
+  }
+
+  return result
+}
 
 /**
  * Internal TypedDoc implementation (not directly exposed to users).
@@ -30,6 +161,7 @@ class TypedDocInternal<Shape extends DocShape> {
   private placeholder: InferPlaceholderType<Shape>
   private doc: LoroDoc
   private overlay?: DiffOverlay
+  private _mergeable: boolean
   private valueRef: DocRef<Shape> | null = null
   // Reference to the proxy for returning from change()
   proxy: TypedDoc<Shape> | null = null
@@ -38,13 +170,19 @@ class TypedDocInternal<Shape extends DocShape> {
     shape: Shape,
     doc: LoroDoc = new LoroDoc(),
     overlay?: DiffOverlay,
+    mergeable = false,
   ) {
     this.shape = shape
     this.placeholder = derivePlaceholder(shape)
     this.doc = doc
     this.overlay = overlay
+    this._mergeable = mergeable
 
     validatePlaceholder(this.placeholder, this.shape)
+  }
+
+  get mergeable(): boolean {
+    return this._mergeable
   }
 
   get value(): Mutable<Shape> {
@@ -55,6 +193,7 @@ class TypedDocInternal<Shape extends DocShape> {
         doc: this.doc,
         autoCommit: true,
         overlay: this.overlay,
+        mergeable: this._mergeable,
       })
     }
     return this.valueRef as unknown as Mutable<Shape>
@@ -62,9 +201,15 @@ class TypedDocInternal<Shape extends DocShape> {
 
   toJSON(): Infer<Shape> {
     const crdtValue = this.doc.toJSON()
+
+    // For mergeable docs, reconstruct hierarchy from flattened storage
+    const hierarchicalValue = this._mergeable
+      ? reconstructDocFromFlattened(crdtValue, this.shape)
+      : crdtValue
+
     return overlayPlaceholder(
       this.shape,
-      crdtValue,
+      hierarchicalValue,
       this.placeholder as any,
     ) as Infer<Shape>
   }
@@ -77,6 +222,7 @@ class TypedDocInternal<Shape extends DocShape> {
       autoCommit: false,
       batchedMutation: true, // Enable value shape caching for find-and-mutate patterns
       overlay: this.overlay,
+      mergeable: this._mergeable,
     })
     fn(draft as unknown as Mutable<Shape>)
     draft[INTERNAL_SYMBOL].absorbPlainValues()
@@ -151,6 +297,23 @@ export type Frontiers = { peer: PeerID; counter: number }[]
 export type CreateTypedDocOptions = {
   doc?: LoroDoc
   overlay?: DiffOverlay
+  /**
+   * When true, all containers are stored at the document root with path-based names.
+   * This ensures container IDs are deterministic and survive `applyDiff`, enabling
+   * proper merging of concurrent container creation.
+   *
+   * Use this when:
+   * - Multiple peers may concurrently create containers at the same schema path
+   * - You need containers to merge correctly via `applyDiff` (e.g., Lens)
+   *
+   * Limitations:
+   * - Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported
+   * - MovableLists of containers are NOT supported
+   * - Use `Shape.record(Shape.struct({...}))` with string keys instead
+   *
+   * @default false
+   */
+  mergeable?: boolean
 }
 
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
@@ -260,6 +423,7 @@ export function createTypedDoc<Shape extends DocShape>(
     shape,
     options.doc || new LoroDoc(),
     options.overlay,
+    options.mergeable,
   )
 
   // Create the loro() namespace for this doc
@@ -295,7 +459,10 @@ export function createTypedDoc<Shape extends DocShape>(
   // Create the forkAt() function that returns a new TypedDoc at the specified version
   const forkAtFunction = (frontiers: Frontiers): TypedDoc<Shape> => {
     const forkedLoroDoc = internal.loroDoc.forkAt(frontiers)
-    return createTypedDoc(internal.docShape, { doc: forkedLoroDoc })
+    return createTypedDoc(internal.docShape, {
+      doc: forkedLoroDoc,
+      mergeable: internal.mergeable,
+    })
   }
 
   // Create a proxy that delegates schema properties to the DocRef

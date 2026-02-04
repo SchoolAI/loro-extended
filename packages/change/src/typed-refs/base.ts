@@ -6,6 +6,7 @@ import type {
   Subscription,
 } from "loro-crdt"
 import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
+import { buildRootContainerName } from "../path-encoding.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
 
@@ -47,6 +48,17 @@ export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   batchedMutation?: boolean // True when inside change() block - enables value shape caching for find-and-mutate patterns
   getDoc: () => LoroDoc // Needed for auto-commit
   overlay?: DiffOverlay // Optional reverse diff overlay for "before" reads
+  /**
+   * Path prefix for flattened root container storage (mergeable containers).
+   * When set, child containers are stored at the document root with path-based names.
+   * Example: pathPrefix = ["data", "nested"] means child "items" becomes root container "data-nested-items"
+   */
+  pathPrefix?: string[]
+  /**
+   * Whether this ref is part of a mergeable document.
+   * When true, containers use flattened root storage for deterministic IDs.
+   */
+  mergeable?: boolean
 }
 
 // ============================================================================
@@ -126,6 +138,28 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this.params.overlay
   }
 
+  /** Get the path prefix for flattened root container storage */
+  getPathPrefix(): string[] | undefined {
+    return this.params.pathPrefix
+  }
+
+  /** Check if this ref is part of a mergeable document */
+  isMergeable(): boolean {
+    return !!this.params.mergeable
+  }
+
+  /**
+   * Compute the root container name for a child key.
+   * Used when mergeable is true to create flattened root containers.
+   *
+   * @param key - The child key to append to the path
+   * @returns The encoded root container name
+   */
+  computeChildRootContainerName(key: string): string {
+    const prefix = this.params.pathPrefix || []
+    return buildRootContainerName([...prefix, key])
+  }
+
   /**
    * Get the TypedRefParams needed to recreate this ref.
    * Used by change() to create draft refs with modified params.
@@ -142,6 +176,8 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
       batchedMutation: this.params.batchedMutation,
       getDoc: this.params.getDoc,
       overlay: this.params.overlay,
+      pathPrefix: this.params.pathPrefix,
+      mergeable: this.params.mergeable,
     }
   }
 

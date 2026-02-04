@@ -17,6 +17,7 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
       doc: LoroDoc
       autoCommit?: boolean
       batchedMutation?: boolean
+      mergeable?: boolean
     },
   ) {
     super()

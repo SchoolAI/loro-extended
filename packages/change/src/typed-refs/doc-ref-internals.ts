@@ -31,12 +31,14 @@ export class DocRefInternals<
   private propertyCache = new Map<string, TypedRef<ContainerShape>>()
   private doc: LoroDoc
   private requiredPlaceholder: Infer<Shape>
+  private _mergeable: boolean
 
   constructor(
     params: Omit<TypedRefParams<Shape>, "getContainer" | "getDoc"> & {
       doc: LoroDoc
       autoCommit?: boolean
       batchedMutation?: boolean
+      mergeable?: boolean
     },
   ) {
     super({
@@ -45,10 +47,12 @@ export class DocRefInternals<
         throw new Error("can't get container on DocRef")
       },
       getDoc: () => params.doc,
+      mergeable: params.mergeable,
     } as TypedRefParams<Shape>)
 
     this.doc = params.doc
     this.requiredPlaceholder = params.placeholder as Infer<Shape>
+    this._mergeable = !!params.mergeable
   }
 
   /** Get typed ref params for creating child refs at a key */
@@ -67,6 +71,23 @@ export class DocRefInternals<
     const getterName = containerGetter[shape._type as ContainerGetterKey]
     const getter = this.doc[getterName].bind(this.doc)
 
+    // For mergeable documents, use root containers with path-based names
+    // This ensures deterministic container IDs that survive applyDiff
+    if (this._mergeable) {
+      return {
+        shape,
+        placeholder: this.requiredPlaceholder[key],
+        getContainer: () => getter(key), // Root container with key as name
+        autoCommit: this.getAutoCommit(),
+        batchedMutation: this.getBatchedMutation(),
+        getDoc: () => this.doc,
+        overlay: this.getOverlay(),
+        pathPrefix: [key], // Start the path prefix for nested containers
+        mergeable: true,
+      }
+    }
+
+    // Non-mergeable: use standard hierarchical storage
     return {
       shape,
       placeholder: this.requiredPlaceholder[key],

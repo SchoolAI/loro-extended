@@ -36,9 +36,13 @@ export { mergeValue, overlayPlaceholder } from "./overlay.js"
 export { createPathBuilder } from "./path-builder.js"
 
 export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
-
+// Path encoding for flattened root container storage (mergeable containers)
+export {
+  buildRootContainerName,
+  escapePathSegment,
+  parseRootContainerName,
+} from "./path-encoding.js"
 export { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
-
 export type {
   PathBuilder,
   PathNode,
