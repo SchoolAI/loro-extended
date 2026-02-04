@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import {
@@ -83,9 +83,9 @@ describe("useDoc", () => {
     // Verify initial state - doc is JSON
     expect(result.current.doc.title).toBe("Test Document")
 
-    // Mutate via handle.batch (wrapped in act to allow React to process updates)
+    // Mutate via change() (wrapped in act to allow React to process updates)
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "Updated Title")
       })
@@ -167,7 +167,7 @@ describe("useDoc", () => {
 
     // Make a change and capture the frontier
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "First Edit")
       })
@@ -177,7 +177,7 @@ describe("useDoc", () => {
 
     // Make another change
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "Second Edit")
       })
@@ -208,7 +208,7 @@ describe("useDoc", () => {
 
     // Make a change and capture the frontier
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "First Edit")
       })
@@ -217,7 +217,7 @@ describe("useDoc", () => {
 
     // Make another change
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "Latest Edit")
       })
@@ -254,7 +254,7 @@ describe("useDoc", () => {
 
     // Make changes
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "Version 1")
       })
@@ -262,7 +262,7 @@ describe("useDoc", () => {
     const frontier1 = result.current.handle.loroDoc.frontiers()
 
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "Version 2")
       })
@@ -301,7 +301,7 @@ describe("useDoc", () => {
 
     // Make first change
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "State A")
       })
@@ -311,7 +311,7 @@ describe("useDoc", () => {
 
     // Make second change
     act(() => {
-      result.current.handle.change(d => {
+      change(result.current.handle.doc, d => {
         d.title.delete(0, d.title.length)
         d.title.insert(0, "State B")
       })

@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import {
@@ -153,7 +153,7 @@ describe("useRefValue", () => {
       expect(result.current.refValue.value).toEqual([])
 
       act(() => {
-        result.current.handle.change(d => {
+        change(result.current.handle.doc, d => {
           d.items.push("Item 1")
           d.items.push("Item 2")
         })
