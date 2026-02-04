@@ -11,7 +11,7 @@
  * that affected the compat adapter (e.g., dropped batch messages).
  */
 
-import { type PeerID, Repo, Shape } from "@loro-extended/repo"
+import { change, type PeerID, Repo, Shape } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -116,7 +116,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Client 1 makes changes
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.text.insert(0, "Hello from client 1")
     })
 
@@ -185,7 +185,7 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Client 1 makes changes
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.text.insert(0, "Hello from client 1")
     })
 

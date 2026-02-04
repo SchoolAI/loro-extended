@@ -1,4 +1,4 @@
-import { Repo, Shape, validatePeerId } from "@loro-extended/repo"
+import { change, Repo, Shape, validatePeerId } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -115,7 +115,7 @@ describe("WebSocket Adapter E2E", () => {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Client 1 makes changes
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.text.insert(0, "Hello")
     })
 
