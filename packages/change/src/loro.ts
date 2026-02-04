@@ -1,43 +1,39 @@
 /**
- * The `loro()` function - single escape hatch for CRDT internals.
+ * The `loro()` function - access native Loro types directly.
  *
  * Design Principle:
- * > If it takes a plain JavaScript value, keep it on the ref.
- * > If it takes a Loro container or exposes CRDT internals, move to `loro()`.
+ * > `loro()` returns native Loro types directly (LoroDoc, LoroText, etc.)
+ * > `ext()` provides loro-extended-specific features (change, fork, subscribe with jsonpath, etc.)
  *
  * @example
  * ```typescript
- * import { loro } from "@loro-extended/change"
+ * import { loro, ext } from "@loro-extended/change"
  *
- * // Access underlying LoroDoc
- * loro(ref).doc
+ * // Access native Loro types directly
+ * const loroDoc = loro(doc)  // LoroDoc
+ * loroDoc.frontiers()
+ * loroDoc.subscribe(callback)
  *
- * // Access underlying Loro container (correctly typed)
- * loro(ref).container  // LoroList, LoroMap, LoroText, etc.
+ * const loroText = loro(doc.title)  // LoroText
+ * loroText.length
  *
- * // Subscribe to changes
- * loro(ref).subscribe(callback)
- *
- * // Container operations
- * loro(list).pushContainer(loroMap)
- * loro(struct).setContainer('key', loroMap)
+ * // Access loro-extended features via ext()
+ * ext(doc).change(draft => { ... })
+ * ext(doc).forkAt(frontiers)
+ * ext(ref).doc  // Get LoroDoc from any ref
  * ```
  */
 
 import type {
-  Container,
   LoroCounter,
   LoroDoc,
-  LoroEventBatch,
   LoroList,
   LoroMap,
   LoroMovableList,
   LoroText,
   LoroTree,
   LoroTreeNode,
-  Subscription,
 } from "loro-crdt"
-import type { JsonPatch } from "./json-patch.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -67,221 +63,96 @@ import type { TreeRef } from "./typed-refs/tree-ref.js"
 export const LORO_SYMBOL = Symbol.for("loro-extended:loro")
 
 // ============================================================================
-// Interface definitions for loro() return types
-// ============================================================================
-
-/**
- * Base interface for all loro() return types.
- * Provides access to the underlying LoroDoc, container, and subscription.
- */
-export interface LoroRefBase {
-  /** The underlying LoroDoc */
-  readonly doc: LoroDoc
-
-  /** The underlying Loro container */
-  readonly container: unknown
-
-  /**
-   * Subscribe to container-level changes.
-   * @param callback - Function called when the container changes
-   * @returns Subscription that can be used to unsubscribe
-   */
-  subscribe(callback: (event: LoroEventBatch) => void): Subscription
-}
-
-/**
- * loro() return type for ListRef and MovableListRef.
- * Provides container operations that take Loro containers.
- */
-export interface LoroListRef extends LoroRefBase {
-  /** The underlying LoroList or LoroMovableList */
-  readonly container: LoroList | LoroMovableList
-
-  /**
-   * Push a Loro container to the end of the list.
-   * Use this when you need to add a pre-existing container.
-   */
-  pushContainer(container: Container): Container
-
-  /**
-   * Insert a Loro container at the specified index.
-   * Use this when you need to insert a pre-existing container.
-   */
-  insertContainer(index: number, container: Container): Container
-}
-
-/**
- * loro() return type for StructRef and RecordRef.
- * Provides container operations that take Loro containers.
- */
-export interface LoroMapRef extends LoroRefBase {
-  /** The underlying LoroMap */
-  readonly container: LoroMap
-
-  /**
-   * Set a Loro container at the specified key.
-   * Use this when you need to set a pre-existing container.
-   */
-  setContainer(key: string, container: Container): Container
-}
-
-/**
- * loro() return type for TextRef.
- */
-export interface LoroTextRef extends LoroRefBase {
-  /** The underlying LoroText */
-  readonly container: LoroText
-}
-
-/**
- * loro() return type for CounterRef.
- */
-export interface LoroCounterRef extends LoroRefBase {
-  /** The underlying LoroCounter */
-  readonly container: LoroCounter
-}
-
-/**
- * loro() return type for TreeRef.
- */
-export interface LoroTreeRef extends LoroRefBase {
-  /** The underlying LoroTree */
-  readonly container: LoroTree
-}
-
-/**
- * loro() return type for TreeNodeRef.
- */
-export interface LoroTreeNodeRef extends LoroRefBase {
-  /** The underlying LoroTreeNode */
-  readonly container: LoroTreeNode
-}
-
-/**
- * loro() return type for TypedDoc.
- * Provides access to doc-level operations.
- */
-export interface LoroTypedDocRef extends LoroRefBase {
-  /** The underlying LoroDoc (same as doc for TypedDoc) */
-  readonly container: LoroDoc
-
-  /**
-   * Apply JSON Patch operations to the document.
-   * @param patch - Array of JSON Patch operations (RFC 6902)
-   * @param pathPrefix - Optional path prefix for scoped operations
-   */
-  applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void
-
-  /** Access the document schema shape */
-  readonly docShape: DocShape
-
-  /** Get raw CRDT value without placeholder overlay */
-  readonly rawValue: unknown
-
-  /**
-   * Whether this document uses mergeable (flattened) storage.
-   * This is the effective value computed from metadata > schema > false.
-   */
-  readonly mergeable: boolean
-}
-
-// ============================================================================
 // loro() function overloads
 // ============================================================================
 
 /**
- * Access CRDT internals for a ListRef.
+ * Access the native LoroList for a ListRef.
  */
-export function loro<NestedShape extends ContainerShape>(
+export function loro<NestedShape extends ContainerOrValueShape>(
   ref: ListRef<NestedShape>,
-): LoroListRef
+): LoroList
 
 /**
- * Access CRDT internals for a MovableListRef.
+ * Access the native LoroMovableList for a MovableListRef.
  */
-export function loro<NestedShape extends ContainerShape>(
+export function loro<NestedShape extends ContainerOrValueShape>(
   ref: MovableListRef<NestedShape>,
-): LoroListRef
+): LoroMovableList
 
 /**
- * Access CRDT internals for a StructRef.
+ * Access the native LoroMap for a StructRef.
  */
 export function loro<
   NestedShapes extends Record<string, ContainerOrValueShape>,
->(ref: StructRef<NestedShapes>): LoroMapRef
+>(ref: StructRef<NestedShapes>): LoroMap
 
 /**
- * Access CRDT internals for a RecordRef.
+ * Access the native LoroMap for a RecordRef.
  */
-export function loro<NestedShape extends ContainerShape>(
+export function loro<NestedShape extends ContainerOrValueShape>(
   ref: RecordRef<NestedShape>,
-): LoroMapRef
+): LoroMap
 
 /**
- * Access CRDT internals for a TextRef.
+ * Access the native LoroText for a TextRef.
  */
-export function loro(ref: TextRef): LoroTextRef
+export function loro(ref: TextRef): LoroText
 
 /**
- * Access CRDT internals for a CounterRef.
+ * Access the native LoroCounter for a CounterRef.
  */
-export function loro(ref: CounterRef): LoroCounterRef
+export function loro(ref: CounterRef): LoroCounter
 
 /**
- * Access CRDT internals for a TreeRef.
+ * Access the native LoroTree for a TreeRef.
  */
 export function loro<DataShape extends StructContainerShape>(
   ref: TreeRef<DataShape> | TreeRefInterface<DataShape>,
-): LoroTreeRef
+): LoroTree
 
 /**
- * Access CRDT internals for a TreeNodeRef.
+ * Access the native LoroTreeNode for a TreeNodeRef.
  */
 export function loro<DataShape extends StructContainerShape>(
   ref: TreeNodeRef<DataShape>,
-): LoroTreeNodeRef
+): LoroTreeNode
 
 /**
- * Access CRDT internals for a TypedDoc.
+ * Access the native LoroDoc for a TypedDoc.
  */
-export function loro<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-): LoroTypedDocRef
+export function loro<Shape extends DocShape>(doc: TypedDoc<Shape>): LoroDoc
 
 /**
- * Access CRDT internals for any TypedRef.
+ * Access the native Loro container for any TypedRef.
  */
 export function loro<Shape extends ContainerShape>(
   ref: TypedRef<Shape>,
-): LoroRefBase
+): unknown
 
 /**
- * The `loro()` function - single escape hatch for CRDT internals.
+ * The `loro()` function - access native Loro types directly.
  *
  * Use this to access:
- * - The underlying LoroDoc
- * - The underlying Loro container (correctly typed)
- * - Container-level subscriptions
- * - Container operations that take Loro containers (pushContainer, setContainer, etc.)
+ * - The underlying LoroDoc from a TypedDoc
+ * - The underlying Loro container (LoroText, LoroList, etc.) from a TypedRef
  *
  * @param refOrDoc - A TypedRef or TypedDoc
- * @returns An object with CRDT internals and operations
+ * @returns The native Loro type (LoroDoc, LoroText, LoroList, etc.)
  *
  * @example
  * ```typescript
  * import { loro } from "@loro-extended/change"
  *
- * // Access underlying LoroDoc
- * loro(doc.settings).doc
+ * // Access native LoroDoc
+ * const loroDoc = loro(doc)
+ * loroDoc.frontiers()
+ * loroDoc.subscribe(callback)
  *
- * // Access underlying Loro container
- * loro(doc.items).container  // LoroList
- *
- * // Subscribe to changes
- * loro(doc.settings).subscribe(event => { ... })
- *
- * // Container operations
- * loro(doc.items).pushContainer(loroMap)
+ * // Access native Loro containers
+ * const loroText = loro(doc.title)  // LoroText
+ * const loroList = loro(doc.items)  // LoroList
+ * const loroMap = loro(doc.settings)  // LoroMap
  * ```
  */
 export function loro(
@@ -292,13 +163,13 @@ export function loro(
     | TreeRefInterface<any>
     | TreeNodeRef<any>
     | StructRef<any>,
-): LoroRefBase {
-  // Access the loro namespace via the well-known symbol
-  const loroNamespace = (refOrDoc as any)[LORO_SYMBOL]
-  if (!loroNamespace) {
+): unknown {
+  // Access the loro value via the well-known symbol
+  const loroValue = (refOrDoc as any)[LORO_SYMBOL]
+  if (loroValue === undefined) {
     throw new Error(
       "Invalid argument: expected TypedRef, TreeRef, or TypedDoc with loro() support",
     )
   }
-  return loroNamespace
+  return loroValue
 }

@@ -5,7 +5,7 @@ import type {
   LoroEventBatch,
   Subscription,
 } from "loro-crdt"
-import type { LoroCounterRef } from "../loro.js"
+import type { ExtRefBase } from "../ext.js"
 import type { CounterContainerShape } from "../shape.js"
 import { BaseRefInternals } from "./base.js"
 
@@ -58,15 +58,17 @@ export class CounterRefInternals extends BaseRefInternals<CounterContainerShape>
     // no plain values contained within
   }
 
-  /** Create the loro namespace for counter */
-  protected override createLoroNamespace(): LoroCounterRef {
+  /** Create the ext namespace for counter */
+  protected override createExtNamespace(): ExtRefBase {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroCounter {
-        return self.getContainer() as LoroCounter
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroCounter).subscribe(callback)

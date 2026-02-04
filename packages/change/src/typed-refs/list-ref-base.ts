@@ -10,7 +10,7 @@ import type {
 } from "loro-crdt"
 import { convertInputToRef } from "../conversion.js"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
-import type { LoroListRef } from "../loro.js"
+import type { ExtListRef } from "../ext.js"
 import { mergeValue } from "../overlay.js"
 import type { ContainerOrValueShape, ContainerShape } from "../shape.js"
 import {
@@ -302,15 +302,17 @@ export class ListRefBaseInternals<
     this.itemCache.clear()
   }
 
-  /** Create the loro namespace for list */
-  protected override createLoroNamespace(): LoroListRef {
+  /** Create the ext namespace for list */
+  protected override createExtNamespace(): ExtListRef {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroList | LoroMovableList {
-        return self.getContainer() as LoroList | LoroMovableList
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroList | LoroMovableList).subscribe(

@@ -8,13 +8,14 @@ import {
   type Value,
 } from "loro-crdt"
 import { derivePlaceholder } from "./derive-placeholder.js"
+import { EXT_SYMBOL, type ExtDocRef } from "./ext.js"
 import {
   type JsonPatch,
   JsonPatchApplicator,
   type JsonPatchOperation,
   normalizePath,
 } from "./json-patch.js"
-import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
+import { LORO_SYMBOL } from "./loro.js"
 import {
   hasMetadata,
   isLoroExtendedReservedKey,
@@ -390,28 +391,6 @@ export type CreateTypedDocOptions = {
 
 export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
   /**
-   * The primary method of mutating typed documents.
-   * Batches multiple mutations into a single transaction.
-   * All changes commit together at the end.
-   *
-   * Use this for:
-   * - Find-and-mutate operations (required due to JS limitations)
-   * - Performance (fewer commits)
-   * - Atomic undo (all changes = one undo step)
-   *
-   * Returns the doc for chaining.
-   *
-   * @example
-   * ```typescript
-   * doc.change(draft => {
-   *   draft.count.increment(10);
-   *   draft.title.update("World");
-   * });
-   * ```
-   */
-  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
-
-  /**
    * Returns the full plain JavaScript object representation of the document.
    * This is an O(N) operation that serializes the entire document.
    *
@@ -422,51 +401,6 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
    * ```
    */
   toJSON(): Infer<Shape>
-
-  /**
-   * Creates a new TypedDoc at a specified version (frontiers).
-   * The forked doc will only contain history before the specified frontiers.
-   * The forked doc has a different PeerID from the original.
-   *
-   * For raw LoroDoc access, use: `loro(doc).doc.forkAt(frontiers)`
-   *
-   * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
-   * @returns A new TypedDoc with the same schema at the specified version
-   *
-   * @example
-   * ```typescript
-   * import { loro } from "@loro-extended/change";
-   *
-   * const doc = createTypedDoc(schema);
-   * doc.title.update("Hello");
-   * const frontiers = loro(doc).doc.frontiers();
-   * doc.title.update("World");
-   *
-   * // Fork at the earlier version
-   * const forkedDoc = doc.forkAt(frontiers);
-   * console.log(forkedDoc.title.toString()); // "Hello"
-   * console.log(doc.title.toString()); // "World"
-   * ```
-   */
-  forkAt(frontiers: Frontiers): TypedDoc<Shape>
-
-  /**
-   * Initialize the document by writing metadata.
-   * This is called automatically unless `skipInitialize: true` was passed to createTypedDoc.
-   * Call this manually if you skipped initialization and want to write metadata later.
-   *
-   * This is idempotent - calling it multiple times has no effect after the first call.
-   *
-   * @example
-   * ```typescript
-   * // Create doc without auto-initialization
-   * const doc = createTypedDoc(schema, { skipInitialize: true });
-   *
-   * // Later, when ready to write metadata
-   * doc.initialize();
-   * ```
-   */
-  initialize(): void
 }
 
 /**
@@ -490,8 +424,9 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  * doc.count.increment(5);
  * doc.title.insert(0, "Hello");
  *
- * // Batched mutations via change()
- * doc.change(draft => {
+ * // Batched mutations via ext().change()
+ * import { ext } from "@loro-extended/change";
+ * ext(doc).change(draft => {
  *   draft.count.increment(10);
  *   draft.title.update("World");
  * });
@@ -499,10 +434,11 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  * // Get plain JSON
  * const snapshot = doc.toJSON();
  *
- * // Access CRDT internals via loro()
+ * // Access native LoroDoc via loro()
  * import { loro } from "@loro-extended/change";
- * loro(doc).doc;  // LoroDoc
- * loro(doc).subscribe(callback);
+ * const loroDoc = loro(doc);  // LoroDoc directly
+ * loroDoc.frontiers();
+ * loroDoc.subscribe(callback);
  * ```
  */
 export function createTypedDoc<Shape extends DocShape>(
@@ -520,21 +456,56 @@ export function createTypedDoc<Shape extends DocShape>(
     options.skipInitialize ?? false,
   )
 
-  // Create the loro() namespace for this doc
-  const loroNamespace: LoroTypedDocRef = {
-    get doc(): LoroDoc {
-      return internal.loroDoc
+  // Create the ext() namespace for this doc (loro-extended features)
+  const extNamespace: ExtDocRef<Shape> = {
+    change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
+      internal.change(fn)
+      return proxy
     },
-    get container(): LoroDoc {
-      return internal.loroDoc
+    fork(opts?: { preservePeerId?: boolean }): TypedDoc<Shape> {
+      const forkedLoroDoc = internal.loroDoc.fork()
+      if (opts?.preservePeerId) {
+        forkedLoroDoc.setPeerId(internal.loroDoc.peerId)
+      }
+      return createTypedDoc(internal.docShape, {
+        doc: forkedLoroDoc,
+        mergeable: internal.mergeable,
+      })
     },
-    subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-      return internal.loroDoc.subscribe(callback)
+    forkAt(frontiers: Frontiers): TypedDoc<Shape> {
+      const forkedLoroDoc = internal.loroDoc.forkAt(frontiers)
+      return createTypedDoc(internal.docShape, {
+        doc: forkedLoroDoc,
+        mergeable: internal.mergeable,
+      })
+    },
+    shallowForkAt(
+      frontiers: Frontiers,
+      opts?: { preservePeerId?: boolean },
+    ): TypedDoc<Shape> {
+      // Export a shallow snapshot at the specified frontiers
+      const shallowBytes = internal.loroDoc.export({
+        mode: "shallow-snapshot",
+        frontiers,
+      })
+      // Create a new LoroDoc from the shallow snapshot
+      const shallowLoroDoc = LoroDoc.fromSnapshot(shallowBytes)
+      // Optionally preserve the peer ID for consistent frontier progression
+      if (opts?.preservePeerId) {
+        shallowLoroDoc.setPeerId(internal.loroDoc.peerId)
+      }
+      return createTypedDoc(internal.docShape, {
+        doc: shallowLoroDoc,
+        mergeable: internal.mergeable,
+      })
+    },
+    initialize(): void {
+      internal.initialize()
     },
     applyPatch(patch: JsonPatch, pathPrefix?: (string | number)[]): void {
       internal.applyPatch(patch, pathPrefix)
     },
-    get docShape(): DocShape {
+    get docShape(): Shape {
       return internal.docShape
     },
     get rawValue(): unknown {
@@ -543,52 +514,22 @@ export function createTypedDoc<Shape extends DocShape>(
     get mergeable(): boolean {
       return internal.mergeable
     },
-  }
-
-  // Create the change() function that returns the proxy for chaining
-  const changeFunction = (
-    fn: (draft: Mutable<Shape>) => void,
-  ): TypedDoc<Shape> => {
-    internal.change(fn)
-    return proxy
-  }
-
-  // Create the forkAt() function that returns a new TypedDoc at the specified version
-  const forkAtFunction = (frontiers: Frontiers): TypedDoc<Shape> => {
-    const forkedLoroDoc = internal.loroDoc.forkAt(frontiers)
-    return createTypedDoc(internal.docShape, {
-      doc: forkedLoroDoc,
-      mergeable: internal.mergeable,
-    })
-  }
-
-  // Create the initialize() function
-  const initializeFunction = (): void => {
-    internal.initialize()
+    subscribe(callback: (event: LoroEventBatch) => void): Subscription {
+      return internal.loroDoc.subscribe(callback)
+    },
   }
 
   // Create a proxy that delegates schema properties to the DocRef
-  // and provides change() and forkAt() methods
   const proxy = new Proxy(internal.value as object, {
     get(target, prop, receiver) {
-      // loro() access via well-known symbol
+      // loro() access via well-known symbol - returns LoroDoc directly
       if (prop === LORO_SYMBOL) {
-        return loroNamespace
+        return internal.loroDoc
       }
 
-      // change() method directly on doc
-      if (prop === "change") {
-        return changeFunction
-      }
-
-      // forkAt() method directly on doc
-      if (prop === "forkAt") {
-        return forkAtFunction
-      }
-
-      // initialize() method directly on doc
-      if (prop === "initialize") {
-        return initializeFunction
+      // ext() access via well-known symbol - returns ExtDocRef
+      if (prop === EXT_SYMBOL) {
+        return extNamespace
       }
 
       // toJSON() should always read fresh from the CRDT
@@ -601,13 +542,8 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     set(target, prop, value, receiver) {
-      // Don't allow setting change, forkAt, initialize, or LORO_SYMBOL
-      if (
-        prop === LORO_SYMBOL ||
-        prop === "change" ||
-        prop === "forkAt" ||
-        prop === "initialize"
-      ) {
+      // Don't allow setting LORO_SYMBOL or EXT_SYMBOL
+      if (prop === LORO_SYMBOL || prop === EXT_SYMBOL) {
         return false
       }
 
@@ -617,13 +553,7 @@ export function createTypedDoc<Shape extends DocShape>(
 
     // Support 'in' operator
     has(target, prop) {
-      if (
-        prop === LORO_SYMBOL ||
-        prop === "change" ||
-        prop === "forkAt" ||
-        prop === "initialize"
-      )
-        return true
+      if (prop === LORO_SYMBOL || prop === EXT_SYMBOL) return true
       return Reflect.has(target, prop)
     },
 
@@ -634,25 +564,18 @@ export function createTypedDoc<Shape extends DocShape>(
     },
 
     getOwnPropertyDescriptor(target, prop) {
-      if (prop === "change") {
-        return {
-          configurable: true,
-          enumerable: false,
-          value: changeFunction,
-        }
-      }
-      if (prop === "forkAt") {
-        return {
-          configurable: true,
-          enumerable: false,
-          value: forkAtFunction,
-        }
-      }
       if (prop === LORO_SYMBOL) {
         return {
           configurable: true,
           enumerable: false,
-          value: loroNamespace,
+          value: internal.loroDoc,
+        }
+      }
+      if (prop === EXT_SYMBOL) {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: extNamespace,
         }
       }
       return Reflect.getOwnPropertyDescriptor(target, prop)

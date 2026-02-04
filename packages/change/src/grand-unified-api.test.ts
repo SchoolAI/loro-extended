@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { ext } from "./ext.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -8,7 +9,7 @@ import { createTypedDoc } from "./typed-doc.js"
  *
  * This API provides direct schema access on the doc object:
  * - doc.count.increment(5) instead of doc.count.increment(5)
- * - doc.change() for batched mutations
+ * - ext(doc).change() for batched mutations
  * - doc.toJSON() for serialization
  */
 describe("Grand Unified API v3", () => {
@@ -114,7 +115,7 @@ describe("Grand Unified API v3", () => {
 
     it("should support 'in' operator after change()", () => {
       const doc = createTypedDoc(schema)
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.users.set("alice", { name: "Alice" })
         draft.users.set("bob", { name: "Bob" })
       })
@@ -129,15 +130,15 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schema)
 
       // Track commits by checking version changes
-      const versionBefore = loro(doc).doc.version()
+      const versionBefore = loro(doc).version()
 
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.count.increment(1)
         draft.count.increment(2)
         draft.count.increment(3)
       })
 
-      const versionAfter = loro(doc).doc.version()
+      const versionAfter = loro(doc).version()
 
       // Version should have changed
       expect(versionAfter).not.toEqual(versionBefore)
@@ -147,7 +148,7 @@ describe("Grand Unified API v3", () => {
     it("should batch multiple different operations", () => {
       const doc = createTypedDoc(schema)
 
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.title.insert(0, "Hello World")
         draft.count.increment(42)
         draft.users.set("alice", { name: "Alice" })
@@ -164,7 +165,7 @@ describe("Grand Unified API v3", () => {
     it("should return doc for chaining from change()", () => {
       const doc = createTypedDoc(schema)
 
-      const result = doc.change(draft => {
+      const result = ext(doc).change(draft => {
         draft.title.insert(0, "Test")
         draft.count.increment(5)
       })
@@ -179,7 +180,7 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schema)
 
       // Chain mutations after change
-      doc
+      ext(doc)
         .change(draft => {
           draft.count.increment(5)
         })
@@ -195,19 +196,19 @@ describe("Grand Unified API v3", () => {
 
       // Both should have .has()
       expect(typeof doc.users.has).toBe("function")
-      doc.change(draft => {
+      ext(doc).change(draft => {
         expect(typeof draft.users.has).toBe("function")
       })
 
       // Both should have .keys()
       expect(typeof doc.users.keys).toBe("function")
-      doc.change(draft => {
+      ext(doc).change(draft => {
         expect(typeof draft.users.keys).toBe("function")
       })
 
       // Both should have .set()
       expect(typeof doc.users.set).toBe("function")
-      doc.change(draft => {
+      ext(doc).change(draft => {
         expect(typeof draft.users.set).toBe("function")
       })
     })
@@ -216,7 +217,7 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schema)
 
       // Set up some data
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.title.insert(0, "Test Title")
         draft.count.increment(42)
         draft.users.set("alice", { name: "Alice" })
@@ -269,7 +270,7 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(listMapSchema)
 
       // Push via batch first to create the structure
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.articles.push({ title: "Article 1", views: 0 })
         draft.articles.push({ title: "Article 2", views: 0 })
       })
@@ -389,19 +390,21 @@ describe("Grand Unified API v3", () => {
     })
   })
 
-  describe("loro() namespace", () => {
+  describe("loro() and ext() namespaces", () => {
     it("should provide access to CRDT internals via loro()", () => {
       const doc = createTypedDoc(schema)
 
-      // loro(doc) should provide access to CRDT internals
-      expect(loro(doc).doc).toBeDefined()
+      // loro(doc) should return the native LoroDoc directly
+      expect(loro(doc)).toBeDefined()
       expect(loro(doc).subscribe).toBeDefined()
-      expect(loro(doc).applyPatch).toBeDefined()
-      expect(loro(doc).rawValue).toBeDefined()
-      expect(loro(doc).docShape).toBeDefined()
 
-      // doc should have change() and toJSON() directly
-      expect(typeof doc.change).toBe("function")
+      // ext(doc) should provide loro-extended features
+      expect(ext(doc).applyPatch).toBeDefined()
+      expect(ext(doc).rawValue).toBeDefined()
+      expect(ext(doc).docShape).toBeDefined()
+      expect(typeof ext(doc).change).toBe("function")
+
+      // doc should have toJSON() directly
       expect(typeof doc.toJSON).toBe("function")
     })
 
@@ -410,20 +413,12 @@ describe("Grand Unified API v3", () => {
 
       // Internal properties should not appear in Object.keys()
       const keys = Object.keys(doc)
-      expect(keys).not.toContain("change")
 
       // But schema keys should appear
       expect(keys).toContain("title")
       expect(keys).toContain("count")
       expect(keys).toContain("users")
       expect(keys).toContain("items")
-    })
-
-    it("should support 'in' operator for change", () => {
-      const doc = createTypedDoc(schema)
-
-      // change should be accessible via 'in'
-      expect("change" in doc).toBe(true)
     })
   })
 })

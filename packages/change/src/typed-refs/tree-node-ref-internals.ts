@@ -5,7 +5,7 @@ import type {
   Subscription,
 } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
-import type { LoroTreeNodeRef } from "../loro.js"
+import type { ExtRefBase } from "../ext.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import {
@@ -30,7 +30,7 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
   implements RefInternalsBase
 {
   private dataRef: StructRef<DataShape["shapes"]> | undefined
-  private loroNamespace: LoroTreeNodeRef | undefined
+  private extNamespace: ExtRefBase | undefined
 
   constructor(private readonly params: TreeNodeRefParams<DataShape>) {}
 
@@ -123,27 +123,34 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
     dataRef[INTERNAL_SYMBOL].materialize()
   }
 
-  /** Get the loro namespace (cached) */
-  getLoroNamespace(): LoroTreeNodeRef {
-    if (!this.loroNamespace) {
-      this.loroNamespace = this.createLoroNamespace()
-    }
-    return this.loroNamespace
+  /** Get the container (LoroTreeNode) */
+  getContainer(): LoroTreeNode {
+    return this.params.node
   }
 
-  /** Create the loro namespace for tree node */
-  protected createLoroNamespace(): LoroTreeNodeRef {
+  /** Get the ext namespace (cached) */
+  getExtNamespace(): ExtRefBase {
+    if (!this.extNamespace) {
+      this.extNamespace = this.createExtNamespace()
+    }
+    return this.extNamespace
+  }
+
+  /** Create the ext namespace for tree node */
+  protected createExtNamespace(): ExtRefBase {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroTreeNode {
-        return self.getNode()
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         // LoroTreeNode doesn't have subscribe, but we can subscribe to the tree
-        // However, LoroRefBase expects subscribe.
+        // However, ExtRefBase expects subscribe.
         // For now, we can throw or return a dummy subscription if LoroTreeNode doesn't support it.
         // But wait, LoroTreeNode is just a handle.
         // Let's check if LoroTreeNode has subscribe.

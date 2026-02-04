@@ -1,5 +1,6 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
+import { ext } from "./ext.js"
 import { hasMetadata, META_CONTAINER_NAME, readMetadata } from "./metadata.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -98,7 +99,7 @@ describe("TypedDoc Metadata Integration", () => {
     expect(hasMetadata(loroDoc)).toBe(false)
 
     // Manually initialize
-    doc.initialize()
+    ext(doc).initialize()
 
     // Now has metadata
     expect(hasMetadata(loroDoc)).toBe(true)
@@ -114,10 +115,10 @@ describe("TypedDoc Metadata Integration", () => {
     const loroDoc = new LoroDoc()
     const doc = createTypedDoc(schema, { doc: loroDoc, skipInitialize: true })
 
-    doc.initialize()
+    ext(doc).initialize()
     const opCountAfterFirst = loroDoc.opCount()
 
-    doc.initialize() // Second call should be no-op
+    ext(doc).initialize() // Second call should be no-op
     expect(loroDoc.opCount()).toBe(opCountAfterFirst)
   })
 
@@ -136,7 +137,7 @@ describe("TypedDoc Metadata Integration", () => {
     const doc1 = createTypedDoc(schema, { doc: loroDoc1 })
 
     // Make some changes
-    doc1.change(draft => {
+    ext(doc1).change(draft => {
       draft.players.set("alice", { score: 100 })
     })
 
@@ -195,7 +196,7 @@ describe("TypedDoc Metadata Integration", () => {
     )
 
     const doc = createTypedDoc(schema)
-    doc.change(draft => {
+    ext(doc).change(draft => {
       draft.players.set("alice", { score: 100 })
     })
 

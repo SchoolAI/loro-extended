@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest"
+import { type ExtRefBase, ext } from "../ext.js"
 import { loro } from "../loro.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 
-describe("TreeRef loro() support", () => {
-  it("should support loro() on TreeRef property", () => {
+describe("TreeRef loro() and ext() support", () => {
+  it("should support loro() and ext() on TreeRef property", () => {
     const StateNodeDataShape = Shape.struct({
       name: Shape.plain.string(),
     })
@@ -15,16 +16,19 @@ describe("TreeRef loro() support", () => {
 
     const doc = createTypedDoc(Schema)
 
-    // This should compile and run without error
-    const treeLoro = loro(doc.states)
+    // loro(ref) returns the native container directly
+    const treeContainer = loro(doc.states)
+    expect(treeContainer).toBeDefined()
+    expect(typeof treeContainer.subscribe).toBe("function")
 
-    expect(treeLoro).toBeDefined()
-    expect(treeLoro.doc).toBeDefined()
-    expect(treeLoro.container).toBeDefined()
-    expect(typeof treeLoro.subscribe).toBe("function")
+    // ext(ref) provides loro-extended features including doc access
+    const treeExt = ext(doc.states)
+    expect(treeExt).toBeDefined()
+    expect(treeExt.doc).toBeDefined()
+    expect(typeof treeExt.subscribe).toBe("function")
   })
 
-  it("should support loro() on TreeNodeRef", () => {
+  it("should support loro() and ext() on TreeNodeRef", () => {
     const StateNodeDataShape = Shape.struct({
       name: Shape.plain.string(),
     })
@@ -35,18 +39,19 @@ describe("TreeRef loro() support", () => {
 
     const doc = createTypedDoc(Schema)
 
-    doc.change(draft => {
+    ext(doc).change(draft => {
       const root = draft.states.createNode({ name: "root" })
 
-      // This should compile and run without error
-      const nodeLoro = loro(root)
+      // loro(ref) returns the native container directly (LoroTreeNode)
+      const nodeContainer = loro(root)
+      expect(nodeContainer).toBeDefined()
 
-      expect(nodeLoro).toBeDefined()
-      expect(nodeLoro.doc).toBeDefined()
-      expect(nodeLoro.container).toBeDefined()
+      // ext(ref) provides loro-extended features including doc access
+      const nodeExt = ext(root) as ExtRefBase
+      expect(nodeExt).toBeDefined()
+      expect(nodeExt.doc).toBeDefined()
       // subscribe might be a no-op or undefined depending on LoroTreeNode support
-      // but the method should exist on the interface
-      expect(typeof nodeLoro.subscribe).toBe("function")
+      expect(typeof nodeExt.subscribe).toBe("function")
     })
   })
 })

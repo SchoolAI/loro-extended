@@ -1,5 +1,6 @@
 import type { LoroDoc, LoroTreeNode, TreeID } from "loro-crdt"
-import { LORO_SYMBOL, type LoroTreeNodeRef } from "../loro.js"
+import { EXT_SYMBOL, type ExtRefBase } from "../ext.js"
+import { LORO_SYMBOL } from "../loro.js"
 import type { StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import { INTERNAL_SYMBOL } from "./base.js"
@@ -42,10 +43,17 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
   }
 
   /**
-   * Access the loro() namespace via the well-known symbol.
+   * Access the native LoroTreeNode via the well-known symbol.
    */
-  get [LORO_SYMBOL](): LoroTreeNodeRef {
-    return this[INTERNAL_SYMBOL].getLoroNamespace()
+  get [LORO_SYMBOL](): LoroTreeNode {
+    return this[INTERNAL_SYMBOL].getContainer()
+  }
+
+  /**
+   * Access the ext() namespace via the well-known symbol.
+   */
+  get [EXT_SYMBOL](): ExtRefBase {
+    return this[INTERNAL_SYMBOL].getExtNamespace()
   }
 
   /**

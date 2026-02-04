@@ -6,7 +6,7 @@ import type {
   Subscription,
   TextDiff,
 } from "loro-crdt"
-import type { LoroTextRef } from "../loro.js"
+import type { ExtRefBase } from "../ext.js"
 import type { TextContainerShape } from "../shape.js"
 import { BaseRefInternals } from "./base.js"
 
@@ -115,15 +115,17 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
     // no plain values contained within
   }
 
-  /** Create the loro namespace for text */
-  protected override createLoroNamespace(): LoroTextRef {
+  /** Create the ext namespace for text */
+  protected override createExtNamespace(): ExtRefBase {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroText {
-        return self.getContainer() as LoroText
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroText).subscribe(callback)

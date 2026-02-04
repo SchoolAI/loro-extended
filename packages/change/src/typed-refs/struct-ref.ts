@@ -1,5 +1,6 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
-import { LORO_SYMBOL, type LoroMapRef } from "../loro.js"
+import { EXT_SYMBOL } from "../ext.js"
+import { LORO_SYMBOL } from "../loro.js"
 import type { ContainerOrValueShape, StructContainerShape } from "../shape.js"
 import type { Infer } from "../types.js"
 import {
@@ -112,9 +113,14 @@ export function createStructRef<
 
   const proxy = new Proxy(impl, {
     get(target, prop, receiver) {
-      // Handle Symbol access (loro(), internal, etc.)
+      // Handle Symbol access (loro(), ext(), internal, etc.)
       if (prop === LORO_SYMBOL) {
-        return target[INTERNAL_SYMBOL].getLoroNamespace()
+        return target[INTERNAL_SYMBOL].getContainer()
+      }
+
+      // Handle EXT_SYMBOL for ext() access - delegate to TypedRef base class
+      if (prop === EXT_SYMBOL) {
+        return target[INTERNAL_SYMBOL].getExtNamespace()
       }
 
       // Handle INTERNAL_SYMBOL for internal methods
@@ -153,6 +159,7 @@ export function createStructRef<
     has(target, prop) {
       if (
         prop === LORO_SYMBOL ||
+        prop === EXT_SYMBOL ||
         prop === INTERNAL_SYMBOL ||
         prop === "toJSON" ||
         prop === "shape"
@@ -253,9 +260,9 @@ export type StructRef<
 
   /**
    * Access CRDT internals via the well-known symbol.
-   * Used by the loro() function.
+   * Used by the loro() function - returns LoroMap directly.
    */
-  [LORO_SYMBOL]: LoroMapRef
+  [LORO_SYMBOL]: LoroMap
 }
 
 // Re-export for backward compatibility

@@ -6,29 +6,20 @@ export {
 } from "./derive-placeholder.js"
 // Diff overlay--make the TypedDoc return values as if a diff is applied
 export { createDiffOverlay } from "./diff-overlay.js"
+// The ext() function for loro-extended-specific features
+export {
+  EXT_SYMBOL,
+  type ExtDocRef,
+  type ExtListRef,
+  type ExtMapRef,
+  type ExtRefBase,
+  ext,
+} from "./ext.js"
 export type { Transition } from "./functional-helpers.js"
 // Functional helpers (recommended API)
-export {
-  change,
-  fork,
-  forkAt,
-  getLoroContainer,
-  getLoroDoc,
-  getTransition,
-  shallowForkAt,
-} from "./functional-helpers.js"
-// The loro() escape hatch for CRDT internals
-export {
-  LORO_SYMBOL,
-  type LoroCounterRef,
-  type LoroListRef,
-  type LoroMapRef,
-  type LoroRefBase,
-  type LoroTextRef,
-  type LoroTreeRef,
-  type LoroTypedDocRef,
-  loro,
-} from "./loro.js"
+export { change, getTransition } from "./functional-helpers.js"
+// The loro() escape hatch for native Loro types
+export { LORO_SYMBOL, loro } from "./loro.js"
 export type { LoroExtendedMeta } from "./metadata.js"
 // Document metadata utilities
 export {

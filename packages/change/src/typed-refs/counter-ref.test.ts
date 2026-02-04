@@ -15,7 +15,7 @@ describe("Counter Ref", () => {
     expect(doc.toJSON().counter).toBe(10)
 
     // Verify it is NOT materialized in the underlying doc
-    const shallow = loro(doc).doc.getShallowValue()
+    const shallow = loro(doc).getShallowValue()
     expect(shallow.counter).toBeUndefined()
   })
 
@@ -49,7 +49,7 @@ describe("Counter Ref", () => {
     expect(doc.counter.value).toBe(5)
 
     // Verify it IS materialized in the underlying doc
-    const shallow = loro(doc).doc.getShallowValue()
+    const shallow = loro(doc).getShallowValue()
     expect(shallow.counter).toBeDefined()
   })
 
@@ -67,7 +67,7 @@ describe("Counter Ref", () => {
     expect(doc.toJSON().counter).toBe(5)
 
     // Verify it IS materialized in the underlying doc
-    const shallow = loro(doc).doc.getShallowValue()
+    const shallow = loro(doc).getShallowValue()
     expect(shallow.counter).toBeDefined()
   })
 
@@ -81,6 +81,6 @@ describe("Counter Ref", () => {
     expect(doc.toJSON().counter).toBe(10)
 
     // Still not materialized
-    expect(loro(doc).doc.getShallowValue().counter).toBeUndefined()
+    expect(loro(doc).getShallowValue().counter).toBeUndefined()
   })
 })

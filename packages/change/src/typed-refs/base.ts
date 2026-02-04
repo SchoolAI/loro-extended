@@ -5,7 +5,8 @@ import type {
   LoroEventBatch,
   Subscription,
 } from "loro-crdt"
-import { LORO_SYMBOL, type LoroRefBase } from "../loro.js"
+import { EXT_SYMBOL, type ExtRefBase } from "../ext.js"
+import { LORO_SYMBOL } from "../loro.js"
 import { buildRootContainerName } from "../path-encoding.js"
 import type { ContainerShape, DocShape, ShapeToContainer } from "../shape.js"
 import type { Infer } from "../types.js"
@@ -75,7 +76,7 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
   implements RefInternalsBase
 {
   protected cachedContainer: ShapeToContainer<Shape> | undefined
-  protected loroNamespace: LoroRefBase | undefined
+  protected extNamespace: ExtRefBase | undefined
   private _suppressAutoCommit = false
 
   constructor(protected readonly params: TypedRefParams<Shape>) {}
@@ -181,12 +182,12 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     }
   }
 
-  /** Get the loro namespace (cached) */
-  getLoroNamespace(): LoroRefBase {
-    if (!this.loroNamespace) {
-      this.loroNamespace = this.createLoroNamespace()
+  /** Get the ext namespace (cached) */
+  getExtNamespace(): ExtRefBase {
+    if (!this.extNamespace) {
+      this.extNamespace = this.createExtNamespace()
     }
-    return this.loroNamespace
+    return this.extNamespace
   }
 
   /** Absorb mutated plain values back into Loro containers - subclasses override */
@@ -197,15 +198,19 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     this.getContainer()
   }
 
-  /** Create the loro() namespace object - subclasses override for specific types */
-  protected createLoroNamespace(): LoroRefBase {
+  /** Create the ext() namespace object - subclasses override for specific types */
+  protected createExtNamespace(): ExtRefBase {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.params.getDoc()
       },
-      get container(): unknown {
-        return self.getContainer()
+      change<T>(_fn: (draft: T) => void): T {
+        // This will be overridden by the change() functional helper
+        // but we provide a basic implementation here
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as any).subscribe(callback)
@@ -238,10 +243,18 @@ export abstract class TypedRef<Shape extends DocShape | ContainerShape> {
   abstract toJSON(): Infer<Shape>
 
   /**
-   * Access the loro() namespace via the well-known symbol.
-   * This is used by the loro() function to access CRDT internals.
+   * Access the native Loro container via the well-known symbol.
+   * This is used by the loro() function to access the container directly.
    */
-  get [LORO_SYMBOL](): LoroRefBase {
-    return this[INTERNAL_SYMBOL].getLoroNamespace()
+  get [LORO_SYMBOL](): ShapeToContainer<Shape> {
+    return this[INTERNAL_SYMBOL].getContainer()
+  }
+
+  /**
+   * Access the ext() namespace via the well-known symbol.
+   * This is used by the ext() function to access loro-extended features.
+   */
+  get [EXT_SYMBOL](): ExtRefBase {
+    return this[INTERNAL_SYMBOL].getExtNamespace()
   }
 }

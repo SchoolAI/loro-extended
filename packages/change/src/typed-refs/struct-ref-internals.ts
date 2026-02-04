@@ -7,7 +7,7 @@ import type {
   Subscription,
   Value,
 } from "loro-crdt"
-import type { LoroMapRef } from "../loro.js"
+import type { ExtMapRef } from "../ext.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -247,15 +247,17 @@ export class StructRefInternals<
     }
   }
 
-  /** Create the loro namespace for struct */
-  protected override createLoroNamespace(): LoroMapRef {
+  /** Create the ext namespace for struct */
+  protected override createExtNamespace(): ExtMapRef {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroMap {
-        return self.getContainer() as LoroMap
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroMap).subscribe(callback)

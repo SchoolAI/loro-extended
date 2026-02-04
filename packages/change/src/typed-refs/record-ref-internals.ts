@@ -8,7 +8,7 @@ import type {
   Value,
 } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
-import type { LoroMapRef } from "../loro.js"
+import type { ExtMapRef } from "../ext.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -350,15 +350,17 @@ export class RecordRefInternals<
     absorbCachedPlainValues(this.refCache, () => this.getContainer() as LoroMap)
   }
 
-  /** Create the loro namespace for record */
-  protected override createLoroNamespace(): LoroMapRef {
+  /** Create the ext namespace for record */
+  protected override createExtNamespace(): ExtMapRef {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroMap {
-        return self.getContainer() as LoroMap
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroMap).subscribe(callback)

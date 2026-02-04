@@ -1,3 +1,4 @@
+import { ext } from "./ext.js"
 /**
  * Integration tests for mergeable flattened containers.
  *
@@ -46,7 +47,7 @@ describe("Mergeable Flattened Containers", () => {
       doc.data.nested.value = "hello"
 
       // Check that root containers exist with path-based names
-      const loroDoc = loro(doc).doc
+      const loroDoc = loro(doc)
       const dataMap = loroDoc.getMap("data")
       const nestedMap = loroDoc.getMap("data-nested")
 
@@ -77,7 +78,7 @@ describe("Mergeable Flattened Containers", () => {
       expect(doc.players.bob.name).toBe("Bob")
 
       // Check root containers
-      const loroDoc = loro(doc).doc
+      const loroDoc = loro(doc)
       const playersMap = loroDoc.getMap("players")
       const aliceMap = loroDoc.getMap("players-alice")
       const bobMap = loroDoc.getMap("players-bob")
@@ -105,7 +106,7 @@ describe("Mergeable Flattened Containers", () => {
       expect(doc.config["api-url"].value).toBe("https://example.com")
 
       // Check that the root container name is properly escaped
-      const loroDoc = loro(doc).doc
+      const loroDoc = loro(doc)
       const apiUrlMap = loroDoc.getMap("config-api\\-url")
       expect(apiUrlMap.get("value")).toBe("https://example.com")
     })
@@ -121,20 +122,20 @@ describe("Mergeable Flattened Containers", () => {
 
       // Peer A creates a doc and adds an item
       const docA = createTypedDoc(schema, { mergeable: true })
-      loro(docA).doc.setPeerId("1")
+      loro(docA).setPeerId("1")
       docA.data.items.a = "from A"
 
       // Peer B creates a doc and adds a different item
       const docB = createTypedDoc(schema, { mergeable: true })
-      loro(docB).doc.setPeerId("2")
+      loro(docB).setPeerId("2")
       docB.data.items.b = "from B"
 
       // Sync via import
-      const exportA = loro(docA).doc.export({ mode: "update" })
-      const exportB = loro(docB).doc.export({ mode: "update" })
+      const exportA = loro(docA).export({ mode: "update" })
+      const exportB = loro(docB).export({ mode: "update" })
 
-      loro(docA).doc.import(exportB)
-      loro(docB).doc.import(exportA)
+      loro(docA).import(exportB)
+      loro(docB).import(exportA)
 
       // Both docs should have both items
       expect(docA.data.items.a).toBe("from A")
@@ -154,20 +155,20 @@ describe("Mergeable Flattened Containers", () => {
 
       // Peer A creates alice
       const docA = createTypedDoc(schema, { mergeable: true })
-      loro(docA).doc.setPeerId("1")
+      loro(docA).setPeerId("1")
       docA.players.alice = { score: 100 }
 
       // Peer B creates bob
       const docB = createTypedDoc(schema, { mergeable: true })
-      loro(docB).doc.setPeerId("2")
+      loro(docB).setPeerId("2")
       docB.players.bob = { score: 200 }
 
       // Sync via import
-      const exportA = loro(docA).doc.export({ mode: "update" })
-      const exportB = loro(docB).doc.export({ mode: "update" })
+      const exportA = loro(docA).export({ mode: "update" })
+      const exportB = loro(docB).export({ mode: "update" })
 
-      loro(docA).doc.import(exportB)
-      loro(docB).doc.import(exportA)
+      loro(docA).import(exportB)
+      loro(docB).import(exportA)
 
       // Both docs should have both players
       expect(docA.players.alice.score).toBe(100)
@@ -187,20 +188,20 @@ describe("Mergeable Flattened Containers", () => {
 
       // Peer A creates a doc and adds an item
       const docA = createTypedDoc(schema, { mergeable: true })
-      loro(docA).doc.setPeerId("1")
+      loro(docA).setPeerId("1")
       docA.data.items.a = "from A"
 
       // Peer B creates a doc and adds a different item
       const docB = createTypedDoc(schema, { mergeable: true })
-      loro(docB).doc.setPeerId("2")
+      loro(docB).setPeerId("2")
       docB.data.items.b = "from B"
 
       // Sync via applyDiff (simulating lens propagation)
-      const diffA = loro(docA).doc.diff([], loro(docA).doc.frontiers(), false)
-      const diffB = loro(docB).doc.diff([], loro(docB).doc.frontiers(), false)
+      const diffA = loro(docA).diff([], loro(docA).frontiers(), false)
+      const diffB = loro(docB).diff([], loro(docB).frontiers(), false)
 
-      loro(docA).doc.applyDiff(diffB)
-      loro(docB).doc.applyDiff(diffA)
+      loro(docA).applyDiff(diffB)
+      loro(docB).applyDiff(diffA)
 
       // Both docs should have both items
       expect(docA.data.items.a).toBe("from A")
@@ -220,20 +221,20 @@ describe("Mergeable Flattened Containers", () => {
 
       // Peer A creates alice
       const docA = createTypedDoc(schema, { mergeable: true })
-      loro(docA).doc.setPeerId("1")
+      loro(docA).setPeerId("1")
       docA.players.alice = { score: 100 }
 
       // Peer B creates bob
       const docB = createTypedDoc(schema, { mergeable: true })
-      loro(docB).doc.setPeerId("2")
+      loro(docB).setPeerId("2")
       docB.players.bob = { score: 200 }
 
       // Sync via applyDiff
-      const diffA = loro(docA).doc.diff([], loro(docA).doc.frontiers(), false)
-      const diffB = loro(docB).doc.diff([], loro(docB).doc.frontiers(), false)
+      const diffA = loro(docA).diff([], loro(docA).frontiers(), false)
+      const diffB = loro(docB).diff([], loro(docB).frontiers(), false)
 
-      loro(docA).doc.applyDiff(diffB)
-      loro(docB).doc.applyDiff(diffA)
+      loro(docA).applyDiff(diffB)
+      loro(docB).applyDiff(diffA)
 
       // Both docs should have both players
       expect(docA.players.alice.score).toBe(100)
@@ -304,7 +305,7 @@ describe("Mergeable Flattened Containers", () => {
       doc.data.nested.value = "hello"
 
       // Check that nested containers are used (not root containers)
-      const loroDoc = loro(doc).doc
+      const loroDoc = loro(doc)
       const dataMap = loroDoc.getMap("data")
 
       // The nested container should be a real container, not a null marker
@@ -345,16 +346,16 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: true })
       doc.data.value = "v1"
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
       doc.data.value = "v2"
 
-      const forked = doc.forkAt(frontiers)
+      const forked = ext(doc).forkAt(frontiers)
 
       // The forked doc should also be mergeable
       // We can verify by checking that it uses root containers
       forked.data.value = "forked"
 
-      const loroDoc = loro(forked).doc
+      const loroDoc = loro(forked)
       const dataMap = loroDoc.getMap("data")
       expect(dataMap.get("value")).toBe("forked")
     })

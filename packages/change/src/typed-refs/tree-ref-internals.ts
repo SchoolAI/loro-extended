@@ -6,7 +6,7 @@ import type {
   Subscription,
   TreeID,
 } from "loro-crdt"
-import type { LoroTreeRef } from "../loro.js"
+import type { ExtRefBase } from "../ext.js"
 import type { StructContainerShape, TreeContainerShape } from "../shape.js"
 import { BaseRefInternals, INTERNAL_SYMBOL } from "./base.js"
 import { TreeNodeRef } from "./tree-node-ref.js"
@@ -93,15 +93,17 @@ export class TreeRefInternals<
     }
   }
 
-  /** Create the loro namespace for tree */
-  protected override createLoroNamespace(): LoroTreeRef {
+  /** Create the ext namespace for tree */
+  protected override createExtNamespace(): ExtRefBase {
     const self = this
     return {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      get container(): LoroTree {
-        return self.getContainer() as LoroTree
+      change<T>(_fn: (draft: T) => void): T {
+        throw new Error(
+          "Use the change() functional helper for ref-level changes: change(ref, fn)",
+        )
       },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroTree).subscribe(callback)

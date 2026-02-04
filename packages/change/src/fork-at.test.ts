@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createTypedDoc, forkAt, loro, Shape } from "./index.js"
+import { ext } from "./ext.js"
+import { createTypedDoc, loro, Shape } from "./index.js"
 
 describe("forkAt", () => {
   describe("TypedDoc.forkAt() method", () => {
@@ -14,14 +15,14 @@ describe("forkAt", () => {
       doc.count.increment(5)
 
       // Get frontiers at this point
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
 
       // Make more changes
       doc.title.update("World")
       doc.count.increment(10)
 
       // Fork at the earlier version
-      const forkedDoc = doc.forkAt(frontiers)
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       // Forked doc should have the earlier state
       expect(forkedDoc.title.toString()).toBe("Hello")
@@ -45,11 +46,11 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.items.push({ name: "Task 1", done: false })
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
 
       doc.items.push({ name: "Task 2", done: true })
 
-      const forkedDoc = doc.forkAt(frontiers)
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       // Type safety: forkedDoc.items should have the same type
       expect(forkedDoc.items.length).toBe(1)
@@ -73,8 +74,8 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.value.increment(10)
 
-      const frontiers = loro(doc).doc.frontiers()
-      const forkedDoc = doc.forkAt(frontiers)
+      const frontiers = loro(doc).frontiers()
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       // Mutate forked doc
       forkedDoc.value.increment(100)
@@ -105,13 +106,13 @@ describe("forkAt", () => {
       doc.settings.set("theme", "dark")
       const node = doc.tree.createNode({ label: "Root" })
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
 
       doc.settings.set("theme", "light")
       doc.settings.set("lang", "en")
       node.data.label.update("Updated Root")
 
-      const forkedDoc = doc.forkAt(frontiers)
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       expect(forkedDoc.settings.get("theme")).toBe("dark")
       // "lang" was not set before the fork, so it should not exist
@@ -132,11 +133,11 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.text.update("Hello")
 
-      const frontiers = loro(doc).doc.frontiers()
-      const forkedDoc = doc.forkAt(frontiers)
+      const frontiers = loro(doc).frontiers()
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
-      const originalPeerId = loro(doc).doc.peerId
-      const forkedPeerId = loro(forkedDoc).doc.peerId
+      const originalPeerId = loro(doc).peerId
+      const forkedPeerId = loro(forkedDoc).peerId
 
       expect(forkedPeerId).not.toBe(originalPeerId)
     })
@@ -151,12 +152,12 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.title.update("Hello")
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
 
       doc.title.update("World")
 
-      // Use functional helper
-      const forkedDoc = forkAt(doc, frontiers)
+      // Use ext() method
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       expect(forkedDoc.title.toString()).toBe("Hello")
       expect(doc.title.toString()).toBe("World")
@@ -170,8 +171,8 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       // Don't increment - should use placeholder
 
-      const frontiers = loro(doc).doc.frontiers()
-      const forkedDoc = forkAt(doc, frontiers)
+      const frontiers = loro(doc).frontiers()
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
       // Placeholder should be preserved
       expect(forkedDoc.toJSON().count).toBe(42)
@@ -187,11 +188,11 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.text.update("Hello")
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
       doc.text.update("World")
 
       // Raw access returns LoroDoc, not TypedDoc
-      const rawForkedDoc = loro(doc).doc.forkAt(frontiers)
+      const rawForkedDoc = loro(doc).forkAt(frontiers)
 
       // It's a plain LoroDoc - note that raw toJSON() includes internal containers
       // like _loro_extended_meta_ which are filtered out by TypedDoc.toJSON()
@@ -211,11 +212,11 @@ describe("forkAt", () => {
       })
 
       const doc = createTypedDoc(schema)
-      const emptyFrontiers = loro(doc).doc.frontiers()
+      const emptyFrontiers = loro(doc).frontiers()
 
       doc.count.increment(10)
 
-      const forkedDoc = doc.forkAt(emptyFrontiers)
+      const forkedDoc = ext(doc).forkAt(emptyFrontiers)
 
       // Should be at initial state (placeholder value)
       expect(forkedDoc.count.value).toBe(0)
@@ -229,8 +230,8 @@ describe("forkAt", () => {
       const doc = createTypedDoc(schema)
       doc.text.update("Hello")
 
-      const currentFrontiers = loro(doc).doc.frontiers()
-      const forkedDoc = doc.forkAt(currentFrontiers)
+      const currentFrontiers = loro(doc).frontiers()
+      const forkedDoc = ext(doc).forkAt(currentFrontiers)
 
       expect(forkedDoc.text.toString()).toBe("Hello")
     })
@@ -244,13 +245,13 @@ describe("forkAt", () => {
       doc.items.push(1)
       doc.items.push(2)
 
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
       doc.items.push(3)
 
-      const forkedDoc = doc.forkAt(frontiers)
+      const forkedDoc = ext(doc).forkAt(frontiers)
 
-      // Use change() on forked doc
-      forkedDoc.change(draft => {
+      // Use ext().change() on forked doc
+      ext(forkedDoc).change(draft => {
         draft.items.push(100)
         draft.items.push(200)
       })

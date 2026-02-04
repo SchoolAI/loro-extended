@@ -1,6 +1,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
-import { createTypedDoc, loro, Shape, shallowForkAt } from "./index.js"
+import { ext } from "./ext.js"
+import { createTypedDoc, loro, Shape } from "./index.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Shallow Fork Tests
@@ -154,8 +155,9 @@ describe("shallow fork", () => {
 
       const frontier = doc.frontiers()
 
-      // Full fork
-      const fullFork = doc.forkAt(frontier)
+      // Full fork - use native LoroDoc.fork() since this is a raw LoroDoc
+      const fullFork = doc.fork()
+      fullFork.checkout(frontier)
       const fullBytes = fullFork.export({ mode: "snapshot" })
 
       // Shallow fork
@@ -188,21 +190,21 @@ describe("shallow fork", () => {
 
       // Set initial state
       doc.counter.increment(5)
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.data.name = "test"
         draft.data.value = 100
       })
 
-      const frontier = loro(doc).doc.frontiers()
-      const versionBefore = loro(doc).doc.version()
+      const frontier = loro(doc).frontiers()
+      const versionBefore = loro(doc).version()
 
       // Create shallow fork using raw API
-      const shallowBytes = loro(doc).doc.export({
+      const shallowBytes = loro(doc).export({
         mode: "shallow-snapshot",
         frontiers: frontier,
       })
       const shallowLoroDoc = LoroDoc.fromSnapshot(shallowBytes)
-      shallowLoroDoc.setPeerId(loro(doc).doc.peerId)
+      shallowLoroDoc.setPeerId(loro(doc).peerId)
 
       // Wrap in TypedDoc
       const shallowDoc = createTypedDoc(TestSchema, { doc: shallowLoroDoc })
@@ -214,17 +216,17 @@ describe("shallow fork", () => {
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
-      shallowDoc.change(draft => {
+      ext(shallowDoc).change(draft => {
         draft.data.name = "modified"
         draft.data.value = 200
       })
 
       // Export and merge back
-      const update = loro(shallowDoc).doc.export({
+      const update = loro(shallowDoc).export({
         mode: "update",
         from: versionBefore,
       })
-      loro(doc).doc.import(update)
+      loro(doc).import(update)
 
       // Verify merge worked
       expect(doc.counter.value).toBe(15)
@@ -237,16 +239,18 @@ describe("shallow fork", () => {
 
       // Set initial state
       doc.counter.increment(5)
-      doc.change(draft => {
+      ext(doc).change(draft => {
         draft.data.name = "test"
         draft.data.value = 100
       })
 
-      const frontier = loro(doc).doc.frontiers()
-      const versionBefore = loro(doc).doc.version()
+      const frontier = loro(doc).frontiers()
+      const versionBefore = loro(doc).version()
 
-      // Use the shallowForkAt helper with preservePeerId
-      const shallowDoc = shallowForkAt(doc, frontier, { preservePeerId: true })
+      // Use the ext().shallowForkAt() method with preservePeerId
+      const shallowDoc = ext(doc).shallowForkAt(frontier, {
+        preservePeerId: true,
+      })
 
       // Verify state is correct
       expect(shallowDoc.counter.value).toBe(5)
@@ -255,17 +259,17 @@ describe("shallow fork", () => {
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
-      shallowDoc.change(draft => {
+      ext(shallowDoc).change(draft => {
         draft.data.name = "modified"
         draft.data.value = 200
       })
 
       // Export and merge back
-      const update = loro(shallowDoc).doc.export({
+      const update = loro(shallowDoc).export({
         mode: "update",
         from: versionBefore,
       })
-      loro(doc).doc.import(update)
+      loro(doc).import(update)
 
       // Verify merge worked
       expect(doc.counter.value).toBe(15)
@@ -277,26 +281,28 @@ describe("shallow fork", () => {
       const doc = createTypedDoc(TestSchema)
       doc.counter.increment(1)
 
-      const frontier = loro(doc).doc.frontiers()
+      const frontier = loro(doc).frontiers()
 
       // Without preservePeerId option
-      const shallowDoc = shallowForkAt(doc, frontier)
+      const shallowDoc = ext(doc).shallowForkAt(frontier)
 
       // Peer IDs should be different
-      expect(loro(shallowDoc).doc.peerId).not.toBe(loro(doc).doc.peerId)
+      expect(loro(shallowDoc).peerId).not.toBe(loro(doc).peerId)
     })
 
     it("should preserve peer ID when option is set", () => {
       const doc = createTypedDoc(TestSchema)
       doc.counter.increment(1)
 
-      const frontier = loro(doc).doc.frontiers()
+      const frontier = loro(doc).frontiers()
 
       // With preservePeerId option
-      const shallowDoc = shallowForkAt(doc, frontier, { preservePeerId: true })
+      const shallowDoc = ext(doc).shallowForkAt(frontier, {
+        preservePeerId: true,
+      })
 
       // Peer IDs should be the same
-      expect(loro(shallowDoc).doc.peerId).toBe(loro(doc).doc.peerId)
+      expect(loro(shallowDoc).peerId).toBe(loro(doc).peerId)
     })
   })
 })

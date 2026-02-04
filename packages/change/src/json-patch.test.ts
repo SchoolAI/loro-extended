@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
+import { ext } from "./ext.js"
 import { change } from "./functional-helpers.js"
 import type { JsonPatch } from "./json-patch.js"
-import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 
@@ -22,7 +22,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/metadata/count", value: 42 },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.metadata.title).toBe("Hello World")
@@ -47,7 +47,7 @@ describe("JSON Patch Integration", () => {
 
       const patch: JsonPatch = [{ op: "remove", path: "/config/debug" }]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.config.theme).toBe("dark")
@@ -75,7 +75,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/settings/volume", value: 100 },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.settings.language).toBe("es")
@@ -97,7 +97,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/items/1", value: "middle" }, // Insert in middle
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.items).toEqual(["first", "middle", "second"])
@@ -121,7 +121,7 @@ describe("JSON Patch Integration", () => {
         { op: "remove", path: "/tasks/1" }, // Remove "task2"
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.tasks).toEqual(["task1", "task3"])
@@ -145,7 +145,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/numbers/1", value: 20 },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.numbers).toEqual([1, 20, 3])
@@ -222,7 +222,7 @@ describe("JSON Patch Integration", () => {
         },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.user.profile.name).toBe("Alice")
@@ -261,7 +261,7 @@ describe("JSON Patch Integration", () => {
         },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.todos).toHaveLength(2)
@@ -297,7 +297,7 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/0", path: "/items/2" }, // Move "first" to end
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.items).toEqual(["second", "third", "first"])
@@ -322,7 +322,7 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/0", path: "/items/3" },
       ]
 
-      loro(typedDoc).applyPatch(patch1)
+      ext(typedDoc).applyPatch(patch1)
       const result1 = typedDoc.toJSON()
       expect(result1.items).toEqual(["B", "C", "D", "A"])
 
@@ -340,7 +340,7 @@ describe("JSON Patch Integration", () => {
         { op: "move", from: "/items/1", path: "/items/3" },
       ]
 
-      loro(typedDoc).applyPatch(patch2)
+      ext(typedDoc).applyPatch(patch2)
       const result2 = typedDoc.toJSON()
       expect(result2.items).toEqual(["A", "C", "D", "B"])
     })
@@ -364,7 +364,7 @@ describe("JSON Patch Integration", () => {
         { op: "copy", from: "/source/1", path: "/target/1" },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.source).toEqual(["item1", "item2"])
@@ -391,7 +391,7 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/config/version", value: "2.1.0" },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.config.version).toBe("2.1.0")
@@ -411,7 +411,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        loro(typedDoc).applyPatch(patch)
+        ext(typedDoc).applyPatch(patch)
       }).toThrow("JSON Patch test failed at path: /config/version")
     })
   })
@@ -439,7 +439,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/email", value: "alice@example.com" },
       ]
 
-      loro(typedDoc).applyPatch(patch, ["users", "alice"])
+      ext(typedDoc).applyPatch(patch, ["users", "alice"])
       const result = typedDoc.toJSON()
 
       expect(result.users.alice.name).toBe("Alice Smith")
@@ -463,7 +463,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/data/items/1", value: "second" },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.data.items).toEqual(["first", "second"])
@@ -483,7 +483,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: ["data", "items", 1], value: "second" },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.data.items).toEqual(["first", "second"])
@@ -505,7 +505,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        loro(typedDoc).applyPatch(patch)
+        ext(typedDoc).applyPatch(patch)
       }).toThrow("Cannot navigate to path segment: nonexistent")
     })
 
@@ -521,7 +521,7 @@ describe("JSON Patch Integration", () => {
       ]
 
       expect(() => {
-        loro(typedDoc).applyPatch(patch)
+        ext(typedDoc).applyPatch(patch)
       }).toThrow("Index out of bound")
     })
   })
@@ -550,7 +550,7 @@ describe("JSON Patch Integration", () => {
         { op: "add", path: "/data/items/1", value: "item2" },
       ]
 
-      loro(typedDoc).applyPatch(patch)
+      ext(typedDoc).applyPatch(patch)
       const result = typedDoc.toJSON()
 
       expect(result.counter).toBe(5)
@@ -573,14 +573,14 @@ describe("JSON Patch Integration", () => {
         { op: "replace", path: "/settings/theme", value: "dark" },
       ]
 
-      loro(typedDoc).applyPatch(patch1)
+      ext(typedDoc).applyPatch(patch1)
 
       // Second patch
       const patch2: JsonPatch = [
         { op: "replace", path: "/settings/language", value: "fr" },
       ]
 
-      loro(typedDoc).applyPatch(patch2)
+      ext(typedDoc).applyPatch(patch2)
       const result = typedDoc.toJSON()
 
       expect(result.settings.theme).toBe("dark") // Should persist from first patch

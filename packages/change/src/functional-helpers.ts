@@ -1,29 +1,15 @@
-import {
-  type LoroCounter,
-  LoroDoc,
-  type LoroEventBatch,
-  type LoroList,
-  type LoroMap,
-  type LoroMovableList,
-  type LoroText,
-  type LoroTree,
-} from "loro-crdt"
+import type { LoroEventBatch } from "loro-crdt"
 import { createDiffOverlay } from "./diff-overlay.js"
+import { EXT_SYMBOL, ext } from "./ext.js"
 import { loro } from "./loro.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
-  CounterContainerShape,
   DocShape,
-  ListContainerShape,
-  MovableListContainerShape,
-  RecordContainerShape,
-  ShapeToContainer,
   StructContainerShape,
-  TextContainerShape,
   TreeRefInterface,
 } from "./shape.js"
-import { createTypedDoc, type Frontiers, type TypedDoc } from "./typed-doc.js"
+import { createTypedDoc, type TypedDoc } from "./typed-doc.js"
 import { INTERNAL_SYMBOL, type TypedRef } from "./typed-refs/base.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
@@ -123,9 +109,11 @@ export function change(
   | TreeRef<any>
   | TreeRefInterface<any>
   | StructRef<any> {
-  // Check if it's a TypedDoc (has .change method)
-  if ("change" in target && typeof (target as any).change === "function") {
-    return (target as TypedDoc<any>).change(fn)
+  // Check if it's a TypedDoc by checking for EXT_SYMBOL with docShape
+  const extNs = (target as any)[EXT_SYMBOL]
+  if (extNs && "docShape" in extNs) {
+    // It's a TypedDoc - use ext().change()
+    return extNs.change(fn)
   }
 
   // It's a TypedRef or TreeRef - use ref-level change logic
@@ -178,254 +166,6 @@ function changeRef<T extends TypedRef<any> | TreeRef<any>>(
   return ref
 }
 
-/**
- * Access the underlying LoroDoc for advanced operations.
- * Works on both TypedDoc and any typed ref (TextRef, CounterRef, ListRef, etc.).
- *
- * @param docOrRef - The TypedDoc or typed ref to unwrap
- * @returns The underlying LoroDoc instance (or undefined for refs created outside a doc context)
- *
- * @example
- * ```typescript
- * import { getLoroDoc } from "@loro-extended/change"
- *
- * // From TypedDoc
- * const loroDoc = getLoroDoc(doc)
- * const version = loroDoc.version()
- * loroDoc.subscribe(() => console.log("changed"))
- *
- * // From any ref (TextRef, CounterRef, ListRef, etc.)
- * const titleRef = doc.title
- * const loroDoc = getLoroDoc(titleRef)
- * loroDoc?.subscribe(() => console.log("changed"))
- * ```
- */
-export function getLoroDoc<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-): LoroDoc
-export function getLoroDoc<Shape extends ContainerShape>(
-  ref: TypedRef<Shape>,
-): LoroDoc
-export function getLoroDoc<DataShape extends StructContainerShape>(
-  ref: TreeRef<DataShape>,
-): LoroDoc
-export function getLoroDoc<DataShape extends StructContainerShape>(
-  ref: TreeRefInterface<DataShape>,
-): LoroDoc
-export function getLoroDoc(
-  docOrRef:
-    | TypedDoc<any>
-    | TypedRef<any>
-    | TreeRef<any>
-    | TreeRefInterface<any>,
-): LoroDoc {
-  // Use loro() to access the underlying LoroDoc
-  return loro(docOrRef as any).doc
-}
-
-/**
- * Access the underlying Loro container from a typed ref.
- * Returns the correctly-typed container based on the ref type.
- *
- * @param ref - The typed ref to unwrap
- * @returns The underlying Loro container (LoroText, LoroCounter, LoroList, etc.)
- *
- * @example
- * ```typescript
- * import { getLoroContainer } from "@loro-extended/change"
- *
- * const titleRef = doc.title
- * const loroText = getLoroContainer(titleRef)  // LoroText
- *
- * const countRef = doc.count
- * const loroCounter = getLoroContainer(countRef)  // LoroCounter
- *
- * const itemsRef = doc.items
- * const loroList = getLoroContainer(itemsRef)  // LoroList
- *
- * // Subscribe to container-level changes
- * loroText.subscribe((event) => console.log("Text changed:", event))
- * ```
- */
-export function getLoroContainer(ref: TypedRef<TextContainerShape>): LoroText
-export function getLoroContainer(
-  ref: TypedRef<CounterContainerShape>,
-): LoroCounter
-export function getLoroContainer(ref: TypedRef<ListContainerShape>): LoroList
-export function getLoroContainer(
-  ref: TypedRef<MovableListContainerShape>,
-): LoroMovableList
-export function getLoroContainer(ref: TypedRef<RecordContainerShape>): LoroMap
-export function getLoroContainer(ref: TypedRef<StructContainerShape>): LoroMap
-export function getLoroContainer<
-  NestedShapes extends Record<string, ContainerOrValueShape>,
->(ref: StructRef<NestedShapes>): LoroMap
-export function getLoroContainer<DataShape extends StructContainerShape>(
-  ref: TreeRef<DataShape>,
-): LoroTree
-export function getLoroContainer<DataShape extends StructContainerShape>(
-  ref: TreeRefInterface<DataShape>,
-): LoroTree
-export function getLoroContainer<Shape extends ContainerShape>(
-  ref: TypedRef<Shape>,
-): ShapeToContainer<Shape>
-export function getLoroContainer(
-  ref: TypedRef<any> | TreeRef<any> | TreeRefInterface<any> | StructRef<any>,
-): unknown {
-  // Use loro() to access the underlying container
-  return loro(ref as any).container
-}
-
-/**
- * Creates a new TypedDoc as a fork of the current document.
- * The forked doc contains all history up to the current version.
- * The forked doc has a different PeerID from the original by default.
- *
- * For raw LoroDoc access, use: `loro(doc).doc.fork()`
- *
- * @param doc - The TypedDoc to fork
- * @param options - Optional settings
- * @param options.preservePeerId - If true, copies the original doc's peer ID to the fork
- * @returns A new TypedDoc with the same schema at the current version
- *
- * @example
- * ```typescript
- * import { fork, loro } from "@loro-extended/change"
- *
- * const doc = createTypedDoc(schema);
- * doc.title.update("Hello");
- *
- * // Fork the document
- * const forkedDoc = fork(doc);
- * forkedDoc.title.update("World");
- *
- * console.log(doc.title.toString()); // "Hello"
- * console.log(forkedDoc.title.toString()); // "World"
- *
- * // Fork with same peer ID (for World/Worldview pattern)
- * const worldview = fork(world, { preservePeerId: true });
- * ```
- */
-export function fork<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-  options?: { preservePeerId?: boolean },
-): TypedDoc<Shape> {
-  const loroDoc = loro(doc).doc
-  const forkedLoroDoc = loroDoc.fork()
-  const shape = loro(doc).docShape as Shape
-
-  // Optionally preserve the peer ID (useful for World/Worldview pattern)
-  if (options?.preservePeerId) {
-    forkedLoroDoc.setPeerId(loroDoc.peerId)
-  }
-
-  return createTypedDoc(shape, { doc: forkedLoroDoc })
-}
-
-/**
- * Creates a new TypedDoc at a specified version (frontiers).
- * The forked doc will only contain history before the specified frontiers.
- * The forked doc has a different PeerID from the original.
- *
- * For raw LoroDoc access, use: `loro(doc).doc.forkAt(frontiers)`
- *
- * @param doc - The TypedDoc to fork
- * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
- * @returns A new TypedDoc with the same schema at the specified version
- *
- * @example
- * ```typescript
- * import { forkAt, loro } from "@loro-extended/change"
- *
- * const doc = createTypedDoc(schema);
- * doc.title.update("Hello");
- * const frontiers = loro(doc).doc.frontiers();
- * doc.title.update("World");
- *
- * // Fork at the earlier version
- * const forkedDoc = forkAt(doc, frontiers);
- * console.log(forkedDoc.title.toString()); // "Hello"
- * console.log(doc.title.toString()); // "World"
- * ```
- */
-export function forkAt<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-  frontiers: Frontiers,
-): TypedDoc<Shape> {
-  const loroDoc = loro(doc).doc
-  const forkedLoroDoc = loroDoc.forkAt(frontiers)
-  const shape = loro(doc).docShape as Shape
-  return createTypedDoc(shape, { doc: forkedLoroDoc })
-}
-
-/**
- * Creates a new TypedDoc at a specified version using a shallow snapshot.
- * Unlike `forkAt`, this creates a "garbage-collected" snapshot that only
- * contains the current state and history since the specified frontiers.
- *
- * This is more memory-efficient than `forkAt` for documents with long history,
- * especially useful for the fork-and-merge pattern in LEA where we only need:
- * 1. Read current state
- * 2. Apply changes
- * 3. Export delta and merge back
- *
- * The shallow fork has a different PeerID from the original by default.
- * Use `preservePeerId: true` to copy the original's peer ID (useful for
- * fork-and-merge patterns where you want consistent frontier progression).
- *
- * @param doc - The TypedDoc to fork
- * @param frontiers - The version to fork at (obtained from `loro(doc).doc.frontiers()`)
- * @param options - Optional settings
- * @param options.preservePeerId - If true, copies the original doc's peer ID to the fork
- * @returns A new TypedDoc with the same schema at the specified version (shallow)
- *
- * @example
- * ```typescript
- * import { shallowForkAt, loro } from "@loro-extended/change"
- *
- * const doc = createTypedDoc(schema);
- * doc.title.update("Hello");
- * const frontiers = loro(doc).doc.frontiers();
- *
- * // Create a shallow fork (memory-efficient)
- * const shallowDoc = shallowForkAt(doc, frontiers, { preservePeerId: true });
- *
- * // Modify the shallow doc
- * shallowDoc.title.update("World");
- *
- * // Merge changes back
- * const update = loro(shallowDoc).doc.export({
- *   mode: "update",
- *   from: loro(doc).doc.version()
- * });
- * loro(doc).doc.import(update);
- * ```
- */
-export function shallowForkAt<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-  frontiers: Frontiers,
-  options?: { preservePeerId?: boolean },
-): TypedDoc<Shape> {
-  const loroDoc = loro(doc).doc
-  const shape = loro(doc).docShape as Shape
-
-  // Export a shallow snapshot at the specified frontiers
-  const shallowBytes = loroDoc.export({
-    mode: "shallow-snapshot",
-    frontiers,
-  })
-
-  // Create a new LoroDoc from the shallow snapshot
-  const shallowLoroDoc = LoroDoc.fromSnapshot(shallowBytes)
-
-  // Optionally preserve the peer ID for consistent frontier progression
-  if (options?.preservePeerId) {
-    shallowLoroDoc.setPeerId(loroDoc.peerId)
-  }
-
-  return createTypedDoc(shape, { doc: shallowLoroDoc })
-}
-
 export type Transition<Shape extends DocShape> = {
   before: TypedDoc<Shape>
   after: TypedDoc<Shape>
@@ -444,8 +184,8 @@ export function getTransition<Shape extends DocShape>(
     throw new Error("getTransition does not support checkout events")
   }
 
-  const loroDoc = getLoroDoc(doc)
-  const shape = loro(doc).docShape as Shape
+  const loroDoc = loro(doc)
+  const shape = ext(doc).docShape as Shape
   const overlay = createDiffOverlay(loroDoc, event)
 
   return {

@@ -8,12 +8,8 @@ import {
   LoroTree,
 } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import {
-  change,
-  getLoroContainer,
-  getLoroDoc,
-  getTransition,
-} from "./functional-helpers.js"
+import { type ExtRefBase, ext } from "./ext.js"
+import { change, getTransition } from "./functional-helpers.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -104,9 +100,8 @@ describe("functional helpers", () => {
 
     it("should commit all changes as one transaction", () => {
       const doc = createTypedDoc(schema)
-      const loroDoc = getLoroDoc(doc)
 
-      const versionBefore = loroDoc.version()
+      const versionBefore = loro(doc).version()
 
       change(doc, draft => {
         draft.count.increment(1)
@@ -114,7 +109,7 @@ describe("functional helpers", () => {
         draft.count.increment(3)
       })
 
-      const versionAfter = loroDoc.version()
+      const versionAfter = loro(doc).version()
 
       // Version should have changed (one commit)
       expect(versionAfter).not.toEqual(versionBefore)
@@ -125,17 +120,17 @@ describe("functional helpers", () => {
   describe("getLoroDoc()", () => {
     it("should return the underlying LoroDoc", () => {
       const doc = createTypedDoc(schema)
-      const loroDoc = getLoroDoc(doc)
+      const loroDoc = loro(doc)
 
       expect(loroDoc).toBeDefined()
       expect(typeof loroDoc.version).toBe("function")
       expect(typeof loroDoc.subscribe).toBe("function")
     })
 
-    it("should return the same LoroDoc as loro(doc).doc", () => {
+    it("should return the same LoroDoc as loro(doc)", () => {
       const doc = createTypedDoc(schema)
 
-      expect(getLoroDoc(doc)).toBe(loro(doc).doc)
+      expect(loro(doc)).toBe(loro(doc))
     })
   })
 
@@ -189,49 +184,50 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(loro(titleRef).doc).toBe(loro(doc).doc)
+      expect(ext(titleRef).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(loro(countRef).doc).toBe(loro(doc).doc)
+      expect(ext(countRef).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(loro(itemsRef).doc).toBe(loro(doc).doc)
+      expect(ext(itemsRef).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from MovableListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const movableItemsRef = doc.movableItems
 
-      expect(loro(movableItemsRef).doc).toBe(loro(doc).doc)
+      expect(ext(movableItemsRef).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from RecordRef", () => {
       const doc = createTypedDoc(fullSchema)
       const usersRef = doc.users
 
-      expect(loro(usersRef).doc).toBe(loro(doc).doc)
+      // Cast through unknown due to TypeScript overload resolution picking wrong type
+      expect((ext(usersRef) as unknown as ExtRefBase).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from StructRef", () => {
       const doc = createTypedDoc(fullSchema)
       const profileRef = doc.profile
 
-      expect(loro(profileRef).doc).toBe(loro(doc).doc)
+      expect(ext(profileRef).doc).toBe(loro(doc))
     })
 
     it("should return the LoroDoc from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(loro(treeRef).doc).toBe(loro(doc).doc)
+      expect(ext(treeRef).doc).toBe(loro(doc))
     })
   })
 
@@ -240,49 +236,49 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(loro(titleRef).container).toBeInstanceOf(LoroText)
+      expect(loro(titleRef)).toBeInstanceOf(LoroText)
     })
 
     it("should return LoroCounter from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(loro(countRef).container).toBeInstanceOf(LoroCounter)
+      expect(loro(countRef)).toBeInstanceOf(LoroCounter)
     })
 
     it("should return LoroList from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(loro(itemsRef).container).toBeInstanceOf(LoroList)
+      expect(loro(itemsRef)).toBeInstanceOf(LoroList)
     })
 
     it("should return LoroMovableList from MovableListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const movableItemsRef = doc.movableItems
 
-      expect(loro(movableItemsRef).container).toBeInstanceOf(LoroMovableList)
+      expect(loro(movableItemsRef)).toBeInstanceOf(LoroMovableList)
     })
 
     it("should return LoroMap from RecordRef", () => {
       const doc = createTypedDoc(fullSchema)
       const usersRef = doc.users
 
-      expect(loro(usersRef).container).toBeInstanceOf(LoroMap)
+      expect(loro(usersRef)).toBeInstanceOf(LoroMap)
     })
 
     it("should return LoroMap from StructRef", () => {
       const doc = createTypedDoc(fullSchema)
       const profileRef = doc.profile
 
-      expect(loro(profileRef).container).toBeInstanceOf(LoroMap)
+      expect(loro(profileRef)).toBeInstanceOf(LoroMap)
     })
 
     it("should return LoroTree from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(loro(treeRef).container).toBeInstanceOf(LoroTree)
+      expect(loro(treeRef)).toBeInstanceOf(LoroTree)
     })
   })
 
@@ -294,7 +290,7 @@ describe("functional helpers", () => {
 
       const unsubscribe = loro(titleRef).subscribe(callback)
       titleRef.insert(0, "Hello")
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -307,7 +303,7 @@ describe("functional helpers", () => {
 
       const unsubscribe = loro(countRef).subscribe(callback)
       countRef.increment(5)
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -320,7 +316,7 @@ describe("functional helpers", () => {
 
       const unsubscribe = loro(itemsRef).subscribe(callback)
       itemsRef.push("item1")
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -333,7 +329,7 @@ describe("functional helpers", () => {
 
       const unsubscribe = loro(usersRef).subscribe(callback)
       usersRef.set("alice", { name: "Alice" })
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -346,7 +342,7 @@ describe("functional helpers", () => {
 
       const unsubscribe = loro(treeRef).subscribe(callback)
       treeRef.createNode()
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).toHaveBeenCalled()
       unsubscribe()
@@ -361,7 +357,7 @@ describe("functional helpers", () => {
       unsubscribe()
 
       titleRef.insert(0, "Hello")
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(callback).not.toHaveBeenCalled()
     })
@@ -375,15 +371,15 @@ describe("functional helpers", () => {
 
       // Set up subscription on doc2's title ref
       const callback = vi.fn()
-      const unsubscribe = loro(doc2.title).subscribe(callback)
+      const unsubscribe = ext(doc2.title).subscribe(callback)
 
       // Make changes on doc1
       doc1.title.insert(0, "Hello from doc1")
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
       // Export from doc1 and import into doc2 (simulating sync)
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       // The subscription should have fired
       expect(callback).toHaveBeenCalled()
@@ -399,13 +395,13 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       const callback = vi.fn()
-      const unsubscribe = loro(doc2.count).subscribe(callback)
+      const unsubscribe = ext(doc2.count).subscribe(callback)
 
       doc1.count.increment(42)
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       expect(callback).toHaveBeenCalled()
       expect(doc2.count.value).toBe(42)
@@ -418,14 +414,14 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       const callback = vi.fn()
-      const unsubscribe = loro(doc2.items).subscribe(callback)
+      const unsubscribe = ext(doc2.items).subscribe(callback)
 
       doc1.items.push("item1")
       doc1.items.push("item2")
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       expect(callback).toHaveBeenCalled()
       expect(doc2.items.toJSON()).toEqual(["item1", "item2"])
@@ -438,13 +434,13 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       const callback = vi.fn()
-      const unsubscribe = loro(doc2).doc.subscribe(callback)
+      const unsubscribe = loro(doc2).subscribe(callback)
 
       doc1.title.insert(0, "Hello")
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       expect(callback).toHaveBeenCalled()
 
@@ -457,13 +453,13 @@ describe("functional helpers", () => {
 
       // Subscribe to count, but only change title
       const countCallback = vi.fn()
-      const unsubscribe = loro(doc2.count).subscribe(countCallback)
+      const unsubscribe = ext(doc2.count).subscribe(countCallback)
 
       doc1.title.insert(0, "Hello")
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       // Count subscription should NOT have fired since count wasn't changed
       expect(countCallback).not.toHaveBeenCalled()
@@ -476,15 +472,15 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       let capturedValue: string | undefined
-      const unsubscribe = loro(doc2.title).subscribe(() => {
+      const unsubscribe = ext(doc2.title).subscribe(() => {
         capturedValue = doc2.title.toString()
       })
 
       doc1.title.insert(0, "Remote text")
-      loro(doc1).doc.commit()
+      loro(doc1).commit()
 
-      const snapshot = loro(doc1).doc.export({ mode: "snapshot" })
-      loro(doc2).doc.import(snapshot)
+      const snapshot = loro(doc1).export({ mode: "snapshot" })
+      loro(doc2).import(snapshot)
 
       expect(capturedValue).toBe("Remote text")
 
@@ -506,7 +502,7 @@ describe("functional helpers", () => {
       })
 
       doc.count.increment(2)
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       expect(transitions).toEqual([{ beforeCount: 0, afterCount: 2 }])
       unsubscribe()
@@ -514,17 +510,17 @@ describe("functional helpers", () => {
 
     it("should throw on checkout events", () => {
       const doc = createTypedDoc(schema)
-      const frontiers = loro(doc).doc.frontiers()
+      const frontiers = loro(doc).frontiers()
 
       doc.count.increment(1)
-      loro(doc).doc.commit()
+      loro(doc).commit()
 
       let checkoutEvent: LoroEventBatch | undefined
       const unsubscribe = loro(doc).subscribe(event => {
         checkoutEvent = event
       })
 
-      loro(doc).doc.checkout(frontiers)
+      loro(doc).checkout(frontiers)
 
       expect(checkoutEvent).toBeDefined()
       expect(() => getTransition(doc, checkoutEvent as LoroEventBatch)).toThrow(
@@ -535,42 +531,42 @@ describe("functional helpers", () => {
     })
   })
 
-  describe("getLoroDoc() on refs", () => {
+  describe("ext(ref).doc", () => {
     it("should return LoroDoc from TextRef", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      expect(getLoroDoc(titleRef)).toBe(loro(doc).doc)
+      expect(ext(titleRef).doc).toBe(loro(doc))
     })
 
     it("should return LoroDoc from CounterRef", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      expect(getLoroDoc(countRef)).toBe(loro(doc).doc)
+      expect(ext(countRef).doc).toBe(loro(doc))
     })
 
     it("should return LoroDoc from ListRef", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      expect(getLoroDoc(itemsRef)).toBe(loro(doc).doc)
+      expect(ext(itemsRef).doc).toBe(loro(doc))
     })
 
     it("should return LoroDoc from TreeRef", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      expect(getLoroDoc(treeRef)).toBe(loro(doc).doc)
+      expect(ext(treeRef).doc).toBe(loro(doc))
     })
   })
 
-  describe("getLoroContainer()", () => {
+  describe("loro(ref)", () => {
     it("should return LoroText from TextRef", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
 
-      const container = getLoroContainer(titleRef)
+      const container = loro(titleRef)
       expect(container).toBeInstanceOf(LoroText)
     })
 
@@ -578,7 +574,7 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const countRef = doc.count
 
-      const container = getLoroContainer(countRef)
+      const container = loro(countRef)
       expect(container).toBeInstanceOf(LoroCounter)
     })
 
@@ -586,7 +582,7 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const itemsRef = doc.items
 
-      const container = getLoroContainer(itemsRef)
+      const container = loro(itemsRef)
       expect(container).toBeInstanceOf(LoroList)
     })
 
@@ -594,7 +590,7 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const movableItemsRef = doc.movableItems
 
-      const container = getLoroContainer(movableItemsRef)
+      const container = loro(movableItemsRef)
       expect(container).toBeInstanceOf(LoroMovableList)
     })
 
@@ -602,7 +598,7 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const usersRef = doc.users
 
-      const container = getLoroContainer(usersRef)
+      const container = loro(usersRef)
       expect(container).toBeInstanceOf(LoroMap)
     })
 
@@ -610,7 +606,7 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const profileRef = doc.profile
 
-      const container = getLoroContainer(profileRef)
+      const container = loro(profileRef)
       expect(container).toBeInstanceOf(LoroMap)
     })
 
@@ -618,18 +614,18 @@ describe("functional helpers", () => {
       const doc = createTypedDoc(fullSchema)
       const treeRef = doc.tree
 
-      const container = getLoroContainer(treeRef)
+      const container = loro(treeRef)
       expect(container).toBeInstanceOf(LoroTree)
     })
 
-    it("should return the same container as loro(ref).container", () => {
+    it("should return the same container", () => {
       const doc = createTypedDoc(fullSchema)
 
-      expect(getLoroContainer(doc.title)).toBe(loro(doc.title).container)
-      expect(getLoroContainer(doc.count)).toBe(loro(doc.count).container)
-      expect(getLoroContainer(doc.items)).toBe(loro(doc.items).container)
-      expect(getLoroContainer(doc.users)).toBe(loro(doc.users).container)
-      expect(getLoroContainer(doc.tree)).toBe(loro(doc.tree).container)
+      expect(loro(doc.title)).toBe(loro(doc.title))
+      expect(loro(doc.count)).toBe(loro(doc.count))
+      expect(loro(doc.items)).toBe(loro(doc.items))
+      expect(loro(doc.users)).toBe(loro(doc.users))
+      expect(loro(doc.tree)).toBe(loro(doc.tree))
     })
   })
 
@@ -797,7 +793,7 @@ describe("functional helpers", () => {
       it("should batch property assignments", () => {
         const doc = createTypedDoc(fullSchema)
 
-        change(doc.profile, draft => {
+        change(doc.profile, (draft: typeof doc.profile) => {
           draft.bio.insert(0, "Hello")
           draft.age.increment(25)
         })
@@ -809,7 +805,7 @@ describe("functional helpers", () => {
       it("should return the original ref for chaining", () => {
         const doc = createTypedDoc(fullSchema)
 
-        const result = change(doc.profile, draft => {
+        const result = change(doc.profile, (draft: typeof doc.profile) => {
           draft.bio.insert(0, "Test")
         })
 
@@ -821,7 +817,7 @@ describe("functional helpers", () => {
       it("should batch set operations", () => {
         const doc = createTypedDoc(fullSchema)
 
-        change(doc.users, draft => {
+        change(doc.users, (draft: typeof doc.users) => {
           draft.set("alice", { name: "Alice" })
           draft.set("bob", { name: "Bob" })
         })
@@ -838,7 +834,7 @@ describe("functional helpers", () => {
         doc.users.set("alice", { name: "Alice" })
         doc.users.set("bob", { name: "Bob" })
 
-        change(doc.users, draft => {
+        change(doc.users, (draft: typeof doc.users) => {
           draft.delete("alice")
           draft.set("charlie", { name: "Charlie" })
         })
@@ -852,7 +848,7 @@ describe("functional helpers", () => {
       it("should return the original ref for chaining", () => {
         const doc = createTypedDoc(fullSchema)
 
-        const result = change(doc.users, draft => {
+        const result = change(doc.users, (draft: typeof doc.users) => {
           draft.set("alice", { name: "Alice" })
         })
 
@@ -1008,11 +1004,11 @@ describe("functional helpers", () => {
       })
     })
 
-    describe("regression: doc.change() still works", () => {
-      it("should still support doc.change() method", () => {
+    describe("regression: ext(doc).change() still works", () => {
+      it("should still support ext(doc).change() method", () => {
         const doc = createTypedDoc(fullSchema)
 
-        doc.change(draft => {
+        ext(doc).change(draft => {
           draft.title.insert(0, "Hello")
           draft.count.increment(5)
         })

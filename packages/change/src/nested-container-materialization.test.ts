@@ -25,8 +25,8 @@ describe("Nested Container Materialization", () => {
     })
 
     // Sync client -> server
-    const clientSnapshot = loro(clientDoc).doc.export({ mode: "snapshot" })
-    loro(serverDoc).doc.import(clientSnapshot)
+    const clientSnapshot = loro(clientDoc).export({ mode: "snapshot" })
+    loro(serverDoc).import(clientSnapshot)
 
     // Server writes to the nested map
     const serverEntry = serverDoc.items.get("item-1")
@@ -34,11 +34,11 @@ describe("Nested Container Materialization", () => {
     serverEntry?.metadata.set("entry-1", { key: "value" })
 
     // Sync server -> client
-    const serverUpdate = loro(serverDoc).doc.export({
+    const serverUpdate = loro(serverDoc).export({
       mode: "update",
-      from: loro(clientDoc).doc.version(),
+      from: loro(clientDoc).version(),
     })
-    loro(clientDoc).doc.import(serverUpdate)
+    loro(clientDoc).import(serverUpdate)
 
     // BUG: Client's metadata is EMPTY!
     const clientEntry = clientDoc.items.get("item-1")
@@ -67,7 +67,7 @@ describe("Nested Container Materialization", () => {
     })
 
     // Sync 1 -> 2
-    loro(doc2).doc.import(loro(doc1).doc.export({ mode: "snapshot" }))
+    loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Peer 1 writes to metadata
     doc1.items.get("item-1")?.metadata.set("p1", "v1")
@@ -76,13 +76,13 @@ describe("Nested Container Materialization", () => {
     doc2.items.get("item-1")?.metadata.set("p2", "v2")
 
     // Sync 1 -> 2
-    loro(doc2).doc.import(
-      loro(doc1).doc.export({ mode: "update", from: loro(doc2).doc.version() }),
+    loro(doc2).import(
+      loro(doc1).export({ mode: "update", from: loro(doc2).version() }),
     )
 
     // Sync 2 -> 1
-    loro(doc1).doc.import(
-      loro(doc2).doc.export({ mode: "update", from: loro(doc1).doc.version() }),
+    loro(doc1).import(
+      loro(doc2).export({ mode: "update", from: loro(doc1).version() }),
     )
 
     // Both should have both values
@@ -116,21 +116,21 @@ describe("Nested Container Materialization", () => {
     })
 
     // Get the node ID for lookup
-    const nodeId = loro(node).container.id
+    const nodeId = loro(node).id
 
     // Sync 1 -> 2
-    loro(doc2).doc.import(loro(doc1).doc.export({ mode: "snapshot" }))
+    loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Verify the container exists in doc1
     const tags = node.data.tags
     expect(tags).toBeDefined()
 
     // Verify it's materialized by checking if we can get its container ID
-    const tagsContainer = loro(tags).container
+    const tagsContainer = loro(tags)
     expect(tagsContainer).toBeDefined()
 
     // Now check doc2 using getNodeByID
-    const tree2 = loro(doc2.tree).container
+    const tree2 = loro(doc2.tree)
     const node2 = tree2.getNodeByID(nodeId)
 
     expect(node2).toBeDefined()
@@ -161,7 +161,7 @@ describe("Nested Container Materialization", () => {
     })
 
     const doc = createTypedDoc(schema)
-    loro(doc).doc.import(oldDoc.export({ mode: "snapshot" }))
+    loro(doc).import(oldDoc.export({ mode: "snapshot" }))
 
     // Access missing container
     const root = doc.root
@@ -186,7 +186,7 @@ describe("Nested Container Materialization", () => {
     expect(newField.get("k")).toBe("v")
 
     // Verify in raw doc
-    const rawMap = loro(doc).doc.getMap("root")
+    const rawMap = loro(doc).getMap("root")
     const rawNewField = rawMap.get("newField")
     expect(rawNewField).toBeDefined()
   })
@@ -215,14 +215,14 @@ describe("Nested Container Materialization", () => {
     const _level3 = doc1.root.level1.level2.level3
 
     // Sync doc1 -> doc2
-    loro(doc2).doc.import(loro(doc1).doc.export({ mode: "snapshot" }))
+    loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Peer 2 writes to the deeply nested container
     doc2.root.level1.level2.level3.set("deep-key", "deep-value")
 
     // Sync doc2 -> doc1
-    loro(doc1).doc.import(
-      loro(doc2).doc.export({ mode: "update", from: loro(doc1).doc.version() }),
+    loro(doc1).import(
+      loro(doc2).export({ mode: "update", from: loro(doc1).version() }),
     )
 
     // Verify the deeply nested value is visible in doc1
@@ -250,7 +250,7 @@ describe("Nested Container Materialization", () => {
     })
 
     // Sync doc1 -> doc2
-    loro(doc2).doc.import(loro(doc1).doc.export({ mode: "snapshot" }))
+    loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Peer 2 writes to the nested metadata
     const item = doc2.items[0]
@@ -258,8 +258,8 @@ describe("Nested Container Materialization", () => {
     item?.metadata.set("key", "value")
 
     // Sync doc2 -> doc1
-    loro(doc1).doc.import(
-      loro(doc2).doc.export({ mode: "update", from: loro(doc1).doc.version() }),
+    loro(doc1).import(
+      loro(doc2).export({ mode: "update", from: loro(doc1).version() }),
     )
 
     // Verify the nested value is visible in doc1
@@ -310,13 +310,13 @@ describe("Nested Container Materialization", () => {
     })
 
     // Get the node ID for later lookup
-    const nodeId = loro(node).container.id
+    const nodeId = loro(node).id
 
     // Sync doc1 -> doc2
-    loro(doc2).doc.import(loro(doc1).doc.export({ mode: "snapshot" }))
+    loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Peer 2 writes to tags using raw Loro API (since TreeRef doesn't expose get by ID)
-    const tree2 = loro(doc2.tree).container
+    const tree2 = loro(doc2.tree)
     const node2Raw = tree2.getNodeByID(nodeId)
     expect(node2Raw).toBeDefined()
     if (node2Raw) {
@@ -326,8 +326,8 @@ describe("Nested Container Materialization", () => {
     }
 
     // Sync doc2 -> doc1
-    loro(doc1).doc.import(
-      loro(doc2).doc.export({ mode: "update", from: loro(doc1).doc.version() }),
+    loro(doc1).import(
+      loro(doc2).export({ mode: "update", from: loro(doc1).version() }),
     )
 
     // Verify the tag is visible in doc1's node
