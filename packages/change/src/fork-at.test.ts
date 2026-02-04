@@ -193,8 +193,10 @@ describe("forkAt", () => {
       // Raw access returns LoroDoc, not TypedDoc
       const rawForkedDoc = loro(doc).doc.forkAt(frontiers)
 
-      // It's a plain LoroDoc
-      expect(rawForkedDoc.toJSON()).toEqual({ text: "Hello" })
+      // It's a plain LoroDoc - note that raw toJSON() includes internal containers
+      // like _loro_extended_meta_ which are filtered out by TypedDoc.toJSON()
+      const rawJson = rawForkedDoc.toJSON()
+      expect(rawJson.text).toBe("Hello")
 
       // Can wrap it manually if needed
       const typedForkedDoc = createTypedDoc(schema, { doc: rawForkedDoc })

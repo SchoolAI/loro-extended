@@ -177,6 +177,12 @@ export interface LoroTypedDocRef extends LoroRefBase {
 
   /** Get raw CRDT value without placeholder overlay */
   readonly rawValue: unknown
+
+  /**
+   * Whether this document uses mergeable (flattened) storage.
+   * This is the effective value computed from metadata > schema > false.
+   */
+  readonly mergeable: boolean
 }
 
 // ============================================================================

@@ -406,6 +406,16 @@ export class Handle<
   }
 
   /**
+   * Whether this document uses mergeable (flattened) storage.
+   * This is the effective value computed from metadata > schema > false.
+   *
+   * @returns true if the document uses mergeable storage
+   */
+  get isMergeable(): boolean {
+    return loro(this._doc).mergeable
+  }
+
+  /**
    * Convenience method: change a set of mutations in a single commit.
    */
   change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {

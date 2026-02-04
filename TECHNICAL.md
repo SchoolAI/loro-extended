@@ -209,6 +209,38 @@ For a schema with nested structs, flattened storage uses `null` markers to indic
 - `computeChildRootContainerName()` builds the root container name from path segments
 - `reconstructFromFlattened()` and `reconstructDocFromFlattened()` handle toJSON reconstruction
 
+### Document Metadata and Reserved Keys
+
+Loro Extended reserves all root container keys starting with `_loro_extended` for internal use. These keys are:
+
+- Automatically excluded from `toJSON()` and `rawValue` output
+- Used for document metadata and future internal features
+- Synced between peers like any other container
+
+**Metadata Container**: `_loro_extended_meta_` stores document metadata:
+- `mergeable`: Whether the document uses flattened root container storage
+- `schemaVersion`: (Future) Schema version for migration support
+
+**Schema-Level Configuration**:
+
+```typescript
+// Declare mergeable in the schema
+const schema = Shape.doc({
+  players: Shape.record(Shape.struct({ score: Shape.plain.number() })),
+}, { mergeable: true })
+
+// Metadata is automatically written on first access
+const doc = createTypedDoc(schema)
+```
+
+**Peer Agreement**: When a peer receives a document, it reads the metadata and validates against its local schema. If there's a mismatch (e.g., local schema says `mergeable: true` but metadata says `false`), a warning is logged and the metadata value is used. This ensures all peers use consistent settings.
+
+**Priority Order**: `options.mergeable` > `schema.mergeable` > existing metadata > `false`
+
+**Backward Compatibility**: Documents without metadata are assumed to have `mergeable: false`.
+
+**Reserved Prefix**: Do not use `_loro_extended` as a prefix for your own root container keys.
+
 ### Infer<> vs InferRaw<> and Type Boundaries
 
 The `@loro-extended/change` package provides two type inference utilities:

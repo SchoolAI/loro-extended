@@ -29,6 +29,17 @@ export {
   type LoroTypedDocRef,
   loro,
 } from "./loro.js"
+export type { LoroExtendedMeta } from "./metadata.js"
+// Document metadata utilities
+export {
+  hasMetadata,
+  isLoroExtendedReservedKey,
+  LORO_EXTENDED_PREFIX,
+  META_CONTAINER_NAME,
+  readMetadata,
+  writeMetadata,
+} from "./metadata.js"
+
 // Regular placeholder overlay
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
 
@@ -71,6 +82,8 @@ export type {
   // Tagged union of two or more plain value types
   DiscriminatedUnionValueShape,
   DocShape,
+  // Options for configuring a document schema
+  DocShapeOptions,
   ListContainerShape,
   MovableListContainerShape,
   NullValueShape,

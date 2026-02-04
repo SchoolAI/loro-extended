@@ -40,6 +40,29 @@ export type WithNullable<S extends ValueShape> = {
   nullable(): WithPlaceholder<UnionValueShape<[NullValueShape, S]>>
 }
 
+/**
+ * Options for configuring a document schema.
+ */
+export interface DocShapeOptions {
+  /**
+   * When true, all containers are stored at the document root with path-based names.
+   * This ensures container IDs are deterministic and survive `applyDiff`, enabling
+   * proper merging of concurrent container creation.
+   *
+   * Use this when:
+   * - Multiple peers may concurrently create containers at the same schema path
+   * - You need containers to merge correctly via `applyDiff` (e.g., Lens)
+   *
+   * Limitations:
+   * - Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported
+   * - MovableLists of containers are NOT supported
+   * - Use `Shape.record(Shape.struct({...}))` with string keys instead
+   *
+   * @default false
+   */
+  mergeable?: boolean
+}
+
 export interface DocShape<
   NestedShapes extends Record<string, ContainerShape> = Record<
     string,
@@ -53,6 +76,11 @@ export interface DocShape<
   readonly _type: "doc"
   // A doc's root containers each separately has its own shape, hence 'shapes'
   readonly shapes: NestedShapes
+  /**
+   * Whether this document uses mergeable (flattened) storage.
+   * When true, containers are stored at the document root with path-based names.
+   */
+  readonly mergeable?: boolean
 }
 
 export interface TextContainerShape extends Shape<string, TextRef, string> {
@@ -442,12 +470,37 @@ function makeNullable<S extends ValueShape>(
  * `ListContainerShape<TextContainerShape>`.
  */
 export const Shape = {
-  doc: <T extends Record<string, ContainerShape>>(shape: T): DocShape<T> => ({
+  /**
+   * Creates a document schema with the given root container shapes.
+   *
+   * @param shapes - The root container shapes for the document
+   * @param options - Optional configuration including `mergeable` for flattened storage
+   * @returns A DocShape that can be used with createTypedDoc
+   *
+   * @example
+   * ```typescript
+   * // Basic document
+   * const schema = Shape.doc({
+   *   title: Shape.text(),
+   *   count: Shape.counter(),
+   * })
+   *
+   * // Mergeable document for concurrent container creation
+   * const mergeableSchema = Shape.doc({
+   *   players: Shape.record(Shape.struct({ score: Shape.plain.number() })),
+   * }, { mergeable: true })
+   * ```
+   */
+  doc: <T extends Record<string, ContainerShape>>(
+    shapes: T,
+    options?: DocShapeOptions,
+  ): DocShape<T> => ({
     _type: "doc" as const,
-    shapes: shape,
+    shapes,
     _plain: {} as any,
     _mutable: {} as any,
     _placeholder: {} as any,
+    mergeable: options?.mergeable,
   }),
 
   /**

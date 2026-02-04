@@ -15,6 +15,12 @@ import {
   normalizePath,
 } from "./json-patch.js"
 import { LORO_SYMBOL, type LoroTypedDocRef } from "./loro.js"
+import {
+  hasMetadata,
+  isLoroExtendedReservedKey,
+  readMetadata,
+  writeMetadata,
+} from "./metadata.js"
 import { overlayPlaceholder } from "./overlay.js"
 import { buildRootContainerName } from "./path-encoding.js"
 import type {
@@ -138,6 +144,7 @@ function reconstructFromFlattened(
 
 /**
  * Reconstructs the full document hierarchy from flattened storage.
+ * Excludes all `_loro_extended*` prefixed keys from the output.
  */
 function reconstructDocFromFlattened(
   flatValue: Record<string, Value>,
@@ -146,9 +153,28 @@ function reconstructDocFromFlattened(
   const result: Record<string, Value> = {}
 
   for (const [key, containerShape] of Object.entries(docShape.shapes)) {
+    // Skip reserved keys (shouldn't be in schema, but be defensive)
+    if (isLoroExtendedReservedKey(key)) {
+      continue
+    }
     result[key] = reconstructFromFlattened(flatValue, containerShape, [key])
   }
 
+  return result
+}
+
+/**
+ * Filters out reserved `_loro_extended*` keys from a raw CRDT value.
+ */
+function filterReservedKeys(
+  crdtValue: Record<string, Value>,
+): Record<string, Value> {
+  const result: Record<string, Value> = {}
+  for (const [key, value] of Object.entries(crdtValue)) {
+    if (!isLoroExtendedReservedKey(key)) {
+      result[key] = value
+    }
+  }
   return result
 }
 
@@ -170,13 +196,28 @@ class TypedDocInternal<Shape extends DocShape> {
     shape: Shape,
     doc: LoroDoc = new LoroDoc(),
     overlay?: DiffOverlay,
-    mergeable = false,
+    schemaMergeable = false,
   ) {
     this.shape = shape
     this.placeholder = derivePlaceholder(shape)
     this.doc = doc
     this.overlay = overlay
-    this._mergeable = mergeable
+
+    // Determine effective mergeable setting with metadata integration
+    // Priority: existing metadata > schema setting > false
+    if (hasMetadata(doc)) {
+      // Document has metadata - use it (metadata takes precedence over schema)
+      const meta = readMetadata(doc)
+      this._mergeable = meta.mergeable ?? false
+    } else {
+      // No metadata - this is a new document or legacy document
+      // Use schema setting and write metadata only for mergeable docs
+      // (to avoid adding operations to non-mergeable docs)
+      this._mergeable = schemaMergeable
+      if (schemaMergeable) {
+        writeMetadata(doc, { mergeable: schemaMergeable })
+      }
+    }
 
     validatePlaceholder(this.placeholder, this.shape)
   }
@@ -203,9 +244,10 @@ class TypedDocInternal<Shape extends DocShape> {
     const crdtValue = this.doc.toJSON()
 
     // For mergeable docs, reconstruct hierarchy from flattened storage
+    // For non-mergeable docs, just filter out reserved keys
     const hierarchicalValue = this._mergeable
       ? reconstructDocFromFlattened(crdtValue, this.shape)
-      : crdtValue
+      : filterReservedKeys(crdtValue)
 
     return overlayPlaceholder(
       this.shape,
@@ -256,7 +298,8 @@ class TypedDocInternal<Shape extends DocShape> {
   }
 
   get rawValue(): any {
-    return this.doc.toJSON()
+    // Filter out reserved keys from raw value
+    return filterReservedKeys(this.doc.toJSON())
   }
 }
 
@@ -419,11 +462,14 @@ export function createTypedDoc<Shape extends DocShape>(
   shape: Shape,
   options: CreateTypedDocOptions = {},
 ): TypedDoc<Shape> {
+  // Determine effective mergeable setting: options > schema > false
+  const effectiveMergeable = options.mergeable ?? shape.mergeable ?? false
+
   const internal = new TypedDocInternal(
     shape,
     options.doc || new LoroDoc(),
     options.overlay,
-    options.mergeable,
+    effectiveMergeable,
   )
 
   // Create the loro() namespace for this doc
@@ -445,6 +491,9 @@ export function createTypedDoc<Shape extends DocShape>(
     },
     get rawValue(): unknown {
       return internal.rawValue
+    },
+    get mergeable(): boolean {
+      return internal.mergeable
     },
   }
 
