@@ -1,5 +1,6 @@
 node_modules
 .roo/
+.turbo/
 impl/
 #plans/
 **/dist
