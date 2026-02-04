@@ -7,6 +7,7 @@
  */
 
 import {
+  change,
   createTypedDoc,
   type DocShape,
   ext,
@@ -448,7 +449,7 @@ export function createLens<D extends DocShape>(
       const worldviewFrontiersBefore = worldviewLoroDoc.frontiers()
 
       // Apply change to worldview
-      ext(worldviewDoc).change(fn)
+      change(worldviewDoc, fn)
 
       // Serialize commit message (handles string/object)
       const serializedMessage = serializeMessage(options?.commitMessage)
