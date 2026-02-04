@@ -12,8 +12,21 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
+import {
+  type DisconnectReason,
+  type WsClientState,
+  WsClientStateMachine,
+  type WsClientStateTransition,
+} from "./client-state-machine.js"
 import { decodeFrame, encodeFrame } from "./wire-format.js"
 
+// Re-export types from state machine for convenience
+export type { DisconnectReason, WsClientState, WsClientStateTransition }
+
+/**
+ * Legacy connection state type for backward compatibility.
+ * @deprecated Use WsClientState instead for full state information
+ */
 export type ConnectionState =
   | "disconnected"
   | "connecting"
@@ -41,6 +54,47 @@ export interface WsClientOptions {
 
   /** Keepalive interval in ms (default: 30000) */
   keepaliveInterval?: number
+
+  /**
+   * Lifecycle event callbacks.
+   * These fire at well-defined points in the connection lifecycle.
+   */
+  lifecycle?: WsClientLifecycleEvents
+}
+
+/**
+ * Lifecycle event callbacks for the WebSocket client.
+ */
+export interface WsClientLifecycleEvents {
+  /**
+   * Called on every state transition.
+   * Transitions are delivered asynchronously via microtask queue.
+   */
+  onStateChange?: (transition: WsClientStateTransition) => void
+
+  /**
+   * Called when the connection is lost (intentionally or not).
+   * Includes the reason for disconnection.
+   */
+  onDisconnect?: (reason: DisconnectReason) => void
+
+  /**
+   * Called when a reconnection attempt is scheduled.
+   * @param attempt The attempt number (1-based)
+   * @param nextAttemptMs Milliseconds until the next attempt
+   */
+  onReconnecting?: (attempt: number, nextAttemptMs: number) => void
+
+  /**
+   * Called when reconnection succeeds (socket opens after being disconnected).
+   */
+  onReconnected?: () => void
+
+  /**
+   * Called when the server sends the "ready" signal.
+   * At this point, the connection is fully established and ready for use.
+   */
+  onReady?: () => void
 }
 
 /**
@@ -111,44 +165,161 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   private socket?: WebSocket
   private serverChannel?: Channel
   private keepaliveTimer?: ReturnType<typeof setInterval>
-  private reconnectAttempts = 0
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private options: ServiceWsClientOptions
   private WebSocketImpl: typeof globalThis.WebSocket
-  private isConnecting = false
   private shouldReconnect = true
-  private serverReady = false
-  public connectionState: ConnectionState = "disconnected"
-  private listeners = new Set<(state: ConnectionState) => void>()
+  private wasConnectedBefore = false
+
+  // Unified state machine
+  private readonly stateMachine = new WsClientStateMachine()
 
   constructor(options: ServiceWsClientOptions) {
     super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
+
+    // Set up lifecycle event forwarding
+    this.setupLifecycleEvents()
   }
 
   /**
+   * Set up lifecycle event forwarding from state machine to options callbacks.
+   */
+  private setupLifecycleEvents(): void {
+    this.stateMachine.subscribeToTransitions(transition => {
+      // Forward to onStateChange callback
+      this.options.lifecycle?.onStateChange?.(transition)
+
+      // Fire specific lifecycle events based on transition
+      const { from, to } = transition
+
+      // onDisconnect: when transitioning TO disconnected
+      if (to.status === "disconnected" && to.reason) {
+        this.options.lifecycle?.onDisconnect?.(to.reason)
+      }
+
+      // onReconnecting: when transitioning TO reconnecting
+      if (to.status === "reconnecting") {
+        this.options.lifecycle?.onReconnecting?.(to.attempt, to.nextAttemptMs)
+      }
+
+      // onReconnected: when transitioning from reconnecting/connecting TO connected/ready
+      // (only if we were connected before)
+      if (
+        this.wasConnectedBefore &&
+        (from.status === "reconnecting" || from.status === "connecting") &&
+        (to.status === "connected" || to.status === "ready")
+      ) {
+        this.options.lifecycle?.onReconnected?.()
+      }
+
+      // onReady: when transitioning TO ready
+      if (to.status === "ready") {
+        this.options.lifecycle?.onReady?.()
+      }
+    })
+  }
+
+  /**
+   * Get the current state of the connection.
+   * This is the new, preferred API for checking connection state.
+   */
+  getState(): WsClientState {
+    return this.stateMachine.getState()
+  }
+
+  /**
+   * Subscribe to state transitions.
+   * This is the new, preferred API for observing state changes.
+   *
+   * @param listener Callback that receives transition events
+   * @returns Unsubscribe function
+   */
+  subscribeToTransitions(
+    listener: (transition: WsClientStateTransition) => void,
+  ): () => void {
+    return this.stateMachine.subscribeToTransitions(listener)
+  }
+
+  /**
+   * Wait for a specific state.
+   *
+   * @param predicate Function that returns true when the desired state is reached
+   * @param options Options including timeout
+   * @returns Promise that resolves with the matching state
+   */
+  waitForState(
+    predicate: (state: WsClientState) => boolean,
+    options?: { timeoutMs?: number },
+  ): Promise<WsClientState> {
+    return this.stateMachine.waitForState(predicate, options)
+  }
+
+  /**
+   * Wait for a specific status.
+   *
+   * @param status The status to wait for
+   * @param options Options including timeout
+   * @returns Promise that resolves with the matching state
+   */
+  waitForStatus(
+    status: WsClientState["status"],
+    options?: { timeoutMs?: number },
+  ): Promise<WsClientState> {
+    return this.stateMachine.waitForStatus(status, options)
+  }
+
+  // ============================================================================
+  // Backward Compatibility APIs
+  // ============================================================================
+
+  /**
    * Subscribe to connection state changes.
+   * @deprecated Use subscribeToTransitions() instead for full state information
    * @param listener Callback function that receives the new state
    * @returns Unsubscribe function
    */
   public subscribe(listener: (state: ConnectionState) => void): () => void {
-    this.listeners.add(listener)
-    // Emit current state immediately
-    listener(this.connectionState)
-    return () => {
-      this.listeners.delete(listener)
-    }
+    return this.stateMachine.subscribe(listener)
   }
 
-  private setConnectionState(state: ConnectionState) {
-    if (this.connectionState !== state) {
-      this.connectionState = state
-      for (const listener of this.listeners) {
-        listener(state)
-      }
-    }
+  /**
+   * Get the current connection state (legacy API).
+   * @deprecated Use getState() instead for full state information
+   */
+  get connectionState(): ConnectionState {
+    return this.stateMachine.getLegacyConnectionState()
   }
+
+  /**
+   * Check if the client is connected (socket is open).
+   * Note: This only checks if the socket is open, not if the server is ready.
+   * Use `isReady` to check if the connection is fully established.
+   */
+  get isConnected(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN
+  }
+
+  /**
+   * Check if the client is ready (server ready signal received).
+   * This is the preferred way to check if the connection is fully established.
+   */
+  get isReady(): boolean {
+    return this.stateMachine.isReady()
+  }
+
+  /**
+   * Check if the server is ready (legacy API).
+   * @deprecated Use isReady instead
+   */
+  get serverReady(): boolean {
+    return this.stateMachine.isReady()
+  }
+
+  // ============================================================================
+  // Adapter Implementation
+  // ============================================================================
 
   protected generate(): GeneratedChannel {
     return {
@@ -164,7 +335,11 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         this.socket.send(frame)
       },
       stop: () => {
-        this.disconnect()
+        // Note: We don't call disconnect() here because the channel's stop()
+        // is called when the channel is removed, which can happen during
+        // handleClose(). If we called disconnect() here, it would transition
+        // to disconnected before scheduleReconnect() has a chance to run.
+        // The actual disconnect is handled by onStop() or handleClose().
       },
     }
   }
@@ -177,19 +352,21 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     }
     this.peerId = this.identity.peerId
     this.shouldReconnect = true
+    this.wasConnectedBefore = false
     await this.connect()
   }
 
   async onStop(): Promise<void> {
     this.shouldReconnect = false
-    this.disconnect()
+    this.disconnect({ type: "intentional" })
   }
 
   /**
    * Connect to the WebSocket server.
    */
   private async connect(): Promise<void> {
-    if (this.isConnecting) {
+    const currentState = this.stateMachine.getState()
+    if (currentState.status === "connecting") {
       return
     }
 
@@ -197,8 +374,11 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       throw new Error("Cannot connect: peerId not set")
     }
 
-    this.isConnecting = true
-    this.setConnectionState("connecting")
+    // Determine attempt number
+    const attempt =
+      currentState.status === "reconnecting" ? currentState.attempt : 1
+
+    this.stateMachine.transition({ status: "connecting", attempt })
 
     // Resolve URL
     const url =
@@ -267,9 +447,8 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         this.socket.addEventListener("close", onClose)
       })
 
-      this.isConnecting = false
-      this.reconnectAttempts = 0
-      this.setConnectionState("connected")
+      // Socket is now open - transition to connected
+      this.stateMachine.transition({ status: "connected" })
 
       this.logger.info("WebSocket connected to {url} (peerId: {peerId})", {
         url,
@@ -294,27 +473,27 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       // Start keepalive
       this.startKeepalive()
 
-      // Reset server ready flag - we'll wait for the "ready" signal
-      this.serverReady = false
-
       // Note: Channel creation is deferred until we receive the "ready" signal
       // from the server. This ensures the server is fully set up before we
       // start sending messages.
     } catch (error) {
-      this.isConnecting = false
       this.logger.error(
         "WebSocket connection failed to {url} (peerId: {peerId}): {error}",
         { error, url, peerId: this.peerId },
       )
-      this.setConnectionState("disconnected")
-      this.scheduleReconnect()
+
+      // Transition to reconnecting or disconnected
+      this.scheduleReconnect({
+        type: "error",
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
     }
   }
 
   /**
    * Disconnect from the WebSocket server.
    */
-  private disconnect(): void {
+  private disconnect(reason: DisconnectReason): void {
     this.stopKeepalive()
     this.clearReconnectTimer()
 
@@ -327,8 +506,12 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       this.removeChannel(this.serverChannel.channelId)
       this.serverChannel = undefined
     }
-    this.serverReady = false
-    this.setConnectionState("disconnected")
+
+    // Only transition if not already disconnected
+    const currentState = this.stateMachine.getState()
+    if (currentState.status !== "disconnected") {
+      this.stateMachine.transition({ status: "disconnected", reason })
+    }
   }
 
   /**
@@ -369,12 +552,16 @@ export class WsClientNetworkAdapter extends Adapter<void> {
    * establish-response containing its actual identity.
    */
   private handleServerReady(): void {
-    if (this.serverReady) {
+    const currentState = this.stateMachine.getState()
+    if (currentState.status === "ready") {
       // Already received ready signal, ignore duplicate
       return
     }
 
-    this.serverReady = true
+    // Transition to ready state
+    this.stateMachine.transition({ status: "ready" })
+    this.wasConnectedBefore = true
+
     this.logger.debug("Received ready signal from server")
 
     // Create channel if not exists
@@ -417,19 +604,14 @@ export class WsClientNetworkAdapter extends Adapter<void> {
     )
 
     this.stopKeepalive()
-    this.serverReady = false
 
     if (this.serverChannel) {
       this.removeChannel(this.serverChannel.channelId)
       this.serverChannel = undefined
     }
 
-    if (this.shouldReconnect) {
-      this.setConnectionState("disconnected")
-      this.scheduleReconnect()
-    } else {
-      this.setConnectionState("disconnected")
-    }
+    // Schedule reconnect or transition to disconnected
+    this.scheduleReconnect({ type: "closed", code, reason })
   }
 
   /**
@@ -458,35 +640,59 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   }
 
   /**
-   * Schedule a reconnection attempt.
+   * Schedule a reconnection attempt or transition to disconnected.
    */
-  private scheduleReconnect(): void {
+  private scheduleReconnect(reason: DisconnectReason): void {
+    const currentState = this.stateMachine.getState()
+
+    // If already disconnected, don't transition again
+    if (currentState.status === "disconnected") {
+      return
+    }
+
     const reconnectOpts = {
       ...DEFAULT_RECONNECT,
       ...this.options.reconnect,
     }
 
-    if (!reconnectOpts.enabled) {
+    if (!this.shouldReconnect || !reconnectOpts.enabled) {
+      this.stateMachine.transition({ status: "disconnected", reason })
       return
     }
 
-    if (this.reconnectAttempts >= reconnectOpts.maxAttempts) {
+    // Get current attempt count from state
+    const currentAttempt =
+      currentState.status === "reconnecting"
+        ? currentState.attempt
+        : currentState.status === "connecting"
+          ? (currentState as { attempt: number }).attempt
+          : 0
+
+    if (currentAttempt >= reconnectOpts.maxAttempts) {
       this.logger.error("Max reconnection attempts reached")
+      this.stateMachine.transition({
+        status: "disconnected",
+        reason: { type: "max-retries-exceeded", attempts: currentAttempt },
+      })
       return
     }
+
+    const nextAttempt = currentAttempt + 1
 
     // Exponential backoff with jitter
     const delay = Math.min(
-      reconnectOpts.baseDelay * 2 ** this.reconnectAttempts +
-        Math.random() * 1000,
+      reconnectOpts.baseDelay * 2 ** (nextAttempt - 1) + Math.random() * 1000,
       reconnectOpts.maxDelay,
     )
 
-    this.reconnectAttempts++
-    this.setConnectionState("reconnecting")
+    this.stateMachine.transition({
+      status: "reconnecting",
+      attempt: nextAttempt,
+      nextAttemptMs: delay,
+    })
 
     this.logger.info("Scheduling reconnect attempt {attempt} in {delay}ms", {
-      attempt: this.reconnectAttempts,
+      attempt: nextAttempt,
       delay,
     })
 
@@ -503,13 +709,6 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = undefined
     }
-  }
-
-  /**
-   * Check if the client is connected.
-   */
-  get isConnected(): boolean {
-    return this.socket?.readyState === WebSocket.OPEN
   }
 }
 

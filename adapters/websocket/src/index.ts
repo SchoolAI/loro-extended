@@ -9,12 +9,20 @@
 
 // Client adapter
 export {
+  type ConnectionState,
   createServiceWsClient,
   createWsClient,
+  type DisconnectReason,
   type ServiceWsClientOptions,
+  type WsClientLifecycleEvents,
   WsClientNetworkAdapter,
   type WsClientOptions,
+  type WsClientState,
+  type WsClientStateTransition,
 } from "./client.js"
+
+// State machine (for advanced use cases)
+export { WsClientStateMachine } from "./client-state-machine.js"
 // Connection
 export { WsConnection } from "./connection.js"
 // Handler types

@@ -116,7 +116,7 @@ describe("WebSocket Ready Signal", () => {
 
       // Verify the channel exists now (after ready signal)
       expect((clientAdapter as any).serverChannel).toBeDefined()
-      expect((clientAdapter as any).serverReady).toBe(true)
+      expect(clientAdapter.isReady).toBe(true)
 
       // Cleanup
       await clientAdapter.onStop()
@@ -160,24 +160,12 @@ describe("WebSocket Ready Signal", () => {
         adapters: [clientAdapter],
       })
 
-      // Wait for connection
-      await new Promise<void>(resolve => {
-        const check = () => {
-          if (
-            clientAdapter?.isConnected &&
-            (clientAdapter as any).serverReady
-          ) {
-            resolve()
-          } else {
-            setTimeout(check, 10)
-          }
-        }
-        check()
-      })
+      // Wait for connection using the new API
+      await clientAdapter.waitForStatus("ready", { timeoutMs: 5000 })
 
       // Verify channel is established
       expect((clientAdapter as any).serverChannel).toBeDefined()
-      expect((clientAdapter as any).serverReady).toBe(true)
+      expect(clientAdapter.isReady).toBe(true)
       expect(clientAdapter.connectionState).toBe("connected")
 
       // Cleanup
@@ -254,20 +242,9 @@ describe("WebSocket Ready Signal", () => {
       })
 
       // Wait for connection to be fully established
-      await new Promise<void>(resolve => {
-        const check = () => {
-          if (
-            clientAdapter?.isConnected &&
-            (clientAdapter as any).serverReady
-          ) {
-            // Give time for any messages to be exchanged
-            setTimeout(resolve, 200)
-          } else {
-            setTimeout(check, 10)
-          }
-        }
-        check()
-      })
+      await clientAdapter.waitForStatus("ready", { timeoutMs: 5000 })
+      // Give time for any messages to be exchanged
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       // Verify: server should NOT have sent any binary messages before
       // the client sent its establish-request
@@ -281,8 +258,8 @@ describe("WebSocket Ready Signal", () => {
   describe("Reconnection resets serverReady", () => {
     it("should reset serverReady on disconnect and wait for new ready signal on reconnect", async () => {
       // This test verifies that reconnection works correctly:
-      // 1. Connect and verify serverReady is true
-      // 2. Disconnect and verify serverReady is false
+      // 1. Connect and verify isReady is true
+      // 2. Disconnect and verify isReady is false
       // 3. Reconnect and verify we wait for new ready signal
 
       let clientAdapter: WsClientNetworkAdapter | undefined
@@ -322,23 +299,12 @@ describe("WebSocket Ready Signal", () => {
         adapters: [clientAdapter],
       })
 
-      // Wait for initial connection
-      await new Promise<void>(resolve => {
-        const check = () => {
-          if (
-            clientAdapter?.isConnected &&
-            (clientAdapter as any).serverReady
-          ) {
-            resolve()
-          } else {
-            setTimeout(check, 10)
-          }
-        }
-        check()
-      })
+      // Wait for initial connection using the new waitForStatus API
+      await clientAdapter.waitForStatus("ready", { timeoutMs: 5000 })
 
       // Verify initial state
-      expect((clientAdapter as any).serverReady).toBe(true)
+      expect(clientAdapter.isReady).toBe(true)
+      expect(clientAdapter.getState().status).toBe("ready")
       expect(connectionCount).toBe(1)
 
       // Force disconnect by closing the server-side connection
@@ -346,41 +312,23 @@ describe("WebSocket Ready Signal", () => {
       expect(connections.length).toBe(1)
       connections[0].close(1000, "Test disconnect")
 
-      // Wait for disconnect to be processed
-      await new Promise<void>(resolve => {
-        const check = () => {
-          if (!clientAdapter?.isConnected) {
-            resolve()
-          } else {
-            setTimeout(check, 10)
-          }
-        }
-        check()
-      })
+      // Wait for disconnect to be processed - use waitForState to observe the transition
+      // We wait for a non-ready state (disconnected or reconnecting)
+      await clientAdapter.waitForState(
+        state =>
+          state.status === "disconnected" || state.status === "reconnecting",
+        { timeoutMs: 5000 },
+      )
 
-      // Verify serverReady is reset
-      expect((clientAdapter as any).serverReady).toBe(false)
-      expect((clientAdapter as any).serverChannel).toBeUndefined()
+      // Verify isReady is reset
+      expect(clientAdapter.isReady).toBe(false)
 
-      // Wait for reconnection
-      await new Promise<void>(resolve => {
-        const check = () => {
-          if (
-            clientAdapter?.isConnected &&
-            (clientAdapter as any).serverReady &&
-            connectionCount === 2
-          ) {
-            resolve()
-          } else {
-            setTimeout(check, 50)
-          }
-        }
-        check()
-      })
+      // Wait for reconnection to complete
+      await clientAdapter.waitForStatus("ready", { timeoutMs: 5000 })
 
       // Verify reconnection worked
-      expect((clientAdapter as any).serverReady).toBe(true)
-      expect((clientAdapter as any).serverChannel).toBeDefined()
+      expect(clientAdapter.isReady).toBe(true)
+      expect(clientAdapter.getState().status).toBe("ready")
       expect(connectionCount).toBe(2)
 
       // Cleanup
