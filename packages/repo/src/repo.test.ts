@@ -72,7 +72,7 @@ describe("Repo", () => {
       expect(handle.doc).toBeDefined()
 
       // Access raw LoroDoc via escape hatch
-      const loroDoc = loro(handle.doc).doc
+      const loroDoc = loro(handle.doc)
       const map = loroDoc.getMap("doc")
       map.set("key", "value")
       expect(map.get("key")).toBe("value")

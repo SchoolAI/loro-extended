@@ -40,7 +40,7 @@ describe("Handle", () => {
       // doc should be a TypedDoc
       expect(handle.doc).toBeDefined()
       expect(loro(handle.doc)).toBeDefined()
-      expect(loro(handle.doc).doc).toBeDefined()
+      expect(loro(handle.doc)).toBeDefined()
 
       // Can use typed mutations
       handle.change(draft => {
@@ -79,13 +79,13 @@ describe("Handle", () => {
       // doc should still be a TypedDoc (with unknown types for the 'doc' field)
       expect(handle.doc).toBeDefined()
       expect(loro(handle.doc)).toBeDefined()
-      expect(loro(handle.doc).doc).toBeDefined()
+      expect(loro(handle.doc)).toBeDefined()
 
       // Can use raw LoroDoc access for the 'doc' container
-      loro(handle.doc).doc.getMap("doc").set("key", "value")
+      loro(handle.doc).getMap("doc").set("key", "value")
 
       // Can read via loroDoc
-      const docMap = loro(handle.doc).doc.getMap("doc")
+      const docMap = loro(handle.doc).getMap("doc")
       expect(docMap.get("key")).toBe("value")
     })
   })

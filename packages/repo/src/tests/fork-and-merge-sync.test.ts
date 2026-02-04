@@ -2,11 +2,11 @@ import {
   change,
   createTypedDoc,
   type DocShape,
+  ext,
   type Frontiers,
   loro,
   replayDiff,
   Shape,
-  shallowForkAt,
   type TypedDoc,
 } from "@loro-extended/change"
 import { UndoManager } from "loro-crdt"
@@ -40,25 +40,27 @@ function createUpdate<Schema extends DocShape, Msg>(
 ): (doc: TypedDoc<Schema>, frontier: Frontiers, msg: Msg) => Frontiers {
   return (doc, frontier, msg) => {
     // Create a shallow fork at the frontier
-    const workingDoc = shallowForkAt(doc, frontier, { preservePeerId: true })
+    const workingDoc = ext(doc).shallowForkAt(frontier, {
+      preservePeerId: true,
+    })
 
     // Capture frontier before handler execution
-    const beforeFrontier = loro(workingDoc).doc.frontiers()
+    const beforeFrontier = loro(workingDoc).frontiers()
 
     // Let handler read/write to the working doc
     handler(workingDoc, msg)
 
     // Get frontier after handler execution
-    const afterFrontier = loro(workingDoc).doc.frontiers()
+    const afterFrontier = loro(workingDoc).frontiers()
 
     // Merge changes back using diff-replay (creates LOCAL events)
-    const diff = loro(workingDoc).doc.diff(beforeFrontier, afterFrontier, false)
+    const diff = loro(workingDoc).diff(beforeFrontier, afterFrontier, false)
     if (diff.length > 0) {
-      replayDiff(loro(doc).doc, diff)
-      loro(doc).doc.commit()
+      replayDiff(loro(doc), diff)
+      loro(doc).commit()
     }
 
-    return loro(doc).doc.frontiers()
+    return loro(doc).frontiers()
   }
 }
 
@@ -103,7 +105,7 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply update using fork-and-merge on peer1
-    const frontier = loro(handle1.doc).doc.frontiers()
+    const frontier = loro(handle1.doc).frontiers()
     update(handle1.doc, frontier, { value: "hello from peer1" })
 
     // Wait for sync
@@ -118,7 +120,7 @@ describe("fork-and-merge synchronization", () => {
     // Create a standalone doc with UndoManager
     const doc = createTypedDoc(DocSchema)
     // Set mergeInterval to 0 to prevent undo steps from being merged
-    const undoManager = new UndoManager(loro(doc).doc, { mergeInterval: 0 })
+    const undoManager = new UndoManager(loro(doc), { mergeInterval: 0 })
 
     // Create the update function
     const update = createUpdate<TestDocSchema, { value: string }>(
@@ -131,7 +133,7 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply first update
-    let frontier = loro(doc).doc.frontiers()
+    let frontier = loro(doc).frontiers()
     frontier = update(doc, frontier, { value: "first" })
 
     // Verify the change was applied
@@ -173,7 +175,7 @@ describe("fork-and-merge synchronization", () => {
     const localUpdates: Uint8Array[] = []
 
     // Subscribe to local updates
-    loro(doc).doc.subscribeLocalUpdates(update => {
+    loro(doc).subscribeLocalUpdates(update => {
       localUpdates.push(update)
     })
 
@@ -187,7 +189,7 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply update using fork-and-merge
-    const frontier = loro(doc).doc.frontiers()
+    const frontier = loro(doc).frontiers()
     update(doc, frontier, { value: "test" })
 
     // Verify local updates were fired
@@ -227,7 +229,7 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply multiple updates on peer1
-    let frontier = loro(handle1.doc).doc.frontiers()
+    let frontier = loro(handle1.doc).frontiers()
     frontier = update(handle1.doc, frontier, { value: "update1" })
     frontier = update(handle1.doc, frontier, { value: "update2" })
     frontier = update(handle1.doc, frontier, { value: "update3" })
@@ -269,8 +271,8 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply updates concurrently from both peers
-    const frontier1 = loro(handle1.doc).doc.frontiers()
-    const frontier2 = loro(handle2.doc).doc.frontiers()
+    const frontier1 = loro(handle1.doc).frontiers()
+    const frontier2 = loro(handle2.doc).frontiers()
 
     update(handle1.doc, frontier1, { value: "from-peer1" })
     update(handle2.doc, frontier2, { value: "from-peer2" })

@@ -10,6 +10,7 @@ import {
   createPathBuilder,
   createTypedDoc,
   evaluatePath,
+  ext,
   hasWildcard,
   loro,
   type PathBuilder,
@@ -409,7 +410,7 @@ export class Handle<
    * ```
    */
   get loroDoc(): LoroDoc {
-    return loro(this._doc).doc
+    return loro(this._doc)
   }
 
   /**
@@ -419,14 +420,14 @@ export class Handle<
    * @returns true if the document uses mergeable storage
    */
   get isMergeable(): boolean {
-    return loro(this._doc).mergeable
+    return ext(this._doc).mergeable
   }
 
   /**
    * Convenience method: change a set of mutations in a single commit.
    */
   change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {
-    return this._doc.change(fn)
+    return ext(this._doc).change(fn)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -516,15 +517,13 @@ export class Handle<
     // A regular Listener takes 1 argument and has no second argument
     // A path selector function also takes 1 argument but MUST have a second argument (the listener)
     if (typeof listenerOrSelectorOrJsonpath === "function" && !pathListener) {
-      return loro(this._doc).doc.subscribe(
-        listenerOrSelectorOrJsonpath as Listener,
-      )
+      return loro(this._doc).subscribe(listenerOrSelectorOrJsonpath as Listener)
     }
 
     // Case 2: Raw JSONPath string (escape hatch)
     if (typeof listenerOrSelectorOrJsonpath === "string") {
       const jsonpath = listenerOrSelectorOrJsonpath
-      const loroDoc = loro(this._doc).doc
+      const loroDoc = loro(this._doc)
 
       if (!pathListener) {
         throw new Error("JSONPath subscription requires a listener callback")
@@ -574,7 +573,7 @@ export class Handle<
       listener(newValue, prev)
     }
 
-    return loro(this._doc).doc.subscribeJsonpath(jsonpath, wrappedCallback)
+    return loro(this._doc).subscribeJsonpath(jsonpath, wrappedCallback)
   }
 
   /**
@@ -590,7 +589,7 @@ export class Handle<
    * ```
    */
   jsonPath(path: string): unknown[] {
-    return loro(this._doc).doc.JSONPath(path)
+    return loro(this._doc).JSONPath(path)
   }
 
   // ═══════════════════════════════════════════════════════════════
