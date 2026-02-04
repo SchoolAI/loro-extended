@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Repo } from "../repo.js"
 import { Bridge, BridgeAdapter } from "./bridge-adapter.js"
@@ -39,7 +39,7 @@ describe("BridgeAdapter Integration Tests", () => {
     // Create a document in repo1
     const docId = "test-doc"
     const handle1 = repo1.get(docId, DocSchema)
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "value")
     })
 
@@ -109,7 +109,7 @@ describe("BridgeAdapter Integration Tests", () => {
     const docId = "test-doc-1"
     const handle1 = repo1.get(docId, DocSchema)
 
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "Hello from repo1")
       draft.count.increment(42)
     })
@@ -150,14 +150,14 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Repo1 creates and modifies document
     const handle1 = repo1.get(docId, DocSchema)
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "from-repo1")
     })
 
     // Repo2 gets the document and adds to it
     const handle2 = repo2.get(docId, DocSchema)
 
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.count.increment(100)
     })
 
@@ -202,17 +202,17 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle2 = repo2.get(docId, DocSchema)
 
     // Initialize with some shared state
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "initialized")
     })
 
     // Make concurrent modifications (without waiting for sync)
     // Both increment the counter - CRDT will merge them
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.count.increment(10)
     })
 
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.count.increment(20)
     })
 
@@ -251,9 +251,9 @@ describe("BridgeAdapter Integration Tests", () => {
     const handle1B = repo1.get("doc-b", DocSchema)
     const handle1C = repo1.get("doc-c", DocSchema)
 
-    handle1A.change(draft => draft.title.insert(0, "a"))
-    handle1B.change(draft => draft.title.insert(0, "b"))
-    handle1C.change(draft => draft.title.insert(0, "c"))
+    change(handle1A.doc, draft => draft.title.insert(0, "a"))
+    change(handle1B.doc, draft => draft.title.insert(0, "b"))
+    change(handle1C.doc, draft => draft.title.insert(0, "c"))
 
     // Access the same documents in repo2
     const handle2A = repo2.get("doc-a", DocSchema)
@@ -344,7 +344,7 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Repo1 creates the document
     const handle1 = repo1.get(docId, DocSchema)
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "repo1")
     })
 
@@ -361,7 +361,7 @@ describe("BridgeAdapter Integration Tests", () => {
     expect(handle3.doc.toJSON().title).toBe("repo1")
 
     // Repo2 makes a change
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.count.increment(200)
     })
 

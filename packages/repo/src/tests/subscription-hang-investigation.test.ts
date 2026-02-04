@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { EphemeralStore } from "loro-crdt"
 import { afterEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
@@ -171,7 +171,7 @@ describe("Subscription Hang Investigation", () => {
       const _handle2 = repo2.get("doc-1", DocSchema)
 
       // Modify document - this uses the existing sync mechanism
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "Hello")
       })
 

@@ -1,10 +1,5 @@
 import { getLogger, type Logger } from "@logtape/logtape"
-import type {
-  DocShape,
-  Infer,
-  Mutable,
-  ValueShape,
-} from "@loro-extended/change"
+import type { DocShape, Infer, ValueShape } from "@loro-extended/change"
 import {
   compileToJsonPath,
   createPathBuilder,
@@ -421,13 +416,6 @@ export class Handle<
    */
   get isMergeable(): boolean {
     return ext(this._doc).mergeable
-  }
-
-  /**
-   * Convenience method: change a set of mutations in a single commit.
-   */
-  change(fn: (draft: Mutable<D>) => void): TypedDoc<D> {
-    return ext(this._doc).change(fn)
   }
 
   // ═══════════════════════════════════════════════════════════════

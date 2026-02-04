@@ -5,7 +5,7 @@
  * in real-world scenarios with actual repos and document sync.
  */
 
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import {
@@ -68,7 +68,7 @@ describe("Rate Limiter Integration", () => {
 
       // Create document and make initial change
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -81,7 +81,7 @@ describe("Rate Limiter Integration", () => {
 
       // Now make rapid changes - these channel/update messages will be rate limited
       for (let i = 0; i < 10; i++) {
-        handle1.change(draft => {
+        change(handle1.doc, draft => {
           draft.count.increment(1)
         })
         await vi.advanceTimersByTimeAsync(10) // Small delay between changes
@@ -94,7 +94,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(1000)
 
       // Make one more change to trigger sync
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.count.increment(1)
       })
 
@@ -140,7 +140,7 @@ describe("Rate Limiter Integration", () => {
       })
 
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "initial content")
       })
 
@@ -209,7 +209,7 @@ describe("Rate Limiter Integration", () => {
 
       // Create document and make changes
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -277,7 +277,7 @@ describe("Rate Limiter Integration", () => {
 
       // Make 10 rapid changes
       for (let i = 0; i < 10; i++) {
-        handle1.change(draft => {
+        change(handle1.doc, draft => {
           draft.count.increment(1)
         })
       }
@@ -339,7 +339,7 @@ describe("Rate Limiter Integration", () => {
 
       // Create document in repo2 and make changes
       const handle2 = repo2.get("test-doc", DocSchema)
-      handle2.change(draft => {
+      change(handle2.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -347,7 +347,7 @@ describe("Rate Limiter Integration", () => {
 
       // Make more changes
       for (let i = 0; i < 5; i++) {
-        handle2.change(draft => {
+        change(handle2.doc, draft => {
           draft.count.increment(1)
         })
       }

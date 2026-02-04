@@ -1,4 +1,4 @@
-import { loro, Shape } from "@loro-extended/change"
+import { change, loro, Shape } from "@loro-extended/change"
 import { beforeEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
 import { Handle } from "./handle.js"
@@ -58,7 +58,7 @@ describe("Repo", () => {
       const handle = repo.get("test-doc", TestDocSchema)
 
       // Change using typed API
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.root.text.insert(0, "hello")
       })
 
@@ -142,7 +142,7 @@ describe("Repo", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const handleA = repoA.get("test-doc", TestDocSchema)
-      handleA.change(draft => {
+      change(handleA.doc, draft => {
         draft.root.text.insert(0, "hello")
       })
 

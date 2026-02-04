@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { EphemeralStore } from "loro-crdt"
 import { afterEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
@@ -150,7 +150,7 @@ describe("Namespaced Store Sync Investigation", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Modify document
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "Hello")
       })
 

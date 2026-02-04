@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
@@ -34,7 +34,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // Create doc on repoA
     const docId = crypto.randomUUID()
     const handleA = repoA.get(docId, DocSchema)
-    handleA.change(draft => {
+    change(handleA.doc, draft => {
       draft.title.insert(0, "secret")
     })
 

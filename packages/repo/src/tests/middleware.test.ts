@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import type { Middleware, MiddlewareContext } from "../middleware.js"
@@ -40,7 +40,7 @@ describe("Middleware", () => {
 
       // Create a document and wait for sync
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -81,7 +81,7 @@ describe("Middleware", () => {
 
       // Create a document in repo1
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -116,7 +116,7 @@ describe("Middleware", () => {
 
       // Create document in repo1 first
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -173,7 +173,7 @@ describe("Middleware", () => {
 
       // Create document with content
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello world this is some content")
       })
 
@@ -230,7 +230,7 @@ describe("Middleware", () => {
 
       // Create document with content that will exceed size limit
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(
           0,
           "this is a long string that should exceed the size limit",
@@ -292,7 +292,7 @@ describe("Middleware", () => {
 
       // Create a document
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 

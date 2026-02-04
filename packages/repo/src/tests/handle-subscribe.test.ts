@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { describe, expect, it, vi } from "vitest"
 import { Repo } from "../repo.js"
 
@@ -38,7 +38,7 @@ describe("Handle.subscribe", () => {
       const unsubscribe = handle.subscribe(listener)
 
       // Make a change
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
@@ -51,7 +51,7 @@ describe("Handle.subscribe", () => {
       unsubscribe()
       listener.mockClear()
 
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "light"
       })
 
@@ -75,7 +75,7 @@ describe("Handle.subscribe", () => {
       const unsubscribe = handle.subscribe(p => p.config.theme, listener)
 
       // Make a change to the matching path
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
@@ -104,12 +104,12 @@ describe("Handle.subscribe", () => {
       )
 
       // First change
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
       // Second change
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "light"
       })
 
@@ -139,7 +139,7 @@ describe("Handle.subscribe", () => {
       )
 
       // Add a book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "New Book",
           price: 15,
@@ -151,7 +151,7 @@ describe("Handle.subscribe", () => {
       expect(receivedTitles).toEqual(["New Book"])
 
       // Add another book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "Another Book",
           price: 25,
@@ -175,7 +175,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -197,7 +197,7 @@ describe("Handle.subscribe", () => {
       )
 
       // Modify the first book's title using the LoroText API
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const book = draft.books.get(0)
         if (book) {
           book.title.delete(0, book.title.length)
@@ -220,7 +220,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -255,7 +255,7 @@ describe("Handle.subscribe", () => {
       )
 
       // Modify the first book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const firstBook = draft.books.get(0)
         if (firstBook) {
           firstBook.title.delete(0, firstBook.title.length)
@@ -266,7 +266,7 @@ describe("Handle.subscribe", () => {
       expect(firstTitle).toBe("Updated First")
 
       // Modify the last book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const lastBook = draft.books.get(2)
         if (lastBook) {
           lastBook.title.delete(0, lastBook.title.length)
@@ -290,7 +290,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data using the correct API
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.users.set("alice", { name: "Alice", score: 0 })
         draft.users.set("bob", { name: "Bob", score: 0 })
       })
@@ -304,7 +304,7 @@ describe("Handle.subscribe", () => {
       )
 
       // Modify Alice's name
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const alice = draft.users.get("alice")
         if (alice) {
           alice.name = "Alice Smith"
@@ -326,7 +326,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.users.set("alice", { name: "Alice", score: 0 })
         draft.users.set("bob", { name: "Bob", score: 0 })
       })
@@ -340,7 +340,7 @@ describe("Handle.subscribe", () => {
       )
 
       // Add a new user
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.users.set("charlie", { name: "Charlie", score: 0 })
       })
 
@@ -361,7 +361,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({ title: "Book 1", price: 10, description: "Desc 1" })
         draft.books.push({ title: "Book 2", price: 20, description: "Desc 2" })
       })
@@ -374,7 +374,7 @@ describe("Handle.subscribe", () => {
 
       // Modify a book's description (not title) - this should NOT trigger the callback
       // because the titles haven't changed
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const book = draft.books.get(0)
         if (book) {
           book.description = "Updated description"
@@ -386,7 +386,7 @@ describe("Handle.subscribe", () => {
       expect(listener).not.toHaveBeenCalled()
 
       // Now modify a title - this SHOULD trigger the callback
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const book = draft.books.get(0)
         if (book) {
           book.title.delete(0, book.title.length)
@@ -417,7 +417,7 @@ describe("Handle.subscribe", () => {
       const unsubscribe = handle.subscribe("$.config.theme", listener)
 
       // Make a change to the matching path
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
@@ -443,14 +443,14 @@ describe("Handle.subscribe", () => {
       })
 
       // Make a change to the matching path
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
       expect(receivedValue).toEqual(["dark"])
 
       // Make another change
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "light"
       })
 
@@ -498,7 +498,7 @@ describe("Handle.subscribe", () => {
       unsubscribe()
 
       // Make a change
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.config.theme = "dark"
       })
 
@@ -523,7 +523,7 @@ describe("Handle.subscribe", () => {
       })
 
       // Add a book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({ title: "New Book", price: 15, description: "New" })
       })
 
@@ -531,7 +531,7 @@ describe("Handle.subscribe", () => {
       expect(receivedPrices).toEqual([15])
 
       // Add another book
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "Another Book",
           price: 25,
@@ -633,7 +633,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({ title: "Book 1", price: 10, description: "Cheap" })
         draft.books.push({
           title: "Book 2",
@@ -660,7 +660,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data with multiple books
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -704,7 +704,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Set up initial data
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -723,7 +723,7 @@ describe("Handle.subscribe", () => {
       })
 
       // Modify the last book's price
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const book = draft.books.get(1)
         if (book) {
           book.price = 25
@@ -733,7 +733,7 @@ describe("Handle.subscribe", () => {
       expect(lastPrice).toEqual([25])
 
       // Add a third book - now it becomes the last
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({
           title: "Third Book",
           price: 30,
@@ -756,7 +756,7 @@ describe("Handle.subscribe", () => {
       const handle = repo.get("doc-1", docShape)
 
       // Add one item
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.books.push({ title: "Only Book", price: 10, description: "Only" })
       })
 

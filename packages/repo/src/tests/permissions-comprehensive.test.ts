@@ -6,7 +6,7 @@
  * 2. When permission returns `false`, the action is BLOCKED
  */
 
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
@@ -36,7 +36,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Create a document in repo1
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -62,7 +62,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Create a document in repo1
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -103,7 +103,7 @@ describe("Permissions - Comprehensive Tests", () => {
       await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
-      handle2.change(draft => {
+      change(handle2.doc, draft => {
         draft.title.insert(0, "hello from repo2")
       })
 
@@ -129,7 +129,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Create document in repo1 with initial content
       const handle1 = repo1.get("test-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "original")
       })
 
@@ -140,7 +140,7 @@ describe("Permissions - Comprehensive Tests", () => {
       await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
-      handle2.change(draft => {
+      change(handle2.doc, draft => {
         draft.title.delete(0, draft.title.length)
         draft.title.insert(0, "modified by repo2")
       })
@@ -217,7 +217,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Create document in repo1
       const handle1 = repo1.get("doc-to-delete", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "will be deleted")
       })
 
@@ -252,7 +252,7 @@ describe("Permissions - Comprehensive Tests", () => {
 
       // Create document in repo1
       const handle1 = repo1.get("doc-to-delete", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "should not be deleted")
       })
 

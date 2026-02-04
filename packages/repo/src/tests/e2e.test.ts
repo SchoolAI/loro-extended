@@ -1,4 +1,4 @@
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
@@ -45,7 +45,7 @@ describe("Repo E2E", () => {
     expect(handle1.doc).toBeDefined()
 
     // Mutate the document using typed API
-    handle1.change(draft => {
+    change(handle1.doc, draft => {
       draft.title.insert(0, "hello")
     })
     expect(handle1.doc.toJSON().title).toBe("hello")
@@ -57,7 +57,7 @@ describe("Repo E2E", () => {
     expect(handle2.doc.toJSON().title).toBe("hello")
 
     // Mutate the document from repo 2
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.title.insert(5, " world")
     })
     expect(handle2.doc.toJSON().title).toBe("hello world")
@@ -92,7 +92,7 @@ describe("Repo E2E", () => {
     await handle2.waitForSync({ timeout: 0 })
 
     // A change from a permitted peer should be applied
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.title.insert(0, "hello")
     })
 
@@ -102,7 +102,7 @@ describe("Repo E2E", () => {
 
     // A change from a non-permitted peer should not be applied
     repo1CanWrite = false
-    handle2.change(draft => {
+    change(handle2.doc, draft => {
       draft.title.insert(5, " world")
     })
 
@@ -208,7 +208,7 @@ describe("Repo E2E", () => {
       })
 
       const handleA = repoA.get(crypto.randomUUID(), DocSchema)
-      handleA.change(draft => {
+      change(handleA.doc, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -233,17 +233,17 @@ describe("Repo E2E", () => {
 
       // Create documents and make changes BEFORE repoB connects
       const handle1 = repoA.get("allowed-doc-1", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "1")
       })
 
       const handle2 = repoA.get("denied-doc-1", DocSchema)
-      handle2.change(draft => {
+      change(handle2.doc, draft => {
         draft.title.insert(0, "2")
       })
 
       const handle3 = repoA.get("allowed-doc-2", DocSchema)
-      handle3.change(draft => {
+      change(handle3.doc, draft => {
         draft.title.insert(0, "3")
       })
 
@@ -279,7 +279,7 @@ describe("Repo E2E", () => {
       const handle1 = repo1.get(documentId, StorageDocSchema)
 
       // Add some content
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.data.title = "My Document"
         draft.data.content = "This should persist"
         draft.data.count = 42
@@ -330,7 +330,7 @@ describe("Repo E2E", () => {
       const documentId = "incremental-doc"
       const handle1 = repo1.get(documentId, DocSchema)
 
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "item1,item2")
         draft.count.increment(2)
       })
@@ -355,7 +355,7 @@ describe("Repo E2E", () => {
       expect(handle2.doc.toJSON().count).toBe(2)
 
       // Make additional changes
-      handle2.change(draft => {
+      change(handle2.doc, draft => {
         draft.title.insert(draft.title.toString().length, ",item3")
         draft.count.increment(1)
       })
@@ -397,7 +397,7 @@ describe("Repo E2E", () => {
       const documentId = "counter"
       const handle1 = repo1.get(documentId, DocSchema)
 
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.count.increment(42)
       })
 
@@ -452,7 +452,7 @@ describe("Repo E2E", () => {
       const documentId = "counter"
       const handle1 = repo1.get(documentId, DocSchema)
 
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.count.increment(42)
       })
 

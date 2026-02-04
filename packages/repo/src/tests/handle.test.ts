@@ -1,4 +1,4 @@
-import { loro, Shape } from "@loro-extended/change"
+import { change, loro, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
@@ -43,7 +43,7 @@ describe("Handle", () => {
       expect(loro(handle.doc)).toBeDefined()
 
       // Can use typed mutations
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.title.insert(0, "Hello")
         draft.count.increment(5)
       })

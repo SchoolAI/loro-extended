@@ -14,7 +14,7 @@
  * ```
  */
 
-import { Shape } from "@loro-extended/change"
+import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DelayedNetworkAdapter } from "../adapter/delayed-network-adapter.js"
 import { NoAdaptersError, SyncTimeoutError } from "../handle.js"
@@ -42,7 +42,7 @@ describe("waitForSync", () => {
         identity: { name: "server", type: "service" },
       })
       const serverHandle = serverRepo.get("test-doc", DocSchema)
-      serverHandle.change(draft => {
+      change(serverHandle.doc, draft => {
         draft.title.insert(0, "Server Data")
         draft.count.increment(42)
       })
@@ -138,7 +138,7 @@ describe("waitForSync", () => {
         identity: { name: "server", type: "service" },
       })
       const serverHandle = serverRepo.get("existing-doc", DocSchema)
-      serverHandle.change(draft => {
+      change(serverHandle.doc, draft => {
         draft.title.insert(0, "Existing Title")
       })
       const serverSnapshot = serverHandle.loroDoc.export({ mode: "snapshot" })
@@ -160,7 +160,7 @@ describe("waitForSync", () => {
         // Only initialize if the document is empty AFTER network sync
         if (clientHandle.loroDoc.opCount() === 0) {
           initializationRan = true
-          clientHandle.change(draft => {
+          change(clientHandle.doc, draft => {
             draft.title.insert(0, "Default Title")
           })
         }
@@ -207,7 +207,7 @@ describe("waitForSync", () => {
         // Only initialize if the document is empty AFTER network sync
         if (clientHandle.loroDoc.opCount() === 0) {
           initializationRan = true
-          clientHandle.change(draft => {
+          change(clientHandle.doc, draft => {
             draft.title.insert(0, "Default Title")
           })
         }
@@ -447,7 +447,7 @@ describe("waitForSync", () => {
       })
 
       const handle1 = repo1.get("existing-doc", DocSchema)
-      handle1.change(draft => {
+      change(handle1.doc, draft => {
         draft.title.insert(0, "Stored Data")
         draft.count.increment(100)
       })
@@ -491,7 +491,7 @@ describe("waitForSync", () => {
 
       // Storage confirmed it doesn't have the document, safe to initialize
       if (handle.loroDoc.opCount() === 0) {
-        handle.change(draft => {
+        change(handle.doc, draft => {
           draft.title.insert(0, "Default Title")
           draft.count.increment(1)
         })
