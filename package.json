@@ -2,19 +2,21 @@
   "name": "loro-extended",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@10.9.0",
   "description": "Extended capabilities for the Loro CRDT library",
   "keywords": [],
   "author": "Duane Johnson",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm -r build",
-    "build:all": "pnpm -r build && pnpm -r build:all",
-    "verify": "pnpm -r --parallel verify"
+    "build": "turbo run build",
+    "build:all": "turbo run build --force",
+    "verify": "turbo run verify"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.7",
     "@changesets/cli": "^2.29.7",
-    "@halecraft/verify": "^1.2.0"
+    "@halecraft/verify": "^1.2.0",
+    "turbo": "2.8.3"
   },
   "pnpm": {
     "overrides": {

@@ -8,3 +8,4 @@ playwright-report
 test-results
 *.jsonl
 .env
+.turbo
