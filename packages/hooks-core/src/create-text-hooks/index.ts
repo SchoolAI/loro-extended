@@ -1,6 +1,6 @@
-import type { LoroTextRef, TextRef } from "@loro-extended/change"
-import { getLoroDoc, loro } from "@loro-extended/change"
-import type { Delta, LoroEventBatch, TextDiff } from "loro-crdt"
+import type { TextRef } from "@loro-extended/change"
+import { ext, loro } from "@loro-extended/change"
+import type { Delta, LoroEventBatch, LoroText, TextDiff } from "loro-crdt"
 import type { CursorRegistry } from "../cursor-registry"
 import type { FrameworkHooks } from "../types"
 import { NAMESPACE_ORIGIN_PREFIX } from "../undo-manager-registry"
@@ -137,12 +137,12 @@ export function createTextHooks(
       validateNamespaceSafe(undoNamespace)
     }
 
-    // Memoize the loro namespace to prevent recreation on every render
+    // Memoize the loro container to prevent recreation on every render
     // This is critical for subscription stability
-    const loroRef = useMemo(() => loro(textRef) as LoroTextRef, [textRef])
+    const loroRef = useMemo(() => loro(textRef) as LoroText, [textRef])
 
     // Get the LoroDoc for setting commit origin
-    const loroDoc = useMemo(() => getLoroDoc(textRef), [textRef])
+    const loroDoc = useMemo(() => ext(textRef).doc, [textRef])
 
     // Helper to set the commit origin before changes when namespace is specified
     const setNamespaceOrigin = useCallback(() => {

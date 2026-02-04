@@ -96,7 +96,7 @@ describe("CursorRegistry integration with undo", () => {
 describe("UndoManagerRegistry integration with cursor callbacks", () => {
   it("passes onPush and onPop callbacks to UndoManager", () => {
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = loro(typedDoc).doc
+    const loroDoc = loro(typedDoc)
     const undoManagerRegistry = new UndoManagerRegistry(loroDoc)
 
     const onPush = vi.fn().mockReturnValue({ value: null, cursors: [] })
@@ -123,7 +123,7 @@ describe("UndoManagerRegistry integration with cursor callbacks", () => {
 
   it("stores custom value in onPush for cursor restoration", () => {
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = loro(typedDoc).doc
+    const loroDoc = loro(typedDoc)
     const undoManagerRegistry = new UndoManagerRegistry(loroDoc)
 
     let storedValue: unknown = null
@@ -158,16 +158,14 @@ describe("UndoManagerRegistry integration with cursor callbacks", () => {
 
   it("creates Loro cursor for position tracking", () => {
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = loro(typedDoc).doc
+    const loroDoc = loro(typedDoc)
 
     // Insert some text first
     typedDoc.title.insert(0, "Hello World")
     loroDoc.commit()
 
     // Get the LoroText container
-    const loroText = loroDoc.getText(
-      loro(typedDoc.title).container.id.toString(),
-    )
+    const loroText = loroDoc.getText(loro(typedDoc.title).id.toString())
 
     // Create a cursor at position 5 (after "Hello")
     const cursor = loroText.getCursor(5, 0)
@@ -189,7 +187,7 @@ describe("UndoManagerRegistry integration with cursor callbacks", () => {
 describe("Namespace-based undo isolation", () => {
   it("isolates undo stacks by namespace", () => {
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = loro(typedDoc).doc
+    const loroDoc = loro(typedDoc)
     const undoManagerRegistry = new UndoManagerRegistry(loroDoc)
 
     // Create managers for different namespaces

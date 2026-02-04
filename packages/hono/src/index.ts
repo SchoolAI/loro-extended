@@ -5,7 +5,7 @@ export type {
   Mutable,
   TextRef,
 } from "@loro-extended/change"
-export { change, getLoroDoc, Shape } from "@loro-extended/change"
+export { change, ext, loro, Shape } from "@loro-extended/change"
 // Re-export hook types from @loro-extended/hooks-core
 export type {
   UseCollaborativeTextOptions,

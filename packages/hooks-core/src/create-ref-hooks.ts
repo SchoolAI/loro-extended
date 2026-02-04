@@ -1,9 +1,6 @@
-import type {
-  AnyContainerShape,
-  ContainerShape,
-  LoroRefBase,
-} from "@loro-extended/change"
+import type { AnyContainerShape, ContainerShape } from "@loro-extended/change"
 import { loro } from "@loro-extended/change"
+import type { Container } from "loro-crdt"
 import type { FrameworkHooks } from "./types"
 import { createSyncStore } from "./utils/create-sync-store"
 import {
@@ -90,12 +87,12 @@ export function createRefHooks(framework: FrameworkHooks) {
    * ```
    */
   function useRefValue<R extends AnyTypedRef>(ref: R): UseRefValueReturn<R> {
-    // Get the loro namespace for subscription
-    // The loro() function accepts any TypedRef and returns a LoroRefBase
+    // Get the loro container for subscription
+    // The loro() function accepts any TypedRef and returns the native container
     // We use a type assertion here because AnyTypedRef is a union type
     // that loro() can handle, but TypeScript can't infer this
     const loroRef = useMemo(
-      () => loro(ref as Parameters<typeof loro>[0]) as LoroRefBase,
+      () => loro(ref as Parameters<typeof loro>[0]) as Container,
       [ref],
     )
 

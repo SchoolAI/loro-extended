@@ -14,5 +14,5 @@ import { loro } from "@loro-extended/change"
  * @returns The container ID as a string
  */
 export function getContainerIdFromTextRef(textRef: TextRef): string {
-  return loro(textRef).container.id.toString()
+  return loro(textRef).id.toString()
 }

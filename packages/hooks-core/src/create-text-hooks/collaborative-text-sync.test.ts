@@ -9,7 +9,7 @@
  * - Namespace origin tagging
  */
 
-import { createTypedDoc, getLoroDoc, loro, Shape } from "@loro-extended/change"
+import { createTypedDoc, ext, loro, Shape } from "@loro-extended/change"
 import type { LoroEventBatch } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { CursorRegistry } from "../cursor-registry"
@@ -267,7 +267,7 @@ describe("Collaborative Text Synchronization", () => {
        * be skipped. This allows undo/redo events to update the textarea.
        */
       const typedDoc = createTypedDoc(TestSchema)
-      const loroDoc = loro(typedDoc).doc
+      const loroDoc = loro(typedDoc)
 
       const { UndoManager } = await import("loro-crdt")
       const undoManager = new UndoManager(loroDoc, { mergeInterval: 0 })
@@ -321,7 +321,7 @@ describe("Collaborative Text Synchronization", () => {
        * actual user input) instead of checking event.by.
        */
       const typedDoc = createTypedDoc(TestSchema)
-      const loroDoc = loro(typedDoc).doc
+      const loroDoc = loro(typedDoc)
 
       const { UndoManager } = await import("loro-crdt")
       const undoManager = new UndoManager(loroDoc, { mergeInterval: 0 })
@@ -506,7 +506,7 @@ describe("Namespace origin tagging", () => {
     const { useCollaborativeText } = createTextHooks(framework)
 
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = getLoroDoc(typedDoc.content)
+    const loroDoc = ext(typedDoc.content).doc
 
     // Spy on setNextCommitOrigin
     const setNextCommitOriginSpy = vi.spyOn(loroDoc, "setNextCommitOrigin")
@@ -538,7 +538,7 @@ describe("Namespace origin tagging", () => {
     const { useCollaborativeText } = createTextHooks(framework)
 
     const typedDoc = createTypedDoc(TestSchema)
-    const loroDoc = getLoroDoc(typedDoc.content)
+    const loroDoc = ext(typedDoc.content).doc
 
     // Spy on setNextCommitOrigin
     const setNextCommitOriginSpy = vi.spyOn(loroDoc, "setNextCommitOrigin")

@@ -3,7 +3,8 @@ import {
   CursorRegistry,
   CursorRegistryContext,
   change,
-  getLoroDoc,
+  ext,
+  loro,
   RepoContext,
   RepoProvider,
   Shape,
@@ -85,8 +86,10 @@ describe("@loro-extended/react exports", () => {
     expect(typeof change).toBe("function")
   })
 
-  it("exports getLoroDoc from @loro-extended/change", () => {
-    expect(getLoroDoc).toBeDefined()
-    expect(typeof getLoroDoc).toBe("function")
+  it("exports loro and ext from @loro-extended/change", () => {
+    expect(loro).toBeDefined()
+    expect(typeof loro).toBe("function")
+    expect(ext).toBeDefined()
+    expect(typeof ext).toBe("function")
   })
 })

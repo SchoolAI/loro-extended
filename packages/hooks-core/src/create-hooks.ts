@@ -205,7 +205,7 @@ export function createHooks(framework: FrameworkHooks) {
 
     const store = useMemo(() => {
       const computeValue = (): { version: string; value: R | Infer<D> } => {
-        const newVersion = getVersionKey(loro(lens.worldview).doc)
+        const newVersion = getVersionKey(loro(lens.worldview))
 
         if (cacheRef.current && cacheRef.current.version === newVersion) {
           return cacheRef.current
@@ -219,7 +219,7 @@ export function createHooks(framework: FrameworkHooks) {
       }
 
       const subscribeToSource = (onChange: () => void) => {
-        return loro(lens.worldview).doc.subscribe(() => {
+        return loro(lens.worldview).subscribe(() => {
           onChange()
         })
       }

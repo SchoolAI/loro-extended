@@ -22,7 +22,7 @@ export function isTextRef(ref: unknown): ref is TextRef {
  * even if textRef.toString() would return a placeholder.
  */
 export function getRawTextValue(textRef: TextRef): string {
-  return loro(textRef).container.getShallowValue()
+  return loro(textRef).getShallowValue()
 }
 
 /**
