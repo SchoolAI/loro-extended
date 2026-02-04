@@ -542,8 +542,36 @@ For lightweight runtimes, the World/Worldview pattern can be implemented directl
 
 This yields a minimal imperative shell:
 
-1. Subscribe to `lens.doc` changes
+1. Subscribe to `lens.worldview` changes
 2. Build `{ before, after }` via `getTransition()`
-3. Invoke reactors with `lens.change()` as the write path
+3. Invoke reactors with `change(lens, fn, options?)` as the write path
 
 Role-specific filters should be isolated (e.g., server vs client) with shared helpers to prevent policy drift. Tests should assert that client filters enforce player sovereignty and server filters enforce authoritative fields.
+
+### Unified `change()` API
+
+The `change()` function from `@loro-extended/change` is the unified mutation API for all changeable types:
+
+```typescript
+import { change } from "@loro-extended/change"
+
+// TypedDoc
+change(doc, draft => draft.counter.increment(1))
+
+// TypedRef
+change(ref, draft => draft.push({ name: "item" }))
+
+// Lens (with commit message for identity-based filtering)
+change(lens, draft => draft.counter.increment(1), { commitMessage: { userId: "alice" } })
+```
+
+**ChangeOptions**: The optional third parameter supports:
+- `commitMessage?: string | object` - Attached to the commit for identity-based filtering
+
+**Detection mechanism**: The `change()` function detects Lens (and any future changeable types) via `[EXT_SYMBOL].change()`. This allows packages to implement the changeable protocol without circular dependencies.
+
+**Re-exports**: For convenience, `@loro-extended/lens` re-exports `change` and `ChangeOptions` from `@loro-extended/change`, enabling single-import usage:
+
+```typescript
+import { createLens, change } from "@loro-extended/lens"
+```

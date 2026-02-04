@@ -1,3 +1,4 @@
+- When making a plan, be sure to read TECHNICAL.md files in related paths or ancestor paths
 - To run all verifications including tests, use `pnpm turbo run verify`.
 - Builds are cached by Turborepo. Only packages with changed source code (or dependencies) will rebuild. To force a full rebuild, use `pnpm build:all`.
 - Running `pnpm turbo run verify` or `pnpm turbo run verify --filter=<pkg>` automatically builds workspace dependencies first.

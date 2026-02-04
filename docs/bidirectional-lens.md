@@ -1,5 +1,7 @@
 # Learnings: Implementing Lens in Repo
 
+> **Note**: As of the unified `change()` API update, `lens.change()` has been removed. Use `change(lens, fn, options?)` instead. See the "Unified change() API" section below.
+
 ## Architecture Summary
 
 ### Bidirectional Flow Between World and Worldview
@@ -331,4 +333,45 @@ This stores all containers at the document root with path-based names (e.g., `pl
 2. **Worldview → World uses applyDiff**: State-based, not op-based
 3. **World → Worldview uses filtered import**: Op-based, but filtered at commit level
 
-This architecture is ready for implementation in Repo's Lens class. Should I switch to Code mode to begin the implementation?
+## Unified `change()` API
+
+The Lens implementation uses the unified `change()` function from `@loro-extended/change` instead of a method on the Lens object. This provides a consistent API across all changeable types (TypedDoc, TypedRef, Lens).
+
+### Usage
+
+```typescript
+import { createLens, change } from "@loro-extended/lens"
+// Or: import { change } from "@loro-extended/change"
+
+const lens = createLens(world, { filter: myFilter })
+
+// Write through the lens with optional commit message
+change(lens, draft => {
+  draft.counter.increment(5)
+}, { commitMessage: { userId: "alice" } })
+```
+
+### Implementation
+
+The Lens exposes `[EXT_SYMBOL].change()` which the unified `change()` function detects:
+
+```typescript
+// In lens.ts
+return {
+  worldview,
+  world,
+  dispose,
+  [EXT_SYMBOL]: {
+    change: processLocalChange,
+  },
+}
+```
+
+The `change()` function in `@loro-extended/change` uses type inference to extract the draft type from the `[EXT_SYMBOL].change` signature, providing full type safety without circular dependencies.
+
+### Benefits
+
+1. **Consistent API**: Same `change(target, fn, options?)` pattern for docs, refs, and lenses
+2. **No circular dependencies**: Lens doesn't need to import from change, change doesn't need to import Lens type
+3. **Type-safe**: Draft type is inferred from the Lens's `[EXT_SYMBOL].change` signature
+4. **Single import**: `@loro-extended/lens` re-exports `change` for convenience
