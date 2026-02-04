@@ -588,7 +588,7 @@ State is derived from the document at a specific frontier:
 ```typescript
 function state<Schema>(doc: TypedDoc<Schema>, frontier: Frontiers): State {
   // Fork the document at the frontier to get a read-only snapshot
-  const snapshot = doc.forkAt(frontier);
+  const snapshot = ext(doc).forkAt(frontier);
   return snapshot.toJSON();
 }
 ```
@@ -683,28 +683,28 @@ function createRuntime<Schema, Msg>(program: Program<Schema, Msg>) {
   const { doc, update, reactors, done } = program;
 
   let isRunning = true;
-  let previousFrontier = doc.frontiers();
+  let previousFrontier = loro(doc).frontiers();
 
   // Dispatch applies the update and lets the subscription handle reactors
   function dispatch(msg: Msg): void {
     if (!isRunning) return;
-    update(doc.frontiers(), msg); // Runtime binds doc internally
+    update(loro(doc).frontiers(), msg); // Runtime binds doc internally
   }
 
   // Subscribe to document changes - the SINGLE path for reactor invocation
-  const unsubscribe = doc.subscribe((event) => {
+  const unsubscribe = ext(doc).subscribe((event) => {
     if (!isRunning) return;
 
     // Skip checkout events (time travel doesn't trigger reactors)
     if (event.by === "checkout") {
-      previousFrontier = doc.frontiers();
+      previousFrontier = loro(doc).frontiers();
       return;
     }
 
     // Create snapshots at before/after frontiers
-    const before = doc.forkAt(previousFrontier);
-    const after = doc.forkAt(doc.frontiers());
-    previousFrontier = doc.frontiers();
+    const before = ext(doc).forkAt(previousFrontier);
+    const after = ext(doc).forkAt(loro(doc).frontiers());
+    previousFrontier = loro(doc).frontiers();
 
     // Invoke all reactors with the transition
     for (const reactor of reactors) {
@@ -725,7 +725,7 @@ function createRuntime<Schema, Msg>(program: Program<Schema, Msg>) {
       if (isRunning) {
         isRunning = false;
         unsubscribe();
-        done?.(doc.frontiers());
+        done?.(loro(doc).frontiers());
       }
     },
   };
@@ -896,7 +896,7 @@ describe("state derivation", () => {
     change(doc, (draft) => {
       draft.game = { status: "choosing", players: {}, result: null };
     });
-    const frontier = doc.frontiers();
+    const frontier = loro(doc).frontiers();
 
     const result = state(doc, frontier);
 
@@ -916,7 +916,7 @@ describe("clientUpdate", () => {
       d.game = { status: "choosing", players: {}, result: null };
     });
 
-    clientUpdate(doc, doc.frontiers(), {
+    clientUpdate(doc, loro(doc).frontiers(), {
       type: "CONSIDERING",
       playerId: "alice",
       choice: "rock",
@@ -939,7 +939,7 @@ describe("clientUpdate", () => {
       };
     });
 
-    clientUpdate(doc, doc.frontiers(), { type: "LOCK_IN", playerId: "bob" });
+    clientUpdate(doc, loro(doc).frontiers(), { type: "LOCK_IN", playerId: "bob" });
 
     expect(doc.game.players["bob"].locked).toBe(true);
     expect(doc.game.status).toBe("choosing"); // Still choosing!
@@ -953,7 +953,7 @@ describe("serverUpdate", () => {
       d.game = { status: "choosing", players: {}, result: null };
     });
 
-    serverUpdate(doc, doc.frontiers(), { type: "BOTH_LOCKED" });
+    serverUpdate(doc, loro(doc).frontiers(), { type: "BOTH_LOCKED" });
 
     expect(doc.game.status).toBe("revealing");
   });
@@ -1029,10 +1029,10 @@ Store serialized messages as commit messages to understand _why_ the document is
 ```typescript
 function createDispatchWithHistory<Msg>(doc: TypedDoc, update: UpdateFn<Msg>) {
   return (msg: Msg) => {
-    const frontier = doc.frontiers();
+    const frontier = loro(doc).frontiers();
 
     // Store the message as the commit message
-    doc.setNextCommitMessage(
+    loro(doc).setNextCommitMessage(
       JSON.stringify({
         type: (msg as any).type,
         msg,
@@ -1059,14 +1059,14 @@ function previewChoice(
   playerId: string,
   choice: "rock" | "paper" | "scissors",
 ): GameState {
-  const frontier = doc.frontiers();
-  const forkedDoc = doc.forkAt(frontier);
+  const frontier = loro(doc).frontiers();
+  const forkedDoc = ext(doc).forkAt(frontier);
 
   // Apply the choice to the fork
   clientUpdate(forkedDoc, frontier, { type: "CONSIDERING", playerId, choice });
 
   // Return the resulting state (original doc unchanged)
-  return state(forkedDoc, forkedDoc.frontiers());
+  return state(forkedDoc, loro(forkedDoc).frontiers());
 }
 ```
 

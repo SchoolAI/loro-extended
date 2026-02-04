@@ -16,6 +16,50 @@ Loro's `commit()` is **idempotent** - calling it multiple times without changes 
 
 ## @loro-extended/change Architecture
 
+### Symbol-Based Escape Hatches
+
+The library uses well-known symbols to provide clean separation between different access patterns:
+
+| Symbol | Function | Purpose |
+|--------|----------|---------|
+| `INTERNAL_SYMBOL` | (internal) | Private implementation details |
+| `LORO_SYMBOL` | `loro()` | Access native Loro types directly |
+| `EXT_SYMBOL` | `ext()` | Access loro-extended-specific features |
+
+**Design Rationale**: TypedDoc and TypedRef are Proxy objects where property names map to schema fields. Symbols provide a clean namespace for library functionality without polluting the user's schema namespace.
+
+### The `loro()` and `ext()` Functions
+
+```typescript
+// loro() returns native Loro types directly
+const loroDoc: LoroDoc = loro(typedDoc)
+const loroText: LoroText = loro(textRef)
+const loroList: LoroList = loro(listRef)
+
+// ext() provides loro-extended-specific features
+ext(doc).change(fn)        // Mutate with auto-commit
+ext(doc).fork()            // Fork the document
+ext(doc).forkAt(frontiers) // Fork at specific version
+ext(doc).initialize()      // Write metadata
+ext(doc).mergeable         // Check if using flattened storage
+ext(doc).docShape          // Get the schema
+ext(doc).applyPatch(patch) // Apply JSON patch
+ext(doc).rawValue          // Get raw value without toJSON
+
+// For refs, ext() provides doc access
+ext(ref).doc               // Get LoroDoc from any ref
+ext(ref).change(fn)        // Mutate via the ref's doc
+ext(listRef).pushContainer(shape)    // Push nested container
+ext(structRef).setContainer(key, shape) // Set nested container
+```
+
+**Migration from old API**:
+- `loro(doc).doc` → `loro(doc)`
+- `loro(ref).container` → `loro(ref)`
+- `loro(ref).doc` → `ext(ref).doc`
+- `doc.change(fn)` → `change(doc, fn)`
+- `doc.forkAt(f)` → `ext(doc).forkAt(f)`
+
 ### Ref Internals Pattern
 
 All typed refs follow a **Facade + Internals** pattern:
@@ -437,8 +481,8 @@ const update = createUpdate<Schema, Msg>((doc, msg, timestamp) => {
 **Critical**: Forks get new peer IDs by default. You must copy the main doc's peer ID to the fork:
 
 ```typescript
-const workingDoc = doc.forkAt(frontier)
-loro(workingDoc).doc.setPeerId(loro(doc).doc.peerId)  // Required!
+const workingDoc = ext(doc).forkAt(frontier)
+loro(workingDoc).setPeerId(loro(doc).peerId)  // Required!
 ```
 
 Without this, each update creates operations from a different peer, causing the frontier to not advance correctly (each peer starts at counter 0).
@@ -450,7 +494,7 @@ See `examples/task-card/TECHNICAL.md` for the full implementation and `docs/lea.
 Browser back/forward navigation is conceptually equivalent to undo/redo of navigation operations. Instead of maintaining manual history stacks (`past`/`future` arrays), use Loro's UndoManager:
 
 ```typescript
-const undoManager = new UndoManager(loro(viewDoc).doc, {
+const undoManager = new UndoManager(loro(viewDoc), {
   maxUndoSteps: 100,
   mergeInterval: 0, // Each navigation is a separate step
 })

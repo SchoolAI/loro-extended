@@ -468,7 +468,7 @@ function AppShell() {
 ```typescript
 function useTimer(handle: Handle<typeof TimerSchema>) {
   const [timerState, setTimerState] = useState(() =>
-    state(handle.doc, handle.doc.frontiers()),
+    state(handle.doc, loro(handle.doc).frontiers()),
   );
   const runtimeRef = useRef<{
     dispatch: Dispatch<TimerMsg>;
