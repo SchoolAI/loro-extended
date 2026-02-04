@@ -1,6 +1,8 @@
 ---
 "@loro-extended/change": major
 "@loro-extended/repo": major
+"@loro-extended/react": major
+"@loro-extended/hooks-core": major
 ---
 
 # Breaking: Major API Simplification
