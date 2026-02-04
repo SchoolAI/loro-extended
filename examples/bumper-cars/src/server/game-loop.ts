@@ -1,3 +1,4 @@
+import { change } from "@loro-extended/change"
 import type { HandleWithEphemerals, PeerID } from "@loro-extended/repo"
 import {
   type ArenaSchema,
@@ -259,8 +260,8 @@ export class GameLoop {
    * Ensure a player has a score entry in the document
    */
   private ensurePlayerScore(peerId: PeerID, name: string, color: string): void {
-    // TypedDocHandle provides direct type-safe document mutations
-    this.handle.change(draft => {
+    // Use change() functional helper for type-safe document mutations
+    change(this.handle.doc, draft => {
       if (!draft.scores.has(peerId)) {
         // Use set() to create the entry with initial values
         // Counter starts at 0 by default
@@ -273,8 +274,8 @@ export class GameLoop {
    * Increment a player's bump score
    */
   private incrementScore(peerId: PeerID): void {
-    // TypedDocHandle provides direct type-safe document mutations
-    this.handle.change(draft => {
+    // Use change() functional helper for type-safe document mutations
+    change(this.handle.doc, draft => {
       const score = draft.scores.get(peerId)
       if (score) {
         score.bumps.increment(1)
