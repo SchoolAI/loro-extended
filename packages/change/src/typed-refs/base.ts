@@ -205,13 +205,6 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
       get doc(): LoroDoc {
         return self.params.getDoc()
       },
-      change<T>(_fn: (draft: T) => void): T {
-        // This will be overridden by the change() functional helper
-        // but we provide a basic implementation here
-        throw new Error(
-          "Use the change() functional helper for ref-level changes: change(ref, fn)",
-        )
-      },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as any).subscribe(callback)
       },

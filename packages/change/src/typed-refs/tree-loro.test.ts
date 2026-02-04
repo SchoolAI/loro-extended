@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { type ExtRefBase, ext } from "../ext.js"
+import { change } from "../functional-helpers.js"
 import { loro } from "../loro.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
@@ -39,7 +40,7 @@ describe("TreeRef loro() and ext() support", () => {
 
     const doc = createTypedDoc(Schema)
 
-    ext(doc).change(draft => {
+    change(doc, draft => {
       const root = draft.states.createNode({ name: "root" })
 
       // loro(ref) returns the native container directly (LoroTreeNode)

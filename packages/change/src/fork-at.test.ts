@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
+import { change } from "./functional-helpers.js"
 import { createTypedDoc, loro, Shape } from "./index.js"
 
 describe("forkAt", () => {
@@ -250,8 +251,8 @@ describe("forkAt", () => {
 
       const forkedDoc = ext(doc).forkAt(frontiers)
 
-      // Use ext().change() on forked doc
-      ext(forkedDoc).change(draft => {
+      // Use change() on forked doc
+      change(forkedDoc, draft => {
         draft.items.push(100)
         draft.items.push(200)
       })

@@ -109,9 +109,9 @@ export function change(
   | TreeRef<any>
   | TreeRefInterface<any>
   | StructRef<any> {
-  // Check if it's a TypedDoc by checking for EXT_SYMBOL with docShape
+  // Check if it's a TypedDoc by checking for EXT_SYMBOL with change method
   const extNs = (target as any)[EXT_SYMBOL]
-  if (extNs && "docShape" in extNs) {
+  if (extNs && "change" in extNs) {
     // It's a TypedDoc - use ext().change()
     return extNs.change(fn)
   }

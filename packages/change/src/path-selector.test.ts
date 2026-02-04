@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { ext } from "./ext.js"
+import { change } from "./functional-helpers.js"
 import { createPathBuilder } from "./path-builder.js"
 import { compileToJsonPath, hasWildcard } from "./path-compiler.js"
 import { evaluatePath, evaluatePathOnValue } from "./path-evaluator.js"
@@ -327,7 +327,7 @@ describe("Path Selector DSL", () => {
       const doc = createTypedDoc(docShape)
 
       // Add some data
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.config.theme = "light"
       })
 
@@ -342,7 +342,7 @@ describe("Path Selector DSL", () => {
       const doc = createTypedDoc(docShape)
 
       // Add some books
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -366,7 +366,7 @@ describe("Path Selector DSL", () => {
       const doc = createTypedDoc(docShape)
 
       // Add some books
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.books.push({
           title: "First Book",
           price: 10,
@@ -390,7 +390,7 @@ describe("Path Selector DSL", () => {
       const doc = createTypedDoc(docShape)
 
       // Add some users
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.users.set("alice", { name: "Alice Smith", score: 100 })
         draft.users.set("bob", { name: "Bob Jones", score: 200 })
       })

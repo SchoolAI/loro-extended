@@ -1,6 +1,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
+import { change } from "./functional-helpers.js"
 import { createTypedDoc, loro, Shape } from "./index.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -190,7 +191,7 @@ describe("shallow fork", () => {
 
       // Set initial state
       doc.counter.increment(5)
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.data.name = "test"
         draft.data.value = 100
       })
@@ -216,7 +217,7 @@ describe("shallow fork", () => {
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
-      ext(shallowDoc).change(draft => {
+      change(shallowDoc, draft => {
         draft.data.name = "modified"
         draft.data.value = 200
       })
@@ -239,7 +240,7 @@ describe("shallow fork", () => {
 
       // Set initial state
       doc.counter.increment(5)
-      ext(doc).change(draft => {
+      change(doc, draft => {
         draft.data.name = "test"
         draft.data.value = 100
       })
@@ -259,7 +260,7 @@ describe("shallow fork", () => {
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
-      ext(shallowDoc).change(draft => {
+      change(shallowDoc, draft => {
         draft.data.name = "modified"
         draft.data.value = 200
       })

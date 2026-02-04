@@ -3,18 +3,20 @@
  *
  * Design Principle:
  * > `loro()` returns native Loro types directly (LoroDoc, LoroText, etc.)
- * > `ext()` provides loro-extended-specific features (change, fork, subscribe with jsonpath, etc.)
+ * > `ext()` provides loro-extended-specific features (fork, subscribe with jsonpath, etc.)
  *
- * @example
+ * For mutations, use the `change()` functional helper:
  * ```typescript
- * import { ext, loro } from "@loro-extended/change"
+ * import { change, ext, loro } from "@loro-extended/change"
+ *
+ * // Mutations via change() functional helper
+ * change(doc, draft => { draft.count.increment(10) })
  *
  * // Access native Loro types directly
  * const loroDoc = loro(doc)  // LoroDoc
  * const loroText = loro(doc.title)  // LoroText
  *
  * // Access loro-extended features
- * ext(doc).change(draft => { ... })
  * ext(doc).forkAt(frontiers)
  * ext(doc).subscribe(callback)
  * ext(ref).doc  // Get LoroDoc from any ref
@@ -63,18 +65,11 @@ export const EXT_SYMBOL = Symbol.for("loro-extended:ext")
 
 /**
  * Base interface for all ext() return types on refs.
- * Provides access to the underlying LoroDoc and change/subscribe functionality.
+ * Provides access to the underlying LoroDoc and subscribe functionality.
  */
 export interface ExtRefBase {
   /** The underlying LoroDoc */
   readonly doc: LoroDoc
-
-  /**
-   * Batched mutations for this ref.
-   * @param fn - Function that performs mutations on the draft
-   * @returns The same ref for chaining
-   */
-  change<T>(fn: (draft: T) => void): T
 
   /**
    * Subscribe to container-level changes.
@@ -119,16 +114,6 @@ export interface ExtMapRef extends ExtRefBase {
  * Provides access to doc-level operations.
  */
 export interface ExtDocRef<Shape extends DocShape> {
-  /**
-   * The primary method of mutating typed documents.
-   * Batches multiple mutations into a single transaction.
-   * All changes commit together at the end.
-   *
-   * @param fn - Function that performs mutations on the draft
-   * @returns The same doc for chaining
-   */
-  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
-
   /**
    * Creates a new TypedDoc as a fork of the current document.
    * The forked doc contains all history up to the current version.
@@ -197,6 +182,18 @@ export interface ExtDocRef<Shape extends DocShape> {
    * @returns Subscription that can be used to unsubscribe
    */
   subscribe(callback: (event: LoroEventBatch) => void): Subscription
+
+  /**
+   * Batch mutations into a single transaction.
+   * All changes commit together at the end.
+   *
+   * Note: The `change(doc, fn)` functional helper is the recommended API.
+   * This method exists for internal use and method-chaining scenarios.
+   *
+   * @param fn - Function that performs mutations on the draft
+   * @returns The same TypedDoc for chaining
+   */
+  change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape>
 }
 
 // ============================================================================
@@ -273,7 +270,6 @@ export function ext<Shape extends ContainerShape>(
  * The `ext()` function - access loro-extended-specific features.
  *
  * Use this to access:
- * - change() for batched mutations
  * - fork(), forkAt(), shallowForkAt() for document forking
  * - initialize() for document initialization
  * - applyPatch() for JSON Patch operations
@@ -282,21 +278,28 @@ export function ext<Shape extends ContainerShape>(
  * - pushContainer(), insertContainer(), setContainer() for container operations
  * - doc property to access LoroDoc from any ref
  *
+ * For mutations, use the `change()` functional helper instead:
+ * ```typescript
+ * import { change } from "@loro-extended/change"
+ * change(doc, draft => { draft.count.increment(10) })
+ * ```
+ *
  * @param refOrDoc - A TypedRef or TypedDoc
  * @returns An object with loro-extended features
  *
  * @example
  * ```typescript
- * import { ext, loro } from "@loro-extended/change"
+ * import { change, ext, loro } from "@loro-extended/change"
+ *
+ * // Mutations via change() functional helper
+ * change(doc, draft => { draft.count.increment(10) })
  *
  * // Document-level features
- * ext(doc).change(draft => { draft.count.increment(10) })
  * ext(doc).forkAt(frontiers)
  * ext(doc).subscribe(callback)
  *
  * // Ref-level features
  * ext(ref).doc  // Get LoroDoc from any ref
- * ext(ref).change(draft => { ... })
  * ext(list).pushContainer(loroMap)
  * ext(struct).setContainer('key', loroMap)
  * ```

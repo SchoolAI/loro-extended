@@ -12,8 +12,9 @@ The `ext()` function API was implemented in the previous phase, introducing a cl
 ## Problem Statement
 
 The current implementation has three ways to mutate documents:
+
 1. `change(doc, fn)` — functional helper
-2. `ext(doc).change(fn)` — via ext namespace  
+2. `ext(doc).change(fn)` — via ext namespace
 3. `handle.change(fn)` — on Handle objects
 
 This creates cognitive load for users. The plan specified removing `Handle.change()` and using `change(handle.doc, fn)` instead, but this wasn't done. Additionally, the `ext()` API surface lacks dedicated test coverage.
@@ -34,72 +35,79 @@ This creates cognitive load for users. The plan specified removing `Handle.chang
 
 ### What Needs to Change
 
-| Current | New |
-|---------|-----|
-| `handle.change(fn)` | `change(handle.doc, fn)` |
-| `ext(doc).change(fn)` | `change(doc, fn)` |
-| `ext(ref).change(fn)` | `change(ref, fn)` |
+| Current               | New                      |
+| --------------------- | ------------------------ |
+| `handle.change(fn)`   | `change(handle.doc, fn)` |
+| `ext(doc).change(fn)` | `change(doc, fn)`        |
+| `ext(ref).change(fn)` | `change(ref, fn)`        |
 
 ### What Stays the Same
 
-| API | Purpose |
-|-----|---------|
-| `ext(doc).fork()` | Fork document |
-| `ext(doc).forkAt(f)` | Fork at frontiers |
-| `ext(doc).shallowForkAt(f)` | Shallow fork |
-| `ext(doc).initialize()` | Initialize metadata |
-| `ext(doc).applyPatch(p)` | Apply JSON patch |
-| `ext(doc).docShape` | Access schema |
-| `ext(doc).rawValue` | Raw CRDT value |
-| `ext(doc).mergeable` | Mergeable flag |
-| `ext(doc).subscribe(cb)` | Subscribe to changes |
-| `ext(ref).doc` | Get LoroDoc from ref |
-| `ext(ref).subscribe(cb)` | Subscribe to ref changes |
-| `ext(list).pushContainer(c)` | Push container to list |
-| `ext(list).insertContainer(i, c)` | Insert container |
-| `ext(map).setContainer(k, c)` | Set container on map |
+| API                               | Purpose                  |
+| --------------------------------- | ------------------------ |
+| `ext(doc).fork()`                 | Fork document            |
+| `ext(doc).forkAt(f)`              | Fork at frontiers        |
+| `ext(doc).shallowForkAt(f)`       | Shallow fork             |
+| `ext(doc).initialize()`           | Initialize metadata      |
+| `ext(doc).applyPatch(p)`          | Apply JSON patch         |
+| `ext(doc).docShape`               | Access schema            |
+| `ext(doc).rawValue`               | Raw CRDT value           |
+| `ext(doc).mergeable`              | Mergeable flag           |
+| `ext(doc).subscribe(cb)`          | Subscribe to changes     |
+| `ext(ref).doc`                    | Get LoroDoc from ref     |
+| `ext(ref).subscribe(cb)`          | Subscribe to ref changes |
+| `ext(list).pushContainer(c)`      | Push container to list   |
+| `ext(list).insertContainer(i, c)` | Insert container         |
+| `ext(map).setContainer(k, c)`     | Set container on map     |
 
 ---
 
 ## Phases and Tasks
 
-### Phase 1: Remove `ext(doc).change()` and `ext(ref).change()` 🔴
+### Phase 1: Remove `ext(doc).change()` and `ext(ref).change()` ✅
 
-- 🔴 Update `packages/change/src/ext.ts`:
+- ✅ Update `packages/change/src/ext.ts`:
+
   - Remove `change` method from `ExtDocRef` interface
   - Remove `change` method from `ExtRefBase` interface
   - Update implementation to not include `change` in returned objects
 
-- 🔴 Update `packages/change/src/typed-doc.ts`:
+- ✅ Update `packages/change/src/typed-doc.ts`:
+
   - Remove `change` from the ext namespace object
 
-- 🔴 Update `packages/change/src/typed-refs/base.ts`:
+- ✅ Update `packages/change/src/typed-refs/base.ts`:
   - Remove `change` from `getExtNamespace()` return
 
-### Phase 2: Remove `Handle.change()` 🔴
+### Phase 2: Remove `Handle.change()` ✅
 
-- 🔴 Update `packages/repo/src/handle.ts`:
+- ✅ Update `packages/repo/src/handle.ts`:
+
   - Remove the `change()` method from Handle class
   - Add deprecation comment pointing to `change(handle.doc, fn)`
 
-- 🔴 Update all test files in `packages/repo/src/tests/`:
+- ✅ Update all test files in `packages/repo/src/tests/`:
   - Replace `handle.change(fn)` with `change(handle.doc, fn)`
   - Add `change` import from `@loro-extended/change`
 
-### Phase 3: Update Tests to Use `change(doc, fn)` 🔴
+### Phase 3: Update Tests to Use `change(doc, fn)` ✅
 
-- 🔴 Update `packages/change/src/loro.test.ts`:
+- ✅ Update `packages/change/src/loro.test.ts`:
+
   - Replace `ext(doc).change(fn)` with `change(doc, fn)`
   - Keep tests for other `ext()` methods
 
-- 🔴 Update `packages/change/src/grand-unified-api.test.ts`:
+- ✅ Update `packages/change/src/grand-unified-api.test.ts`:
+
   - Replace `ext(doc).change(fn)` with `change(doc, fn)`
 
-- 🔴 Update `packages/change/src/functional-helpers.test.ts`:
+- ✅ Update `packages/change/src/functional-helpers.test.ts`:
+
   - Remove the "regression: ext(doc).change() still works" test
   - Keep tests for `change(doc, fn)` functional helper
 
-- 🔴 Update other test files using `ext(doc).change()`:
+- ✅ Update other test files using `ext(doc).change()`:
+
   - `typed-doc-metadata.test.ts`
   - `fork-at.test.ts`
   - `shallow-fork.test.ts`
@@ -107,14 +115,15 @@ This creates cognitive load for users. The plan specified removing `Handle.chang
   - `path-selector.test.ts`
   - `typed-refs/tree-loro.test.ts`
 
-- 🔴 Update `packages/lens/src/lens.ts`:
+- ✅ Update `packages/lens/src/lens.ts`:
   - Replace `ext(worldviewDoc).change(fn)` with `change(worldviewDoc, fn)`
 
-### Phase 4: Create Dedicated `ext.test.ts` 🔴
+### Phase 4: Create Dedicated `ext.test.ts` ✅
 
-- 🔴 Create `packages/change/src/ext.test.ts` with explicit tests for:
+- ✅ Create `packages/change/src/ext.test.ts` with explicit tests for:
 
   **ExtDocRef methods:**
+
   - `ext(doc).fork()` - creates fork with different peer ID
   - `ext(doc).fork({ preservePeerId: true })` - preserves peer ID
   - `ext(doc).forkAt(frontiers)` - forks at specific version
@@ -127,6 +136,7 @@ This creates cognitive load for users. The plan specified removing `Handle.chang
   - `ext(doc).subscribe(cb)` - subscribes to changes
 
   **ExtRefBase methods:**
+
   - `ext(textRef).doc` - returns LoroDoc
   - `ext(listRef).doc` - returns LoroDoc
   - `ext(counterRef).doc` - returns LoroDoc
@@ -136,31 +146,31 @@ This creates cognitive load for users. The plan specified removing `Handle.chang
   - `ext(ref).subscribe(cb)` - subscribes to ref changes
 
   **ExtListRef methods:**
+
   - `ext(list).pushContainer(container)` - pushes container
   - `ext(list).insertContainer(index, container)` - inserts container
 
   **ExtMapRef methods:**
+
   - `ext(struct).setContainer(key, container)` - sets container
   - `ext(record).setContainer(key, container)` - sets container
 
-### Phase 5: Update Transitive Dependencies 🔴
+### Phase 5: Update Transitive Dependencies ✅
 
-- 🔴 Update `adapters/websocket/src/__tests__/*.test.ts`:
+- ✅ Update `adapters/websocket/src/__tests__/*.test.ts`:
+
   - Replace `handle.change(fn)` with `change(handle.doc, fn)`
 
-- 🔴 Update `adapters/http-polling/src/__tests__/*.test.ts`:
+- ✅ Update `adapters/websocket-compat/src/__tests__/*.test.ts`:
+
   - Replace `handle.change(fn)` with `change(handle.doc, fn)`
 
-- 🔴 Update `adapters/sse/src/__tests__/*.test.ts`:
-  - Replace `handle.change(fn)` with `change(handle.doc, fn)`
-
-- 🔴 Update `examples/*/src/**/*.ts`:
-  - Replace `handle.change(fn)` with `change(handle.doc, fn)`
-  - Replace `ext(doc).change(fn)` with `change(doc, fn)`
+- ✅ All other adapters and examples verified to pass
 
 ### Phase 6: Documentation 🔴
 
 - 🔴 Update `packages/change/README.md`:
+
   - Document `change(doc, fn)` as the canonical mutation pattern
   - Remove references to `ext(doc).change()`
   - Update migration guide
@@ -181,38 +191,38 @@ The new test file should cover the complete `ext()` API surface with minimal boi
 // packages/change/src/ext.test.ts
 describe("ext() function", () => {
   describe("ExtDocRef", () => {
-    it("fork() creates fork with different peer ID")
-    it("fork({ preservePeerId: true }) preserves peer ID")
-    it("forkAt() forks at specific version")
-    it("shallowForkAt() creates shallow fork")
-    it("initialize() writes metadata")
-    it("applyPatch() applies JSON patch operations")
-    it("docShape returns the schema")
-    it("rawValue returns raw CRDT value without placeholders")
-    it("mergeable returns effective mergeable flag")
-    it("subscribe() subscribes to document changes")
-  })
+    it("fork() creates fork with different peer ID");
+    it("fork({ preservePeerId: true }) preserves peer ID");
+    it("forkAt() forks at specific version");
+    it("shallowForkAt() creates shallow fork");
+    it("initialize() writes metadata");
+    it("applyPatch() applies JSON patch operations");
+    it("docShape returns the schema");
+    it("rawValue returns raw CRDT value without placeholders");
+    it("mergeable returns effective mergeable flag");
+    it("subscribe() subscribes to document changes");
+  });
 
   describe("ExtRefBase", () => {
-    it("doc returns LoroDoc from TextRef")
-    it("doc returns LoroDoc from ListRef")
-    it("doc returns LoroDoc from CounterRef")
-    it("doc returns LoroDoc from StructRef")
-    it("doc returns LoroDoc from RecordRef")
-    it("doc returns LoroDoc from TreeRef")
-    it("subscribe() subscribes to ref changes")
-  })
+    it("doc returns LoroDoc from TextRef");
+    it("doc returns LoroDoc from ListRef");
+    it("doc returns LoroDoc from CounterRef");
+    it("doc returns LoroDoc from StructRef");
+    it("doc returns LoroDoc from RecordRef");
+    it("doc returns LoroDoc from TreeRef");
+    it("subscribe() subscribes to ref changes");
+  });
 
   describe("ExtListRef", () => {
-    it("pushContainer() pushes a Loro container")
-    it("insertContainer() inserts a Loro container at index")
-  })
+    it("pushContainer() pushes a Loro container");
+    it("insertContainer() inserts a Loro container at index");
+  });
 
   describe("ExtMapRef", () => {
-    it("setContainer() sets a Loro container on StructRef")
-    it("setContainer() sets a Loro container on RecordRef")
-  })
-})
+    it("setContainer() sets a Loro container on StructRef");
+    it("setContainer() sets a Loro container on RecordRef");
+  });
+});
 ```
 
 ### Existing Test Updates
@@ -237,15 +247,18 @@ Tests that currently use `ext(doc).change()` will be updated to use `change(doc,
 ### Transitive Effects
 
 1. **`@loro-extended/repo`**:
+
    - `handle.ts` has `change()` method that must be removed
    - ~50+ test files use `handle.change()` pattern
    - **Impact**: All tests must be updated
 
 2. **`@loro-extended/lens`**:
+
    - `lens.ts` uses `ext(worldviewDoc).change(fn)`
    - **Impact**: Must update to `change(worldviewDoc, fn)`
 
 3. **Adapters** (`websocket`, `http-polling`, `sse`, `webrtc`, `websocket-compat`):
+
    - Test files use `handle.change()` pattern
    - **Impact**: All adapter tests must be updated
 
@@ -269,7 +282,7 @@ All packages in the chain must be updated together.
 
 ## Changeset
 
-```markdown
+````markdown
 ---
 "@loro-extended/change": major
 "@loro-extended/repo": major
@@ -284,17 +297,20 @@ All packages in the chain must be updated together.
 Use the `change()` functional helper instead:
 
 Before:
+
 ```typescript
-ext(doc).change(draft => {
-  draft.title.insert(0, "Hello")
-})
+ext(doc).change((draft) => {
+  draft.title.insert(0, "Hello");
+});
 ```
+````
 
 After:
+
 ```typescript
-change(doc, draft => {
-  draft.title.insert(0, "Hello")
-})
+change(doc, (draft) => {
+  draft.title.insert(0, "Hello");
+});
 ```
 
 ### `Handle.change()` removed
@@ -302,19 +318,21 @@ change(doc, draft => {
 Use `change(handle.doc, fn)` instead:
 
 Before:
+
 ```typescript
-handle.change(draft => {
-  draft.title.insert(0, "Hello")
-})
+handle.change((draft) => {
+  draft.title.insert(0, "Hello");
+});
 ```
 
 After:
-```typescript
-import { change } from "@loro-extended/change"
 
-change(handle.doc, draft => {
-  draft.title.insert(0, "Hello")
-})
+```typescript
+import { change } from "@loro-extended/change";
+
+change(handle.doc, (draft) => {
+  draft.title.insert(0, "Hello");
+});
 ```
 
 ## Rationale
@@ -326,6 +344,7 @@ Having three ways to mutate documents (`change(doc, fn)`, `ext(doc).change(fn)`,
 1. Replace `ext(doc).change(fn)` with `change(doc, fn)`
 2. Replace `handle.change(fn)` with `change(handle.doc, fn)`
 3. Ensure `change` is imported from `@loro-extended/change`
+
 ```
 
 ---
@@ -333,3 +352,4 @@ Having three ways to mutate documents (`change(doc, fn)`, `ext(doc).change(fn)`,
 ## Summary
 
 This follow-up plan consolidates the mutation API to a single canonical pattern: `change(doc, fn)`. This reduces cognitive load and makes the API more predictable. The `ext()` function remains for accessing loro-extended-specific features like `fork()`, `forkAt()`, `applyPatch()`, etc., but mutation is handled exclusively by the `change()` functional helper.
+```

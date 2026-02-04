@@ -122,11 +122,6 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
       get doc(): LoroDoc {
         return self.getDoc()
       },
-      change<T>(_fn: (draft: T) => void): T {
-        throw new Error(
-          "Use the change() functional helper for ref-level changes: change(ref, fn)",
-        )
-      },
       subscribe(callback: (event: LoroEventBatch) => void): Subscription {
         return (self.getContainer() as LoroText).subscribe(callback)
       },

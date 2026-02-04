@@ -1004,20 +1004,8 @@ describe("functional helpers", () => {
       })
     })
 
-    describe("regression: ext(doc).change() still works", () => {
-      it("should still support ext(doc).change() method", () => {
-        const doc = createTypedDoc(fullSchema)
-
-        ext(doc).change(draft => {
-          draft.title.insert(0, "Hello")
-          draft.count.increment(5)
-        })
-
-        expect(doc.title.toString()).toBe("Hello")
-        expect(doc.count.value).toBe(5)
-      })
-
-      it("should still support change(doc, fn) helper", () => {
+    describe("change(doc, fn) helper", () => {
+      it("should support change(doc, fn) helper", () => {
         const doc = createTypedDoc(fullSchema)
 
         change(doc, draft => {

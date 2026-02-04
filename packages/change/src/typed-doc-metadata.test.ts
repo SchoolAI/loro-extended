@@ -1,6 +1,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
+import { change } from "./functional-helpers.js"
 import { hasMetadata, META_CONTAINER_NAME, readMetadata } from "./metadata.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -137,7 +138,7 @@ describe("TypedDoc Metadata Integration", () => {
     const doc1 = createTypedDoc(schema, { doc: loroDoc1 })
 
     // Make some changes
-    ext(doc1).change(draft => {
+    change(doc1, draft => {
       draft.players.set("alice", { score: 100 })
     })
 
@@ -196,7 +197,7 @@ describe("TypedDoc Metadata Integration", () => {
     )
 
     const doc = createTypedDoc(schema)
-    ext(doc).change(draft => {
+    change(doc, draft => {
       draft.players.set("alice", { score: 100 })
     })
 

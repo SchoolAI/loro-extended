@@ -291,11 +291,11 @@ describe("ext() function", () => {
       subscription()
     })
 
-    describe("ext(doc).change() method", () => {
-      it("should batch mutations via ext(doc).change()", () => {
+    describe("change(doc, fn) helper", () => {
+      it("should batch mutations via change(doc, fn)", () => {
         const doc = createTypedDoc(schema)
 
-        ext(doc).change(draft => {
+        change(doc, draft => {
           draft.title.insert(0, "Hello")
           draft.count.increment(5)
           draft.items.push("item1")
@@ -309,7 +309,7 @@ describe("ext() function", () => {
       it("should return the doc for chaining", () => {
         const doc = createTypedDoc(schema)
 
-        const result = ext(doc).change(draft => {
+        const result = change(doc, draft => {
           draft.count.increment(1)
         })
 
@@ -319,36 +319,21 @@ describe("ext() function", () => {
       it("should support chained change() calls", () => {
         const doc = createTypedDoc(schema)
 
-        ext(
-          ext(
-            ext(doc).change(draft => {
+        change(
+          change(
+            change(doc, draft => {
               draft.count.increment(1)
             }),
-          ).change(draft => {
-            draft.count.increment(2)
-          }),
-        ).change(draft => {
-          draft.count.increment(3)
-        })
+            draft => {
+              draft.count.increment(2)
+            },
+          ),
+          draft => {
+            draft.count.increment(3)
+          },
+        )
 
         expect(doc.count.value).toBe(6)
-      })
-
-      it("ext(doc).change() and change(doc, fn) should be equivalent", () => {
-        const doc1 = createTypedDoc(schema)
-        const doc2 = createTypedDoc(schema)
-
-        ext(doc1).change(draft => {
-          draft.count.increment(5)
-          draft.title.insert(0, "Test")
-        })
-
-        change(doc2, draft => {
-          draft.count.increment(5)
-          draft.title.insert(0, "Test")
-        })
-
-        expect(doc1.toJSON()).toEqual(doc2.toJSON())
       })
     })
 

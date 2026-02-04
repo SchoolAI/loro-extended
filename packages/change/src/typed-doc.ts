@@ -424,9 +424,9 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
  * doc.count.increment(5);
  * doc.title.insert(0, "Hello");
  *
- * // Batched mutations via ext().change()
- * import { ext } from "@loro-extended/change";
- * ext(doc).change(draft => {
+ * // Batched mutations via change() functional helper
+ * import { change } from "@loro-extended/change";
+ * change(doc, draft => {
  *   draft.count.increment(10);
  *   draft.title.update("World");
  * });
@@ -458,10 +458,6 @@ export function createTypedDoc<Shape extends DocShape>(
 
   // Create the ext() namespace for this doc (loro-extended features)
   const extNamespace: ExtDocRef<Shape> = {
-    change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
-      internal.change(fn)
-      return proxy
-    },
     fork(opts?: { preservePeerId?: boolean }): TypedDoc<Shape> {
       const forkedLoroDoc = internal.loroDoc.fork()
       if (opts?.preservePeerId) {
@@ -516,6 +512,10 @@ export function createTypedDoc<Shape extends DocShape>(
     },
     subscribe(callback: (event: LoroEventBatch) => void): Subscription {
       return internal.loroDoc.subscribe(callback)
+    },
+    change(fn: (draft: Mutable<Shape>) => void): TypedDoc<Shape> {
+      internal.change(fn)
+      return proxy
     },
   }
 

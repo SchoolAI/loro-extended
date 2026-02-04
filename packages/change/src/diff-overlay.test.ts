@@ -1,7 +1,7 @@
 import type { LoroEventBatch } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { createDiffOverlay } from "./diff-overlay.js"
-import { ext } from "./ext.js"
+import { change } from "./functional-helpers.js"
 import { createTypedDoc, loro, Shape } from "./index.js"
 
 describe("diff overlay", () => {
@@ -69,7 +69,7 @@ describe("diff overlay", () => {
       })
     })
 
-    ext(doc).change(draft => {
+    change(doc, draft => {
       draft.counter.increment(5)
       draft.info.name = "Bob"
       draft.info.count = 2
