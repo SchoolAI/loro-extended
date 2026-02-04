@@ -1,5 +1,6 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import {
+  change,
   Shape,
   useDoc,
   useEphemeral,
@@ -188,7 +189,7 @@ export default function VideoConferenceApp({
   const joinRoom = useCallback(() => {
     const alreadyJoined = participants.some(p => p.peerId === myPeerId)
     if (!alreadyJoined) {
-      handle.change(draft => {
+      change(handle.doc, draft => {
         draft.participants.push({
           peerId: myPeerId,
           name: displayName,
@@ -201,7 +202,7 @@ export default function VideoConferenceApp({
 
   // Leave room
   const leaveRoom = useCallback(() => {
-    handle.change(draft => {
+    change(handle.doc, draft => {
       const index = draft.participants.findIndex(p => p.peerId === myPeerId)
       if (index !== -1) {
         draft.participants.delete(index, 1)
@@ -213,7 +214,7 @@ export default function VideoConferenceApp({
   // Remove a participant from the document (used by cleanup hook)
   const removeParticipant = useCallback(
     (peerId: string) => {
-      handle.change(draft => {
+      change(handle.doc, draft => {
         const index = draft.participants.findIndex(p => p.peerId === peerId)
         if (index !== -1) {
           draft.participants.delete(index, 1)
