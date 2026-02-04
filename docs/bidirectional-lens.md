@@ -313,6 +313,18 @@ worldLoroDoc.applyDiff(diff);
 
 This makes the propagation **state-based** rather than **op-based**, avoiding the causal history issues.
 
+### Mergeable Containers for applyDiff Compatibility
+
+**Important**: When using `applyDiff()` to propagate changes from Worldview to World, nested containers created via `setContainer()` or `getOrCreateContainer()` receive peer-dependent IDs. When `applyDiff` is applied to the target document, container IDs are **remapped** to new peer-dependent IDs, breaking the merge semantics.
+
+**Solution**: Use `mergeable: true` when creating TypedDocs that will be used with Lens:
+
+```typescript
+const worldview = createTypedDoc(schema, { mergeable: true });
+```
+
+This stores all containers at the document root with path-based names (e.g., `players-alice-score`), ensuring deterministic IDs that survive `applyDiff`. See TECHNICAL.md section "Mergeable Containers via Flattened Root Storage" for implementation details.
+
 **Key differences from current LEA:**
 
 1. **Filter signature simplified**: `(commit: JsonChange) => boolean` - no worldview, no source

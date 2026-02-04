@@ -165,6 +165,50 @@ recordRef.set("item-1", { id: "item-1", metadata: {} })
 
 See `packages/change/NESTED_CONTAINER_MATERIALIZATION_BUG.md` for the full bug report and resolution.
 
+### Mergeable Containers via Flattened Root Storage
+
+**Problem**: When two peers concurrently create a nested container at the same schema path, they create containers with different peer-dependent IDs. After sync, Loro's LWW semantics cause one peer's container to "win" while the other's operations appear lost. This is especially problematic with `applyDiff()` which remaps container IDs.
+
+**Solution**: When `mergeable: true` is set on a TypedDoc, all containers are stored at the document root with path-based names. This ensures deterministic IDs that survive `applyDiff`.
+
+```typescript
+const doc = createTypedDoc(schema, { mergeable: true });
+```
+
+**Path Encoding**:
+- Separator: `-` (hyphen)
+- Escape character: `\` (backslash)
+- Literal hyphen in key: `\-`
+- Literal backslash in key: `\\`
+
+| Schema Path | Encoded Root Name | Container ID |
+|-------------|-------------------|--------------|
+| `data.items` | `data-items` | `cid:root-data-items:List` |
+| `data["my-key"].value` | `data-my\-key-value` | `cid:root-data-my\-key-value:Map` |
+
+**Storage Structure**:
+
+For a schema with nested structs, flattened storage uses `null` markers to indicate child containers:
+
+```typescript
+// Schema: { data: { nested: { value: string } } }
+// Flattened storage:
+// - cid:root-data:Map → { nested: null }  // null marker
+// - cid:root-data-nested:Map → { value: "hello" }
+```
+
+**toJSON Reconstruction**: The `toJSON()` method automatically reconstructs the hierarchical structure from flattened storage when `mergeable: true`.
+
+**Limitations**:
+- Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported with `mergeable: true`
+- MovableLists of containers have the same limitation
+- Use `Shape.record(Shape.struct({...}))` with string keys instead
+
+**Implementation Details**:
+- `pathPrefix` is passed through `TypedRefParams` to track the current path
+- `computeChildRootContainerName()` builds the root container name from path segments
+- `reconstructFromFlattened()` and `reconstructDocFromFlattened()` handle toJSON reconstruction
+
 ### Infer<> vs InferRaw<> and Type Boundaries
 
 The `@loro-extended/change` package provides two type inference utilities:
