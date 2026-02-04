@@ -13,7 +13,7 @@ export default defineConfig({
     exclude: [
       "@loro-extended/change",
       "@loro-extended/react",
-      "@loro-extended/lea",
+      "@loro-extended/lens",
       "@loro-extended/repo",
       "@loro-extended/adapter-websocket",
     ],

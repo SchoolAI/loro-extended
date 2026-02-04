@@ -13,7 +13,7 @@
     "@loro-extended/lens": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",
-    "loro-crdt": "link:/Users/duane/tools/loro/crates/loro-wasm",
+    "loro-crdt": "1.10.3",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "ws": "^8.18.0",
