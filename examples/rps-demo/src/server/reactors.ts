@@ -76,12 +76,6 @@ export const resolveGameReactor = (
   },
   change: (fn: GameChangeFn) => void,
 ) => {
-  console.log("resolveGameReactor", {
-    beforePhase: before.game.phase,
-    afterPhase: after.game.phase,
-    beforeIsChoosing: before.game.phase === "choosing",
-    afterIsReveal: after.game.phase === "reveal",
-  })
   // Detect transition to reveal phase
   if (before.game.phase === "choosing" && after.game.phase === "reveal") {
     const aliceChoice = after.game.players.get("alice")?.choice ?? null

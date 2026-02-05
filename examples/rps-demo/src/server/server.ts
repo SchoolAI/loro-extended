@@ -47,13 +47,15 @@ const repo = new Repo({ adapters: [wsAdapter] })
 // 2. Get handle for game document
 const handle = repo.get("rps-game", GameSchema)
 
+let i = 0
 handle.subscribe(event => {
-  console.log("handle.doc subscribe event", event)
+  i++
+  console.dir({ [`${i}: world event`]: event }, { depth: null })
 })
 
 // 3. Create Lens attached to Repo's doc
 // The lens will filter world imports into its worldview
-const gameFilter = makeGameFilter(handle.doc)
+const gameFilter = makeGameFilter()
 const lens = createLens<GameDocShape>(handle.doc, { filter: gameFilter })
 
 function changeAsServer(fn: GameChangeFn) {
@@ -61,7 +63,7 @@ function changeAsServer(fn: GameChangeFn) {
 }
 
 const unsubscribe = loro(lens.worldview).subscribe(event => {
-  console.log("subscribe event", event)
+  console.dir({ [`${i}: worldview event`]: event }, { depth: null })
 
   if (event.by === "checkout") return
 

@@ -1,67 +1,179 @@
 import type { CommitInfo } from "@loro-extended/lens"
+import type {
+  ContainerID,
+  JsonChange,
+  JsonOp,
+  JsonOpID,
+  JsonValue,
+  MapOp,
+  PeerID,
+} from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { createClientLensFilter } from "../client/filters.js"
 import { SERVER_PLAYER_ID } from "./identity.js"
 
-type OpLike = {
-  container: string
-  content?: { type?: string; key?: unknown }
-}
+/**
+ * Helper to create a commit info object for testing
+ */
+function createCommitInfo(
+  playerId: string | undefined,
+  ops: Array<{
+    container: ContainerID
+    key?: string
+    value?: JsonValue
+  }>,
+): CommitInfo {
+  const peerId: PeerID = "0"
+  const counter = 1
+  const id: JsonOpID = `${counter}@${peerId}`
+  const msg = playerId ? JSON.stringify({ playerId }) : null
 
-function commit(playerId: string | undefined, ops: OpLike[]): CommitInfo {
+  const jsonOps: JsonOp[] = ops.map((op, index) => {
+    const content: MapOp = {
+      type: "insert",
+      key: op.key ?? "",
+      value: op.value ?? null,
+    }
+
+    return {
+      container: op.container,
+      counter: index,
+      content,
+    }
+  })
+
+  const raw: JsonChange = {
+    id,
+    timestamp: Math.floor(Date.now() / 1000),
+    deps: [],
+    lamport: 1,
+    msg,
+    ops: jsonOps,
+  }
+
   return {
-    raw: {
-      id: "1@peer",
-      timestamp: Date.now(),
-      msg: playerId ? JSON.stringify({ playerId }) : undefined,
-      ops,
-      length: 1,
-      deps: [],
-      lamport: 1,
-    } as unknown as CommitInfo["raw"],
-    peerId: "peer",
-    counter: 1,
-    timestamp: Date.now(),
+    raw,
+    peerId,
+    counter,
+    timestamp: raw.timestamp,
     message: playerId ? { playerId } : undefined,
   }
 }
 
-describe("filters", () => {
-  it("client lens rejects other-player mutations", () => {
+describe("client filter - with path-based container IDs", () => {
+  it("accepts server commits", () => {
     const filter = createClientLensFilter("alice")
-    const otherPlayerCommit = commit("bob", [
-      { container: "cid:root-game/players/bob:Map" },
+    const serverCommit = createCommitInfo(SERVER_PLAYER_ID, [
+      {
+        container: "cid:root-game:Map",
+        key: "phase",
+        value: "reveal",
+      },
+    ])
+    expect(filter(serverCommit)).toBe(true)
+  })
+
+  it("accepts own player mutations", () => {
+    const filter = createClientLensFilter("alice")
+
+    const ownCommit = createCommitInfo("alice", [
+      {
+        container: "cid:root-game-players-alice:Map",
+        key: "choice",
+        value: "rock",
+      },
+    ])
+    expect(filter(ownCommit)).toBe(true)
+  })
+
+  it("rejects other player trying to modify our state", () => {
+    const filter = createClientLensFilter("alice")
+
+    // Bob trying to modify alice's state
+    const otherPlayerCommit = createCommitInfo("bob", [
+      {
+        container: "cid:root-game-players-alice:Map",
+        key: "choice",
+        value: "rock",
+      },
     ])
     expect(filter(otherPlayerCommit)).toBe(false)
   })
 
-  it("client lens rejects non-server peer edits to shared phase", () => {
+  it("accepts other player modifying their own state", () => {
     const filter = createClientLensFilter("alice")
-    const peerPhaseCommit = commit("bob", [
+
+    // Bob modifying his own state - alice's filter should accept this
+    const otherPlayerCommit = createCommitInfo("bob", [
+      {
+        container: "cid:root-game-players-bob:Map",
+        key: "choice",
+        value: "rock",
+      },
+    ])
+    expect(filter(otherPlayerCommit)).toBe(true)
+  })
+
+  it("rejects non-server peer edits to phase", () => {
+    const filter = createClientLensFilter("alice")
+    const peerPhaseCommit = createCommitInfo("bob", [
       {
         container: "cid:root-game:Map",
-        content: { type: "insert", key: "phase" },
+        key: "phase",
+        value: "reveal",
       },
     ])
     expect(filter(peerPhaseCommit)).toBe(false)
   })
 
-  it("client lens accepts its own player mutations", () => {
+  it("rejects commits without identity", () => {
     const filter = createClientLensFilter("alice")
-    const ownCommit = commit("alice", [
-      { container: "cid:root-game/players/alice:Map" },
+    const noIdentityCommit = createCommitInfo(undefined, [
+      { container: "cid:root-game:Map" },
+    ])
+    expect(filter(noIdentityCommit)).toBe(false)
+  })
+})
+
+describe("client filter - bob's perspective", () => {
+  it("accepts bob's own mutations", () => {
+    const filter = createClientLensFilter("bob")
+
+    const ownCommit = createCommitInfo("bob", [
+      {
+        container: "cid:root-game-players-bob:Map",
+        key: "choice",
+        value: "paper",
+      },
     ])
     expect(filter(ownCommit)).toBe(true)
   })
 
-  it("client lens accepts server commits", () => {
-    const filter = createClientLensFilter("alice")
-    const serverCommit = commit(SERVER_PLAYER_ID, [
+  it("rejects alice trying to modify bob's state", () => {
+    const filter = createClientLensFilter("bob")
+
+    // Alice trying to modify bob's state
+    const otherPlayerCommit = createCommitInfo("alice", [
       {
-        container: "cid:root-game:Map",
-        content: { type: "insert", key: "phase" },
+        container: "cid:root-game-players-bob:Map",
+        key: "choice",
+        value: "rock",
       },
     ])
-    expect(filter(serverCommit)).toBe(true)
+    expect(filter(otherPlayerCommit)).toBe(false)
+  })
+
+  it("accepts alice modifying her own state", () => {
+    const filter = createClientLensFilter("bob")
+
+    // Alice modifying her own state - bob's filter should accept this
+    const otherPlayerCommit = createCommitInfo("alice", [
+      {
+        container: "cid:root-game-players-alice:Map",
+        key: "choice",
+        value: "rock",
+      },
+    ])
+    expect(filter(otherPlayerCommit)).toBe(true)
   })
 })
