@@ -30,18 +30,21 @@ export type PlayerState = {
  * - game.result: Game result (null until resolved)
  * - game.players: Map of player ID to player state
  */
-export const GameSchema = Shape.doc({
-  game: Shape.struct({
-    phase: Shape.plain.string<Phase>().placeholder("choosing"),
-    result: Shape.plain.string<Result>().nullable(),
-    players: Shape.record(
-      Shape.struct({
-        choice: Shape.plain.string<Choice>().nullable(),
-        locked: Shape.plain.boolean().placeholder(false),
-      }),
-    ),
-  }),
-})
+export const GameSchema = Shape.doc(
+  {
+    game: Shape.struct({
+      phase: Shape.plain.string<Phase>().placeholder("choosing"),
+      result: Shape.plain.string<Result>().nullable(),
+      players: Shape.record(
+        Shape.struct({
+          choice: Shape.plain.string<Choice>().nullable(),
+          locked: Shape.plain.boolean().placeholder(false),
+        }),
+      ),
+    }),
+  },
+  { mergeable: true },
+)
 
 export type GameDocShape = typeof GameSchema
 

@@ -34,6 +34,6 @@
     "vitest": "^4.0.17"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.10.3"
+    "loro-crdt": "^1.10.6"
   }
 }

@@ -37,7 +37,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/node": "^22.15.29",
     "@types/ws": "^8.5.13",
-    "loro-crdt": "^1.10.3",
+    "loro-crdt": "^1.10.6",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^4.0.17",

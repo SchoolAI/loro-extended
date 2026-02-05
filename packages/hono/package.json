@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "hono": ">=4",
-    "loro-crdt": "^1.10.3"
+    "loro-crdt": "^1.10.6"
   },
   "peerDependenciesMeta": {
     "@loro-extended/change": {

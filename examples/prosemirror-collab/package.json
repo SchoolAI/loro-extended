@@ -23,7 +23,7 @@
     "@loro-extended/repo": "workspace:^",
     "classic-level": "^1.2.0",
     "fastify": "^5.0.0",
-    "loro-crdt": "^1.10.3",
+    "loro-crdt": "^1.10.6",
     "loro-prosemirror": "^0.4.1",
     "prosemirror-example-setup": "^1.2.2",
     "prosemirror-keymap": "^1.2.2",

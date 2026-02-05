@@ -7,7 +7,7 @@ settings:
 overrides:
   react: 19.1.0
   react-dom: 19.1.0
-  loro-crdt: 1.10.3
+  loro-crdt: 1.10.6
 
 packageExtensionsChecksum: sha256-0j/G9R4nW6bplfJI2ElkSyVk6gJXJMpKbd4+Z1PY5AU=
 
@@ -47,8 +47,8 @@ importers:
         specifier: 7.0.0-dev.20260103.1
         version: 7.0.0-dev.20260103.1
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
@@ -153,8 +153,8 @@ importers:
         specifier: 7.0.0-dev.20260103.1
         version: 7.0.0-dev.20260103.1
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
@@ -212,8 +212,8 @@ importers:
         specifier: latest
         version: 1.3.8
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
@@ -246,8 +246,8 @@ importers:
         specifier: 7.0.0-dev.20260103.1
         version: 7.0.0-dev.20260103.1
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
@@ -485,8 +485,8 @@ importers:
         specifier: workspace:^
         version: link:../../packages/repo
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -650,11 +650,11 @@ importers:
         specifier: ^5.0.0
         version: 5.6.2
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       loro-prosemirror:
         specifier: ^0.4.1
-        version: 0.4.2(loro-crdt@1.10.3)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.4)
+        version: 0.4.2(loro-crdt@1.10.6)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.4)
       prosemirror-example-setup:
         specifier: ^1.2.2
         version: 1.2.3
@@ -747,8 +747,8 @@ importers:
         specifier: workspace:^
         version: link:../../packages/repo
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -1124,8 +1124,8 @@ importers:
   packages/change:
     dependencies:
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
     devDependencies:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260103.1
@@ -1155,8 +1155,8 @@ importers:
         specifier: '>=4'
         version: 4.11.3
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
     devDependencies:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260103.1
@@ -1187,8 +1187,8 @@ importers:
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.8.0
@@ -1231,8 +1231,8 @@ importers:
         specifier: workspace:^
         version: link:../change
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
     devDependencies:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260103.1
@@ -1256,8 +1256,8 @@ importers:
         specifier: workspace:^
         version: link:../repo
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.8.0
@@ -1306,8 +1306,8 @@ importers:
         specifier: ^1.0.1
         version: 1.2.0
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       mutative:
         specifier: ^1.2.0
         version: 1.3.0
@@ -1349,8 +1349,8 @@ importers:
         specifier: ^6.0.0
         version: 6.2.0(ink@6.6.0(@types/react@19.1.8)(react@19.1.0))(react@19.1.0)
       loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 1.10.6
+        version: 1.10.6
       meow:
         specifier: ^14.0.0
         version: 14.0.0
@@ -3758,13 +3758,13 @@ packages:
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
 
-  loro-crdt@1.10.3:
-    resolution: {integrity: sha512-vzWkVw7mWrKTilPjrgAhhzjAyOn3/DaUPJxdK9lunpEI1Y+uQMDBt/pEtRiovKFtGXo4tUVfULnFc7H/ufGwkQ==}
+  loro-crdt@1.10.6:
+    resolution: {integrity: sha512-ije6m7wrSRtzdyEd7n+rjgA+UCzfvz2PkjLk5Lf86zf1LgcbWY3g2nE3+7TDADiiX/ziYTovHnGRBiylPt2ipw==}
 
   loro-prosemirror@0.4.2:
     resolution: {integrity: sha512-j+7UybYAbTcv/uuoFJkd03EQWJzihd0fbwsoq93ExJtZ/4y5GXU4ZpRSkDwqYXczyh5Ptd+NecbILNpRMLPBTw==}
     peerDependencies:
-      loro-crdt: 1.10.3
+      loro-crdt: 1.10.6
       prosemirror-model: ^1.18.1
       prosemirror-state: ^1.4.1
       prosemirror-view: ^1.28.0
@@ -7366,12 +7366,12 @@ snapshots:
 
   lodash@4.17.21: {}
 
-  loro-crdt@1.10.3: {}
+  loro-crdt@1.10.6: {}
 
-  loro-prosemirror@0.4.2(loro-crdt@1.10.3)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.4):
+  loro-prosemirror@0.4.2(loro-crdt@1.10.6)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.4):
     dependencies:
       lib0: 0.2.117
-      loro-crdt: 1.10.3
+      loro-crdt: 1.10.6
       prosemirror-model: 1.25.4
       prosemirror-state: 1.4.4
       prosemirror-view: 1.41.4

@@ -34,7 +34,7 @@
     "uuid": "^9.0.1"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.10.3"
+    "loro-crdt": "^1.10.6"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

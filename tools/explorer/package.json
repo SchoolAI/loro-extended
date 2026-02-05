@@ -17,7 +17,7 @@
     "date-fns": "^4.1.0",
     "ink": "^6.5.1",
     "ink-select-input": "^6.0.0",
-    "loro-crdt": "^1.10.3",
+    "loro-crdt": "^1.10.6",
     "meow": "^14.0.0",
     "react": "19.2.0"
   },

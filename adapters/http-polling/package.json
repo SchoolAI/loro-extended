@@ -40,7 +40,7 @@
     "@logtape/logtape": "^1.1.1",
     "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "@types/express": "^4.17.23",
-    "loro-crdt": "^1.10.3",
+    "loro-crdt": "^1.10.6",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^4.0.17"

@@ -29,7 +29,7 @@
     "@loro-extended/change": "workspace:^"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.10.3"
+    "loro-crdt": "^1.10.6"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260103.1",
