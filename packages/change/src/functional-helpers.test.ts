@@ -508,6 +508,49 @@ describe("functional helpers", () => {
       unsubscribe()
     })
 
+    it("should return before/after for mergeable nested containers", () => {
+      const mergeableSchema = Shape.doc(
+        {
+          game: Shape.struct({
+            players: Shape.record(
+              Shape.struct({
+                locked: Shape.plain.boolean().placeholder(false),
+              }),
+            ),
+          }),
+        },
+        { mergeable: true },
+      )
+
+      const doc = createTypedDoc(mergeableSchema)
+
+      change(doc, draft => {
+        draft.game.players.set("alice", { locked: false })
+        draft.game.players.set("bob", { locked: false })
+      })
+
+      const transitions: Array<{ beforeLocked: boolean; afterLocked: boolean }> =
+        []
+
+      const unsubscribe = loro(doc).subscribe(event => {
+        const { before, after } = getTransition(doc, event)
+        transitions.push({
+          beforeLocked: before.game.players.get("bob")?.locked ?? false,
+          afterLocked: after.game.players.get("bob")?.locked ?? false,
+        })
+      })
+
+      change(doc, draft => {
+        const bob = draft.game.players.get("bob")
+        if (bob) {
+          bob.locked = true
+        }
+      })
+
+      expect(transitions).toEqual([{ beforeLocked: false, afterLocked: true }])
+      unsubscribe()
+    })
+
     it("should throw on checkout events", () => {
       const doc = createTypedDoc(schema)
       const frontiers = loro(doc).frontiers()

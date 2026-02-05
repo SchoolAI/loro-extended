@@ -88,6 +88,7 @@ export class StructRefInternals<
         autoCommit: this.getAutoCommit(),
         batchedMutation: this.getBatchedMutation(),
         getDoc: () => doc,
+        overlay: this.getOverlay(),
         pathPrefix: newPathPrefix,
         mergeable: true,
       }
@@ -105,6 +106,7 @@ export class StructRefInternals<
       autoCommit: this.getAutoCommit(),
       batchedMutation: this.getBatchedMutation(),
       getDoc: () => this.getDoc(),
+      overlay: this.getOverlay(),
     }
   }
 
