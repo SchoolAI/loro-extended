@@ -179,7 +179,7 @@ describe("functional helpers", () => {
     })
   })
 
-  describe("loro(ref).doc", () => {
+  describe("ext(ref).doc", () => {
     it("should return the LoroDoc from TextRef", () => {
       const doc = createTypedDoc(fullSchema)
       const titleRef = doc.title
@@ -529,8 +529,10 @@ describe("functional helpers", () => {
         draft.game.players.set("bob", { locked: false })
       })
 
-      const transitions: Array<{ beforeLocked: boolean; afterLocked: boolean }> =
-        []
+      const transitions: Array<{
+        beforeLocked: boolean
+        afterLocked: boolean
+      }> = []
 
       const unsubscribe = loro(doc).subscribe(event => {
         const { before, after } = getTransition(doc, event)

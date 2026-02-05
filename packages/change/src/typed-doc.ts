@@ -367,9 +367,9 @@ class TypedDocInternal<Shape extends DocShape> {
  *   draft.title.update("World");
  * });
  *
- * // Access CRDT internals via loro()
+ * // Access native Loro types via loro()
  * import { loro } from "@loro-extended/change";
- * loro(doc).doc;  // LoroDoc
+ * loro(doc);  // returns LoroDoc directly
  * loro(doc).subscribe(callback);
  * ```
  */

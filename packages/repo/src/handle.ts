@@ -385,7 +385,7 @@ export class Handle<
   /**
    * The strongly-typed document.
    * Always returns a TypedDoc - use Shape.any() for untyped access.
-   * Access raw LoroDoc via getLoroDoc() for untyped operations.
+   * Access raw LoroDoc via `loro(handle.doc)` for untyped operations.
    */
   get doc(): TypedDoc<D> {
     return this._doc

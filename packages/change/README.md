@@ -15,7 +15,7 @@ Working with Loro directly involves somewhat verbose container operations and co
 - **Placeholders**: Seamlessly blend default values with CRDT state
 - **Full Type Safety**: Complete TypeScript support with compile-time validation
 - **Transactional Changes**: All mutations within a `change()` block are atomic
-- **Loro Compatible**: Works seamlessly with existing Loro code (`loro(doc).doc` is a familiar `LoroDoc`)
+- **Loro Compatible**: Works seamlessly with existing Loro code (`loro(doc)` returns the familiar `LoroDoc`)
 
 ## Installation
 
@@ -58,15 +58,14 @@ if ("alice" in doc.users) {
 }
 
 // Batched mutations - commit together (optional, for performance)
-// Using functional helper (recommended)
-doc.change((draft) => {
+change(doc, (draft) => {
   draft.title.insert(0, "Change: ");
   draft.count.increment(10);
   draft.users.set("bob", { name: "Bob" });
 });
 // All changes commit as one transaction
 
-// Get JSON snapshot using functional helper
+// Get JSON snapshot
 console.log(doc.toJSON());
 // { title: "Change: 📝 Todo", count: 15, users: { alice: { name: "Alice" }, bob: { name: "Bob" } } }
 ```
@@ -152,7 +151,7 @@ console.log(doc.toJSON());
 // { title: "Untitled Document", viewCount: 0, ... }
 
 // After changes, CRDT values take priority over empty state
-doc.change((draft) => {
+change(doc, (draft) => {
   draft.title.insert(0, "My Blog Post");
   draft.viewCount.increment(10);
 });
@@ -176,7 +175,7 @@ doc.tags.push("typescript");
 For batched operations (better performance, atomic undo), use `change()`:
 
 ```typescript
-doc.change((draft) => {
+change(doc, (draft) => {
   // Text operations
   draft.title.insert(0, "📝");
   draft.title.delete(5, 3);
@@ -430,7 +429,7 @@ const complexSchema = Shape.doc({
     metadata: Shape.struct({
       views: Shape.counter(),
       author: Shape.struct({
-        name: Shape.plain.string().placeholder("Anonymous),
+        name: Shape.plain.string().placeholder("Anonymous"),
         email: Shape.plain.string(),
       }),
     }),
@@ -439,7 +438,7 @@ const complexSchema = Shape.doc({
 
 const doc = createTypedDoc(complexSchema);
 
-doc.change((draft) => {
+change(doc, (draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
   draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
@@ -488,7 +487,7 @@ const collaborativeSchema = Shape.doc({
   ),
 });
 
-doc.change((draft) => {
+change(doc, (draft) => {
   // Push creates and configures nested containers automatically
   draft.articles.push({
     title: "Collaborative Article",
@@ -501,8 +500,8 @@ doc.change((draft) => {
   });
 
   // Later, edit the collaborative parts
-  draft.articles.[0]?.title.insert(0, "✨ ");
-  draft.articles.[0]?.tags.push("real-time");
+  draft.articles[0]?.title.insert(0, "✨ ");
+  draft.articles[0]?.tags.push("real-time");
 });
 ```
 
@@ -535,7 +534,7 @@ See `@loro-extended/repo` documentation for full details on `Handle.subscribe()`
 
 ### Core Functions
 
-#### `createTypedDoc<T>(schema, existingDoc?)`
+#### `createTypedDoc<T>(schema, options?)`
 
 Creates a new typed Loro document. This is the recommended way to create documents.
 
@@ -543,123 +542,185 @@ Creates a new typed Loro document. This is the recommended way to create documen
 import { createTypedDoc, Shape } from "@loro-extended/change";
 
 const doc = createTypedDoc(schema);
-const docFromExisting = createTypedDoc(schema, existingLoroDoc);
+const docFromExisting = createTypedDoc(schema, { doc: existingLoroDoc });
 ```
 
-### The `loro()` Escape Hatch
+**Options:**
 
-The `loro()` function provides access to CRDT internals and container-specific operations. It follows a simple design principle:
+| Option           | Type        | Default | Description                                                    |
+| ---------------- | ----------- | ------- | -------------------------------------------------------------- |
+| `doc`            | `LoroDoc`   | —       | Wrap an existing LoroDoc instead of creating a new one         |
+| `mergeable`      | `boolean`   | `false` | Store containers at root with path-based names for deterministic IDs |
+| `skipInitialize` | `boolean`   | `false` | Skip automatic metadata initialization (for synced documents)  |
 
-> **If it takes a plain JavaScript value, keep it on the ref.** > **If it takes a Loro container or exposes CRDT internals, use `loro()`.**
+#### `change(target, fn, options?)`
+
+The primary mutation API. Batches multiple mutations into a single transaction. Works with TypedDoc and all ref types. Returns the target for chaining.
+
+```typescript
+import { change } from "@loro-extended/change";
+
+// Document-level
+change(doc, (draft) => {
+  draft.count.increment(10);
+  draft.title.update("Hello");
+});
+
+// Ref-level
+change(doc.items, (draft) => {
+  draft.push("item1");
+});
+
+// With commit message
+change(doc, (draft) => {
+  draft.count.increment(10);
+}, { commitMessage: { userId: "alice" } });
+```
+
+**Options:**
+
+| Option          | Type               | Description                                              |
+| --------------- | ------------------ | -------------------------------------------------------- |
+| `commitMessage` | `string \| object` | Metadata attached to the commit (objects are JSON-serialized) |
+
+### The `loro()` Function
+
+The `loro()` function returns the **native Loro type** directly from any TypedDoc or ref. Use it when you need to access the underlying Loro API.
 
 ```typescript
 import { loro } from "@loro-extended/change";
 
-// Access underlying Loro primitives
-loro(ref).doc; // LoroDoc
-loro(ref).container; // LoroList, LoroMap, etc. (correctly typed)
-loro(ref).subscribe(cb); // Subscribe to changes
+// Returns native Loro types directly
+const loroDoc = loro(doc);           // LoroDoc
+const loroText = loro(doc.title);    // LoroText
+const loroList = loro(doc.items);    // LoroList
+const loroMap = loro(doc.settings);  // LoroMap (for struct or record)
+const loroCounter = loro(doc.count); // LoroCounter
+const loroTree = loro(doc.states);   // LoroTree
 
-// Container operations (take Loro containers, not plain values)
-loro(list).pushContainer(loroMap);
-loro(list).insertContainer(0, loroMap);
-loro(struct).setContainer("key", loroMap);
-loro(record).setContainer("key", loroMap);
+// Call native Loro methods directly
+loroDoc.frontiers();
+loroDoc.peerId;
+loroDoc.subscribe(callback);
 
-// TypedDoc operations
-loro(doc).doc; // Raw LoroDoc access
-loro(doc).applyPatch(patch); // JSON Patch operations
-loro(doc).docShape; // Schema access
-loro(doc).rawValue; // Unmerged CRDT value
+loroText.length;
+loroText.toString();
+```
+
+### The `ext()` Function
+
+The `ext()` function provides access to **loro-extended-specific features** that go beyond native Loro. Use it for forking, subscribing, and accessing document metadata.
+
+```typescript
+import { ext } from "@loro-extended/change";
+
+// Document-level features
+ext(doc).fork();                     // Fork the document
+ext(doc).forkAt(frontiers);          // Fork at a specific version
+ext(doc).shallowForkAt(frontiers);   // Fork with shallow snapshot
+ext(doc).subscribe(callback);        // Subscribe to changes
+ext(doc).applyPatch(patch);          // Apply JSON Patch operations
+ext(doc).docShape;                   // Access the schema
+ext(doc).rawValue;                   // CRDT state without placeholders
+ext(doc).mergeable;                  // Whether doc uses mergeable storage
+ext(doc).initialize();               // Write metadata (if skipInitialize was used)
+
+// Ref-level features
+ext(ref).doc;                        // Get LoroDoc from any ref
+ext(ref).subscribe(callback);        // Subscribe to container changes
+ext(list).pushContainer(container);  // Push a pre-existing Loro container
+ext(list).insertContainer(i, c);     // Insert a pre-existing Loro container
+ext(struct).setContainer("key", c);  // Set a pre-existing Loro container
+ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 ```
 
 #### API Surface by Ref Type
 
 **ListRef / MovableListRef**
 
-| Direct Access          | Only via `loro()`                   |
-| ---------------------- | ----------------------------------- |
-| `push(item)`           | `pushContainer(container)`          |
-| `insert(index, item)`  | `insertContainer(index, container)` |
-| `delete(index, len)`   | `subscribe(callback)`               |
-| `find(predicate)`      | `doc`                               |
-| `filter(predicate)`    | `container`                         |
-| `map(callback)`        |                                     |
-| `forEach(callback)`    |                                     |
-| `some(predicate)`      |                                     |
-| `every(predicate)`     |                                     |
-| `slice(start, end)`    |                                     |
-| `findIndex(predicate)` |                                     |
-| `length`, `[index]`    |                                     |
-| `toJSON()`             |                                     |
+| Direct Access          | Via `loro()` (native)               | Via `ext()` (extended)              |
+| ---------------------- | ----------------------------------- | ----------------------------------- |
+| `push(item)`           | Native `LoroList` / `LoroMovableList` methods | `pushContainer(container)`          |
+| `insert(index, item)`  |                                     | `insertContainer(index, container)` |
+| `delete(index, len)`   |                                     | `subscribe(callback)`               |
+| `find(predicate)`      |                                     | `doc`                               |
+| `filter(predicate)`    |                                     |                                     |
+| `map(callback)`        |                                     |                                     |
+| `forEach(callback)`    |                                     |                                     |
+| `some(predicate)`      |                                     |                                     |
+| `every(predicate)`     |                                     |                                     |
+| `slice(start, end)`    |                                     |                                     |
+| `findIndex(predicate)` |                                     |                                     |
+| `length`, `[index]`    |                                     |                                     |
+| `toJSON()`             |                                     |                                     |
 
 **StructRef**
 
-| Direct Access                | Only via `loro()`              |
-| ---------------------------- | ------------------------------ |
-| `obj.property` (get)         | `setContainer(key, container)` |
-| `obj.property = value` (set) | `subscribe(callback)`          |
-| `Object.keys(obj)`           | `doc`                          |
-| `'key' in obj`               | `container`                    |
-| `delete obj.key`             |                                |
-| `toJSON()`                   |                                |
+| Direct Access                | Via `loro()` (native)    | Via `ext()` (extended)         |
+| ---------------------------- | ------------------------ | ------------------------------ |
+| `obj.property` (get)         | Native `LoroMap` methods | `setContainer(key, container)` |
+| `obj.property = value` (set) |                          | `subscribe(callback)`          |
+| `Object.keys(obj)`           |                          | `doc`                          |
+| `'key' in obj`               |                          |                                |
+| `delete obj.key`             |                          |                                |
+| `toJSON()`                   |                          |                                |
 
 **RecordRef** (Map-like interface)
 
-| Direct Access                     | Only via `loro()`              |
-| --------------------------------- | ------------------------------ |
-| `get(key)`                        | `setContainer(key, container)` |
-| `set(key, value)`                 | `subscribe(callback)`          |
-| `delete(key)`                     | `doc`                          |
-| `has(key)`                        | `container`                    |
-| `keys()`, `values()`, `entries()` |                                |
-| `size`                            |                                |
-| `replace(values)`                 |                                |
-| `merge(values)`                   |                                |
-| `clear()`                         |                                |
-| `toJSON()`                        |                                |
+| Direct Access                     | Via `loro()` (native)    | Via `ext()` (extended)         |
+| --------------------------------- | ------------------------ | ------------------------------ |
+| `get(key)`                        | Native `LoroMap` methods | `setContainer(key, container)` |
+| `set(key, value)`                 |                          | `subscribe(callback)`          |
+| `delete(key)`                     |                          | `doc`                          |
+| `has(key)`                        |                          |                                |
+| `keys()`, `values()`, `entries()` |                          |                                |
+| `size`                            |                          |                                |
+| `replace(values)`                 |                          |                                |
+| `merge(values)`                   |                          |                                |
+| `clear()`                         |                          |                                |
+| `toJSON()`                        |                          |                                |
 
 **TextRef**
 
-| Direct Access                    | Only via `loro()`     |
-| -------------------------------- | --------------------- |
-| `insert(index, content)`         | `subscribe(callback)` |
-| `delete(index, len)`             | `doc`                 |
-| `update(text)`                   | `container`           |
-| `mark(range, key, value)`        |                       |
-| `unmark(range, key)`             |                       |
-| `toDelta()`, `applyDelta(delta)` |                       |
-| `toString()`, `valueOf()`        |                       |
-| `length`, `toJSON()`             |                       |
+| Direct Access                    | Via `loro()` (native)    | Via `ext()` (extended)  |
+| -------------------------------- | ------------------------ | ----------------------- |
+| `insert(index, content)`         | Native `LoroText` methods | `subscribe(callback)`  |
+| `delete(index, len)`             |                          | `doc`                   |
+| `update(text)`                   |                          |                         |
+| `mark(range, key, value)`        |                          |                         |
+| `unmark(range, key)`             |                          |                         |
+| `toDelta()`, `applyDelta(delta)` |                          |                         |
+| `toString()`, `valueOf()`        |                          |                         |
+| `length`, `toJSON()`             |                          |                         |
 
 **CounterRef**
 
-| Direct Access        | Only via `loro()`     |
-| -------------------- | --------------------- |
-| `increment(value)`   | `subscribe(callback)` |
-| `decrement(value)`   | `doc`                 |
-| `value`, `valueOf()` | `container`           |
-| `toJSON()`           |                       |
+| Direct Access        | Via `loro()` (native)       | Via `ext()` (extended) |
+| -------------------- | --------------------------- | ---------------------- |
+| `increment(value)`   | Native `LoroCounter` methods | `subscribe(callback)` |
+| `decrement(value)`   |                             | `doc`                  |
+| `value`, `valueOf()` |                             |                        |
+| `toJSON()`           |                             |                        |
 
 **TypedDoc**
 
-| Direct Access                  | Only via `loro()`     |
-| ------------------------------ | --------------------- |
-| `doc.property` (schema access) | `doc` (raw LoroDoc)   |
-| `toJSON()`                     | `subscribe(callback)` |
-| `change(fn)`                   | `applyPatch(patch)`   |
-|                                | `docShape`            |
-|                                | `rawValue`            |
+| Direct Access                  | Via `loro()` (native)  | Via `ext()` (extended)  |
+| ------------------------------ | ---------------------- | ----------------------- |
+| `doc.property` (schema access) | Native `LoroDoc` methods | `subscribe(callback)` |
+| `toJSON()`                     |                        | `fork()`, `forkAt()`    |
+|                                |                        | `applyPatch(patch)`     |
+|                                |                        | `docShape`, `rawValue`  |
 
 ### Subscribing to Ref Changes
 
-The `loro()` function enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document:
+The `loro()` function enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document. Since `loro()` returns the native Loro container, you call `.subscribe()` directly on it:
 
 ```typescript
 import { loro } from "@loro-extended/change";
 
 function TextEditor({ textRef }: { textRef: TextRef }) {
   useEffect(() => {
+    // loro(textRef) returns a LoroText — call subscribe on it directly
     return loro(textRef).subscribe((event) => {
       // Handle text changes
     });
@@ -677,6 +738,7 @@ subscription event using the diff overlay (no checkout or fork required):
 ```typescript
 import { getTransition, loro } from "@loro-extended/change";
 
+// loro(doc) returns a LoroDoc — call subscribe on it directly
 const unsubscribe = loro(doc).subscribe((event) => {
   if (event.by === "checkout") return;
 
@@ -690,7 +752,7 @@ const unsubscribe = loro(doc).subscribe((event) => {
 
 ### Schema Builders
 
-#### `Shape.doc(shape)`
+#### `Shape.doc(shape, options?)`
 
 Creates a document schema.
 
@@ -699,6 +761,11 @@ const schema = Shape.doc({
   field1: Shape.text(),
   field2: Shape.counter(),
 });
+
+// With mergeable storage for deterministic container IDs
+const mergeableSchema = Shape.doc({
+  players: Shape.record(Shape.struct({ score: Shape.plain.number() })),
+}, { mergeable: true });
 ```
 
 #### Container Types
@@ -775,7 +842,7 @@ email: Shape.plain
 
 ### TypedDoc API
 
-With the proxy-based API, schema properties are accessed directly on the doc object, and CRDT internals are accessed via the `loro()` function.
+With the proxy-based API, schema properties are accessed directly on the doc object, and CRDT internals are accessed via `loro()` and `ext()`.
 
 #### Direct Schema Access
 
@@ -806,22 +873,24 @@ Returns the full plain JavaScript object representation.
 const snapshot = doc.toJSON();
 ```
 
-#### `loro(doc).rawValue`
+#### `ext(doc).rawValue`
 
 Returns raw CRDT state without placeholders (empty state overlay).
 
 ```typescript
-import { loro } from "@loro-extended/change";
-const crdtState = loro(doc).rawValue;
+import { ext } from "@loro-extended/change";
+const crdtState = ext(doc).rawValue;
 ```
 
-#### `loro(doc).doc`
+#### `loro(doc)` — Access the underlying LoroDoc
 
-Access the underlying LoroDoc.
+Returns the native `LoroDoc` directly.
 
 ```typescript
 import { loro } from "@loro-extended/change";
-const loroDoc = loro(doc).doc;
+const loroDoc = loro(doc); // LoroDoc instance
+loroDoc.frontiers();
+loroDoc.peerId;
 ```
 
 ## CRDT Container Operations
@@ -1103,7 +1172,7 @@ const serializedMetadata = JSON.stringify(doc.metadata); // returns string
 Full TypeScript support with compile-time validation:
 
 ```typescript
-import { TypedDoc, Shape, type InferPlainType } from "@loro-extended/change";
+import { TypedDoc, Shape, type Infer } from "@loro-extended/change";
 
 // Define your desired interface
 interface TodoDoc {
@@ -1144,7 +1213,7 @@ change(doc, (draft) => {
 const result: TodoDoc = doc.toJSON();
 
 // You can also use type assertion to ensure schema compatibility
-type SchemaType = InferPlainType<typeof todoSchema>;
+type SchemaType = Infer<typeof todoSchema>;
 const _typeCheck: TodoDoc = {} as SchemaType; // ✅ Will error if types don't match
 ```
 
@@ -1156,14 +1225,14 @@ const _typeCheck: TodoDoc = {} as SchemaType; // ✅ Will error if types don't m
 
 ```typescript
 import { LoroDoc } from "loro-crdt";
-import { createTypedDoc, getLoroDoc } from "@loro-extended/change";
+import { createTypedDoc, loro } from "@loro-extended/change";
 
 // Wrap existing LoroDoc
 const existingDoc = new LoroDoc();
-const typedDoc = createTypedDoc(schema, existingDoc);
+const typedDoc = createTypedDoc(schema, { doc: existingDoc });
 
 // Access underlying LoroDoc
-const loroDoc = getLoroDoc(typedDoc);
+const loroDoc = loro(typedDoc); // returns the LoroDoc directly
 
 // Use with existing Loro APIs
 loroDoc.subscribe((event) => {

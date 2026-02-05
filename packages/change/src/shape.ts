@@ -575,7 +575,7 @@ export const Shape = {
   }),
 
   /**
-   * @deprecated Use `Shape.struct` instead. `Shape.struct` will be removed in a future version.
+   * @deprecated Use `Shape.struct` instead. `Shape.map` will be removed in a future version.
    */
   map: <T extends Record<string, ContainerOrValueShape>>(
     shape: T,
