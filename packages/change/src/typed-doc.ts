@@ -34,6 +34,7 @@ import type {
 } from "./shape.js"
 import { type DiffOverlay, INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc-ref.js"
+import { serializeRefToJSON } from "./typed-refs/utils.js"
 import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { isValueShape } from "./utils/type-guards.js"
 import { validatePlaceholder } from "./validation.js"
@@ -262,6 +263,19 @@ class TypedDocInternal<Shape extends DocShape> {
   }
 
   toJSON(): Infer<Shape> {
+    if (this.overlay) {
+      const refJson = serializeRefToJSON(
+        this.value as unknown as Record<string, any>,
+        Object.keys(this.shape.shapes),
+      )
+
+      return overlayPlaceholder(
+        this.shape,
+        refJson,
+        this.placeholder as any,
+      ) as Infer<Shape>
+    }
+
     const crdtValue = this.doc.toJSON()
 
     // For mergeable docs, reconstruct hierarchy from flattened storage
