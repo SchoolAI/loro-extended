@@ -47,4 +47,10 @@ export {
 // Core
 export { createLens, parseCommitInfo } from "./lens.js"
 // Types
-export type { CommitInfo, Lens, LensFilter, LensOptions } from "./types.js"
+export type {
+  CommitInfo,
+  DebugFn,
+  Lens,
+  LensFilter,
+  LensOptions,
+} from "./types.js"

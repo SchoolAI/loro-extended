@@ -150,6 +150,47 @@ describe("createLens", () => {
       lens.dispose()
     })
 
+    it("emits a second worldview local event when change() is triggered during an import callback", async () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+      const remote = createTypedDoc(TestSchema)
+
+      change(remote, d => {
+        d.counter.increment(1)
+      })
+
+      const bytes = loro(remote).export({ mode: "update" })
+
+      const localTexts: string[] = []
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "import") {
+          change(lens, d => {
+            d.text.insert(0, "reveal")
+          })
+          return
+        }
+
+        if (event.by === "local") {
+          const value = lens.worldview.text.toString()
+          localTexts.push(value)
+          if (value === "reveal") {
+            change(lens, d => {
+              d.text.update("resolved")
+            })
+          }
+        }
+      })
+
+      loro(world).import(bytes)
+
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(localTexts).toEqual(["reveal", "resolved"])
+
+      unsubscribe()
+      lens.dispose()
+    })
+
     it("serializes object commit messages to JSON", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
@@ -268,6 +309,227 @@ describe("createLens", () => {
       expect(lens3.worldview.counter.value).toBe(1)
 
       lens3.dispose()
+      lens2.dispose()
+      lens1.dispose()
+    })
+  })
+
+  describe("worldview subscription events", () => {
+    it("fires local event on worldview when change(lens, fn) is called directly", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      const events: Array<{ by: string }> = []
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        events.push({ by: event.by })
+      })
+
+      change(lens, d => {
+        d.counter.increment(5)
+      })
+
+      // Should have received a "local" event
+      expect(events.length).toBeGreaterThan(0)
+      expect(events.some(e => e.by === "local")).toBe(true)
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("fires local event on worldview for each change(lens, fn) call", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      const localEvents: Array<{ by: string }> = []
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "local") {
+          localEvents.push({ by: event.by })
+        }
+      })
+
+      change(lens, d => {
+        d.counter.increment(1)
+      })
+
+      change(lens, d => {
+        d.counter.increment(2)
+      })
+
+      change(lens, d => {
+        d.counter.increment(3)
+      })
+
+      // Should have received 3 local events (one per change call)
+      expect(localEvents.length).toBe(3)
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("fires import event on worldview when external changes are imported to world", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      const events: Array<{ by: string }> = []
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        events.push({ by: event.by })
+      })
+
+      // Create external doc and import to world
+      const externalDoc = new LoroDoc()
+      externalDoc.setPeerId("999")
+      externalDoc.getCounter("counter").increment(7)
+      externalDoc.commit()
+
+      loro(world).import(externalDoc.export({ mode: "update" }))
+
+      // Should have received an "import" event on worldview
+      expect(events.length).toBeGreaterThan(0)
+      expect(events.some(e => e.by === "import")).toBe(true)
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("allows reactive patterns: change(lens) in response to worldview local event", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      let reactionCount = 0
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "local" && reactionCount === 0) {
+          reactionCount++
+          // React to the first local event by making another change
+          change(lens, d => {
+            d.text.insert(0, "reacted")
+          })
+        }
+      })
+
+      // Trigger the initial change
+      change(lens, d => {
+        d.counter.increment(1)
+      })
+
+      // Both changes should have been applied
+      expect(lens.worldview.counter.value).toBe(1)
+      expect(lens.worldview.text.toString()).toBe("reacted")
+      expect(world.counter.value).toBe(1)
+      expect(world.text.toString()).toBe("reacted")
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("allows reactive patterns: change(lens) in response to worldview import event", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      let reactionCount = 0
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "import" && reactionCount === 0) {
+          reactionCount++
+          // React to import by making a local change
+          change(lens, d => {
+            d.text.insert(0, "reacted-to-import")
+          })
+        }
+      })
+
+      // Import external changes
+      const externalDoc = new LoroDoc()
+      externalDoc.setPeerId("999")
+      externalDoc.getCounter("counter").increment(7)
+      externalDoc.commit()
+
+      loro(world).import(externalDoc.export({ mode: "update" }))
+
+      // Both the import and reaction should be applied
+      expect(lens.worldview.counter.value).toBe(7)
+      expect(lens.worldview.text.toString()).toBe("reacted-to-import")
+      expect(world.counter.value).toBe(7)
+      expect(world.text.toString()).toBe("reacted-to-import")
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("subscription to worldview receives events even with filter that rejects all", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world, { filter: filterAll }) // Reject all external
+
+      const events: Array<{ by: string }> = []
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        events.push({ by: event.by })
+      })
+
+      // Local change should still fire event (bypasses filter)
+      change(lens, d => {
+        d.counter.increment(5)
+      })
+
+      expect(events.some(e => e.by === "local")).toBe(true)
+
+      unsubscribe()
+      lens.dispose()
+    })
+  })
+
+  describe("re-entrant change calls", () => {
+    it("handles multiple queued changes without double-propagation", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens = createLens(world)
+
+      let callCount = 0
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "local" && callCount < 3) {
+          callCount++
+          change(lens, d => {
+            d.counter.increment(1)
+          })
+        }
+      })
+
+      // Trigger the initial change
+      change(lens, d => {
+        d.counter.increment(1)
+      })
+
+      // Initial + 3 queued = 4 increments, each applied exactly once
+      expect(lens.worldview.counter.value).toBe(4)
+      expect(world.counter.value).toBe(4) // NOT 8 or higher!
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("handles re-entrancy in chained lenses", () => {
+      const world = createTypedDoc(TestSchema)
+      const lens1 = createLens(world)
+      const lens2 = createLens(lens1.worldview)
+
+      let reacted = false
+      const unsubscribe = loro(lens2.worldview).subscribe(event => {
+        if (event.by === "local" && !reacted) {
+          reacted = true
+          change(lens2, d => {
+            d.text.insert(0, "chained")
+          })
+        }
+      })
+
+      // Trigger the initial change
+      change(lens2, d => {
+        d.counter.increment(1)
+      })
+
+      // Changes propagate through chain without duplication
+      expect(lens2.worldview.counter.value).toBe(1)
+      expect(lens1.worldview.counter.value).toBe(1)
+      expect(world.counter.value).toBe(1) // NOT 2!
+      expect(world.text.toString()).toBe("chained")
+
+      unsubscribe()
       lens2.dispose()
       lens1.dispose()
     })
@@ -466,6 +728,75 @@ describe("createLens", () => {
       // Should not throw
       lens.dispose()
       lens.dispose()
+      lens.dispose()
+    })
+  })
+
+  describe("debug option", () => {
+    it("calls debug function with log messages", () => {
+      const source = createTypedDoc(TestSchema)
+      const logs: string[] = []
+      const lens = createLens(source, {
+        debug: msg => logs.push(msg),
+      })
+
+      // Should have logged creation
+      expect(logs.some(l => l.includes("created lens"))).toBe(true)
+
+      // Make a change
+      change(lens, d => {
+        d.counter.increment(5)
+      })
+
+      // Should have logged the change processing
+      expect(logs.some(l => l.includes("processLocalChange"))).toBe(true)
+      expect(logs.some(l => l.includes("applyAndPropagate"))).toBe(true)
+
+      // Dispose
+      lens.dispose()
+
+      // Should have logged dispose
+      expect(logs.some(l => l.includes("dispose"))).toBe(true)
+    })
+
+    it("logs re-entrant calls", () => {
+      const source = createTypedDoc(TestSchema)
+      const logs: string[] = []
+      const lens = createLens(source, {
+        debug: msg => logs.push(msg),
+      })
+
+      let reacted = false
+      const unsubscribe = loro(lens.worldview).subscribe(event => {
+        if (event.by === "local" && !reacted) {
+          reacted = true
+          change(lens, d => {
+            d.text.insert(0, "reacted")
+          })
+        }
+      })
+
+      change(lens, d => {
+        d.counter.increment(1)
+      })
+
+      // Should have logged the queued re-entrant call
+      expect(logs.some(l => l.includes("queued"))).toBe(true)
+      expect(logs.some(l => l.includes("processQueue"))).toBe(true)
+
+      unsubscribe()
+      lens.dispose()
+    })
+
+    it("works without debug option (no errors)", () => {
+      const source = createTypedDoc(TestSchema)
+      const lens = createLens(source) // No debug option
+
+      change(lens, d => {
+        d.counter.increment(5)
+      })
+
+      expect(lens.worldview.counter.value).toBe(5)
       lens.dispose()
     })
   })

@@ -115,6 +115,7 @@ Creates a Lens from a world TypedDoc.
 - `world: TypedDoc<D>` - The world document (shared, converging state)
 - `options?: LensOptions` - Optional configuration
   - `filter?: LensFilter` - Filter function for incoming commits (default: accept all)
+  - `debug?: DebugFn` - Debug logging function (e.g., `console.log`)
 
 **Returns:** `Lens<D>`
 
@@ -321,6 +322,77 @@ change(
 The message is automatically JSON-serialized and available in the filter's `CommitInfo.message`. This enables identity-based filtering where the server can verify who made each change.
 
 Commit messages also propagate through chained lenses, so a change made in a deeply nested lens will have its message available at the root world.
+
+## Reactive Patterns
+
+The lens supports calling `change(lens, ...)` inside subscription callbacks, enabling reactive patterns:
+
+```typescript
+import { change, createLens } from "@loro-extended/lens";
+import { loro } from "@loro-extended/change";
+
+const lens = createLens(world);
+
+// React to local changes
+loro(lens.worldview).subscribe((event) => {
+  if (event.by === "local") {
+    // Safe to call change() here - it will be queued and processed
+    change(lens, (draft) => {
+      draft.lastModified.insert(0, new Date().toISOString());
+    });
+  }
+});
+
+// React to imported changes
+loro(lens.worldview).subscribe((event) => {
+  if (event.by === "import") {
+    // Respond to external changes
+    change(lens, (draft) => {
+      draft.notifications.push("New data received");
+    });
+  }
+});
+```
+
+Re-entrant calls are queued and processed in order after the current operation completes. This prevents infinite loops while enabling powerful reactive workflows.
+
+## Debugging
+
+Enable debug logging to understand the internal flow of the lens:
+
+```typescript
+import { createLens, change } from "@loro-extended/lens";
+
+// Use console.log for simple debugging
+const lens = createLens(world, {
+  debug: console.log,
+});
+
+// Or use a custom logger
+const lens = createLens(world, {
+  debug: (msg) => console.log(`[Lens ${Date.now()}] ${msg}`),
+});
+
+// Debug output includes:
+// - Lens creation with peer ID
+// - World subscription events (imports, local changes)
+// - Filter results (accepted/rejected spans)
+// - Change processing (start, queue, propagate)
+// - Worldview subscription events (chained lens changes)
+// - Dispose cleanup
+```
+
+Example debug output:
+
+```
+created lens with peerId=12345678901234567890
+processLocalChange: starting
+applyAndPropagate: starting
+applyAndPropagate: completed
+world subscription: event.by=import
+filter: accepted 1 spans, rejected peers: 0
+dispose: cleaning up
+```
 
 ## Lens Composition
 

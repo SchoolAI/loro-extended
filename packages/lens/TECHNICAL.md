@@ -112,43 +112,62 @@ worldviewLoroDoc.subscribe((event) => {
 - **World "local"**: Parent lens's `change()` method (for chained lenses)
 - **Worldview "local"**: Chained lens applying changes via `applyDiff`
 
-### 5. Processing State
+### 5. Change Processing with Re-entrancy Support
 
-The lens uses an explicit `ProcessingState` string union to track what operation is in progress:
+The lens uses a queue-based approach to handle re-entrant calls (e.g., calling `change(lens, ...)` inside a subscription callback):
 
 ```typescript
-type ProcessingState =
-  | "idle"
-  | "filtering-world-to-worldview"
-  | "propagating-worldview-to-world"
-  | "applying-local-change";
+let isProcessing = false;
+const changeQueue: Array<{ fn, options }> = [];
 
-let processingState: ProcessingState = "idle";
-
-function processWorldChange(): void {
-  if (isDisposed || processingState !== "idle") return;
-  // ...
+function processLocalChange(fn, options): void {
+  if (isProcessing) {
+    changeQueue.push({ fn, options });
+    return;
+  }
+  
+  isProcessing = true;
+  try {
+    applyAndPropagate(fn, options);
+    while (changeQueue.length > 0) {
+      const queued = changeQueue.shift();
+      applyAndPropagate(queued.fn, queued.options);
+    }
+  } finally {
+    isProcessing = false;
+  }
 }
 ```
 
-This explicit state machine:
+This approach:
 
-- Makes control flow self-documenting
 - Prevents infinite loops between subscriptions
-- Allows fine-grained control over which operations block which
+- Supports reactive patterns (change in response to events)
+- Processes queued changes in order after the current operation completes
 
-### 6. Centralized Frontier Tracking
+### 6. Fresh Frontier Capture
 
-Frontier updates are centralized in a single `syncFrontiers()` function:
+Instead of tracking worldview frontiers in mutable state, frontiers are captured fresh at the moment of each change:
 
 ```typescript
-function syncFrontiers(): void {
-  lastKnownWorldFrontiers = worldLoroDoc.frontiers();
-  lastKnownWorldviewFrontiers = worldviewLoroDoc.frontiers();
+function applyAndPropagate(fn, options): void {
+  // Capture FRESH frontiers at this exact moment
+  const frontiersBefore = worldviewLoroDoc.frontiers();
+  
+  // Apply change to worldview
+  change(worldviewDoc, fn);
+  
+  // Capture FRESH frontiers after change
+  const frontiersAfter = worldviewLoroDoc.frontiers();
+  
+  // Compute diff for THIS change only
+  const diff = worldviewLoroDoc.diff(frontiersBefore, frontiersAfter, false);
+  worldLoroDoc.applyDiff(diff);
+  // ... commit
 }
 ```
 
-This is called at the end of every operation that modifies either document, ensuring frontier tracking stays synchronized and eliminating the risk of missed updates.
+This eliminates stale frontier bugs in re-entrant scenarios. Only `lastKnownWorldFrontiers` is tracked (for filtering external imports).
 
 ## Lens Chaining
 
@@ -178,10 +197,7 @@ const lens3 = createLens(lens2.doc, { filter: filterC });
 
 ### Frontier Tracking
 
-Each lens tracks two sets of frontiers:
-
-- `lastKnownWorldFrontiers`: For detecting world changes
-- `lastKnownWorldviewFrontiers`: For detecting chained lens changes
+Each lens tracks only `lastKnownWorldFrontiers` for detecting world changes. Worldview frontiers are captured fresh at the moment of each change operation, eliminating stale state bugs in re-entrant scenarios.
 
 This enables delta-based propagation--only new changes are processed, not the entire state.
 

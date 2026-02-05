@@ -83,6 +83,23 @@ export interface CommitInfo {
 export type LensFilter = (info: CommitInfo) => boolean
 
 /**
+ * Debug logging function type.
+ * Accepts a message string and optional additional arguments.
+ *
+ * @example
+ * ```typescript
+ * // Use console.log
+ * const lens = createLens(world, { debug: console.log })
+ *
+ * // Use a custom logger
+ * const lens = createLens(world, {
+ *   debug: (msg, ...args) => myLogger.debug(`[Lens] ${msg}`, ...args)
+ * })
+ * ```
+ */
+export type DebugFn = (message: string, ...args: unknown[]) => void
+
+/**
  * Options for creating a Lens.
  */
 export interface LensOptions {
@@ -101,6 +118,23 @@ export interface LensOptions {
    * ```
    */
   filter?: LensFilter
+
+  /**
+   * Debug logging function.
+   * When provided, the lens will log internal operations for debugging.
+   *
+   * @example
+   * ```typescript
+   * // Simple console logging
+   * const lens = createLens(world, { debug: console.log })
+   *
+   * // Custom logger
+   * const lens = createLens(world, {
+   *   debug: (msg) => console.log(`[Lens ${Date.now()}] ${msg}`)
+   * })
+   * ```
+   */
+  debug?: DebugFn
 }
 
 /**
