@@ -415,6 +415,15 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       }
       this.socket.binaryType = "arraybuffer"
 
+      // IMPORTANT: Set up message handler IMMEDIATELY after creating the socket.
+      // This must happen BEFORE waiting for the open event to avoid a race
+      // condition where the server sends "ready" before the handler is attached.
+      // The server sends "ready" as soon as the connection opens, and if we wait
+      // until after the Promise resolves to set up handlers, we may miss it.
+      this.socket.addEventListener("message", event => {
+        this.handleMessage(event)
+      })
+
       await new Promise<void>((resolve, reject) => {
         if (!this.socket) {
           reject(new Error("Socket not created"))
@@ -455,17 +464,12 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         peerId: this.peerId,
       })
 
-      // Set up message handler
-      this.socket.addEventListener("message", event => {
-        this.handleMessage(event)
-      })
-
-      // Set up close handler
+      // Set up close handler for disconnections after connection is established
       this.socket.addEventListener("close", event => {
         this.handleClose(event.code, event.reason)
       })
 
-      // Set up error handler
+      // Set up error handler for errors after connection is established
       this.socket.addEventListener("error", () => {
         this.logger.warn("WebSocket error")
       })
