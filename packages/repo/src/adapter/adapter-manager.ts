@@ -167,12 +167,46 @@ export class AdapterManager {
   }
 
   /**
+   * Await all pending async operations across all adapters.
+   *
+   * This is useful for ensuring all storage saves have completed
+   * before shutting down. Does NOT disconnect adapters.
+   */
+  async flush(): Promise<void> {
+    await Promise.all(
+      Array.from(this.#adapters.values()).map(adapter => adapter.flush()),
+    )
+  }
+
+  /**
    * Reset all adapters and clear the manager.
    */
   reset() {
     for (const adapter of this.#adapters.values()) {
       // Let the adapter clean up its part
       adapter._stop()
+
+      // Clean up our per-adapter part
+      this.#onReset(adapter)
+    }
+
+    this.#adapters.clear()
+  }
+
+  /**
+   * Gracefully shut down all adapters: flush pending operations, then reset.
+   *
+   * This ensures all in-flight storage saves complete before adapters
+   * are disconnected and removed.
+   */
+  async shutdown(): Promise<void> {
+    // First, flush all pending operations (especially storage saves)
+    await this.flush()
+
+    // Then reset (stop adapters and clear)
+    for (const adapter of this.#adapters.values()) {
+      // Let the adapter clean up its part
+      await adapter._stop()
 
       // Clean up our per-adapter part
       this.#onReset(adapter)

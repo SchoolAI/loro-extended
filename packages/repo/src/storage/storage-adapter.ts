@@ -55,14 +55,35 @@ export abstract class StorageAdapter extends Adapter<void> {
   private readonly storagePeerId: PeerID = generatePeerId()
 
   /**
+   * Track pending async operations (saves, loads, etc.) so they can be
+   * awaited during flush/shutdown.
+   */
+  readonly #pendingOps: Set<Promise<void>> = new Set()
+
+  /**
    * Generate channel actions for storage operations.
    * The kind and adapterType are automatically added by the base class.
+   *
+   * The send function wraps handleChannelMessage to track pending async
+   * operations, enabling flush() to await all in-flight saves.
    */
   protected generate(): GeneratedChannel {
     return {
       kind: this.kind,
       adapterType: this.adapterType,
-      send: this.handleChannelMessage.bind(this),
+      send: (msg: ChannelMsg) => {
+        const op = this.handleChannelMessage(msg).catch(error => {
+          this.logger.error("unhandled error in storage channel message", {
+            error,
+            type: msg.type,
+          })
+        })
+        this.#trackOp(op)
+        // Return the promise so callers that `await channel.send(...)` still
+        // work (e.g., tests). The ChannelActions.send type is `void`, but
+        // TypeScript allows returning a value from a void function.
+        return op as unknown as void
+      },
       stop: () => {},
     }
   }
@@ -82,10 +103,36 @@ export abstract class StorageAdapter extends Adapter<void> {
    * Stop the storage adapter and clean up resources.
    */
   async onStop(): Promise<void> {
+    // Flush pending operations before stopping
+    await this.flush()
+
     if (this.storageChannel) {
       this.removeChannel(this.storageChannel.channelId)
       this.storageChannel = undefined
     }
+  }
+
+  /**
+   * Await all pending async storage operations (saves, loads, etc.).
+   *
+   * Call this before shutting down to ensure all data has been persisted.
+   * This does NOT disconnect the adapter — it only waits for in-flight
+   * operations to complete.
+   */
+  async flush(): Promise<void> {
+    while (this.#pendingOps.size > 0) {
+      await Promise.all(this.#pendingOps)
+    }
+  }
+
+  /**
+   * Track an async operation so flush() can await it.
+   */
+  #trackOp(op: Promise<void>): void {
+    this.#pendingOps.add(op)
+    op.finally(() => {
+      this.#pendingOps.delete(op)
+    })
   }
 
   /**

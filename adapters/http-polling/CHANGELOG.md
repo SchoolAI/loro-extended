@@ -1,5 +1,11 @@
 # @loro-extended/adapter-http-polling
 
+## 5.4.2
+
+### Patch Changes
+
+- @loro-extended/repo@5.4.2
+
 ## 5.4.1
 
 ### Patch Changes

@@ -976,6 +976,39 @@ export class Synchronizer {
   }
 
   /**
+   * Await all pending async operations across all adapters.
+   *
+   * This ensures all in-flight storage saves have completed.
+   * Does NOT disconnect adapters or reset the synchronizer.
+   */
+  public async flush(): Promise<void> {
+    await this.adapters.flush()
+  }
+
+  /**
+   * Gracefully shut down: flush all pending storage operations, then reset.
+   *
+   * Use this instead of reset() when you need to ensure data persistence
+   * (e.g., before app shutdown, between test sessions sharing storage).
+   *
+   * @example
+   * ```typescript
+   * // Ensure all data is saved before stopping
+   * await repo.shutdown()
+   * ```
+   */
+  public async shutdown(): Promise<void> {
+    this.#heartbeatManager.stop()
+
+    const [initialModel] = programInit(this.model.identity)
+
+    // Gracefully shut down all adapters (flush + stop)
+    await this.adapters.shutdown()
+
+    this.model = initialModel
+  }
+
+  /**
    * Get the current model state (for debugging purposes).
    * Returns a deep copy to prevent accidental mutations.
    */

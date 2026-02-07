@@ -289,6 +289,19 @@ export abstract class Adapter<G> {
   }
 
   /**
+   * Await all pending async operations in this adapter.
+   *
+   * Override in subclasses (e.g., StorageAdapter) to await in-flight
+   * saves/loads. The default implementation is a no-op.
+   *
+   * This does NOT disconnect the adapter — it only waits for pending
+   * operations to complete.
+   */
+  async flush(): Promise<void> {
+    // No-op by default. StorageAdapter overrides this.
+  }
+
+  /**
    * Given an envelope with zero or more toChannelIds, attempts to send the
    * message (in the envelope) through this adapter's channels. Note that this
    * does NOT guarantee delivery, only sending will be attempted through any

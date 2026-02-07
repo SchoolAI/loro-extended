@@ -199,7 +199,16 @@ export class ListRefBaseInternals<
       return cachedItem as MutableItem
     }
 
-    // Container shapes: safe to cache (handles)
+    // Container shapes: only cache in batchedMutation mode (inside change())
+    // Outside of change(), always create fresh refs to avoid stale cache issues
+    // after move operations (where indices shift but cached refs have hardcoded indices)
+    if (!this.getBatchedMutation()) {
+      return createContainerTypedRef(
+        this.getChildTypedRefParams(index, shape.shape as ContainerShape),
+      ) as MutableItem
+    }
+
+    // In batched mode, cache for consistent behavior within a single change() call
     let cachedItem = this.itemCache.get(index)
     if (!cachedItem) {
       cachedItem = createContainerTypedRef(

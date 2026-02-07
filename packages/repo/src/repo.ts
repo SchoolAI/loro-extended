@@ -195,10 +195,57 @@ export class Repo {
   /**
    * Disconnects all network adapters and cleans up resources.
    * This should be called when the Repo is no longer needed.
+   *
+   * ⚠️ WARNING: This is synchronous and does NOT wait for pending storage
+   * saves to complete. If you need to ensure data persistence (e.g., before
+   * app shutdown or between test sessions), use {@link shutdown} instead.
    */
   reset(): void {
     // Clear synchronizer model
     this.#synchronizer.reset()
+  }
+
+  /**
+   * Await all pending storage operations without disconnecting adapters.
+   *
+   * Use this when you want to ensure all data has been persisted but
+   * plan to continue using the Repo afterwards.
+   *
+   * @example
+   * ```typescript
+   * handle.change(draft => { draft.title = 'Hello' })
+   * await repo.flush() // Ensure the change is saved to storage
+   * ```
+   */
+  async flush(): Promise<void> {
+    await this.#synchronizer.flush()
+  }
+
+  /**
+   * Gracefully shut down: flush all pending storage operations, then
+   * disconnect all adapters and clean up resources.
+   *
+   * This is the recommended way to stop a Repo when using persistent
+   * storage adapters. It ensures all in-flight saves complete before
+   * the adapters are disconnected.
+   *
+   * @example
+   * ```typescript
+   * // Session 1: create and save
+   * const repo = new Repo({ adapters: [storage] })
+   * const handle = repo.get('doc', DocSchema)
+   * handle.change(draft => { draft.title = 'Hello' })
+   * await repo.shutdown() // Data is safely persisted
+   *
+   * // Session 2: load from same storage
+   * const repo2 = new Repo({ adapters: [storage2] })
+   * const handle2 = repo2.get('doc', DocSchema)
+   * await handle2.waitForSync({ kind: 'storage' })
+   * // handle2.doc.title === 'Hello' ✓
+   * ```
+   */
+  async shutdown(): Promise<void> {
+    await this.#synchronizer.shutdown()
   }
 
   //
