@@ -11,7 +11,6 @@
     "@loro-extended/adapter-websocket": "workspace:^",
     "@loro-extended/change": "workspace:^",
     "@loro-extended/lens": "workspace:^",
-    "@loro-extended/lea": "workspace:^",
     "@loro-extended/react": "workspace:^",
     "@loro-extended/repo": "workspace:^",
     "loro-crdt": "link:/Users/duane/tools/loro/crates/loro-wasm",
