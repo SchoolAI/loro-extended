@@ -726,82 +726,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.19.5)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.21.0)
 
-  examples/quiz-challenge:
-    dependencies:
-      '@loro-extended/adapter-websocket':
-        specifier: workspace:^
-        version: link:../../adapters/websocket
-      '@loro-extended/change':
-        specifier: workspace:^
-        version: link:../../packages/change
-      '@loro-extended/lea':
-        specifier: workspace:^
-        version: link:../../packages/lea
-      '@loro-extended/react':
-        specifier: workspace:^
-        version: link:../../packages/react
-      '@loro-extended/repo':
-        specifier: workspace:^
-        version: link:../../packages/repo
-      loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
-      react:
-        specifier: 19.1.0
-        version: 19.1.0
-      react-dom:
-        specifier: 19.1.0
-        version: 19.1.0(react@19.1.0)
-      ws:
-        specifier: ^8.18.0
-        version: 8.19.0
-    devDependencies:
-      '@playwright/test':
-        specifier: ^1.57.0
-        version: 1.57.0
-      '@types/node':
-        specifier: ^22.15.29
-        version: 22.19.5
-      '@types/react':
-        specifier: 19.1.8
-        version: 19.1.8
-      '@types/react-dom':
-        specifier: 19.1.6
-        version: 19.1.6(@types/react@19.1.8)
-      '@types/uuid':
-        specifier: ^11.0.0
-        version: 11.0.0
-      '@types/ws':
-        specifier: ^8.5.13
-        version: 8.18.1
-      '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260103.1
-        version: 7.0.0-dev.20260103.1
-      '@vitejs/plugin-react':
-        specifier: ^4.5.2
-        version: 4.7.0(vite@6.4.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
-      tsx:
-        specifier: ^4.19.4
-        version: 4.21.0
-      typescript:
-        specifier: ~5.8.3
-        version: 5.8.3
-      uuid:
-        specifier: ^13.0.0
-        version: 13.0.0
-      vite:
-        specifier: ^6.3.5
-        version: 6.4.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
-      vite-plugin-top-level-await:
-        specifier: ^1.5.0
-        version: 1.6.0(rollup@4.55.1)(vite@6.4.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
-      vite-plugin-wasm:
-        specifier: ^3.4.1
-        version: 3.5.0(vite@6.4.1(@types/node@22.19.5)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/node@22.19.5)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.21.0)
-
   examples/rps-demo:
     dependencies:
       '@loro-extended/adapter-websocket':
@@ -810,9 +734,6 @@ importers:
       '@loro-extended/change':
         specifier: workspace:^
         version: link:../../packages/change
-      '@loro-extended/lea':
-        specifier: workspace:^
-        version: link:../../packages/lea
       '@loro-extended/lens':
         specifier: workspace:^
         version: link:../../packages/lens
@@ -1300,31 +1221,6 @@ importers:
       '@loro-extended/change':
         specifier: workspace:^
         version: link:../change
-
-  packages/lea:
-    dependencies:
-      '@loro-extended/change':
-        specifier: workspace:^
-        version: link:../change
-      loro-crdt:
-        specifier: 1.10.3
-        version: 1.10.3
-    devDependencies:
-      '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260103.1
-        version: 7.0.0-dev.20260103.1
-      tsup:
-        specifier: ^8.5.0
-        version: 8.5.1(@swc/core@1.15.8)(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.20.3
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.17
-        version: 4.0.17(@opentelemetry/api@1.9.0)(@types/node@22.19.5)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(tsx@4.21.0)
 
   packages/lens:
     dependencies:
@@ -2753,10 +2649,6 @@ packages:
 
   '@types/simple-peer@9.11.9':
     resolution: {integrity: sha512-6Gdl7TSS5oh9nuwKD4Pl8cSmaxWycYeZz9HLnJBNvIwWjZuGVsmHe9RwW3+9RxfhC1aIR9Z83DvaJoMw6rhkbg==}
-
-  '@types/uuid@11.0.0':
-    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
-    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/uuid@9.0.8':
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
@@ -4800,10 +4692,6 @@ packages:
     resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
     hasBin: true
 
-  uuid@13.0.0:
-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
-    hasBin: true
-
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
@@ -6254,10 +6142,6 @@ snapshots:
   '@types/simple-peer@9.11.9':
     dependencies:
       '@types/node': 20.19.28
-
-  '@types/uuid@11.0.0':
-    dependencies:
-      uuid: 13.0.0
 
   '@types/uuid@9.0.8': {}
 
@@ -8337,8 +8221,6 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@10.0.0: {}
-
-  uuid@13.0.0: {}
 
   uuid@9.0.1: {}
 
