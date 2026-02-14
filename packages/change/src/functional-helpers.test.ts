@@ -8,11 +8,12 @@ import {
   LoroTree,
 } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
-import { type ExtRefBase, ext } from "./ext.js"
+import type { ChangeOptions } from "./change-options.js"
+import { EXT_SYMBOL, type ExtRefBase, ext } from "./ext.js"
 import { change, getTransition } from "./functional-helpers.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
-import { createTypedDoc } from "./typed-doc.js"
+import { createTypedDoc, type TypedDoc } from "./typed-doc.js"
 
 const schema = Shape.doc({
   title: Shape.text(),
@@ -1060,6 +1061,153 @@ describe("functional helpers", () => {
 
         expect(doc.title.toString()).toBe("World")
         expect(doc.count.value).toBe(10)
+      })
+    })
+
+    /**
+     * TypedDoc [EXT_SYMBOL] Type Tests
+     *
+     * These tests verify the fix for TypeScript overload resolution failure
+     * when TypedDoc types are "flattened" across module boundaries.
+     *
+     * Root cause: When a type alias like `type IssueDoc = TypedDoc<IssueSchema>`
+     * crosses module boundaries, TypeScript may expand it to its structural form,
+     * losing the TypedDoc<T> wrapper. This prevents the first change() overload
+     * from matching, causing it to fall through to the [EXT_SYMBOL] overload.
+     */
+    describe("TypedDoc [EXT_SYMBOL] type fix", () => {
+      const TestSchema = Shape.doc({
+        count: Shape.counter(),
+        title: Shape.text(),
+      })
+
+      // Helper type to extract draft type from [EXT_SYMBOL].change signature
+      // (copied from functional-helpers.ts since it's not exported)
+      type ExtractDraft<T> = T extends {
+        [EXT_SYMBOL]: {
+          change: (
+            fn: (draft: infer D) => void,
+            options?: ChangeOptions,
+          ) => void
+        }
+      }
+        ? D
+        : never
+
+      /**
+       * TYPE ASSERTION TEST
+       * Verifies that TypedDoc<T> now includes [EXT_SYMBOL] in its type.
+       * This is a compile-time test - if the type regresses, this file won't compile.
+       */
+      it("TypedDoc includes [EXT_SYMBOL] in its type (compile-time assertion)", () => {
+        // Static assertion helper - causes compile error if T is not true
+        type AssertTrue<T extends true> = T
+
+        // Test 1: TypedDoc has [EXT_SYMBOL] property
+        type HasExtSymbol = TypedDoc<typeof TestSchema> extends {
+          [EXT_SYMBOL]: unknown
+        }
+          ? true
+          : false
+        const _assert1: AssertTrue<HasExtSymbol> = true
+
+        // Test 2: The [EXT_SYMBOL] has a change method
+        type HasChangeMethod = TypedDoc<typeof TestSchema> extends {
+          [EXT_SYMBOL]: { change: (...args: any[]) => any }
+        }
+          ? true
+          : false
+        const _assert2: AssertTrue<HasChangeMethod> = true
+
+        // Test 3: Can access [EXT_SYMBOL] on a TypedDoc (type-level)
+        type ExtSymbolType = TypedDoc<typeof TestSchema>[typeof EXT_SYMBOL]
+        const _assert3: ExtSymbolType = {} as ExtSymbolType // Just needs to compile
+
+        expect(_assert1).toBe(true)
+        expect(_assert2).toBe(true)
+        expect(_assert3).toBeDefined()
+      })
+
+      /**
+       * INFERENCE TEST
+       * Verifies that ExtractDraft<TypedDoc<T>> correctly yields Mutable<T>.
+       * This ensures the fallback overload path works correctly.
+       */
+      it("ExtractDraft correctly infers draft type from TypedDoc (compile-time assertion)", () => {
+        type AssertTrue<T extends true> = T
+
+        // ExtractDraft<TypedDoc<Schema>> should be Mutable<Schema>, not 'never'
+        type Draft = ExtractDraft<TypedDoc<typeof TestSchema>>
+        type IsNotNever = Draft extends never ? false : true
+        const _assert1: AssertTrue<IsNotNever> = true
+
+        // Draft should have the schema's properties
+        type HasCount = Draft extends {
+          count: { increment: (n: number) => void }
+        }
+          ? true
+          : false
+        const _assert2: AssertTrue<HasCount> = true
+
+        expect(_assert1).toBe(true)
+        expect(_assert2).toBe(true)
+      })
+
+      /**
+       * RUNTIME TEST
+       * Verifies that change() works correctly at runtime when using TypedDoc.
+       */
+      it("change() works with TypedDoc passed through function parameters", () => {
+        // Simulate the pattern that previously failed
+        function mutateDoc(doc: TypedDoc<typeof TestSchema>) {
+          change(doc, draft => {
+            draft.count.increment(1)
+            draft.title.insert(0, "Hello")
+          })
+        }
+
+        const doc = createTypedDoc(TestSchema)
+        mutateDoc(doc)
+
+        expect(doc.toJSON().count).toBe(1)
+        expect(doc.toJSON().title).toBe("Hello")
+      })
+
+      /**
+       * FALLBACK PATH TEST
+       * Verifies that even when accessing through EXT_SYMBOL directly,
+       * the change method works correctly.
+       */
+      it("change() works via EXT_SYMBOL fallback path", () => {
+        const doc = createTypedDoc(TestSchema)
+
+        // Access through the EXT_SYMBOL path directly
+        // This is what happens internally when the first overload fails
+        const extNs = doc[EXT_SYMBOL]
+        extNs.change(draft => {
+          draft.count.increment(5)
+        })
+
+        expect(doc.toJSON().count).toBe(5)
+      })
+
+      /**
+       * TYPE ALIAS TEST
+       * Verifies that type aliases work correctly.
+       */
+      it("change() works with type alias for TypedDoc", () => {
+        type MyDoc = TypedDoc<typeof TestSchema>
+
+        function acceptsAlias(doc: MyDoc) {
+          change(doc, draft => {
+            draft.count.increment(10)
+          })
+        }
+
+        const doc = createTypedDoc(TestSchema)
+        acceptsAlias(doc)
+
+        expect(doc.toJSON().count).toBe(10)
       })
     })
   })

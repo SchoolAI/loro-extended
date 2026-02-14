@@ -423,6 +423,25 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
    * ```
    */
   toJSON(): Infer<Shape>
+
+  /**
+   * Internal symbol for change() detection.
+   * Use `change(doc, fn, options?)` instead of accessing this directly.
+   *
+   * This property enables the `change()` function to work correctly even when
+   * the TypedDoc type is "flattened" across module boundaries (e.g., in .d.ts files).
+   * When TypeScript can't infer the Shape parameter from the TypedDoc<Shape> wrapper,
+   * it falls back to the [EXT_SYMBOL] overload which extracts the draft type from
+   * this change method signature.
+   *
+   * @internal
+   */
+  readonly [EXT_SYMBOL]: {
+    change: (
+      fn: (draft: Mutable<Shape>) => void,
+      options?: ChangeOptions,
+    ) => void
+  }
 }
 
 /**

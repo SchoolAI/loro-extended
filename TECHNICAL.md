@@ -28,6 +28,8 @@ The library uses well-known symbols to provide clean separation between differen
 
 **Design Rationale**: TypedDoc and TypedRef are Proxy objects where property names map to schema fields. Symbols provide a clean namespace for library functionality without polluting the user's schema namespace.
 
+**TypedDoc and Lens both expose `[EXT_SYMBOL]` in their types**: Both `TypedDoc<Shape>` and `Lens<D>` include `[EXT_SYMBOL]` with a `change` method signature in their type definitions. This serves as a fallback for the `change()` function when TypeScript's generic inference fails due to type flattening across module boundaries (e.g., in `.d.ts` files or re-exported type aliases). Users should always use `change(doc, fn)` or `ext(doc)` rather than accessing the symbol directly.
+
 ### The `loro()` and `ext()` Functions
 
 ```typescript
