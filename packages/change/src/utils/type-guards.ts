@@ -155,11 +155,6 @@ export function isStructShape(
 }
 
 /**
- * @deprecated Use isStructShape instead. isMapShape is an alias for backward compatibility.
- */
-export const isMapShape = isStructShape
-
-/**
  * Type guard to check if a schema is for RecordDraftNode
  */
 export function isRecordShape(

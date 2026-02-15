@@ -76,7 +76,7 @@ describe("List value updates across change() calls", () => {
     it("reads updated object values after modification", () => {
       const Schema = Shape.doc({
         items: Shape.list(
-          Shape.plain.object({
+          Shape.plain.struct({
             name: Shape.plain.string(),
             value: Shape.plain.number(),
           }),

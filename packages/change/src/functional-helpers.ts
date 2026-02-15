@@ -15,7 +15,6 @@ import { INTERNAL_SYMBOL, type TypedRef } from "./typed-refs/base.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
 import { createContainerTypedRef } from "./typed-refs/utils.js"
-import type { Mutable } from "./types.js"
 
 // Helper type to extract the draft type from an object with [EXT_SYMBOL].change()
 type ExtractDraft<T> = T extends {
@@ -82,12 +81,13 @@ type ExtractDraft<T> = T extends {
  * }, { commitMessage: { playerId: "alice" } })
  * ```
  */
-// Overload for TypedDoc
-export function change<Shape extends DocShape>(
-  doc: TypedDoc<Shape>,
-  fn: (draft: Mutable<Shape>) => void,
-  options?: ChangeOptions,
-): TypedDoc<Shape>
+// NOTE: There is intentionally NO overload for TypedDoc<Shape> here.
+// TypedDoc (and types that extend it like Doc<D, E>) are handled by the
+// generic [EXT_SYMBOL] overload below, which extracts the draft type from
+// the [EXT_SYMBOL].change signature. This works correctly for:
+// - TypedDoc<D> directly
+// - Doc<D, E> = TypedDoc<D> & { __ephemeralType?: E }
+// - Any other intersection type extending TypedDoc
 
 // Overload for TreeRef (special case - not a TypedRef<ContainerShape>)
 export function change<DataShape extends StructContainerShape>(

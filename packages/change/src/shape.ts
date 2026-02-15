@@ -194,16 +194,6 @@ export interface MovableListContainerShape<
 }
 
 /**
- * @deprecated Use StructContainerShape instead. MapContainerShape is an alias for backward compatibility.
- */
-export type MapContainerShape<
-  NestedShapes extends Record<string, ContainerOrValueShape> = Record<
-    string,
-    ContainerOrValueShape
-  >,
-> = StructContainerShape<NestedShapes>
-
-/**
  * Container shape for objects with fixed keys (structs).
  * This is the preferred way to define fixed-key objects.
  * Uses LoroMap as the underlying container.
@@ -312,13 +302,6 @@ export interface Uint8ArrayValueShape
   readonly _type: "value"
   readonly valueType: "uint8array"
 }
-
-/**
- * @deprecated Use StructValueShape instead. ObjectValueShape is an alias for backward compatibility.
- */
-export type ObjectValueShape<
-  T extends Record<string, ValueShape> = Record<string, ValueShape>,
-> = StructValueShape<T>
 
 /**
  * Value shape for objects with fixed keys (structs).
@@ -514,8 +497,8 @@ export const Shape = {
    *   doc: Shape.any(), // opt out of typing for this container
    * })
    *
-   * const handle = repo.getHandle(docId, ProseMirrorDocShape, CursorPresenceShape)
-   * // handle.doc.doc is typed as `unknown` - you're on your own
+   * const doc = repo.get(docId, ProseMirrorDocShape, CursorPresenceShape)
+   * // doc.doc is typed as `unknown` - you're on your own
    * ```
    */
   any: (): AnyContainerShape => ({
@@ -564,19 +547,6 @@ export const Shape = {
    * ```
    */
   struct: <T extends Record<string, ContainerOrValueShape>>(
-    shape: T,
-  ): StructContainerShape<T> => ({
-    _type: "struct" as const,
-    shapes: shape,
-    _plain: {} as any,
-    _mutable: {} as any,
-    _placeholder: {} as any,
-  }),
-
-  /**
-   * @deprecated Use `Shape.struct` instead. `Shape.map` will be removed in a future version.
-   */
-  map: <T extends Record<string, ContainerOrValueShape>>(
     shape: T,
   ): StructContainerShape<T> => ({
     _type: "struct" as const,
@@ -816,29 +786,6 @@ export const Shape = {
      * ```
      */
     struct: <T extends Record<string, ValueShape>>(
-      shape: T,
-    ): StructValueShape<T> & WithNullable<StructValueShape<T>> => {
-      const base: StructValueShape<T> = {
-        _type: "value" as const,
-        valueType: "struct" as const,
-        shape,
-        _plain: {} as any,
-        _mutable: {} as any,
-        _placeholder: {} as any,
-      }
-      return Object.assign(base, {
-        nullable(): WithPlaceholder<
-          UnionValueShape<[NullValueShape, StructValueShape<T>]>
-        > {
-          return makeNullable(base)
-        },
-      })
-    },
-
-    /**
-     * @deprecated Use `Shape.plain.struct` instead. `Shape.plain.struct` will be removed in a future version.
-     */
-    object: <T extends Record<string, ValueShape>>(
       shape: T,
     ): StructValueShape<T> & WithNullable<StructValueShape<T>> => {
       const base: StructValueShape<T> = {
