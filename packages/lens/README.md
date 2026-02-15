@@ -422,9 +422,14 @@ If Bob tries to surreptitiously write Alice's choice to the world, and Alice fil
 
 If commit N from a peer is rejected, all subsequent commits (N+1, N+2, etc.) from that peer in the same batch are also rejected. This maintains causal consistency.
 
-### Preserved Peer ID
+### Separate Peer IDs
 
-The worldview is created via `world.fork()` with the same peer ID as the world. This keeps the version vector small and ensures local writes appear as the same peer in both documents.
+The worldview is created via `world.fork()` with its own unique peer ID (not shared with the world). This is safe because:
+
+- **Outbound** (worldview → world): `applyDiff` + `commit()` creates new ops with the world's peer ID
+- **Inbound** (world → worldview): `import` preserves original authors' peer IDs
+
+Using separate peer IDs avoids potential `(peerId, counter)` collisions between world and worldview ops, and aligns with Loro's expectations about peer ID uniqueness.
 
 ## Limitations
 
@@ -455,14 +460,41 @@ Filters only apply to **inbound** changes (world → worldview). Outbound writes
 | Simple list push/pop         | ✅ Works   |                                        |
 | Map key with primitive       | ✅ Works   |                                        |
 | Delete map key               | ⚠️ Partial | Results in empty string, not undefined |
-| Modify existing nested       | ✅ Works   | Requires loro-crdt ≥1.10.5             |
-| Create new nested (raw Loro) | ✅ Works   | Requires loro-crdt ≥1.10.5             |
-| Create new nested (TypedDoc) | ✅ Works   | Requires loro-crdt ≥1.10.5             |
+| Modify existing nested       | ✅ Works   | Requires `mergeable: true` on schema   |
+| Create new nested (raw Loro) | ✅ Works   | Requires `mergeable: true` on schema   |
+| Create new nested (TypedDoc) | ✅ Works   | Requires `mergeable: true` on schema   |
 
 **Notes**:
 
-- **loro-crdt 1.10.5+**: The `applyDiff` same-peer-ID fix enables all nested container operations. Container IDs are preserved when applying diffs back to the source document.
-- All nested container operations (create, modify) work correctly via `lens.change()` with loro-crdt 1.10.5+.
+- **Nested containers require `mergeable: true`**: When using lenses with nested containers, use `mergeable: true` on the schema. Without it, container IDs encode the worldview's peer ID, and subsequent modifications via `applyDiff` fail because the world doesn't have containers with those IDs.
+- **Lists of containers not supported with mergeable**: Use `Shape.record(Shape.struct({...}))` with string keys instead of `Shape.list(Shape.struct({...}))`.
+
+```typescript
+// Recommended for lens usage with nested containers
+const schema = Shape.doc({
+  items: Shape.record(Shape.struct({
+    name: Shape.text(),
+    tags: Shape.list(Shape.plain.string()),
+  })),
+}, { mergeable: true });
+```
+
+### Chained Lens Limitations
+
+When chaining lenses (`lens2 = createLens(lens1.worldview)`), changes made through a **parent** lens do NOT automatically propagate to a **child** lens's worldview:
+
+```typescript
+const lens1 = createLens(world);
+const lens2 = createLens(lens1.worldview);
+
+// This reaches world but NOT lens2.worldview
+change(lens1, d => d.counter.increment(1));
+
+// This reaches lens1.worldview AND world
+change(lens2, d => d.counter.increment(1));
+```
+
+**Workaround**: Always make changes through the deepest lens in a chain.
 
 ### Filter Lifecycle
 

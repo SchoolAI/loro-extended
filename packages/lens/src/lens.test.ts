@@ -41,14 +41,16 @@ describe("createLens", () => {
       lens.dispose()
     })
 
-    it("doc has same peer ID as source", () => {
+    it("worldview has different peer ID than world", () => {
       const source = createTypedDoc(TestSchema)
       const lens = createLens(source)
 
       const sourcePeerId = loro(source).peerId
       const docPeerId = loro(lens.worldview).peerId
 
-      expect(docPeerId).toBe(sourcePeerId)
+      // Worldview has its own peer ID (from fork()) to avoid (peerId, counter) collisions
+      // and align with Loro's expectations about peer ID uniqueness
+      expect(docPeerId).not.toBe(sourcePeerId)
 
       lens.dispose()
     })

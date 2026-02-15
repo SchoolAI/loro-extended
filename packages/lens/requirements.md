@@ -149,15 +149,25 @@ Developers must be able to call `change(lens, ...)` in response to events withou
 
 ---
 
-## Requirement 5: Peer ID Consistency
+## Requirement 5: Peer ID Separation
 
-### 5.1 Same Peer ID
+### 5.1 Separate Peer IDs
 
-The worldview must have the same peer ID as the world to keep version vectors small and ensure local writes appear as the same peer in both documents.
+The worldview has its own unique peer ID (different from the world's). This is safe because:
+
+- **Outbound** (worldview → world): `applyDiff` + `commit()` creates new ops with the world's peer ID
+- **Inbound** (world → worldview): `import` preserves original authors' peer IDs
 
 ```typescript
-worldviewLoroDoc.setPeerId(worldLoroDoc.peerId);
+// fork() automatically assigns a new unique peerId - we don't override it
+const worldviewLoroDoc = worldLoroDoc.fork();
 ```
+
+Using separate peer IDs:
+
+- Avoids potential `(peerId, counter)` collisions between world and worldview ops
+- Aligns with Loro's expectations about peer ID uniqueness
+- Improves debugging clarity (worldview ops are clearly distinct from world ops)
 
 ---
 
@@ -196,24 +206,30 @@ Local changes during external import processing should work correctly.
 
 ---
 
-## Current Implementation Issues
+## Implementation Notes
 
-Based on my analysis, the current implementation has these issues:
+The current implementation handles these concerns correctly:
 
-### Issue 1: Re-entrant Change Calls
+### Re-entrant Change Calls
 
-When `change(lens, ...)` is called inside a subscription callback (reactive pattern), the nested call can cause double-propagation of changes to the world.
+When `change(lens, ...)` is called inside a subscription callback (reactive pattern), the implementation uses a queue-based approach to prevent double-propagation. Changes are queued and processed in order after the current operation completes.
 
-### Issue 2: Complexity
+### Peer ID Separation
+
+The worldview has its own unique peer ID (from `fork()`), which:
+
+- Avoids potential `(peerId, counter)` collisions between world and worldview ops
+- Aligns with Loro's expectations about peer ID uniqueness
+- Requires tracking both world frontiers (`lastKnownWorldFrontiers`) and worldview frontiers (`lastKnownWorldviewFrontiers`) separately for correct diff computation
+
+### Architecture
 
 The implementation uses:
 
-- 4-state processing state machine
-- Dual subscriptions (world + worldview)
-- Module-level WeakMap for message passing
-- Frontier tracking with manual synchronization
-
-This complexity makes it hard to reason about and introduces subtle bugs.
+- Dual subscriptions (world for inbound filtering, worldview for chained lens propagation)
+- Module-level WeakMap for commit message passing through lens chains
+- Separate frontier tracking for world and worldview (necessary due to different peer IDs)
+- Queue-based re-entrancy handling with `isProcessing` flag
 
 ---
 

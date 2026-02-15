@@ -2,6 +2,8 @@
 
 > **Note**: As of the unified `change()` API update, `lens.change()` has been removed. Use `change(lens, fn, options?)` instead. See the "Unified change() API" section below.
 
+> **Update**: The worldview now uses a separate peer ID from the world (the default from `fork()`). This improves safety by avoiding `(peerId, counter)` collisions and aligns with Loro's expectations about peer ID uniqueness. See "Peer ID Separation" section below.
+
 ## Architecture Summary
 
 ### Bidirectional Flow Between World and Worldview
@@ -27,7 +29,7 @@
    - No source parameter (identity comes from commit.msg)
    - Everything needed is in the commit (id has peer, msg has identity, ops has operations)
 
-2. **LoroDoc.fork() preserves state**: A fork contains all data from the original. Use `preservePeerId: true` to keep same peer ID.
+2. **LoroDoc.fork() preserves state**: A fork contains all data from the original. The worldview uses its own peer ID (the default from `fork()`) rather than sharing the world's peer ID.
 
 3. **Loro's commit-level filtering API**:
 
@@ -197,15 +199,18 @@ worldLoroDoc.applyDiff(diff);
 ```
 ┌───────────────────────────────────────────────────────────────┐
 │                           WORLD                               │
-│                       (Source.doc)                            │
+│                  (Source.doc, peerId = A)                     │
 │                                                               │
 │  • Synced via network (Repo)                                  │
 │  • Receives local changes via applyDiff() ← STATE-BASED       │
+│  • applyDiff + commit creates ops with world's peerId (A)     │
 │  • Standard CRDT convergence                                  │
 └───────────────────────────────────────────────────────────────┘
           ▲                              │
           │ applyDiff()                  │ import() from peers
           │ (state-based)                │ (op-based)
+          │ creates ops with             │ preserves original
+          │ world's peerId               │ authors' peerIds
           │                              ▼
           │                    ┌─────────────────────┐
           │                    │   filter commits    │
@@ -216,14 +221,33 @@ worldLoroDoc.applyDiff(diff);
           │                              ▼
 ┌───────────────────────────────────────────────────────────────┐
 │                         WORLDVIEW                             │
-│                        (Lens.doc)                             │
+│                  (Lens.doc, peerId = B)                       │
 │                                                               │
-│  • Created via world.fork({ preservePeerId: true })           │
-│  • All local writes happen here                               │
+│  • Created via world.fork() with its OWN unique peer ID       │
+│  • All local writes happen here (ops use peerId B)            │
 │  • Receives filtered remote changes via import()              │
 │  • UI reads from here                                         │
+│  • Separate frontier tracking (lastKnownWorldviewFrontiers)   │
 └───────────────────────────────────────────────────────────────┘
 ```
+
+### Peer ID Separation
+
+The worldview uses its own unique peer ID (from `fork()`) rather than sharing the world's peer ID. This is safe because:
+
+- **Outbound (worldview → world)**: `applyDiff()` + `commit()` creates NEW ops with the world's peer ID
+- **Inbound (world → worldview)**: `import()` preserves original authors' peer IDs
+
+**Why separate peer IDs**:
+1. Avoids potential `(peerId, counter)` collisions between world and worldview
+2. Aligns with Loro's expectations about peer ID uniqueness
+3. Improves debugging (worldview ops are clearly distinct from world ops)
+
+**Frontier tracking**: Because peer IDs differ, the lens tracks frontiers for both documents separately:
+- `lastKnownWorldFrontiers` - for detecting inbound changes to filter
+- `lastKnownWorldviewFrontiers` - for computing diffs in chained lens propagation
+
+**Nested containers**: When using lenses with nested containers, use `mergeable: true` on the schema. Without it, container IDs encode the worldview's peer ID, and subsequent modifications via `applyDiff` fail.
 
 ### Anti-Patterns to Avoid
 
@@ -232,6 +256,7 @@ worldLoroDoc.applyDiff(diff);
 3. **Don't leave filtering as TODO** - The filter function must be called
 4. **Don't create parallel implementations** - LEA should USE Lens, not duplicate it
 5. **Don't treat "tests pass" as "done"** - Write tests that verify filtering works
+6. **Don't use `mergeable: false` with nested containers in lenses** - Container IDs will mismatch
 
 ### Tests to Write
 
@@ -241,6 +266,9 @@ worldLoroDoc.applyDiff(diff);
 4. Rejected peer's subsequent commits also rejected (causal consistency)
 5. Local changes bypass filter (trusted local code)
 6. **Causal history test**: Bob writes Alice's data, Alice filters it, Alice writes her own data - Alice's data should win in World
+7. **Peer ID separation**: World and worldview have different peer IDs
+8. **Nested containers with mergeable**: Nested container creation/modification through lens with `mergeable: true`
+9. **Chained lens propagation**: Changes through deepest lens propagate all the way to world
 
 ## Understanding the Architecture
 
@@ -317,15 +345,36 @@ This makes the propagation **state-based** rather than **op-based**, avoiding th
 
 ### Mergeable Containers for applyDiff Compatibility
 
-**Important**: When using `applyDiff()` to propagate changes from Worldview to World, nested containers created via `setContainer()` or `getOrCreateContainer()` receive peer-dependent IDs. When `applyDiff` is applied to the target document, container IDs are **remapped** to new peer-dependent IDs, breaking the merge semantics.
+**Important**: When using `applyDiff()` to propagate changes from Worldview to World, nested containers created via `setContainer()` or `getOrCreateContainer()` receive peer-dependent IDs. With separate peer IDs for world and worldview, subsequent modifications to these containers via `applyDiff` fail because the world doesn't have containers with those IDs.
 
 **Solution**: Use `mergeable: true` when creating TypedDocs that will be used with Lens:
 
 ```typescript
-const worldview = createTypedDoc(schema, { mergeable: true });
+const schema = Shape.doc({
+  items: Shape.record(Shape.struct({
+    name: Shape.text(),
+    tags: Shape.list(Shape.plain.string()),
+  })),
+}, { mergeable: true });
+
+const world = createTypedDoc(schema);
+const lens = createLens(world, { filter: myFilter });
 ```
 
-This stores all containers at the document root with path-based names (e.g., `players-alice-score`), ensuring deterministic IDs that survive `applyDiff`. See TECHNICAL.md section "Mergeable Containers via Flattened Root Storage" for implementation details.
+This stores all containers at the document root with path-based names (e.g., `items-alice-name`), ensuring deterministic IDs that survive `applyDiff`. See TECHNICAL.md section "Mergeable Containers via Flattened Root Storage" for implementation details.
+
+**Note**: Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported with `mergeable: true`. Use `Shape.record(Shape.struct({...}))` with string keys instead.
+
+### Known Limitation: Chained Lens Parent-to-Child Propagation
+
+When making changes through a PARENT lens (lens1), those changes reach the world but do NOT automatically propagate DOWN to a CHILD lens's worldview (lens2). This is because:
+
+1. `lens1.change()` modifies `lens1.worldview` directly
+2. `lens1` propagates to world via `applyDiff`
+3. `lens2.world === lens1.worldview`, but `lens2` only filters INBOUND changes
+4. The direct mutation of `lens1.worldview` is a "local" event, not a filtered import
+
+**Workaround**: Always make changes through the deepest lens in a chain, or accept that parent changes won't reach child worldviews.
 
 **Key differences from current LEA:**
 

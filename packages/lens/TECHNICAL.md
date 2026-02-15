@@ -46,18 +46,24 @@ The lens takes a TypedDoc as input rather than a Handle. This enables:
 - **Flexibility**: Works with any TypedDoc, not just repo-managed docs
 - **Separation of concerns**: Lens doesn't need to know about Repo
 
-### 2. Fork with Preserved Peer ID
+### 2. Fork with Separate Peer ID
 
 ```typescript
 // Internally, the worldview is created as a fork of the world
 const worldviewLoroDoc = worldLoroDoc.fork();
-worldviewLoroDoc.setPeerId(worldLoroDoc.peerId);
+// fork() automatically assigns a new unique peerId - we don't override it
 ```
 
-The worldview is created as a fork of the world with the same peer ID. This:
+The worldview is created as a fork of the world with its own unique peer ID. This is safe because:
 
-- Keeps the version vector small
-- Ensures local writes appear as the same peer in both documents
+- **Outbound** (worldview → world): `applyDiff` + `commit()` creates new ops with the world's peer ID
+- **Inbound** (world → worldview): `import` preserves original authors' peer IDs
+
+Using separate peer IDs:
+
+- Avoids potential `(peerId, counter)` collisions between world and worldview ops
+- Aligns with Loro's expectations about peer ID uniqueness
+- Improves debugging clarity (worldview ops are clearly distinct from world ops)
 - Maintains consistency when propagating changes
 
 ### 3. Bidirectional Sync Strategy
@@ -375,10 +381,10 @@ The mechanism: `diff(before, after)` captures only the delta, which is then appl
 
 ### Peer ID Behavior
 
-- `lens.doc` (worldview) uses the world's peer ID (as bigint)
-- Writes via lens appear with the world's peer ID
-- Multiple participants each see their own peer ID in their lens
-- This is correct--each participant's world has their own peer ID
+- `lens.doc` (worldview) has its own unique peer ID (different from the world's)
+- Writes via lens appear with the **world's** peer ID (because `applyDiff` + `commit` creates new ops)
+- The worldview's peer ID is only used for local ops within the worldview itself
+- This separation avoids `(peerId, counter)` collisions and aligns with Loro's expectations
 
 ### Container Creation
 

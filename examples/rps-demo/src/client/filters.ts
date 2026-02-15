@@ -11,11 +11,11 @@ type OpLike = {
 
 /**
  * Extract player name from a path-based container ID.
- * 
+ *
  * With mergeable: true, container IDs are path-based like:
  * - "cid:root-game-players-alice:Map"
  * - "cid:root-game-players-bob:Map"
- * 
+ *
  * @param containerId - The container ID to parse
  * @returns The player name, or null if not a player container
  */
@@ -60,10 +60,10 @@ function getTargetedPlayers(ops: OpLike[]): Set<string> {
  * - Accept own commits that only modify own player state
  * - Reject other players' commits that try to modify our state
  * - Accept other players' commits that modify their own state
- * 
+ *
  * With mergeable: true, container IDs are path-based, so we can extract
  * the player name directly from the container ID.
- * 
+ *
  * @param playerId - The current player's ID
  */
 export function createClientLensFilter(playerId: string): LensFilter {

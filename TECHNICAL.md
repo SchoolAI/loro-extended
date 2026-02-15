@@ -550,6 +550,42 @@ This yields a minimal imperative shell:
 
 Role-specific filters should be isolated (e.g., server vs client) with shared helpers to prevent policy drift. Tests should assert that client filters enforce player sovereignty and server filters enforce authoritative fields.
 
+### Lens Peer ID Separation
+
+The worldview document uses its own unique peer ID (from `fork()`) rather than sharing the world's peer ID. This is safe because:
+
+- **Outbound (worldview → world)**: `applyDiff()` + `commit()` creates new ops with the world's peer ID
+- **Inbound (world → worldview)**: `import()` preserves original authors' peer IDs
+
+**Why separate peer IDs**:
+1. Avoids potential `(peerId, counter)` collisions between world and worldview ops
+2. Aligns with Loro's expectations about peer ID uniqueness
+3. Improves debugging clarity (worldview ops are clearly distinct from world ops)
+
+**Frontier tracking**: Because world and worldview have different peer IDs, the lens tracks frontiers for both documents separately:
+- `lastKnownWorldFrontiers` - for detecting inbound changes to filter
+- `lastKnownWorldviewFrontiers` - for computing diffs when propagating chained lens changes
+
+**Nested containers with lenses**: When using lenses with nested containers, use `mergeable: true` on the schema. Without it, container IDs encode the worldview's peer ID, and subsequent modifications via `applyDiff` fail because the world doesn't have containers with those IDs.
+
+```typescript
+// Recommended for lens usage with nested containers
+const schema = Shape.doc({
+  items: Shape.record(Shape.struct({
+    name: Shape.text(),
+    tags: Shape.list(Shape.plain.string()),
+  })),
+}, { mergeable: true });
+```
+
+**Known limitation - chained lens propagation**: When making changes through a PARENT lens (lens1), those changes reach the world but do NOT automatically propagate DOWN to a CHILD lens's worldview (lens2). This is because:
+1. `lens1.change()` modifies `lens1.worldview` directly
+2. `lens1` propagates to world via `applyDiff`
+3. `lens2.world === lens1.worldview`, but `lens2` only filters INBOUND changes
+4. The direct mutation of `lens1.worldview` is a "local" event, not a filtered import
+
+**Workaround**: Always make changes through the deepest lens in a chain, or accept that parent changes won't reach child worldviews.
+
 ### Unified `change()` API
 
 The `change()` function from `@loro-extended/change` is the unified mutation API for all changeable types:

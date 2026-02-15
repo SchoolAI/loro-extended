@@ -114,11 +114,13 @@ export function createLens<D extends DocShape>(
   const worldLoroDoc = loro(world)
   const worldShape = ext(world).docShape as D
 
-  // Create worldview as a fork with preserved peer ID
-  // This keeps the version vector small and ensures local writes
-  // appear as the same peer in both documents.
+  // Create worldview as a fork with its own unique peer ID.
+  // Different peer IDs are safe because:
+  // - Outbound (worldview → world): applyDiff + commit creates new ops with world's peerId
+  // - Inbound (world → worldview): import preserves original authors' peerIds
+  // Using separate peer IDs avoids potential (peerId, counter) collisions and
+  // aligns with Loro's expectations about peer ID uniqueness.
   const worldviewLoroDoc = worldLoroDoc.fork()
-  worldviewLoroDoc.setPeerId(worldLoroDoc.peerId)
 
   const worldviewDoc = createTypedDoc(worldShape, { doc: worldviewLoroDoc })
 
@@ -137,8 +139,13 @@ export function createLens<D extends DocShape>(
     options?: ChangeOptions
   }> = []
 
-  // Track world frontiers for filtering (worldview frontiers captured fresh)
+  // Track world frontiers for filtering
   let lastKnownWorldFrontiers = worldLoroDoc.frontiers()
+
+  // Track worldview frontiers for chained lens propagation
+  // This is needed because worldview has a different peerId than world,
+  // so we can't use world's frontiers when computing diffs on worldview
+  let lastKnownWorldviewFrontiers = worldviewLoroDoc.frontiers()
 
   // ============================================
   // FILTERING: World → Worldview
@@ -266,6 +273,8 @@ export function createLens<D extends DocShape>(
     isProcessing = true
     try {
       filterWorldToWorldview(worldFrontiersBefore, worldFrontiersAfter)
+      // Update worldview frontiers after filtering
+      lastKnownWorldviewFrontiers = worldviewLoroDoc.frontiers()
     } finally {
       isProcessing = false
       // Process any queued changes after filtering completes
@@ -319,8 +328,9 @@ export function createLens<D extends DocShape>(
     }
     worldLoroDoc.commit()
 
-    // Update world frontiers
+    // Update both frontier trackers
     lastKnownWorldFrontiers = worldLoroDoc.frontiers()
+    lastKnownWorldviewFrontiers = frontiersAfter
     debug?.(`applyAndPropagate: completed`)
   }
 
@@ -357,13 +367,14 @@ export function createLens<D extends DocShape>(
 
       isProcessing = true
       try {
-        // Capture fresh frontiers for this propagation
+        // Capture fresh worldview frontiers for this propagation
         const worldviewFrontiers = worldviewLoroDoc.frontiers()
-        const worldFrontiers = worldLoroDoc.frontiers()
 
-        // Get diff from world's perspective to worldview's current state
+        // Get diff using worldview's own frontier history (not world's frontiers)
+        // This is necessary because worldview has a different peerId than world,
+        // so world's frontier IDs may not exist in worldview's history
         const diff = worldviewLoroDoc.diff(
-          worldFrontiers,
+          lastKnownWorldviewFrontiers,
           worldviewFrontiers,
           false,
         )
@@ -381,8 +392,9 @@ export function createLens<D extends DocShape>(
         }
         worldLoroDoc.commit()
 
-        // Update world frontiers
+        // Update both frontier trackers
         lastKnownWorldFrontiers = worldLoroDoc.frontiers()
+        lastKnownWorldviewFrontiers = worldviewFrontiers
         debug?.(`worldview subscription: propagated to world`)
       } finally {
         isProcessing = false
