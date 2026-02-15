@@ -20,7 +20,7 @@ describe("Ephemeral Store Integration", () => {
       identity: { name: "repo1", type: "user" },
       adapters: [new InMemoryStorageAdapter()],
     })
-    const handle = repo.get("test-doc", DocSchema, {
+    const handle = repo.getHandle("test-doc", DocSchema, {
       presence: PresenceSchema,
     })
 
@@ -55,8 +55,12 @@ describe("Ephemeral Store Integration", () => {
     })
 
     const docId = "ephemeral-sync-doc"
-    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
-    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle1 = repo1.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
+    const handle2 = repo2.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
 
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -88,7 +92,7 @@ describe("Ephemeral Store Integration", () => {
       identity: { name: "repo1", type: "user" },
       adapters: [new InMemoryStorageAdapter()],
     })
-    const handle = repo.get("test-doc", DocSchema, {
+    const handle = repo.getHandle("test-doc", DocSchema, {
       presence: PresenceSchema,
     })
 
@@ -118,7 +122,9 @@ describe("Ephemeral Store Integration", () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     const docId = "initial-sync-doc"
-    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle1 = repo1.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
     handle1.presence.setSelf({ status: "online" })
 
     // Wait for presence to be set
@@ -138,7 +144,9 @@ describe("Ephemeral Store Integration", () => {
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle2 = repo2.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
 
     // Wait for sync - heartbeat will propagate the presence
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -175,8 +183,12 @@ describe("Ephemeral Store Integration", () => {
     })
 
     const docId = "typed-ephemeral-doc"
-    const handle1 = repo1.get(docId, DocSchema, { presence: PresenceSchema })
-    const handle2 = repo2.get(docId, DocSchema, { presence: PresenceSchema })
+    const handle1 = repo1.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
+    const handle2 = repo2.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
 
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 100))

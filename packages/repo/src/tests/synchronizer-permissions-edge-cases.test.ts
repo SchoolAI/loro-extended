@@ -33,7 +33,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
 
     // Create doc on repoA
     const docId = crypto.randomUUID()
-    const handleA = repoA.get(docId, DocSchema)
+    const handleA = repoA.getHandle(docId, DocSchema)
     change(handleA.doc, draft => {
       draft.title.insert(0, "secret")
     })
@@ -71,7 +71,7 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // (even though visibility is false)
     expect(repoB.has(docId)).toBe(true)
 
-    const handleB = repoB.get(docId, DocSchema)
+    const handleB = repoB.getHandle(docId, DocSchema)
     await handleB.waitForSync({ timeout: 0 })
     expect(handleB.doc.toJSON().title).toBe("secret")
   })

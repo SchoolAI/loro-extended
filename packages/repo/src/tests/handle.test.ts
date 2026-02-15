@@ -35,7 +35,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema)
+      const handle = repo.getHandle("doc-1", DocSchema)
 
       // doc should be a TypedDoc
       expect(handle.doc).toBeDefined()
@@ -60,7 +60,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema)
+      const handle = repo.getHandle("doc-1", DocSchema)
 
       expect(handle.docId).toBe("doc-1")
       expect(handle.peerId).toBe("123")
@@ -74,7 +74,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", AnyDocSchema)
+      const handle = repo.getHandle("doc-1", AnyDocSchema)
 
       // doc should still be a TypedDoc (with unknown types for the 'doc' field)
       expect(handle.doc).toBeDefined()
@@ -97,7 +97,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
@@ -128,7 +128,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -151,7 +151,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -183,7 +183,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -221,7 +221,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         cursors: CursorPresenceSchema,
       })
 
@@ -270,7 +270,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: FlexiblePresenceSchema,
       })
 
@@ -305,7 +305,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema)
+      const handle = repo.getHandle("doc-1", DocSchema)
 
       // Create an external store (like loro-prosemirror would)
       const externalStore = new EphemeralStore()
@@ -328,7 +328,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -348,7 +348,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema)
+      const handle = repo.getHandle("doc-1", DocSchema)
 
       // With no adapters, readyStates includes the local "aware" state
       expect(handle.readyStates.length).toBeGreaterThanOrEqual(0)
@@ -362,7 +362,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema)
+      const handle = repo.getHandle("doc-1", DocSchema)
 
       const changes: unknown[] = []
       const unsubscribe = handle.onReadyStateChange(states => {
@@ -390,11 +390,11 @@ describe("Handle", () => {
       })
 
       try {
-        const handle1 = repo1.get("doc-1", DocSchema, {
+        const handle1 = repo1.getHandle("doc-1", DocSchema, {
           presence: PresenceSchema,
         })
 
-        const _handle2 = repo2.get("doc-1", DocSchema, {
+        const _handle2 = repo2.getHandle("doc-1", DocSchema, {
           presence: PresenceSchema,
         })
 

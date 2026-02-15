@@ -257,6 +257,25 @@ type HandleParams<D extends DocShape, E extends EphemeralDeclarations> = {
 /**
  * A unified handle to a Loro document with typed ephemeral stores.
  *
+ * @deprecated Use `repo.get()` which returns a `Doc<D>` directly.
+ * Access sync capabilities via `sync(doc)` from `@loro-extended/repo`.
+ *
+ * Migration:
+ * ```typescript
+ * // Before
+ * const handle = repo.getHandle(docId, schema)
+ * handle.doc.title.insert(0, "Hello")
+ * await handle.waitForSync()
+ * handle.presence.setSelf({ status: "online" })
+ *
+ * // After
+ * import { sync } from "@loro-extended/repo"
+ * const doc = repo.get(docId, schema, { presence: PresenceSchema })
+ * doc.title.insert(0, "Hello")
+ * await sync(doc).waitForSync()
+ * sync(doc).presence.setSelf({ status: "online" })
+ * ```
+ *
  * This class provides:
  * - Type-safe document access via `.doc` (always a TypedDoc)
  * - Type-safe ephemeral store access via declared store names
@@ -400,7 +419,7 @@ export class Handle<
    *
    * @example
    * ```typescript
-   * const handle = repo.get('my-doc', Shape.any())
+   * const handle = repo.getHandle('my-doc', Shape.any())
    * handle.loroDoc.getMap('root').set('key', 'value')
    * ```
    */
@@ -750,6 +769,9 @@ export class Handle<
 /**
  * Type helper to extract ephemeral store types from a Handle.
  * This allows accessing declared ephemeral stores as properties.
+ *
+ * @deprecated Use `Doc<D>` from `repo.get()` instead.
+ * Access ephemeral stores via `sync(doc).presence` etc.
  */
 export type HandleWithEphemerals<
   D extends DocShape,
@@ -760,6 +782,11 @@ export type HandleWithEphemerals<
 
 /**
  * Creates a Handle with ephemeral stores accessible as properties.
+ *
+ * @deprecated Use `createRepoDoc()` from `./sync.ts` instead.
+ * This function is kept for backward compatibility with `repo.getHandle()`.
+ *
+ * @internal
  */
 export function createHandle<
   D extends DocShape,

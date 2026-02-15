@@ -41,7 +41,7 @@ describe("waitForSync", () => {
       const serverRepo = new Repo({
         identity: { name: "server", type: "service" },
       })
-      const serverHandle = serverRepo.get("test-doc", DocSchema)
+      const serverHandle = serverRepo.getHandle("test-doc", DocSchema)
       change(serverHandle.doc, draft => {
         draft.title.insert(0, "Server Data")
         draft.count.increment(42)
@@ -56,7 +56,7 @@ describe("waitForSync", () => {
       })
 
       // Get the document handle
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // At this point, the channel is established but no sync-response has arrived
       expect(clientHandle.loroDoc.opCount()).toBe(0)
@@ -103,7 +103,7 @@ describe("waitForSync", () => {
       })
 
       // Get a document that doesn't exist on the server
-      const clientHandle = clientRepo.get("nonexistent-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("nonexistent-doc", DocSchema)
 
       // Start waiting for sync
       let waitResolved = false
@@ -137,7 +137,7 @@ describe("waitForSync", () => {
       const serverRepo = new Repo({
         identity: { name: "server", type: "service" },
       })
-      const serverHandle = serverRepo.get("existing-doc", DocSchema)
+      const serverHandle = serverRepo.getHandle("existing-doc", DocSchema)
       change(serverHandle.doc, draft => {
         draft.title.insert(0, "Existing Title")
       })
@@ -150,7 +150,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("existing-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("existing-doc", DocSchema)
 
       // The app's initialization pattern
       let initializationRan = false
@@ -195,7 +195,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("new-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("new-doc", DocSchema)
 
       // The app's initialization pattern
       let initializationRan = false
@@ -239,7 +239,7 @@ describe("waitForSync", () => {
         adapters: [], // No adapters!
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // waitForSync should throw immediately
       await expect(
@@ -255,7 +255,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // waitForSync for storage should throw
       await expect(
@@ -274,7 +274,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // Start waiting with a very short timeout (50ms)
       // The adapter won't respond in time, so it should timeout
@@ -306,7 +306,7 @@ describe("waitForSync", () => {
         adapters: [],
       })
 
-      const clientHandle = clientRepo.get("my-special-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("my-special-doc", DocSchema)
 
       try {
         await clientHandle.waitForSync({ kind: "network" })
@@ -328,7 +328,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // Start waiting with timeout disabled
       let resolved = false
@@ -364,7 +364,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // Create an AbortController
       const controller = new AbortController()
@@ -399,7 +399,7 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.get("test-doc", DocSchema)
+      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
 
       // Create an already-aborted signal
       const controller = new AbortController()
@@ -426,7 +426,7 @@ describe("waitForSync", () => {
       })
 
       // Get a document that doesn't exist in storage
-      const handle = repo.get("nonexistent-doc", DocSchema)
+      const handle = repo.getHandle("nonexistent-doc", DocSchema)
 
       // waitForSync should resolve (not hang) because storage confirms "absent"
       await handle.waitForSync({ kind: "storage", timeout: 0 })
@@ -446,7 +446,7 @@ describe("waitForSync", () => {
         adapters: [storage1],
       })
 
-      const handle1 = repo1.get("existing-doc", DocSchema)
+      const handle1 = repo1.getHandle("existing-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "Stored Data")
         draft.count.increment(100)
@@ -462,7 +462,7 @@ describe("waitForSync", () => {
         adapters: [storage2],
       })
 
-      const handle2 = repo2.get("existing-doc", DocSchema)
+      const handle2 = repo2.getHandle("existing-doc", DocSchema)
 
       // waitForSync should resolve when storage sends the data
       await handle2.waitForSync({ kind: "storage", timeout: 0 })
@@ -484,7 +484,7 @@ describe("waitForSync", () => {
         adapters: [storage],
       })
 
-      const handle = repo.get("new-doc", DocSchema)
+      const handle = repo.getHandle("new-doc", DocSchema)
 
       // The app's initialization pattern
       await handle.waitForSync({ kind: "storage", timeout: 0 })

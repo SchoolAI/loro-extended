@@ -514,7 +514,7 @@ export const Shape = {
    *   doc: Shape.any(), // opt out of typing for this container
    * })
    *
-   * const handle = repo.get(docId, ProseMirrorDocShape, CursorPresenceShape)
+   * const handle = repo.getHandle(docId, ProseMirrorDocShape, CursorPresenceShape)
    * // handle.doc.doc is typed as `unknown` - you're on your own
    * ```
    */

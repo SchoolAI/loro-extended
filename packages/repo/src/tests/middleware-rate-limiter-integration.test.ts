@@ -67,7 +67,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make initial change
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -76,7 +76,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 first to establish subscription
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Now make rapid changes - these channel/update messages will be rate limited
@@ -139,7 +139,7 @@ describe("Rate Limiter Integration", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
       })
 
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "initial content")
       })
@@ -158,7 +158,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Request the document (this will trigger a sync-request)
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Document should be empty because sync-response was blocked
@@ -208,7 +208,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make changes
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -216,7 +216,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Sync should work (not rate limited)
@@ -273,7 +273,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make rapid changes
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
 
       // Make 10 rapid changes
       for (let i = 0; i < 10; i++) {
@@ -338,7 +338,7 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document in repo2 and make changes
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       change(handle2.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -411,10 +411,10 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document with ephemeral store declared
-      const handle1 = repo1.get("test-doc", DocSchema, {
+      const handle1 = repo1.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
-      const handle2 = repo2.get("test-doc", DocSchema, {
+      const handle2 = repo2.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 

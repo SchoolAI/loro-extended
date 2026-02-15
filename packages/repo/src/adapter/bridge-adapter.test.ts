@@ -38,13 +38,13 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Create a document in repo1
     const docId = "test-doc"
-    const handle1 = repo1.get(docId, DocSchema)
+    const handle1 = repo1.getHandle(docId, DocSchema)
     change(handle1.doc, draft => {
       draft.title.insert(0, "value")
     })
 
     // Get the document in repo2
-    const handle2 = repo2.get(docId, DocSchema)
+    const handle2 = repo2.getHandle(docId, DocSchema)
 
     // Wait for sync
     await handle2.waitForSync({ timeout: 0 })
@@ -107,7 +107,7 @@ describe("BridgeAdapter Integration Tests", () => {
 
     // Create and modify a document in repo1
     const docId = "test-doc-1"
-    const handle1 = repo1.get(docId, DocSchema)
+    const handle1 = repo1.getHandle(docId, DocSchema)
 
     change(handle1.doc, draft => {
       draft.title.insert(0, "Hello from repo1")
@@ -115,7 +115,7 @@ describe("BridgeAdapter Integration Tests", () => {
     })
 
     // Get the same document in repo2
-    const handle2 = repo2.get(docId, DocSchema)
+    const handle2 = repo2.getHandle(docId, DocSchema)
     await handle2.waitForSync({ timeout: 0 })
 
     // Verify the document was synchronized
@@ -149,13 +149,13 @@ describe("BridgeAdapter Integration Tests", () => {
     const docId = "bidirectional-doc"
 
     // Repo1 creates and modifies document
-    const handle1 = repo1.get(docId, DocSchema)
+    const handle1 = repo1.getHandle(docId, DocSchema)
     change(handle1.doc, draft => {
       draft.title.insert(0, "from-repo1")
     })
 
     // Repo2 gets the document and adds to it
-    const handle2 = repo2.get(docId, DocSchema)
+    const handle2 = repo2.getHandle(docId, DocSchema)
 
     change(handle2.doc, draft => {
       draft.count.increment(100)
@@ -198,8 +198,8 @@ describe("BridgeAdapter Integration Tests", () => {
     const docId = "concurrent-doc"
 
     // Both repos get the document
-    const handle1 = repo1.get(docId, DocSchema)
-    const handle2 = repo2.get(docId, DocSchema)
+    const handle1 = repo1.getHandle(docId, DocSchema)
+    const handle2 = repo2.getHandle(docId, DocSchema)
 
     // Initialize with some shared state
     change(handle1.doc, draft => {
@@ -247,18 +247,18 @@ describe("BridgeAdapter Integration Tests", () => {
     })
 
     // Create multiple documents in repo1
-    const handle1A = repo1.get("doc-a", DocSchema)
-    const handle1B = repo1.get("doc-b", DocSchema)
-    const handle1C = repo1.get("doc-c", DocSchema)
+    const handle1A = repo1.getHandle("doc-a", DocSchema)
+    const handle1B = repo1.getHandle("doc-b", DocSchema)
+    const handle1C = repo1.getHandle("doc-c", DocSchema)
 
     change(handle1A.doc, draft => draft.title.insert(0, "a"))
     change(handle1B.doc, draft => draft.title.insert(0, "b"))
     change(handle1C.doc, draft => draft.title.insert(0, "c"))
 
     // Access the same documents in repo2
-    const handle2A = repo2.get("doc-a", DocSchema)
-    const handle2B = repo2.get("doc-b", DocSchema)
-    const handle2C = repo2.get("doc-c", DocSchema)
+    const handle2A = repo2.getHandle("doc-a", DocSchema)
+    const handle2B = repo2.getHandle("doc-b", DocSchema)
+    const handle2C = repo2.getHandle("doc-c", DocSchema)
 
     await Promise.all([
       handle2A.waitForSync({ timeout: 0 }),
@@ -343,14 +343,14 @@ describe("BridgeAdapter Integration Tests", () => {
     const docId = "shared-doc"
 
     // Repo1 creates the document
-    const handle1 = repo1.get(docId, DocSchema)
+    const handle1 = repo1.getHandle(docId, DocSchema)
     change(handle1.doc, draft => {
       draft.title.insert(0, "repo1")
     })
 
     // Repo2 and Repo3 should both receive it
-    const handle2 = repo2.get(docId, DocSchema)
-    const handle3 = repo3.get(docId, DocSchema)
+    const handle2 = repo2.getHandle(docId, DocSchema)
+    const handle3 = repo3.getHandle(docId, DocSchema)
 
     await Promise.all([
       handle2.waitForSync({ timeout: 0 }),

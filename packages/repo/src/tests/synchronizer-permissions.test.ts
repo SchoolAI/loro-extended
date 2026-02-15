@@ -153,7 +153,7 @@ describe("Synchronizer - Permissions Integration", () => {
 
     // Repo1 creates a handle (but doesn't change it yet)
     // This sends a sync-request to Repo2
-    repo1.get("test-doc-1", DocSchema)
+    repo1.getHandle("test-doc-1", DocSchema)
 
     // Wait for sync to happen
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -183,7 +183,7 @@ describe("Synchronizer - Permissions Integration", () => {
     })
 
     // Repo1 creates a handle
-    repo1.get("test-doc-2", DocSchema)
+    repo1.getHandle("test-doc-2", DocSchema)
 
     // Wait for sync to happen
     await new Promise(resolve => setTimeout(resolve, 100))

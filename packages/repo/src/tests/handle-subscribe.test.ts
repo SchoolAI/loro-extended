@@ -37,7 +37,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe(listener)
@@ -74,7 +74,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe(p => p.config.theme, listener)
@@ -98,7 +98,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const calls: Array<{ value: string; prev: string | undefined }> = []
       const unsubscribe = handle.subscribe(
@@ -133,7 +133,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       let receivedTitles: string[] = []
       const unsubscribe = handle.subscribe(
@@ -177,7 +177,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -222,7 +222,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -292,7 +292,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data using the correct API
       change(handle.doc, draft => {
@@ -328,7 +328,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -363,7 +363,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -416,7 +416,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
@@ -440,7 +440,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       let receivedValue: unknown[] = []
       const unsubscribe = handle.subscribe("$.config.theme", value => {
@@ -471,7 +471,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
@@ -494,7 +494,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       const listener = vi.fn()
       const unsubscribe = handle.subscribe("$.config.theme", listener)
@@ -519,7 +519,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       let receivedPrices: unknown[] = []
       // Use price (a plain value) instead of title (a LoroText container)
@@ -559,7 +559,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // This should compile - listener receives LoroEventBatch
       handle.subscribe(event => {
@@ -579,7 +579,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // This should compile - listener receives typed value and prev
       handle.subscribe(
@@ -615,7 +615,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // This should compile - listener receives unknown[]
       handle.subscribe("$.config.theme", value => {
@@ -635,7 +635,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -662,7 +662,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data with multiple books
       change(handle.doc, draft => {
@@ -706,7 +706,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Set up initial data
       change(handle.doc, draft => {
@@ -758,7 +758,7 @@ describe("Handle.subscribe", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", docShape)
+      const handle = repo.getHandle("doc-1", docShape)
 
       // Add one item
       change(handle.doc, draft => {

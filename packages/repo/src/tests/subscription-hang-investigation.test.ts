@@ -167,8 +167,8 @@ describe("Subscription Hang Investigation", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Get handles (this creates doc state)
-      const handle1 = repo1.get("doc-1", DocSchema)
-      const _handle2 = repo2.get("doc-1", DocSchema)
+      const handle1 = repo1.getHandle("doc-1", DocSchema)
+      const _handle2 = repo2.getHandle("doc-1", DocSchema)
 
       // Modify document - this uses the existing sync mechanism
       change(handle1.doc, draft => {

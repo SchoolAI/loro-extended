@@ -17,7 +17,7 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle1 = repo1.get("doc", DocSchema)
+    const handle1 = repo1.getHandle("doc", DocSchema)
     change(handle1.doc, draft => {
       draft.content.insert(0, "Hello, world!")
     })
@@ -36,7 +36,7 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle2 = repo2.get("doc", DocSchema)
+    const handle2 = repo2.getHandle("doc", DocSchema)
     await handle2.waitForSync({ kind: "storage", timeout: 5000 })
 
     expect(handle2.doc.content.toString()).toBe("Hello, world!")
@@ -53,7 +53,7 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle = repo.get("doc", DocSchema)
+    const handle = repo.getHandle("doc", DocSchema)
     change(handle.doc, draft => {
       draft.content.insert(0, "Hello!")
     })

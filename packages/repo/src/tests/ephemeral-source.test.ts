@@ -45,7 +45,9 @@ describe("Ephemeral Event Source", () => {
     it("should emit source: 'local' when setSelf is called", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.get(docId, DocSchema, { presence: PresenceSchema })
+      const handle = client.getHandle(docId, DocSchema, {
+        presence: PresenceSchema,
+      })
 
       const events: Array<{ source: string }> = []
 
@@ -74,10 +76,10 @@ describe("Ephemeral Event Source", () => {
       const docId = "test-doc"
 
       // Both need to get handles to establish subscription
-      const serverHandle = server.get(docId, DocSchema, {
+      const serverHandle = server.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
-      const clientHandle = client.get(docId, DocSchema, {
+      const clientHandle = client.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -108,7 +110,9 @@ describe("Ephemeral Event Source", () => {
     it("should pass source: 'initial' on first subscribe callback", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.get(docId, DocSchema, { presence: PresenceSchema })
+      const handle = client.getHandle(docId, DocSchema, {
+        presence: PresenceSchema,
+      })
 
       // Set some presence first
       handle.presence.setSelf({ cursor: "initial-cursor" })
@@ -131,10 +135,10 @@ describe("Ephemeral Event Source", () => {
       const { server, client } = createConnectedPair()
       const docId = "test-doc"
 
-      const serverHandle = server.get(docId, DocSchema, {
+      const serverHandle = server.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
-      const clientHandle = client.get(docId, DocSchema, {
+      const clientHandle = client.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -180,7 +184,9 @@ describe("Ephemeral Event Source", () => {
     it("demonstrates that source filtering prevents the loop", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.get(docId, DocSchema, { presence: PresenceSchema })
+      const handle = client.getHandle(docId, DocSchema, {
+        presence: PresenceSchema,
+      })
 
       const sources: string[] = []
 

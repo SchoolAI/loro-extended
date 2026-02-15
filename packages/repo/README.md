@@ -13,7 +13,7 @@ pnpm add @loro-extended/repo
 ## Quick Start
 
 ```typescript
-import { Repo, Shape } from "@loro-extended/repo";
+import { Repo, Shape, sync } from "@loro-extended/repo";
 import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
 import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
 
@@ -29,16 +29,14 @@ const TodoSchema = Shape.doc({
   ),
 });
 
-// 2. Define your ephemeral declarations (optional)
-const EphemeralDeclarations = {
-  presence: Shape.plain.struct({
-    cursor: Shape.plain.struct({
-      x: Shape.plain.number(),
-      y: Shape.plain.number(),
-    }),
-    name: Shape.plain.string().placeholder("Anonymous"),
+// 2. Define ephemeral stores (optional)
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
+    x: Shape.plain.number(),
+    y: Shape.plain.number(),
   }),
-};
+  name: Shape.plain.string(),
+});
 
 // 3. Create adapters
 const network = new SseClientNetworkAdapter({
@@ -47,38 +45,99 @@ const network = new SseClientNetworkAdapter({
 });
 const storage = new IndexedDBStorageAdapter();
 
-// 4. Create the Repo (identity and adapters are optional)
+// 4. Create the Repo
 const repo = new Repo({
   adapters: [network, storage],
-  identity: { name: "my-app", type: "user" }, // Optional - defaults provided
+  identity: { name: "my-app", type: "user" },
 });
 
-// 5. Get a typed document handle
-const handle = repo.get("my-todos", TodoSchema, EphemeralDeclarations);
+// 5. Get a typed document (Doc<D>)
+const doc = repo.get("my-todos", TodoSchema, { presence: PresenceSchema });
 
-// 6. Make type-safe mutations
-handle.change((draft) => {
-  draft.title.insert(0, "My Todo List");
-  draft.todos.push({
-    id: crypto.randomUUID(),
-    text: "Learn Loro",
-    done: false,
-  });
+// 6. Make type-safe mutations directly on the doc
+doc.title.insert(0, "My Todo List");
+doc.todos.push({
+  id: crypto.randomUUID(),
+  text: "Learn Loro",
+  done: false,
 });
 
-// 7. Use presence for real-time collaboration
-handle.presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
+// 7. Access sync capabilities via sync()
+sync(doc).presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
+await sync(doc).waitForSync();
 
 // 8. Read current state
-console.log(handle.doc.toJSON());
+console.log(doc.toJSON());
 // { title: "My Todo List", todos: [{ id: "...", text: "Learn Loro", done: false }] }
 ```
 
 ## Core Concepts
 
-### Repo
+### The Doc-First API
 
-The `Repo` class is the central orchestrator. It manages document lifecycle, coordinates adapters, and provides the main API for document operations.
+The `repo.get()` method returns a `Doc<D>` - a typed document you can read and mutate directly:
+
+```typescript
+const doc = repo.get("doc-id", MySchema);
+
+// Direct mutations (no .doc property needed)
+doc.title.insert(0, "Hello");
+doc.count.increment(5);
+doc.items.push({ id: "1", name: "Item" });
+
+// Read values
+const snapshot = doc.toJSON();
+```
+
+### The `sync()` Function
+
+Sync/network capabilities are accessed via the `sync()` function. This keeps the common case simple while providing full access to sync infrastructure when needed:
+
+```typescript
+import { sync } from "@loro-extended/repo";
+
+const doc = repo.get("doc-id", MySchema, { presence: PresenceSchema });
+
+// Access sync capabilities
+sync(doc).peerId              // Your peer ID
+sync(doc).docId               // Document ID  
+sync(doc).readyStates         // Sync status with peers
+sync(doc).loroDoc             // Raw LoroDoc for advanced use
+
+// Wait for sync
+await sync(doc).waitForSync()
+await sync(doc).waitForSync({ kind: "storage" })
+await sync(doc).waitForSync({ kind: "network", timeout: 5000 })
+
+// Ephemeral stores (presence, cursors, etc.)
+sync(doc).presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" })
+sync(doc).presence.self       // Your presence value
+sync(doc).presence.peers      // Map<peerId, presence>
+
+// Subscribe to ready state changes
+sync(doc).onReadyStateChange((readyStates) => {
+  console.log("Sync status:", readyStates);
+});
+```
+
+### Document Caching
+
+`repo.get()` caches documents by ID. Multiple calls return the same instance:
+
+```typescript
+const doc1 = repo.get("my-doc", MySchema);
+const doc2 = repo.get("my-doc", MySchema);
+doc1 === doc2; // true - same instance
+
+// Schema mismatch throws an error
+repo.get("my-doc", DifferentSchema); // Error!
+```
+
+This makes it safe to call `repo.get()` without memoization in React components.
+
+## Repo
+
+The `Repo` class is the central orchestrator. It manages document lifecycle, coordinates adapters, and provides the main API.
 
 ```typescript
 import { Repo } from "@loro-extended/repo";
@@ -88,194 +147,26 @@ const repo = new Repo();
 
 // With configuration
 const repo = new Repo({
-  adapters: [networkAdapter, storageAdapter], // Optional - defaults to []
+  adapters: [networkAdapter, storageAdapter],
   identity: {
-    name: "my-peer", // Optional - human-readable name
-    type: "user", // Optional - defaults to "user" ("user" | "bot" | "service")
-    peerId: "123456789", // Optional - auto-generated if not provided
+    name: "my-peer",           // Optional: human-readable name
+    type: "user",              // Optional: "user" | "bot" | "service"
+    peerId: "123456789",       // Optional: auto-generated if not provided
   },
-  rules: {
-    // Optional: permission rules (all 5 shown below)
-    canBeginSync: (ctx) => true,  // Should we start syncing with this peer?
-    canReveal: (ctx) => true,     // Can we tell this peer about a document?
-    canUpdate: (ctx) => true,     // Do we accept updates from this peer?
-    canDelete: (ctx) => true,     // Can this peer delete this document?
-    canCreate: (ctx) => true,     // Can this peer create a new document?
+  permissions: {
+    visibility: (doc, peer) => true,   // Can peer see this doc?
+    mutability: (doc, peer) => true,   // Can peer mutate this doc?
+    deletion: (doc, peer) => true,     // Can peer delete this doc?
   },
 });
-
-// Add adapters dynamically
-await repo.addAdapter(networkAdapter);
-
-// Remove adapters at runtime
-await repo.removeAdapter(networkAdapter.adapterId);
 ```
 
-### Document Handles
-
-Get typed document handles with `repo.get()`. Documents are immediately available—no loading states required.
+### Repo Methods
 
 ```typescript
-// Get a typed handle with doc and ephemeral schemas
-const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
-
-// Access the typed document
-handle.doc.title.insert(0, "Hello"); // Direct mutations (auto-commit)
-handle.doc.count.increment(5);
-
-// Batch mutations for atomic operations
-handle.change((draft) => {
-  draft.title.insert(0, "Batched: ");
-  draft.count.increment(10);
-});
-
-// Get JSON snapshot
-const snapshot = handle.doc.toJSON();
-```
-
-### Presence (Ephemeral State)
-
-Real-time ephemeral state for collaboration features like cursors, selections, and user status.
-
-```typescript
-const PresenceSchema = Shape.plain.struct({
-  cursor: Shape.plain.struct({
-    x: Shape.plain.number(),
-    y: Shape.plain.number(),
-  }),
-  name: Shape.plain.string().placeholder("Anonymous"),
-  status: Shape.plain.string().placeholder("online"),
-});
-
-const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
-
-// Set your presence
-handle.presence.setSelf({ cursor: { x: 100, y: 200 }, name: "Alice" });
-
-// Read your presence (with placeholder defaults)
-console.log(handle.presence.self);
-// { cursor: { x: 100, y: 200 }, name: "Alice", status: "online" }
-
-// Read other peers' presence
-for (const [peerId, presence] of handle.presence.peers) {
-  console.log(
-    `${peerId}: ${presence.name} at (${presence.cursor.x}, ${presence.cursor.y})`
-  );
-}
-
-// Subscribe to presence changes
-handle.presence.subscribe(({ key, value, source }) => {
-  console.log(`Peer ${key} updated:`, value, `(source: ${source})`);
-});
-```
-
-### Multiple Ephemeral Stores
-
-You can declare multiple ephemeral stores for bandwidth isolation:
-
-```typescript
-const handle = repo.get("doc-id", DocSchema, {
-  mouse: MouseShape,      // High-frequency updates
-  profile: ProfileShape,  // Low-frequency updates
-});
-
-handle.mouse.setSelf({ x: 100, y: 200 });
-handle.profile.setSelf({ name: "Alice", avatar: "..." });
-```
-
-## Adapters
-
-Adapters provide pluggable network and storage implementations. Mix and match to fit your architecture.
-
-### Network Adapters
-
-| Package                                                              | Description          | Use Case                                |
-| -------------------------------------------------------------------- | -------------------- | --------------------------------------- |
-| [`@loro-extended/adapter-sse`](../../adapters/sse)                   | Server-Sent Events   | Client-server sync with Express/Node.js |
-| [`@loro-extended/adapter-websocket`](../../adapters/websocket)       | WebSocket            | Real-time bidirectional sync            |
-| [`@loro-extended/adapter-webrtc`](../../adapters/webrtc)             | WebRTC Data Channels | Peer-to-peer sync (no server required)  |
-| [`@loro-extended/adapter-http-polling`](../../adapters/http-polling) | HTTP Long-Polling    | Fallback for restricted environments    |
-
-### Storage Adapters
-
-| Package                                                        | Description | Use Case                    |
-| -------------------------------------------------------------- | ----------- | --------------------------- |
-| [`@loro-extended/adapter-indexeddb`](../../adapters/indexeddb) | IndexedDB   | Browser-based persistence   |
-| [`@loro-extended/adapter-leveldb`](../../adapters/leveldb)     | LevelDB     | Node.js server persistence  |
-| [`@loro-extended/adapter-postgres`](../../adapters/postgres)   | PostgreSQL  | Production database storage |
-
-### Built-in Adapters
-
-The repo package includes basic adapters for testing and development:
-
-- **`InMemoryStorageAdapter`** - Stores data in memory (useful for testing)
-- **`BridgeAdapter`** - Connects repos in-process (useful for testing multi-peer scenarios)
-
-```typescript
-import { InMemoryStorageAdapter } from "@loro-extended/repo";
-
-const storage = new InMemoryStorageAdapter();
-const repo = new Repo({
-  adapters: [storage],
-  identity: { name: "test", type: "user" },
-});
-```
-
-### Example: Multi-Adapter Setup
-
-Combine adapters for resilient, offline-capable applications:
-
-```typescript
-import { Repo } from "@loro-extended/repo";
-import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
-import { WebRTCAdapter } from "@loro-extended/adapter-webrtc";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
-
-// SSE for server sync + WebRTC for peer-to-peer + IndexedDB for offline
-const repo = new Repo({
-  adapters: [
-    new SseClientNetworkAdapter({
-      postUrl: "/sync",
-      eventSourceUrl: (id) => `/events?id=${id}`,
-    }),
-    new WebRTCAdapter({ signaling: signalingChannel }),
-    new IndexedDBStorageAdapter(),
-  ],
-  identity: { name: "hybrid-client", type: "user" },
-});
-```
-
-## API Reference
-
-### Repo Class
-
-#### Constructor
-
-```typescript
-interface RepoParams {
-  identity?: {
-    name?: string; // Optional: human-readable peer name
-    type?: "user" | "bot" | "service"; // Optional: defaults to "user"
-    peerId?: string; // Optional: auto-generated if not provided
-  };
-  adapters?: AnyAdapter[]; // Optional: defaults to []
-  rules?: Partial<Rules>; // Optional permission rules
-  onUpdate?: HandleUpdateFn; // Optional update callback, for logs/debug
-}
-
-// All parameters are optional
-const repo = new Repo();
-const repo = new Repo(params);
-```
-
-#### Methods
-
-```typescript
-// Get a typed document handle with ephemeral stores
-const handle = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
-
-// Get a typed handle without ephemeral stores
-const handle = repo.get("doc-id", DocSchema);
+// Get a typed document
+const doc = repo.get("doc-id", DocSchema);
+const doc = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
 // Check if a document exists
 repo.has("doc-id"); // boolean
@@ -283,171 +174,247 @@ repo.has("doc-id"); // boolean
 // Delete a document
 await repo.delete("doc-id");
 
-// Reset the repo (disconnect adapters, clear state)
+// Flush pending storage writes
+await repo.flush();
+
+// Graceful shutdown (flush + disconnect)
+await repo.shutdown();
+
+// Reset (disconnect adapters, clear state)
 repo.reset();
 
 // Dynamic adapter management
-await repo.addAdapter(adapter); // Add adapter at runtime (idempotent)
-await repo.removeAdapter(adapterId); // Remove adapter at runtime (idempotent)
-repo.hasAdapter(adapterId); // Check if adapter exists
-repo.getAdapter(adapterId); // Get adapter by ID
-repo.adapters; // Get all current adapters
+await repo.addAdapter(adapter);
+await repo.removeAdapter(adapterId);
+repo.hasAdapter(adapterId);
+repo.getAdapter(adapterId);
+repo.adapters; // All current adapters
 ```
 
-### Handle
+## Presence (Ephemeral State)
 
-The `Handle` provides typed access to documents and ephemeral stores.
-
-#### Properties
+Real-time ephemeral state for collaboration features:
 
 ```typescript
-handle.docId; // string - The document ID
-handle.peerId; // string - The local peer ID
-handle.doc; // TypedDoc<D> - The typed document
-handle.presence; // TypedEphemeral<P> - The typed presence (if declared)
-handle.readyStates; // ReadyState[] - Current sync status
-```
-
-#### Methods
-
-```typescript
-// Batch mutations into a single commit
-handle.change((draft) => {
-  draft.title.insert(0, "Hello");
-  draft.count.increment(5);
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
+    x: Shape.plain.number(),
+    y: Shape.plain.number(),
+  }),
+  name: Shape.plain.string(),
+  status: Shape.plain.string(),
 });
 
-// Wait for storage to load
-await handle.waitForStorage();
+const doc = repo.get("doc-id", DocSchema, { presence: PresenceSchema });
 
-// Wait for network sync
-await handle.waitForNetwork();
-
-// Custom readiness check
-await handle.waitUntilReady((readyStates) => {
-  return readyStates.some((s) => s.state === "loaded");
+// Set your presence
+sync(doc).presence.setSelf({ 
+  cursor: { x: 100, y: 200 }, 
+  name: "Alice",
+  status: "online",
 });
 
-// Subscribe to ready state changes
-const unsubscribe = handle.onReadyStateChange((readyStates) => {
-  console.log("Sync status changed:", readyStates);
+// Read your presence
+console.log(sync(doc).presence.self);
+
+// Read other peers' presence
+for (const [peerId, presence] of sync(doc).presence.peers) {
+  console.log(`${peerId}: ${presence.name} at (${presence.cursor.x}, ${presence.cursor.y})`);
+}
+
+// Subscribe to presence changes
+sync(doc).presence.subscribe(({ key, value, source }) => {
+  console.log(`Peer ${key} updated:`, value, `(source: ${source})`);
 });
 ```
 
-### Subscribing to Document Changes
+### Multiple Ephemeral Stores
 
-To react to document changes, subscribe to the underlying LoroDoc:
+Declare multiple stores for bandwidth isolation:
 
 ```typescript
-import { getLoroDoc } from "@loro-extended/repo";
-
-// Option 1: Using getLoroDoc helper
-const loroDoc = getLoroDoc(handle.doc);
-loroDoc.subscribe((event) => {
-  console.log("Document changed:", event);
-  // Update your UI here
+const doc = repo.get("doc-id", DocSchema, {
+  mouse: MouseSchema,      // High-frequency updates
+  profile: ProfileSchema,  // Low-frequency updates
 });
 
-// Option 2: Using $ namespace
-handle.doc.$.loroDoc.subscribe((event) => {
-  console.log("Document changed:", event);
+sync(doc).mouse.setSelf({ x: 100, y: 200 });
+sync(doc).profile.setSelf({ name: "Alice", avatar: "..." });
+```
+
+## Adapters
+
+Adapters provide pluggable network and storage implementations.
+
+### Network Adapters
+
+| Package | Description | Use Case |
+|---------|-------------|----------|
+| [`@loro-extended/adapter-sse`](../../adapters/sse) | Server-Sent Events | Client-server sync |
+| [`@loro-extended/adapter-websocket`](../../adapters/websocket) | WebSocket | Real-time bidirectional |
+| [`@loro-extended/adapter-webrtc`](../../adapters/webrtc) | WebRTC | Peer-to-peer (no server) |
+| [`@loro-extended/adapter-http-polling`](../../adapters/http-polling) | HTTP Polling | Restricted environments |
+
+### Storage Adapters
+
+| Package | Description | Use Case |
+|---------|-------------|----------|
+| [`@loro-extended/adapter-indexeddb`](../../adapters/indexeddb) | IndexedDB | Browser persistence |
+| [`@loro-extended/adapter-leveldb`](../../adapters/leveldb) | LevelDB | Node.js persistence |
+| [`@loro-extended/adapter-postgres`](../../adapters/postgres) | PostgreSQL | Production database |
+
+### Built-in Adapters
+
+```typescript
+import { InMemoryStorageAdapter, BridgeAdapter, Bridge } from "@loro-extended/repo";
+
+// In-memory storage (for testing)
+const storage = new InMemoryStorageAdapter();
+
+// Bridge adapter (for testing multi-peer scenarios)
+const bridge = new Bridge();
+const repo1 = new Repo({ adapters: [new BridgeAdapter({ bridge })] });
+const repo2 = new Repo({ adapters: [new BridgeAdapter({ bridge })] });
+```
+
+### Multi-Adapter Setup
+
+```typescript
+import { Repo } from "@loro-extended/repo";
+import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client";
+import { WebRTCAdapter } from "@loro-extended/adapter-webrtc";
+import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
+
+const repo = new Repo({
+  adapters: [
+    // Server sync
+    new SseClientNetworkAdapter({
+      postUrl: "/sync",
+      eventSourceUrl: (id) => `/events?id=${id}`,
+    }),
+    // Peer-to-peer fallback
+    new WebRTCAdapter({ signaling: signalingChannel }),
+    // Offline persistence
+    new IndexedDBStorageAdapter(),
+  ],
 });
+```
+
+## Waiting for Sync
+
+Use `sync(doc).waitForSync()` to wait for synchronization:
+
+```typescript
+const doc = repo.get("doc-id", DocSchema);
+
+// Wait for network sync (default)
+await sync(doc).waitForSync();
+
+// Wait for storage sync
+await sync(doc).waitForSync({ kind: "storage" });
+
+// With timeout
+await sync(doc).waitForSync({ timeout: 5000 });
+
+// With abort signal
+const controller = new AbortController();
+await sync(doc).waitForSync({ signal: controller.signal });
+```
+
+### InitializeIfEmpty Pattern
+
+```typescript
+const doc = repo.get("doc-id", DocSchema);
+
+// Wait for sync to know if doc exists on server
+await sync(doc).waitForSync({ kind: "storage" });
+
+// Check if doc is empty (new)
+if (sync(doc).loroDoc.opCount() === 0) {
+  // Initialize with default values
+  doc.title.insert(0, "New Document");
+  doc.items.push({ id: "1", name: "First Item" });
+}
 ```
 
 ## Permission System
 
-Control document access with the `Rules` interface. There are 5 permission rules:
-
-| Rule | Purpose |
-|------|---------|
-| `canBeginSync` | Should we start syncing with this peer? |
-| `canReveal` | Can we tell this peer about a document? |
-| `canUpdate` | Do we accept updates from this peer? |
-| `canDelete` | Can this peer delete this document? |
-| `canCreate` | Can this peer create a new document? |
+Control document access with permissions:
 
 ```typescript
 const repo = new Repo({
   adapters: [network, storage],
-  identity: { name: "server", type: "service" },
-  rules: {
-    // Control which documents are revealed to peers
-    canReveal: (ctx) => {
-      // Always reveal to storage adapters
-      if (ctx.channelKind === "storage") return true;
-      // Only reveal public documents to network peers
-      return ctx.docId.startsWith("public-");
+  permissions: {
+    // Control document visibility
+    visibility: (doc, peer) => {
+      return doc.id.startsWith("public/") || peer.peerType === "service";
     },
-
-    // Control who can update documents
-    canUpdate: (ctx) => {
-      return ctx.peerType === "user" || ctx.peerId === "trusted-service-123";
+    
+    // Control who can mutate
+    mutability: (doc, peer) => {
+      return peer.peerType !== "bot";
     },
-
-    // Control who can delete documents
-    canDelete: (ctx) => {
-      return ctx.peerType === "service" || ctx.peerId === "admin-456";
-    },
-
-    // Control who can create new documents
-    canCreate: (ctx) => {
-      return ctx.peerType !== "bot";
+    
+    // Control who can delete
+    deletion: (doc, peer) => {
+      return peer.peerType === "service";
     },
   },
 });
 ```
 
-### RuleContext
+## TypeScript Support
 
-The `RuleContext` provides information about the peer and document:
-
-```typescript
-type RuleContext = {
-  doc: LoroDoc;
-  docId: DocId;
-  peerId: PeerID;                        // Unique peer identifier
-  peerName?: string;                     // Human-readable name (optional)
-  peerType: "user" | "bot" | "service";  // Peer type
-  channelId: ChannelId;
-  channelKind: "storage" | "network" | "other";
-};
-```
-
-## Architecture
-
-The repo package uses a layered architecture with the Repo as the central orchestrator, coordinating DocHandles, a Synchronizer, and Adapters via an AdapterManager.
-
-For detailed architecture documentation, see:
-
-- [Architecture Overview](../../docs/repo-architecture.md) - System design and components
-- [Synchronizer Protocol](./src/synchronizer.md) - Sync protocol details
-- [Creating Custom Adapters](../../docs/creating-adapters.md) - Adapter implementation guide
-
-## Advanced Usage
-
-### Untyped Document Access
-
-For dynamic schemas or direct LoroDoc access, use `Shape.any()`:
+Full type inference from schemas:
 
 ```typescript
-// Get a handle with untyped document
-const handle = repo.get("doc-id", Shape.any());
+const DocSchema = Shape.doc({
+  title: Shape.text(),
+  count: Shape.counter(),
+  items: Shape.list(Shape.plain.string()),
+});
 
-// Access the raw LoroDoc via escape hatch
-handle.loroDoc.getMap("root").set("key", "value");
-handle.loroDoc.commit();
+const doc = repo.get("doc-id", DocSchema);
 
-// Or use the doc property (TypedDoc<AnyShape>)
-handle.doc.$.loroDoc.getMap("root").set("title", "Hello");
+// All mutations are type-safe
+doc.title.insert(0, "Hello");     // OK
+doc.count.increment(1);           // OK
+doc.items.push("new item");       // OK
+
+// Type errors caught at compile time
+doc.title.increment(1);           // Error: increment doesn't exist on TextRef
+doc.count.insert(0, "x");         // Error: insert doesn't exist on CounterRef
 ```
 
-### Custom Adapters
+## Migration from Handle API
 
-For creating custom storage or network adapters, see the [Creating Custom Adapters](../../docs/creating-adapters.md) guide.
+If upgrading from the previous handle-based API:
+
+**Before (deprecated):**
+```typescript
+const handle = repo.getHandle(docId, schema, { presence: PresenceSchema });
+handle.doc.title.insert(0, "Hello");
+await handle.waitForSync();
+handle.presence.setSelf({ status: "online" });
+const snapshot = handle.doc.toJSON();
+```
+
+**After (recommended):**
+```typescript
+import { sync } from "@loro-extended/repo";
+
+const doc = repo.get(docId, schema, { presence: PresenceSchema });
+doc.title.insert(0, "Hello");
+await sync(doc).waitForSync();
+sync(doc).presence.setSelf({ status: "online" });
+const snapshot = doc.toJSON();
+```
+
+The `repo.getHandle()` method is still available for backward compatibility but is deprecated.
 
 ## Logging
 
-The package uses [@logtape/logtape](https://github.com/dahlia/logtape) for structured logging:
+Uses [@logtape/logtape](https://github.com/dahlia/logtape) for structured logging:
 
 ```typescript
 import { configure, getConsoleSink } from "@logtape/logtape";
@@ -460,19 +427,11 @@ await configure({
 });
 ```
 
-## Development
+## Related Packages
 
-Run tests:
-
-```bash
-pnpm --filter @loro-extended/repo test
-```
-
-Run specific test file:
-
-```bash
-pnpm --filter @loro-extended/repo test run src/repo.test.ts
-```
+- [`@loro-extended/react`](../react/README.md) - React hooks (`useDocument`, `useValue`)
+- [`@loro-extended/hooks-core`](../hooks-core/README.md) - Framework-agnostic hooks
+- [`@loro-extended/change`](../change/README.md) - Schema definitions and typed operations
 
 ## License
 

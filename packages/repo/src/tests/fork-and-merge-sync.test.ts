@@ -89,8 +89,8 @@ describe("fork-and-merge synchronization", () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Create handles on both repos
-    const handle1 = repo1.get("doc-1", DocSchema)
-    const handle2 = repo2.get("doc-1", DocSchema)
+    const handle1 = repo1.getHandle("doc-1", DocSchema)
+    const handle2 = repo2.getHandle("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -214,8 +214,8 @@ describe("fork-and-merge synchronization", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const handle1 = repo1.get("doc-1", DocSchema)
-    const handle2 = repo2.get("doc-1", DocSchema)
+    const handle1 = repo1.getHandle("doc-1", DocSchema)
+    const handle2 = repo2.getHandle("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -257,8 +257,8 @@ describe("fork-and-merge synchronization", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const handle1 = repo1.get("doc-1", DocSchema)
-    const handle2 = repo2.get("doc-1", DocSchema)
+    const handle1 = repo1.getHandle("doc-1", DocSchema)
+    const handle2 = repo2.getHandle("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 

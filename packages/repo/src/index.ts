@@ -13,6 +13,14 @@ export * from "./permissions.js"
 export * from "./repo.js"
 export * from "./storage/in-memory-storage-adapter.js"
 export * from "./storage/storage-adapter.js"
+export {
+  Doc,
+  hasSync,
+  type SyncRef,
+  type SyncRefWithEphemerals,
+  sync,
+  type WaitForSyncOptions,
+} from "./sync.js"
 export * from "./types.js"
 export * from "./utils/generate-peer-id.js"
 export * from "./utils/generate-uuid.js"

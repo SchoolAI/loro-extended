@@ -22,7 +22,7 @@ describe("LoroDoc PeerID consistency", () => {
       adapters: [],
     })
 
-    const handle = repo.get("test-doc", DocSchema)
+    const handle = repo.getHandle("test-doc", DocSchema)
 
     // BUG: The LoroDoc's PeerID should match the Repo's identity PeerID
     expect(handle.loroDoc.peerId.toString()).toBe(repo.identity.peerId)
@@ -36,8 +36,8 @@ describe("LoroDoc PeerID consistency", () => {
       adapters: [],
     })
 
-    const handle1 = repo.get("doc-1", DocSchema)
-    const handle2 = repo.get("doc-2", DocSchema)
+    const handle1 = repo.getHandle("doc-1", DocSchema)
+    const handle2 = repo.getHandle("doc-2", DocSchema)
 
     // Both documents should have the same PeerID (matching the Repo's identity)
     expect(handle1.loroDoc.peerId.toString()).toBe("100")

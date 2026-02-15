@@ -50,7 +50,7 @@ describe("Handle proxy ownKeys", () => {
   describe("Handle without ephemeral stores", () => {
     it("Reflect.ownKeys() should return only string keys", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema)
+      const handle = repo.getHandle("test-doc", DocSchema)
 
       const keys = Reflect.ownKeys(handle)
 
@@ -63,7 +63,7 @@ describe("Handle proxy ownKeys", () => {
 
     it("Object.keys() should return handle properties", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema)
+      const handle = repo.getHandle("test-doc", DocSchema)
 
       const keys = Object.keys(handle)
 
@@ -82,7 +82,7 @@ describe("Handle proxy ownKeys", () => {
   describe("Handle with ephemeral stores", () => {
     it("Reflect.ownKeys() should return only string keys", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema, {
+      const handle = repo.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -96,7 +96,7 @@ describe("Handle proxy ownKeys", () => {
 
     it("Object.keys() should include ephemeral store names", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema, {
+      const handle = repo.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -114,7 +114,7 @@ describe("Handle proxy ownKeys", () => {
 
     it("for...in should iterate ephemeral store names", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema, {
+      const handle = repo.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -129,7 +129,7 @@ describe("Handle proxy ownKeys", () => {
 
     it("spread operator should include ephemeral stores", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema, {
+      const handle = repo.getHandle("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -144,7 +144,7 @@ describe("Handle proxy ownKeys", () => {
   describe("Object.entries()", () => {
     it("should work without errors", () => {
       const repo = createRepo()
-      const handle = repo.get("test-doc", DocSchema)
+      const handle = repo.getHandle("test-doc", DocSchema)
 
       // This should not throw "Object keys must be strings"
       const entries = Object.entries(handle)

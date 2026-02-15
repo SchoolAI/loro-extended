@@ -94,7 +94,7 @@ describe("Namespaced Store Sync Investigation", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -108,7 +108,7 @@ describe("Namespaced Store Sync Investigation", () => {
         adapters: [],
       })
 
-      const handle = repo.get("doc-1", DocSchema, {
+      const handle = repo.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -143,8 +143,8 @@ describe("Namespaced Store Sync Investigation", () => {
       })
 
       // Just get handles without ephemeral stores
-      const handle1 = repo1.get("doc-1", DocSchema)
-      const _handle2 = repo2.get("doc-1", DocSchema)
+      const handle1 = repo1.getHandle("doc-1", DocSchema)
+      const _handle2 = repo2.getHandle("doc-1", DocSchema)
 
       // Wait for connection
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -175,11 +175,11 @@ describe("Namespaced Store Sync Investigation", () => {
       })
 
       // Get handles with ephemeral stores
-      const handle1 = repo1.get("doc-1", DocSchema, {
+      const handle1 = repo1.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.get("doc-1", DocSchema, {
+      const handle2 = repo2.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -214,11 +214,11 @@ describe("Namespaced Store Sync Investigation", () => {
         adapters: [new BridgeAdapter({ adapterType: "network-2", bridge })],
       })
 
-      const handle1 = repo1.get("doc-1", DocSchema, {
+      const handle1 = repo1.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.get("doc-1", DocSchema, {
+      const handle2 = repo2.getHandle("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 

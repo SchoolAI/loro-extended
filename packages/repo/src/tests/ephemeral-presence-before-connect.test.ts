@@ -83,8 +83,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     repos.push(clientA)
 
     const docId = "test-doc"
-    const handleA = clientA.get(docId, DocSchema, { presence: PresenceSchema })
-    server.get(docId, DocSchema, { presence: PresenceSchema })
+    const handleA = clientA.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
+    server.getHandle(docId, DocSchema, { presence: PresenceSchema })
 
     await new Promise(r => setTimeout(r, 100))
     handleA.presence.setSelf({ name: "Alice", status: "online" })
@@ -108,14 +110,16 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
 
     // IMMEDIATELY get handle and set presence
     // This happens before the channel is established (simulating React useEffect)
-    const handleB = clientB.get(docId, DocSchema, { presence: PresenceSchema })
+    const handleB = clientB.getHandle(docId, DocSchema, {
+      presence: PresenceSchema,
+    })
     handleB.presence.setSelf({ name: "Bob", status: "online" })
 
     // Now wait for everything to sync (increased timeout for reliability)
     await new Promise(r => setTimeout(r, 300))
 
     // Verify server has clientB's presence
-    const serverHandle = server.get(docId, DocSchema, {
+    const serverHandle = server.getHandle(docId, DocSchema, {
       presence: PresenceSchema,
     })
     const serverPresence = serverHandle.presence.getAll()
@@ -163,10 +167,10 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     repos.push(clientA)
 
     const docId = "test-doc-2"
-    const handleA = clientA.get(docId, DocSchema, {
+    const handleA = clientA.getHandle(docId, DocSchema, {
       presence: SimplePresenceSchema,
     })
-    server.get(docId, DocSchema, { presence: SimplePresenceSchema })
+    server.getHandle(docId, DocSchema, { presence: SimplePresenceSchema })
 
     await new Promise(r => setTimeout(r, 100))
     handleA.presence.setSelf({ name: "Alice" })
@@ -184,7 +188,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     })
     repos.push(clientB)
 
-    const handleB = clientB.get(docId, DocSchema, {
+    const handleB = clientB.getHandle(docId, DocSchema, {
       presence: SimplePresenceSchema,
     })
     handleB.presence.setSelf({ name: "Bob" })
@@ -211,7 +215,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
   it("should handle presence set in same tick as repo creation", async () => {
     // This simulates the React pattern where everything happens synchronously:
     // const repo = new Repo({ adapters: [...] })
-    // const handle = repo.get(docId)
+    // const handle = repo.getHandle(docId)
     // handle.presence.setSelf({ ... }) // All in same tick!
 
     const bridge = new Bridge()
@@ -230,7 +234,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     repos.push(client)
 
     const docId = "test-doc-3"
-    const handle = client.get(docId, DocSchema, {
+    const handle = client.getHandle(docId, DocSchema, {
       presence: UserPresenceSchema,
     })
     handle.presence.setSelf({ type: "user", lastSeen: Date.now() })
@@ -239,7 +243,7 @@ describe("Ephemeral Store - Presence Set Before Connection", () => {
     await new Promise(r => setTimeout(r, 300))
 
     // Server should have client's presence
-    const serverHandle = server.get(docId, DocSchema, {
+    const serverHandle = server.getHandle(docId, DocSchema, {
       presence: UserPresenceSchema,
     })
     const serverPresence = serverHandle.presence.getAll()

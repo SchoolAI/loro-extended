@@ -39,7 +39,7 @@ describe("Middleware", () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Create a document and wait for sync
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -80,7 +80,7 @@ describe("Middleware", () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Create a document in repo1
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -90,7 +90,7 @@ describe("Middleware", () => {
 
       // repo2 should not have the document because middleware rejected all messages
       // Note: The document might exist but be empty because sync was rejected
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       expect(handle2.doc.toJSON().title).toBe("") // Empty because sync was rejected
     })
   })
@@ -115,7 +115,7 @@ describe("Middleware", () => {
       })
 
       // Create document in repo1 first
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -131,7 +131,7 @@ describe("Middleware", () => {
       })
 
       // Request the document
-      const _handle2 = repo2.get("test-doc", DocSchema)
+      const _handle2 = repo2.getHandle("test-doc", DocSchema)
 
       // Wait for sync
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -172,7 +172,7 @@ describe("Middleware", () => {
       })
 
       // Create document with content
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello world this is some content")
       })
@@ -188,7 +188,7 @@ describe("Middleware", () => {
       })
 
       // Request the document
-      repo2.get("test-doc", DocSchema)
+      repo2.getHandle("test-doc", DocSchema)
 
       // Wait for sync
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -229,7 +229,7 @@ describe("Middleware", () => {
       })
 
       // Create document with content that will exceed size limit
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(
           0,
@@ -248,7 +248,7 @@ describe("Middleware", () => {
       })
 
       // Request the document
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
 
       // Wait for sync attempt
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -291,7 +291,7 @@ describe("Middleware", () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Create a document
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -347,7 +347,7 @@ describe("Middleware", () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Create a document
-      repo1.get("test-doc", DocSchema)
+      repo1.getHandle("test-doc", DocSchema)
 
       // Wait for messages
       await new Promise(resolve => setTimeout(resolve, 100))

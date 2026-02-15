@@ -41,7 +41,7 @@ describe("Repo E2E", () => {
     })
 
     // Repo 1 creates a document
-    const handle1 = repo1.get("the-doc-id", DocSchema)
+    const handle1 = repo1.getHandle("the-doc-id", DocSchema)
     expect(handle1.doc).toBeDefined()
 
     // Mutate the document using typed API
@@ -51,7 +51,7 @@ describe("Repo E2E", () => {
     expect(handle1.doc.toJSON().title).toBe("hello")
 
     // Repo 2 finds the document and waits for network sync
-    const handle2 = repo2.get("the-doc-id", DocSchema)
+    const handle2 = repo2.getHandle("the-doc-id", DocSchema)
     await handle2.waitForSync({ timeout: 0 })
 
     expect(handle2.doc.toJSON().title).toBe("hello")
@@ -83,12 +83,12 @@ describe("Repo E2E", () => {
       adapters: [new BridgeAdapter({ bridge, adapterType: "adapter2" })],
     })
 
-    const handle1 = repo1.get(crypto.randomUUID(), DocSchema)
+    const handle1 = repo1.getHandle(crypto.randomUUID(), DocSchema)
 
     // Wait for network connections to establish
     await vi.advanceTimersByTimeAsync(100)
 
-    const handle2 = repo2.get(handle1.docId, DocSchema)
+    const handle2 = repo2.getHandle(handle1.docId, DocSchema)
     await handle2.waitForSync({ timeout: 0 })
 
     // A change from a permitted peer should be applied
@@ -123,12 +123,12 @@ describe("Repo E2E", () => {
       adapters: [new BridgeAdapter({ bridge, adapterType: "adapter2" })],
     })
 
-    const handle1 = repo1.get(crypto.randomUUID(), DocSchema)
+    const handle1 = repo1.getHandle(crypto.randomUUID(), DocSchema)
 
     // Wait for network connections to establish
     await vi.advanceTimersByTimeAsync(100)
 
-    const handle2 = repo2.get(handle1.docId, DocSchema)
+    const handle2 = repo2.getHandle(handle1.docId, DocSchema)
     await handle2.waitForSync({ timeout: 0 })
 
     await repo2.delete(handle1.docId)
@@ -154,8 +154,8 @@ describe("Repo E2E", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterA" })],
         permissions: { visibility: () => true },
       })
-      const handle1 = repoA.get(crypto.randomUUID(), DocSchema)
-      const handle2 = repoA.get(crypto.randomUUID(), DocSchema)
+      const handle1 = repoA.getHandle(crypto.randomUUID(), DocSchema)
+      const handle2 = repoA.getHandle(crypto.randomUUID(), DocSchema)
 
       repoB = new Repo({
         identity: { name: "repoB", type: "user" },
@@ -168,8 +168,8 @@ describe("Repo E2E", () => {
       expect(repoB.has(handle1.docId)).toBe(true)
       expect(repoB.has(handle2.docId)).toBe(true)
 
-      const bHandle1 = repoB.get(handle1.docId, DocSchema)
-      const bHandle2 = repoB.get(handle2.docId, DocSchema)
+      const bHandle1 = repoB.getHandle(handle1.docId, DocSchema)
+      const bHandle2 = repoB.getHandle(handle2.docId, DocSchema)
 
       expect(bHandle1.doc).toBeDefined()
       expect(bHandle2.doc).toBeDefined()
@@ -186,7 +186,7 @@ describe("Repo E2E", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
-      repoA.get(crypto.randomUUID(), DocSchema) // Create a document that will not be announced
+      repoA.getHandle(crypto.randomUUID(), DocSchema) // Create a document that will not be announced
       await vi.runAllTimersAsync()
 
       // B should not know about the doc, because it was not announced
@@ -207,7 +207,7 @@ describe("Repo E2E", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapterB" })],
       })
 
-      const handleA = repoA.get(crypto.randomUUID(), DocSchema)
+      const handleA = repoA.getHandle(crypto.randomUUID(), DocSchema)
       change(handleA.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -216,7 +216,7 @@ describe("Repo E2E", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // B explicitly requests the document. It should succeed.
-      const handleB = repoB.get(handleA.docId, DocSchema)
+      const handleB = repoB.getHandle(handleA.docId, DocSchema)
       await handleB.waitForSync({ timeout: 0 })
 
       expect(handleB.doc.toJSON().title).toBe("hello")
@@ -232,17 +232,17 @@ describe("Repo E2E", () => {
       })
 
       // Create documents and make changes BEFORE repoB connects
-      const handle1 = repoA.get("allowed-doc-1", DocSchema)
+      const handle1 = repoA.getHandle("allowed-doc-1", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "1")
       })
 
-      const handle2 = repoA.get("denied-doc-1", DocSchema)
+      const handle2 = repoA.getHandle("denied-doc-1", DocSchema)
       change(handle2.doc, draft => {
         draft.title.insert(0, "2")
       })
 
-      const handle3 = repoA.get("allowed-doc-2", DocSchema)
+      const handle3 = repoA.getHandle("allowed-doc-2", DocSchema)
       change(handle3.doc, draft => {
         draft.title.insert(0, "3")
       })
@@ -276,7 +276,7 @@ describe("Repo E2E", () => {
       await vi.runAllTimersAsync()
 
       const documentId = "persistent-doc"
-      const handle1 = repo1.get(documentId, StorageDocSchema)
+      const handle1 = repo1.getHandle(documentId, StorageDocSchema)
 
       // Add some content
       change(handle1.doc, draft => {
@@ -299,7 +299,7 @@ describe("Repo E2E", () => {
       })
 
       // Try to find the document - it should load from storage
-      const handle2 = repo2.get(documentId, StorageDocSchema)
+      const handle2 = repo2.getHandle(documentId, StorageDocSchema)
 
       // Allow time for storage channel to establish and respond
       await vi.runAllTimersAsync()
@@ -328,7 +328,7 @@ describe("Repo E2E", () => {
       await vi.runAllTimersAsync()
 
       const documentId = "incremental-doc"
-      const handle1 = repo1.get(documentId, DocSchema)
+      const handle1 = repo1.getHandle(documentId, DocSchema)
 
       change(handle1.doc, draft => {
         draft.title.insert(0, "item1,item2")
@@ -345,7 +345,7 @@ describe("Repo E2E", () => {
         adapters: [storage2],
       })
 
-      const handle2 = repo2.get(documentId, DocSchema)
+      const handle2 = repo2.getHandle(documentId, DocSchema)
 
       // Allow time for storage channel to establish and respond
       await vi.runAllTimersAsync()
@@ -369,7 +369,7 @@ describe("Repo E2E", () => {
         adapters: [storage3],
       })
 
-      const handle3 = repo3.get(documentId, DocSchema)
+      const handle3 = repo3.getHandle(documentId, DocSchema)
 
       // Allow time for storage channel to establish and respond
       await vi.runAllTimersAsync()
@@ -381,7 +381,7 @@ describe("Repo E2E", () => {
     it("should load stored documents when app creates document after storage establishes", async () => {
       // This test replicates the hono-counter scenario:
       // 1. Storage has a document with data
-      // 2. App starts and creates the document via repo.get()
+      // 2. App starts and creates the document via repo.getHandle()
       // 3. App should see the stored data
 
       const storage1 = new InMemoryStorageAdapter()
@@ -395,7 +395,7 @@ describe("Repo E2E", () => {
       await vi.runAllTimersAsync()
 
       const documentId = "counter"
-      const handle1 = repo1.get(documentId, DocSchema)
+      const handle1 = repo1.getHandle(documentId, DocSchema)
 
       change(handle1.doc, draft => {
         draft.count.increment(42)
@@ -414,7 +414,7 @@ describe("Repo E2E", () => {
       })
 
       // App creates the document (like useDocument does)
-      const handle2 = repo2.get(documentId, DocSchema)
+      const handle2 = repo2.getHandle(documentId, DocSchema)
 
       // Wait for storage to establish and sync
       await vi.runAllTimersAsync()
@@ -450,7 +450,7 @@ describe("Repo E2E", () => {
       await vi.runAllTimersAsync()
 
       const documentId = "counter"
-      const handle1 = repo1.get(documentId, DocSchema)
+      const handle1 = repo1.getHandle(documentId, DocSchema)
 
       change(handle1.doc, draft => {
         draft.count.increment(42)
@@ -466,7 +466,7 @@ describe("Repo E2E", () => {
       })
 
       // App creates the document immediately (like useDocument does)
-      const handle2 = repo2.get(documentId, DocSchema)
+      const handle2 = repo2.getHandle(documentId, DocSchema)
 
       // Wait for async storage operations to complete
       await vi.runAllTimersAsync()
@@ -484,7 +484,7 @@ describe("Repo E2E", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
       })
 
-      const handle = repo1.get("escape-hatch-doc", DocSchema)
+      const handle = repo1.getHandle("escape-hatch-doc", DocSchema)
 
       // Access the raw LoroDoc
       const loroDoc = handle.loroDoc

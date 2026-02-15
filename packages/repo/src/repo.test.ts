@@ -48,14 +48,14 @@ describe("Repo", () => {
 
   describe("get() - Unified Handle API", () => {
     it("should create a Handle with typed document", () => {
-      const handle = repo.get("test-doc", TestDocSchema)
+      const handle = repo.getHandle("test-doc", TestDocSchema)
       expect(handle).toBeInstanceOf(Handle)
       expect(handle.doc).toBeDefined()
       expect(handle.docId).toBe("test-doc")
     })
 
     it("should provide typed access to document via doc.$", () => {
-      const handle = repo.get("test-doc", TestDocSchema)
+      const handle = repo.getHandle("test-doc", TestDocSchema)
 
       // Change using typed API
       change(handle.doc, draft => {
@@ -67,7 +67,7 @@ describe("Repo", () => {
     })
 
     it("should support Shape.any() for untyped documents", () => {
-      const handle = repo.get("test-doc", AnyDocSchema)
+      const handle = repo.getHandle("test-doc", AnyDocSchema)
       expect(handle).toBeInstanceOf(Handle)
       expect(handle.doc).toBeDefined()
 
@@ -79,7 +79,7 @@ describe("Repo", () => {
     })
 
     it("should support ephemeral store declarations", () => {
-      const handle = repo.get("test-doc", TestDocSchema, {
+      const handle = repo.getHandle("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
@@ -93,7 +93,7 @@ describe("Repo", () => {
     })
 
     it("should support multiple ephemeral stores", () => {
-      const handle = repo.get("test-doc", TestDocSchema, {
+      const handle = repo.getHandle("test-doc", TestDocSchema, {
         presence: PresenceSchema,
         cursors: CursorSchema,
       })
@@ -114,7 +114,7 @@ describe("Repo", () => {
     })
 
     it("should provide access to ephemeral stores as properties via proxy", () => {
-      const handle = repo.get("test-doc", TestDocSchema, {
+      const handle = repo.getHandle("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
@@ -141,12 +141,12 @@ describe("Repo", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handleA = repoA.get("test-doc", TestDocSchema)
+      const handleA = repoA.getHandle("test-doc", TestDocSchema)
       change(handleA.doc, draft => {
         draft.root.text.insert(0, "hello")
       })
 
-      const handleB = repoB.get("test-doc", TestDocSchema)
+      const handleB = repoB.getHandle("test-doc", TestDocSchema)
       await handleB.waitForSync({ timeout: 0 })
 
       expect(handleB.doc.toJSON().root.text).toBe("hello")
@@ -171,11 +171,11 @@ describe("Repo", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handleA = repoA.get("test-doc", TestDocSchema, {
+      const handleA = repoA.getHandle("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
-      const handleB = repoB.get("test-doc", TestDocSchema, {
+      const handleB = repoB.getHandle("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
@@ -199,14 +199,14 @@ describe("Repo", () => {
   describe("document management", () => {
     it("should check if document exists with has()", () => {
       expect(repo.has("test-doc")).toBe(false)
-      repo.get("test-doc", TestDocSchema)
+      repo.getHandle("test-doc", TestDocSchema)
       // Note: has() checks synchronizer state, not Handle cache
       // The document state is created when we call get()
       expect(repo.has("test-doc")).toBe(true)
     })
 
     it("should delete documents", async () => {
-      const handle = repo.get("test-doc", TestDocSchema)
+      const handle = repo.getHandle("test-doc", TestDocSchema)
       expect(repo.has(handle.docId)).toBe(true)
 
       await new Promise(resolve => setTimeout(resolve, 50))

@@ -35,7 +35,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create a document in repo1
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -61,7 +61,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create a document in repo1
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "hello")
       })
@@ -94,12 +94,12 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create document in repo1
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
 
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 and wait for sync
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
@@ -128,7 +128,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create document in repo1 with initial content
-      const handle1 = repo1.get("test-doc", DocSchema)
+      const handle1 = repo1.getHandle("test-doc", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "original")
       })
@@ -136,7 +136,7 @@ describe("Permissions - Comprehensive Tests", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 and wait for sync
-      const handle2 = repo2.get("test-doc", DocSchema)
+      const handle2 = repo2.getHandle("test-doc", DocSchema)
       await handle2.waitForSync({ timeout: 0 })
 
       // Make a change in repo2
@@ -168,7 +168,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // repo1 creates a document
-      repo1.get("new-doc", DocSchema)
+      repo1.getHandle("new-doc", DocSchema)
 
       await vi.runAllTimersAsync()
 
@@ -191,7 +191,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // repo1 creates a document
-      repo1.get("new-doc", DocSchema)
+      repo1.getHandle("new-doc", DocSchema)
 
       await vi.runAllTimersAsync()
 
@@ -216,7 +216,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create document in repo1
-      const handle1 = repo1.get("doc-to-delete", DocSchema)
+      const handle1 = repo1.getHandle("doc-to-delete", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "will be deleted")
       })
@@ -224,7 +224,7 @@ describe("Permissions - Comprehensive Tests", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 and wait for sync
-      const handle2 = repo2.get("doc-to-delete", DocSchema)
+      const handle2 = repo2.getHandle("doc-to-delete", DocSchema)
       await handle2.waitForSync({ timeout: 0 })
 
       // repo2 deletes the document
@@ -251,7 +251,7 @@ describe("Permissions - Comprehensive Tests", () => {
       })
 
       // Create document in repo1
-      const handle1 = repo1.get("doc-to-delete", DocSchema)
+      const handle1 = repo1.getHandle("doc-to-delete", DocSchema)
       change(handle1.doc, draft => {
         draft.title.insert(0, "should not be deleted")
       })
@@ -259,7 +259,7 @@ describe("Permissions - Comprehensive Tests", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 and wait for sync
-      const handle2 = repo2.get("doc-to-delete", DocSchema)
+      const handle2 = repo2.getHandle("doc-to-delete", DocSchema)
       await handle2.waitForSync({ timeout: 0 })
 
       // repo2 tries to delete the document

@@ -71,12 +71,12 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // Simulate what React does: get handle and immediately set presence
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
       handleA.presence.setSelf({ status: "online-A" })
 
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
       handleB.presence.setSelf({ status: "online-B" })
@@ -96,7 +96,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // ClientA gets handle and sets presence immediately (before sync)
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
       handleA.presence.setSelf({ status: "connecting" })
@@ -105,7 +105,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(10)
 
       // ClientB connects
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
       handleB.presence.setSelf({ status: "connecting" })
@@ -124,10 +124,10 @@ describe("Ephemeral Store - Timing Issues", () => {
       // Wait for connection
       await wait(100)
 
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -157,7 +157,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // ClientA connects first and sets presence
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -168,7 +168,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // ClientB connects later
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -185,7 +185,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // ClientA connects first
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -196,7 +196,7 @@ describe("Ephemeral Store - Timing Issues", () => {
       await wait(100)
 
       // ClientB connects and sets presence
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: PresenceSchema,
       })
       handleB.presence.setSelf({ status: "second" })
@@ -216,8 +216,8 @@ describe("Ephemeral Store - Timing Issues", () => {
       // Wait for connection
       await wait(100)
 
-      clientA.get(docId, DocSchema, { presence: PresenceSchema })
-      clientB.get(docId, DocSchema, { presence: PresenceSchema })
+      clientA.getHandle(docId, DocSchema, { presence: PresenceSchema })
+      clientB.getHandle(docId, DocSchema, { presence: PresenceSchema })
 
       await wait(200)
 
@@ -245,7 +245,7 @@ describe("Ephemeral Store - Timing Issues", () => {
         await wait(100)
 
         // Client A connects first and sets presence
-        const handleA = clientA.get(docId, DocSchema, {
+        const handleA = clientA.getHandle(docId, DocSchema, {
           presence: PresenceSchema,
         })
 
@@ -256,7 +256,7 @@ describe("Ephemeral Store - Timing Issues", () => {
         await wait(100)
 
         // Now simulate what React does: get handle and IMMEDIATELY set presence
-        const handleB = clientB.get(docId, DocSchema, {
+        const handleB = clientB.getHandle(docId, DocSchema, {
           presence: PresenceSchema,
         })
 

@@ -108,13 +108,13 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const docId = "hub-spoke-doc"
 
       // All three repos get the same document
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: CursorPresenceSchema,
       })
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: CursorPresenceSchema,
       })
-      server.get(docId, DocSchema, { presence: CursorPresenceSchema })
+      server.getHandle(docId, DocSchema, { presence: CursorPresenceSchema })
 
       // Wait for all connections to establish and sync
       await new Promise(resolve => setTimeout(resolve, 200))
@@ -152,13 +152,13 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
     it("should propagate presence updates bidirectionally through hub", async () => {
       const docId = "bidirectional-doc"
 
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: UserPresenceSchema,
       })
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: UserPresenceSchema,
       })
-      server.get(docId, DocSchema, { presence: UserPresenceSchema })
+      server.getHandle(docId, DocSchema, { presence: UserPresenceSchema })
 
       // Wait for connections
       await new Promise(resolve => setTimeout(resolve, 200))
@@ -186,10 +186,10 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const docId = "late-joiner-doc"
 
       // ClientA connects and sets presence BEFORE clientB connects
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: StatusPresenceSchema,
       })
-      server.get(docId, DocSchema, { presence: StatusPresenceSchema })
+      server.getHandle(docId, DocSchema, { presence: StatusPresenceSchema })
 
       // Wait for A to connect to server
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -201,7 +201,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Now clientB connects and gets the document
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: StatusPresenceSchema,
       })
 
@@ -223,7 +223,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       // Helper to count users with presence
       const countUsers = (
         handle: ReturnType<
-          typeof clientA.get<
+          typeof clientA.getHandle<
             typeof DocSchema,
             { presence: typeof TypePresenceSchema }
           >
@@ -234,17 +234,17 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       }
 
       // ClientA connects and sets presence
-      const handleA = clientA.get(docId, DocSchema, {
+      const handleA = clientA.getHandle(docId, DocSchema, {
         presence: TypePresenceSchema,
       })
-      server.get(docId, DocSchema, { presence: TypePresenceSchema })
+      server.getHandle(docId, DocSchema, { presence: TypePresenceSchema })
       await new Promise(resolve => setTimeout(resolve, 100))
 
       handleA.presence.setSelf({ type: "user" })
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // ClientB connects
-      const handleB = clientB.get(docId, DocSchema, {
+      const handleB = clientB.getHandle(docId, DocSchema, {
         presence: TypePresenceSchema,
       })
       handleB.presence.setSelf({ type: "user" })
@@ -280,10 +280,10 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       })
 
       const docId = "direct-peer-doc"
-      const handle1 = peer1.get(docId, DocSchema, {
+      const handle1 = peer1.getHandle(docId, DocSchema, {
         presence: DirectPresenceSchema,
       })
-      const handle2 = peer2.get(docId, DocSchema, {
+      const handle2 = peer2.getHandle(docId, DocSchema, {
         presence: DirectPresenceSchema,
       })
 
