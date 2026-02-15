@@ -140,6 +140,9 @@ describe("waitForSync", () => {
 
   describe("timeout behavior", () => {
     it("should throw SyncTimeoutError when timeout expires", async () => {
+      // Use real timers for this test to avoid fake timer race conditions
+      vi.useRealTimers()
+
       // Create client with delayed network adapter that never delivers
       const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10_000 })
       const clientRepo = new Repo({
@@ -149,20 +152,22 @@ describe("waitForSync", () => {
 
       const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      // Start waiting for sync with a short timeout
-      const waitPromise = sync(clientDoc).waitForSync({ timeout: 100 })
-
-      // Advance time past the timeout and wait for the rejection
-      await vi.advanceTimersByTimeAsync(150)
-
-      // Should throw SyncTimeoutError
-      await expect(waitPromise).rejects.toThrow(SyncTimeoutError)
+      // Should throw SyncTimeoutError with a short real timeout
+      await expect(
+        sync(clientDoc).waitForSync({ timeout: 50 }),
+      ).rejects.toThrow(SyncTimeoutError)
 
       // Cleanup
       clientRepo.synchronizer.stopHeartbeat()
-    }, 1000)
+
+      // Restore fake timers for other tests
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+    }, 5000)
 
     it("should include diagnostic information in timeout error", async () => {
+      // Use real timers for this test to avoid fake timer race conditions
+      vi.useRealTimers()
+
       const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10_000 })
       const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
@@ -171,24 +176,23 @@ describe("waitForSync", () => {
 
       const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      const waitPromise = sync(clientDoc).waitForSync({ timeout: 100 })
-
-      await vi.advanceTimersByTimeAsync(150)
-
       try {
-        await waitPromise
+        await sync(clientDoc).waitForSync({ timeout: 50 })
         expect.fail("Should have thrown")
       } catch (error) {
         expect(error).toBeInstanceOf(SyncTimeoutError)
         const syncError = error as SyncTimeoutError
         expect(syncError.kind).toBe("network")
-        expect(syncError.timeoutMs).toBe(100)
+        expect(syncError.timeoutMs).toBe(50)
         expect(syncError.docId).toBe("test-doc")
       }
 
       // Cleanup
       clientRepo.synchronizer.stopHeartbeat()
-    }, 1000)
+
+      // Restore fake timers for other tests
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+    }, 5000)
   })
 
   describe("no adapters configured", () => {
