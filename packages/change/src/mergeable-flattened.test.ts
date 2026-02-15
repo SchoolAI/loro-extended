@@ -300,8 +300,8 @@ describe("Mergeable Flattened Containers", () => {
         }),
       })
 
-      // Non-mergeable doc (default)
-      const doc = createTypedDoc(schema)
+      // Explicitly non-mergeable doc
+      const doc = createTypedDoc(schema, { mergeable: false })
       doc.data.nested.value = "hello"
 
       // Check that nested containers are used (not root containers)
@@ -323,7 +323,7 @@ describe("Mergeable Flattened Containers", () => {
         ),
       })
 
-      const doc = createTypedDoc(schema) // No mergeable option
+      const doc = createTypedDoc(schema, { mergeable: false })
       doc.players.alice = { score: 100 }
 
       expect(doc.players.alice.score).toBe(100)

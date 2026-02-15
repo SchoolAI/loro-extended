@@ -6,24 +6,29 @@ const crdt = Shape
 const value = Shape.plain
 
 describe("Handle.subscribe", () => {
-  const docShape = Shape.doc({
-    books: crdt.list(
-      crdt.struct({
-        title: crdt.text(),
-        price: value.number(),
-        description: value.string(),
+  // Path selector subscriptions don't yet support flattened (mergeable) storage,
+  // so we use mergeable: false here to keep hierarchical container paths.
+  const docShape = Shape.doc(
+    {
+      books: crdt.list(
+        crdt.struct({
+          title: crdt.text(),
+          price: value.number(),
+          description: value.string(),
+        }),
+      ),
+      config: crdt.struct({
+        theme: value.string(),
       }),
-    ),
-    config: crdt.struct({
-      theme: value.string(),
-    }),
-    users: crdt.record(
-      crdt.struct({
-        name: value.string(),
-        score: crdt.counter(),
-      }),
-    ),
-  })
+      users: crdt.record(
+        crdt.struct({
+          name: value.string(),
+          score: crdt.counter(),
+        }),
+      ),
+    },
+    { mergeable: false },
+  )
 
   describe("regular subscription (backward compatibility)", () => {
     it("should subscribe to all document changes", async () => {

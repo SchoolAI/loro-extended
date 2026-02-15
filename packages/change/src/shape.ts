@@ -49,16 +49,15 @@ export interface DocShapeOptions {
    * This ensures container IDs are deterministic and survive `applyDiff`, enabling
    * proper merging of concurrent container creation.
    *
-   * Use this when:
-   * - Multiple peers may concurrently create containers at the same schema path
-   * - You need containers to merge correctly via `applyDiff` (e.g., Lens)
+   * Benefits:
+   * - Concurrent container creation at the same schema path merges correctly
+   * - Works correctly with `applyDiff` (e.g., Lens worldview → world propagation)
+   * - Deterministic container IDs across peers
    *
-   * Limitations:
-   * - Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported
-   * - MovableLists of containers are NOT supported
-   * - Use `Shape.record(Shape.struct({...}))` with string keys instead
+   * Note: Lists of containers (`Shape.list(Shape.struct({...}))`) are unaffected
+   * by this setting—they always use hierarchical storage with peer-dependent IDs.
    *
-   * @default false
+   * @default true
    */
   mergeable?: boolean
 }

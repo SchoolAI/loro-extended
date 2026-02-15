@@ -117,27 +117,27 @@ function reconstructFromFlattened(
     case "list":
     case "movableList": {
       // Lists store their items directly in the root container
+      // Return undefined if not materialized so overlay can apply placeholders
       const containerName = buildRootContainerName(pathPrefix)
-      const container = flatValue[containerName]
-      return container ?? []
+      return flatValue[containerName]
     }
 
     case "text": {
+      // Return undefined if not materialized so overlay can apply placeholders
       const containerName = buildRootContainerName(pathPrefix)
-      const container = flatValue[containerName]
-      return container ?? ""
+      return flatValue[containerName]
     }
 
     case "counter": {
+      // Return undefined if not materialized so overlay can apply placeholders
       const containerName = buildRootContainerName(pathPrefix)
-      const container = flatValue[containerName]
-      return container ?? 0
+      return flatValue[containerName]
     }
 
     case "tree": {
+      // Return undefined if not materialized so overlay can apply placeholders
       const containerName = buildRootContainerName(pathPrefix)
-      const container = flatValue[containerName]
-      return container ?? []
+      return flatValue[containerName]
     }
 
     default:
@@ -387,16 +387,15 @@ export type CreateTypedDocOptions = {
    * This ensures container IDs are deterministic and survive `applyDiff`, enabling
    * proper merging of concurrent container creation.
    *
-   * Use this when:
-   * - Multiple peers may concurrently create containers at the same schema path
-   * - You need containers to merge correctly via `applyDiff` (e.g., Lens)
+   * Benefits:
+   * - Concurrent container creation at the same schema path merges correctly
+   * - Works correctly with `applyDiff` (e.g., Lens worldview → world propagation)
+   * - Deterministic container IDs across peers
    *
-   * Limitations:
-   * - Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported
-   * - MovableLists of containers are NOT supported
-   * - Use `Shape.record(Shape.struct({...}))` with string keys instead
+   * Note: Lists of containers (`Shape.list(Shape.struct({...}))`) are unaffected
+   * by this setting—they always use hierarchical storage with peer-dependent IDs.
    *
-   * @default false
+   * @default true
    */
   mergeable?: boolean
   /**
@@ -486,8 +485,9 @@ export function createTypedDoc<Shape extends DocShape>(
   shape: Shape,
   options: CreateTypedDocOptions = {},
 ): TypedDoc<Shape> {
-  // Determine effective mergeable setting: options > schema > false
-  const effectiveMergeable = options.mergeable ?? shape.mergeable ?? false
+  // Determine effective mergeable setting: options > schema > true (default)
+  // Note: Documents with existing metadata will use metadata.mergeable instead
+  const effectiveMergeable = options.mergeable ?? shape.mergeable ?? true
 
   const internal = new TypedDocInternal(
     shape,

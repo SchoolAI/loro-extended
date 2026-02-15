@@ -72,7 +72,7 @@ describe("TypedDoc Metadata Integration", () => {
     // All docs now write metadata by default
     expect(hasMetadata(loroDoc)).toBe(true)
     const meta = readMetadata(loroDoc)
-    expect(meta.mergeable).toBe(false)
+    expect(meta.mergeable).toBe(true)
   })
 
   it("skips metadata write when skipInitialize is true", () => {
@@ -105,7 +105,7 @@ describe("TypedDoc Metadata Integration", () => {
     // Now has metadata
     expect(hasMetadata(loroDoc)).toBe(true)
     const meta = readMetadata(loroDoc)
-    expect(meta.mergeable).toBe(false)
+    expect(meta.mergeable).toBe(true)
   })
 
   it("initialize() is idempotent", () => {

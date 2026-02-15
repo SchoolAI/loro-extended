@@ -271,10 +271,10 @@ describe("ext() function", () => {
 
     it("should access mergeable property", () => {
       const doc = createTypedDoc(schema)
-      expect(ext(doc).mergeable).toBe(false)
+      expect(ext(doc).mergeable).toBe(true)
 
-      const mergeableDoc = createTypedDoc(schema, { mergeable: true })
-      expect(ext(mergeableDoc).mergeable).toBe(true)
+      const nonMergeableDoc = createTypedDoc(schema, { mergeable: false })
+      expect(ext(nonMergeableDoc).mergeable).toBe(false)
     })
 
     it("should subscribe to doc-level changes via ext()", () => {
@@ -484,7 +484,9 @@ describe("container operations via ext()", () => {
     })
 
     it("should setContainer via ext()", () => {
-      const doc = createTypedDoc(schema)
+      // setContainer places a raw Loro container directly inside the parent,
+      // which requires hierarchical storage (mergeable: false)
+      const doc = createTypedDoc(schema, { mergeable: false })
       const { LoroMap } = require("loro-crdt")
 
       const newMap = new LoroMap()
@@ -507,7 +509,9 @@ describe("container operations via ext()", () => {
     })
 
     it("should setContainer via ext()", () => {
-      const doc = createTypedDoc(schema)
+      // setContainer places a raw Loro container directly inside the parent,
+      // which requires hierarchical storage (mergeable: false)
+      const doc = createTypedDoc(schema, { mergeable: false })
       const { LoroMap } = require("loro-crdt")
 
       const newMap = new LoroMap()

@@ -146,12 +146,12 @@ describe("ext() function", () => {
     it("mergeable returns effective mergeable flag", () => {
       const doc = createTypedDoc(TestSchema)
 
-      // Default is false
-      expect(ext(doc).mergeable).toBe(false)
+      // Default is true
+      expect(ext(doc).mergeable).toBe(true)
 
-      // Create with mergeable: true
-      const mergeableDoc = createTypedDoc(TestSchema, { mergeable: true })
-      expect(ext(mergeableDoc).mergeable).toBe(true)
+      // Create with mergeable: false
+      const nonMergeableDoc = createTypedDoc(TestSchema, { mergeable: false })
+      expect(ext(nonMergeableDoc).mergeable).toBe(false)
     })
 
     it("subscribe() subscribes to document changes", () => {
