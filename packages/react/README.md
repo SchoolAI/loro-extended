@@ -4,18 +4,18 @@ React hooks for building real-time collaborative applications with [Loro CRDT](h
 
 ## What This Package Does
 
-This package provides React-specific bindings for Loro CRDT documents with a handle-first pattern:
+This package provides React-specific bindings for Loro CRDT documents with a **doc-first pattern**:
 
-- **`useHandle`** - Get a stable, typed document handle
-- **`useDoc`** - Subscribe to document changes with optional selectors
-- **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
+- **`useDocument`** - Get a typed document directly
+- **`useValue`** - Subscribe to document or ref value changes
+- **`sync(doc)`** - Access sync/network capabilities when needed
 
 ### Key Features
 
-- **Stable References** - Handles never change, preventing unnecessary re-renders
-- **Fine-Grained Reactivity** - Use selectors to only re-render when specific data changes
+- **Direct Document Access** - No handle intermediary, work with docs directly
+- **Fine-Grained Reactivity** - Subscribe to specific refs or whole documents
 - **Type Safety** - Full TypeScript support with schema-driven type inference
-- **Unified Presence** - Document and presence are managed together through the handle
+- **Clean Separation** - Document mutations are separate from sync infrastructure
 
 ## Installation
 
@@ -28,14 +28,14 @@ pnpm add @loro-extended/react @loro-extended/change @loro-extended/repo loro-crd
 ## Quick Start
 
 ```tsx
-import { Shape, useHandle, useDoc, useEphemeral, RepoProvider } from "@loro-extended/react"
+import { Shape, useDocument, useValue, RepoProvider, sync } from "@loro-extended/react"
 import type { RepoParams } from "@loro-extended/repo"
 
 // Define your document schema
 const TodoSchema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
   todos: Shape.list(
-    Shape.map({
+    Shape.struct({
       id: Shape.plain.string(),
       text: Shape.plain.string(),
       completed: Shape.plain.boolean(),
@@ -44,53 +44,51 @@ const TodoSchema = Shape.doc({
 })
 
 // Define presence schema (optional)
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
-  name: Shape.plain.string().placeholder("Anonymous"),
+  name: Shape.plain.string(),
 })
 
 function TodoApp() {
-  // Get a stable handle (never re-renders)
-  const handle = useHandle("todo-doc", TodoSchema, { presence: PresenceSchema })
+  // Get the document directly
+  const doc = useDocument("todo-doc", TodoSchema, { presence: PresenceSchema })
   
-  // Subscribe to document changes
-  const doc = useDoc(handle)
+  // Subscribe to values reactively
+  const title = useValue(doc.title)
+  const todos = useValue(doc.todos)
   
-  // Subscribe to presence changes
-  const { self, peers } = useEphemeral(handle.presence)
+  // Subscribe to presence via sync()
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
   const addTodo = (text: string) => {
-    handle.change(d => {
-      d.todos.push({
-        id: Date.now().toString(),
-        text,
-        completed: false,
-      })
+    // Mutate directly on the doc
+    doc.todos.push({
+      id: Date.now().toString(),
+      text,
+      completed: false,
     })
   }
 
   const toggleTodo = (index: number) => {
-    handle.change(d => {
-      const todo = d.todos.get(index)
-      if (todo) {
-        todo.completed = !todo.completed
-      }
-    })
+    const todo = doc.todos.get(index)
+    if (todo) {
+      todo.completed = !todo.completed
+    }
   }
 
   return (
     <div>
-      <h1>{doc.title}</h1>
+      <h1>{title}</h1>
       
       {/* Show connected users */}
       <div>
         Online: {self?.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
       </div>
 
-      {doc.todos.map((todo, index) => (
+      {todos.map((todo, index) => (
         <div key={todo.id}>
           <input
             type="checkbox"
@@ -123,82 +121,87 @@ function App() {
 }
 ```
 
+## Core Concepts
+
+| Concept | Purpose |
+|---------|---------|
+| `useDocument(id, schema)` | Get the document (stable `Doc` reference) |
+| `useValue(doc.field)` | Subscribe to a field's value (reactive) |
+| `useValue(doc)` | Subscribe to whole doc snapshot (reactive) |
+| `usePlaceholder(doc.field)` | Get placeholder value (rare) |
+| `doc.field.method()` | Mutate the document directly |
+| `sync(doc)` | Access sync/network features (rare) |
+| `useRepo()` | Access repo directly (delete, flush, etc.) |
+
 ## Core Hooks
 
-### `useHandle(docId, docSchema, presenceSchema?)`
+### `useDocument(docId, schema, ephemeral?)`
 
-Returns a stable `TypedDocHandle` for the given document. The handle is created synchronously and never changes.
+Returns a `Doc<D>` for the given document. The doc is cached by the Repo, so multiple calls return the same instance.
 
 ```typescript
-// Without presence
-const handle = useHandle(docId, docSchema)
+// Basic usage
+const doc = useDocument("my-doc", MySchema)
 
-// With presence
-const handle = useHandle(docId, docSchema, presenceSchema)
+// With ephemeral stores (presence, cursors, etc.)
+const doc = useDocument("my-doc", MySchema, { presence: PresenceSchema })
 ```
 
 **Parameters:**
-- `docId: DocId` - The document identifier
-- `docSchema: DocShape` - The document schema
-- `presenceSchema?: ValueShape` - Optional presence schema
+- `docId: string` - The document identifier
+- `schema: DocShape` - The document schema
+- `ephemeral?: Record<string, ValueShape>` - Optional ephemeral store declarations
 
-**Returns:** `Handle<D, E>` with:
-- `handle.doc` - The typed document (TypedDoc)
-- `handle.change(fn)` - Mutate the document (batched transaction)
-- `handle.loroDoc` - Raw LoroDoc for untyped access
-- `handle.docId` - The document ID
-- `handle.readyStates` - Sync status information
+**Returns:** `Doc<D>` - A typed document you can read and mutate directly
 
-### `useDoc(handle, selector?)`
+### `useValue(refOrDoc)`
 
-Subscribes to document changes and returns the current value.
+Subscribes to value changes and returns the current value directly.
 
 ```typescript
-// Full document
-const doc = useDoc(handle)
+// Subscribe to a specific ref
+const title = useValue(doc.title)      // string
+const count = useValue(doc.count)      // number
+const todos = useValue(doc.todos)      // array
 
-// With selector (fine-grained updates)
-const title = useDoc(handle, d => d.title)
-const todoCount = useDoc(handle, d => d.todos.length)
+// Subscribe to whole document
+const snapshot = useValue(doc)         // Infer<D>
 ```
 
 **Parameters:**
-- `handle: TypedDocHandle<D>` - The document handle
-- `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector
+- `refOrDoc` - A typed ref (TextRef, ListRef, etc.) or a Doc
 
-**Returns:** The document value or selected value
+**Returns:** The current value (re-renders when it changes)
+
+### `usePlaceholder(ref)`
+
+Returns the placeholder value for a ref (if defined in the schema).
+
+```typescript
+const placeholder = usePlaceholder(doc.title)  // "Untitled" or undefined
+```
+
+**Parameters:**
+- `ref` - A typed ref
+
+**Returns:** The placeholder value or `undefined`
 
 ### `useEphemeral(ephemeral)`
 
-Subscribes to any ephemeral store and returns the current state. This is the preferred way to subscribe to presence and other ephemeral data.
+Subscribes to ephemeral store changes (presence, cursors, etc.).
 
 ```typescript
-// For presence
-const { self, peers } = useEphemeral(handle.presence)
+const doc = useDocument("my-doc", MySchema, { presence: PresenceSchema })
+const { self, peers } = useEphemeral(sync(doc).presence)
 
-// For other ephemeral stores
-const { self, peers } = useEphemeral(handle.cursors)
-
-// Update your value
-handle.presence.setSelf({ cursor: { x: 100, y: 200 } })
+// Update your presence
+sync(doc).presence.setSelf({ cursor: { x: 100, y: 200 } })
 ```
 
 **Parameters:**
-- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store from the handle
+- `ephemeral: TypedEphemeral<T>` - An ephemeral store from `sync(doc)`
 
 **Returns:** `{ self: T | undefined, peers: Map<string, T> }`
-
-### `usePresence(handle)` (Deprecated)
-
-> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
-
-Subscribes to presence changes.
-
-```typescript
-const { self, peers } = usePresence(handle)
-```
-
-**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
 
 ### `useRepo()`
 
@@ -207,27 +210,78 @@ Returns the Repo instance from context.
 ```typescript
 const repo = useRepo()
 const myPeerId = repo.identity.peerId
+await repo.delete("old-doc")
 ```
 
-## Fine-Grained Reactivity with Selectors
+## The `sync()` Function
 
-Use selectors to prevent unnecessary re-renders:
+The `sync()` function provides access to sync/network capabilities. This is intentionally separate from the document to keep the common case simple.
+
+```typescript
+import { sync } from "@loro-extended/react"
+
+const doc = useDocument("my-doc", MySchema, { presence: PresenceSchema })
+
+// Access sync capabilities
+sync(doc).peerId              // Your peer ID
+sync(doc).docId               // Document ID
+sync(doc).readyStates         // Sync status with peers
+sync(doc).loroDoc             // Raw LoroDoc for advanced use
+
+// Wait for sync
+await sync(doc).waitForSync()
+await sync(doc).waitForSync({ kind: "storage" })
+
+// Ephemeral stores
+sync(doc).presence.setSelf({ ... })
+sync(doc).presence.self
+sync(doc).presence.peers
+```
+
+## Direct Mutations
+
+With the doc-first API, you mutate documents directly:
+
+```typescript
+const doc = useDocument("my-doc", MySchema)
+
+// Text operations
+doc.title.insert(0, "Hello")
+doc.title.delete(0, 5)
+doc.title.update("New Title")
+
+// Counter operations
+doc.count.increment(1)
+doc.count.decrement(1)
+
+// List operations
+doc.todos.push({ id: "1", text: "Task", completed: false })
+doc.todos.insert(0, { ... })
+doc.todos.delete(0)
+
+// Struct operations
+doc.settings.theme = "dark"
+```
+
+## Fine-Grained Reactivity
+
+Use `useValue` on specific refs to minimize re-renders:
 
 ```tsx
 function TodoCount() {
-  const handle = useHandle("todos", TodoSchema)
+  const doc = useDocument("todos", TodoSchema)
   
-  // Only re-renders when the count changes
-  const count = useDoc(handle, d => d.todos.length)
+  // Only re-renders when todos change (not title)
+  const todos = useValue(doc.todos)
   
-  return <span>Total: {count}</span>
+  return <span>Total: {todos.length}</span>
 }
 
 function TodoTitle() {
-  const handle = useHandle("todos", TodoSchema)
+  const doc = useDocument("todos", TodoSchema)
   
-  // Only re-renders when the title changes
-  const title = useDoc(handle, d => d.title)
+  // Only re-renders when title changes (not todos)
+  const title = useValue(doc.title)
   
   return <h1>{title}</h1>
 }
@@ -235,30 +289,28 @@ function TodoTitle() {
 
 ## Presence
 
-Presence allows you to share ephemeral state (like cursors, selections, or user status) with other connected users.
+Share ephemeral state with other connected users:
 
 ```tsx
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
-  name: Shape.plain.string().placeholder("Anonymous"),
-  isTyping: Shape.plain.boolean(),
+  name: Shape.plain.string(),
 })
 
 function CollaborativeEditor() {
-  const handle = useHandle("doc", DocSchema, { presence: PresenceSchema })
-  const { self, peers } = useEphemeral(handle.presence)
+  const doc = useDocument("doc", DocSchema, { presence: PresenceSchema })
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
-  // Update cursor position
   const handleMouseMove = (e: MouseEvent) => {
-    handle.presence.setSelf({
-      cursor: { x: e.clientX, y: e.clientY }
+    sync(doc).presence.setSelf({
+      cursor: { x: e.clientX, y: e.clientY },
+      name: "Alice",
     })
   }
 
-  // Show other users' cursors
   return (
     <div onMouseMove={handleMouseMove}>
       {Array.from(peers.entries()).map(([peerId, presence]) => (
@@ -301,26 +353,6 @@ function App() {
 }
 ```
 
-## Sync Status
-
-Check the document's sync status using `readyStates`:
-
-```tsx
-function SyncStatus() {
-  const handle = useHandle("doc", DocSchema)
-  
-  const isConnected = handle.readyStates.some(
-    s => s.state === "loaded" && s.channels.some(c => c.kind === "network")
-  )
-
-  return (
-    <div className={isConnected ? "connected" : "disconnected"}>
-      {isConnected ? "Connected" : "Offline"}
-    </div>
-  )
-}
-```
-
 ## TypeScript Support
 
 Full type inference from your schemas:
@@ -329,42 +361,60 @@ Full type inference from your schemas:
 const DocSchema = Shape.doc({
   title: Shape.text(),
   count: Shape.counter(),
+  items: Shape.list(Shape.plain.string()),
 })
 
-const handle = useHandle("doc", DocSchema)
-const doc = useDoc(handle)
+const doc = useDocument("doc", DocSchema)
 
-// doc.title is typed as string
-// doc.count is typed as number
+// Types are inferred
+const title = useValue(doc.title)   // string
+const count = useValue(doc.count)   // number
+const items = useValue(doc.items)   // string[]
 
-handle.change(d => {
-  d.title.insert(0, "Hello") // TypedText methods
-  d.count.increment(1)       // Counter methods
-})
+// Mutations are type-safe
+doc.title.insert(0, "Hello")        // OK
+doc.count.increment(1)              // OK
+doc.items.push("new item")          // OK
 ```
 
 ## Migration from Previous API
 
-If you're upgrading from the previous `useDocument` API:
+If you're upgrading from the handle-based API:
 
-**Before:**
-```typescript
-const [doc, changeDoc, handle] = useDocument(docId, schema)
-changeDoc(d => { d.title.update("new") })
-
-const { peers, self, setSelf } = usePresence(docId, PresenceSchema)
-setSelf({ cursor: { x: 10, y: 20 } })
-```
-
-**After:**
+**Before (deprecated):**
 ```typescript
 const handle = useHandle(docId, schema, { presence: PresenceSchema })
-const doc = useDoc(handle)
-const { self, peers } = useEphemeral(handle.presence)
-
-handle.change(d => { d.title.update("new") })
-handle.presence.setSelf({ cursor: { x: 10, y: 20 } })
+const snapshot = useDoc(handle)
+const { value, placeholder } = useRefValue(handle.doc.title)
+handle.doc.title.insert(0, "Hello")
+await handle.waitForSync()
+handle.presence.setSelf({ status: "online" })
 ```
+
+**After (recommended):**
+```typescript
+import { sync } from "@loro-extended/react"
+
+const doc = useDocument(docId, schema, { presence: PresenceSchema })
+const snapshot = useValue(doc)
+const title = useValue(doc.title)
+const placeholder = usePlaceholder(doc.title)
+doc.title.insert(0, "Hello")
+await sync(doc).waitForSync()
+sync(doc).presence.setSelf({ status: "online" })
+```
+
+## Deprecated Hooks
+
+The following hooks are deprecated but still exported for backward compatibility:
+
+| Deprecated | Replacement |
+|------------|-------------|
+| `useHandle(docId, schema)` | `useDocument(docId, schema)` |
+| `useDoc(handle)` | `useValue(doc)` |
+| `useRefValue(ref)` | `useValue(ref)` + `usePlaceholder(ref)` |
+
+These deprecated hooks will emit console warnings in development.
 
 ## Examples
 
@@ -373,7 +423,7 @@ See the example applications for complete implementations:
 - [Todo SSE Example](../../examples/todo-sse/) - Basic todo app with SSE sync
 - [Todo WebSocket Example](../../examples/todo-websocket/) - Todo app with WebSocket sync
 - [Chat Example](../../examples/chat/) - Real-time chat with presence
-- [Bumper Cars Example](../../examples/bumper-cars/) - Multiplayer game with presence
+- [RPS Demo](../../examples/rps-demo/) - Multiplayer game with presence
 
 ## Related Packages
 
@@ -383,10 +433,6 @@ See the example applications for complete implementations:
 - Network adapters: `@loro-extended/adapter-sse`, `@loro-extended/adapter-websocket`, `@loro-extended/adapter-webrtc`
 - Storage adapters: `@loro-extended/adapter-indexeddb`, `@loro-extended/adapter-leveldb`, `@loro-extended/adapter-postgres`
 
-## Testing
-
-Core hook tests are located in `@loro-extended/hooks-core`. This package provides React-specific bindings that wrap the framework-agnostic hook implementations.
-
 ## Requirements
 
 - React 18+
@@ -395,16 +441,3 @@ Core hook tests are located in `@loro-extended/hooks-core`. This package provide
 ## License
 
 MIT
-### `useLens(world, options?, selector?)`
-
-Create a Lens from a world `TypedDoc` and subscribe to its worldview snapshot.
-
-```tsx
-const handle = useHandle(docId, DocSchema)
-const { lens, doc } = useLens(handle.doc, {
-  filter: info => info.message?.userId === myUserId,
-})
-
-// Optional selector
-const { lens, doc: title } = useLens(handle.doc, undefined, d => d.title)
-```

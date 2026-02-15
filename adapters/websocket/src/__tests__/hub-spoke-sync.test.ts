@@ -105,12 +105,12 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
       checkConnected()
     })
 
-    // NOTE: Server does NOT call serverRepo.get(docId, DocSchema)
+    // NOTE: Server does NOT call serverRepo.getHandle(docId, DocSchema)
     // This is the key difference - the server acts purely as a relay
 
     // Both clients join the document
-    const handle1 = clientRepo1.get(docId, DocSchema)
-    const handle2 = clientRepo2.get(docId, DocSchema)
+    const handle1 = clientRepo1.getHandle(docId, DocSchema)
+    const handle2 = clientRepo2.getHandle(docId, DocSchema)
 
     // Wait for initial sync
     await new Promise(resolve => setTimeout(resolve, 500))
@@ -175,11 +175,11 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
     })
 
     // Server explicitly gets the document - this is what makes the e2e.test.ts pass
-    serverRepo.get(docId, DocSchema)
+    serverRepo.getHandle(docId, DocSchema)
 
     // Both clients join the document
-    const handle1 = clientRepo1.get(docId, DocSchema)
-    const handle2 = clientRepo2.get(docId, DocSchema)
+    const handle1 = clientRepo1.getHandle(docId, DocSchema)
+    const handle2 = clientRepo2.getHandle(docId, DocSchema)
 
     // Wait for initial sync
     await new Promise(resolve => setTimeout(resolve, 500))

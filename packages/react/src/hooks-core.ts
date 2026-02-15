@@ -19,8 +19,12 @@ export { CursorRegistry, CursorRegistryContext, useCursorRegistry }
 
 // Create core hooks
 const coreHooks = createHooks(React)
-export const { RepoContext, useRepo, useHandle, useDoc, useEphemeral } =
-  coreHooks
+
+// New API (recommended)
+export const { RepoContext, useRepo, useDocument, useEphemeral } = coreHooks
+
+// Deprecated (still exported for backward compatibility)
+export const { useHandle, useDoc } = coreHooks
 
 export function useLens<D extends DocShape>(
   world: TypedDoc<D>,
@@ -46,7 +50,13 @@ export function useLens<D extends DocShape, R>(
 }
 
 // Create ref hooks
-export const { useRefValue } = createRefHooks(React)
+const refHooks = createRefHooks(React)
+
+// New API (recommended)
+export const { useValue, usePlaceholder } = refHooks
+
+// Deprecated (still exported for backward compatibility)
+export const { useRefValue } = refHooks
 
 // Create text hooks with a stable getter that reads from a ref
 // This avoids recreating the hooks on every render

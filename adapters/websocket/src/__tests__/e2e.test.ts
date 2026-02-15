@@ -102,11 +102,11 @@ describe("WebSocket Adapter E2E", () => {
     })
 
     // Server also needs to have the document for relay to work
-    serverRepo.get(docId, DocSchema)
+    serverRepo.getHandle(docId, DocSchema)
 
     // Both clients need to "join" the document
-    const handle1 = clientRepo1.get(docId, DocSchema)
-    const handle2 = clientRepo2.get(docId, DocSchema)
+    const handle1 = clientRepo1.getHandle(docId, DocSchema)
+    const handle2 = clientRepo2.getHandle(docId, DocSchema)
 
     // Wait for all parties to sync
     await new Promise(resolve => setTimeout(resolve, 500))

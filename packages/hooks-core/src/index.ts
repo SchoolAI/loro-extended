@@ -14,9 +14,14 @@
  *
  * const frameworkHooks = { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore, useContext, createContext }
  *
- * export const { RepoContext, useRepo, useHandle, useDoc, useEphemeral } = createHooks(frameworkHooks)
+ * // New API (recommended)
+ * export const { RepoContext, useRepo, useDocument, useEphemeral, useLens } = createHooks(frameworkHooks)
+ * export const { useValue, usePlaceholder } = createRefHooks(frameworkHooks)
  * export const { useCollaborativeText } = createTextHooks(frameworkHooks)
  * export const { useUndoManager } = createUndoHooks(frameworkHooks)
+ *
+ * // Deprecated (still exported for backward compatibility)
+ * export const { useHandle, useDoc } = createHooks(frameworkHooks)
  * export const { useRefValue } = createRefHooks(frameworkHooks)
  * ```
  */

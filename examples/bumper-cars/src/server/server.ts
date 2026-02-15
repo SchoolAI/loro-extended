@@ -55,7 +55,7 @@ logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
 // Get or create the arena document with typed schemas
 // This provides type-safe access to both document and presence data
-const arenaHandle = repo.get(
+const arenaHandle = repo.getHandle(
   ARENA_DOC_ID,
   ArenaSchema,
   GameEphemeralDeclarations,

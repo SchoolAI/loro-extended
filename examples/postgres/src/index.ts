@@ -35,7 +35,7 @@ async function main() {
 
   // Create and modify a document
   console.log("\n📝 Creating document...")
-  const handle = repo.get("my-doc", DocSchema)
+  const handle = repo.getHandle("my-doc", DocSchema)
   change(handle.doc, doc => {
     doc.root.message = "Hello from PostgreSQL!"
     doc.root.timestamp = Date.now()

@@ -164,7 +164,7 @@ export function App() {
   // Get handle with untyped document (loro-prosemirror manages structure)
   // No ephemeral declarations needed - cursor store is added via handle.addEphemeral()
   const handle = useMemo(
-    () => repo.get(docId, ProseMirrorDocSchema),
+    () => repo.getHandle(docId, ProseMirrorDocSchema),
     [repo, docId],
   )
 

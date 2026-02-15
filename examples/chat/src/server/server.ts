@@ -179,7 +179,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
 
   logger.info("Subscribing to document {docId}", { docId })
 
-  const handle = repo.get(docId, ChatSchema, ChatEphemeralDeclarations)
+  const handle = repo.getHandle(docId, ChatSchema, ChatEphemeralDeclarations)
 
   // Subscribe to messages changes using path-based subscription
   const unsubscribeDoc = handle.subscribe(

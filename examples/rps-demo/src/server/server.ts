@@ -45,7 +45,7 @@ const wsAdapter = new WsServerNetworkAdapter()
 const repo = new Repo({ adapters: [wsAdapter] })
 
 // 2. Get handle for game document
-const handle = repo.get("rps-game", GameSchema)
+const handle = repo.getHandle("rps-game", GameSchema)
 
 let i = 0
 handle.subscribe(event => {

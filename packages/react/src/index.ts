@@ -12,8 +12,10 @@ export type {
   TreeRef,
 } from "@loro-extended/change"
 export { change, ext, loro, Shape } from "@loro-extended/change"
+
 // Re-export hook types from @loro-extended/hooks-core
 export type {
+  AnyTypedRef,
   Lens,
   LensOptions,
   UseCollaborativeTextOptions,
@@ -22,10 +24,21 @@ export type {
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
-// Re-export handle types from @loro-extended/repo
-export type { DocId, Handle } from "@loro-extended/repo"
 
-// Hooks
+// Re-export types from @loro-extended/repo
+export type {
+  Doc,
+  DocId,
+  Handle,
+  SyncRef,
+  SyncRefWithEphemerals,
+  WaitForSyncOptions,
+} from "@loro-extended/repo"
+
+// Re-export sync function from @loro-extended/repo
+export { hasSync, sync } from "@loro-extended/repo"
+// New API hooks (recommended)
+// Deprecated hooks (still exported for backward compatibility)
 export {
   CursorRegistry,
   CursorRegistryContext,
@@ -33,12 +46,15 @@ export {
   useCollaborativeText,
   useCursorRegistry,
   useDoc,
+  useDocument,
   useEphemeral,
   useHandle,
   useLens,
+  usePlaceholder,
   useRefValue,
   useRepo,
   useUndoManager,
+  useValue,
 } from "./hooks-core.js"
 
 // Context provider
