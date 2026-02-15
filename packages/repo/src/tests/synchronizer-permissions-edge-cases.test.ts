@@ -2,6 +2,7 @@ import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 import { createVersionVector } from "../synchronizer/test-utils.js"
 import { generatePeerId } from "../utils/generate-peer-id.js"
 
@@ -33,8 +34,8 @@ describe("Synchronizer Permissions Edge Cases", () => {
 
     // Create doc on repoA
     const docId = crypto.randomUUID()
-    const handleA = repoA.getHandle(docId, DocSchema)
-    change(handleA.doc, draft => {
+    const docA = repoA.get(docId, DocSchema)
+    change(docA, draft => {
       draft.title.insert(0, "secret")
     })
 
@@ -71,8 +72,8 @@ describe("Synchronizer Permissions Edge Cases", () => {
     // (even though visibility is false)
     expect(repoB.has(docId)).toBe(true)
 
-    const handleB = repoB.getHandle(docId, DocSchema)
-    await handleB.waitForSync({ timeout: 0 })
-    expect(handleB.doc.toJSON().title).toBe("secret")
+    const docB = repoB.get(docId, DocSchema)
+    await sync(docB).waitForSync({ timeout: 0 })
+    expect(docB.toJSON().title).toBe("secret")
   })
 })

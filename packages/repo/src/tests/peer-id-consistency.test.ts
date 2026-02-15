@@ -10,6 +10,7 @@
 import { Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 describe("LoroDoc PeerID consistency", () => {
   const DocSchema = Shape.doc({
@@ -22,10 +23,10 @@ describe("LoroDoc PeerID consistency", () => {
       adapters: [],
     })
 
-    const handle = repo.getHandle("test-doc", DocSchema)
+    const doc = repo.get("test-doc", DocSchema)
 
     // BUG: The LoroDoc's PeerID should match the Repo's identity PeerID
-    expect(handle.loroDoc.peerId.toString()).toBe(repo.identity.peerId)
+    expect(sync(doc).loroDoc.peerId.toString()).toBe(repo.identity.peerId)
 
     repo.reset()
   })
@@ -36,12 +37,12 @@ describe("LoroDoc PeerID consistency", () => {
       adapters: [],
     })
 
-    const handle1 = repo.getHandle("doc-1", DocSchema)
-    const handle2 = repo.getHandle("doc-2", DocSchema)
+    const doc1 = repo.get("doc-1", DocSchema)
+    const doc2 = repo.get("doc-2", DocSchema)
 
     // Both documents should have the same PeerID (matching the Repo's identity)
-    expect(handle1.loroDoc.peerId.toString()).toBe("100")
-    expect(handle2.loroDoc.peerId.toString()).toBe("100")
+    expect(sync(doc1).loroDoc.peerId.toString()).toBe("100")
+    expect(sync(doc2).loroDoc.peerId.toString()).toBe("100")
 
     repo.reset()
   })

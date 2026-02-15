@@ -88,9 +88,9 @@ describe("fork-and-merge synchronization", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    // Create handles on both repos
-    const handle1 = repo1.getHandle("doc-1", DocSchema)
-    const handle2 = repo2.getHandle("doc-1", DocSchema)
+    // Create documents on both repos
+    const doc1 = repo1.get("doc-1", DocSchema)
+    const doc2 = repo2.get("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -105,15 +105,15 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply update using fork-and-merge on peer1
-    const frontier = loro(handle1.doc).frontiers()
-    update(handle1.doc, frontier, { value: "hello from peer1" })
+    const frontier = loro(doc1).frontiers()
+    update(doc1, frontier, { value: "hello from peer1" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Verify peer2 received the changes
-    expect(handle2.doc.data.value).toBe("hello from peer1")
-    expect(handle2.doc.counter.value).toBe(1)
+    expect(doc2.data.value).toBe("hello from peer1")
+    expect(doc2.counter.value).toBe(1)
   })
 
   it("should allow undo of fork-and-merge changes", async () => {
@@ -214,8 +214,8 @@ describe("fork-and-merge synchronization", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const handle1 = repo1.getHandle("doc-1", DocSchema)
-    const handle2 = repo2.getHandle("doc-1", DocSchema)
+    const doc1 = repo1.get("doc-1", DocSchema)
+    const doc2 = repo2.get("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -229,17 +229,17 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply multiple updates on peer1
-    let frontier = loro(handle1.doc).frontiers()
-    frontier = update(handle1.doc, frontier, { value: "update1" })
-    frontier = update(handle1.doc, frontier, { value: "update2" })
-    frontier = update(handle1.doc, frontier, { value: "update3" })
+    let frontier = loro(doc1).frontiers()
+    frontier = update(doc1, frontier, { value: "update1" })
+    frontier = update(doc1, frontier, { value: "update2" })
+    frontier = update(doc1, frontier, { value: "update3" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 300))
 
     // Verify peer2 received all changes
-    expect(handle2.doc.data.value).toBe("update3")
-    expect(handle2.doc.counter.value).toBe(3)
+    expect(doc2.data.value).toBe("update3")
+    expect(doc2.counter.value).toBe(3)
   })
 
   it("should handle concurrent fork-and-merge updates from both peers", async () => {
@@ -257,8 +257,8 @@ describe("fork-and-merge synchronization", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    const handle1 = repo1.getHandle("doc-1", DocSchema)
-    const handle2 = repo2.getHandle("doc-1", DocSchema)
+    const doc1 = repo1.get("doc-1", DocSchema)
+    const doc2 = repo2.get("doc-1", DocSchema)
 
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -271,17 +271,17 @@ describe("fork-and-merge synchronization", () => {
     )
 
     // Apply updates concurrently from both peers
-    const frontier1 = loro(handle1.doc).frontiers()
-    const frontier2 = loro(handle2.doc).frontiers()
+    const frontier1 = loro(doc1).frontiers()
+    const frontier2 = loro(doc2).frontiers()
 
-    update(handle1.doc, frontier1, { value: "from-peer1" })
-    update(handle2.doc, frontier2, { value: "from-peer2" })
+    update(doc1, frontier1, { value: "from-peer1" })
+    update(doc2, frontier2, { value: "from-peer2" })
 
     // Wait for sync
     await new Promise(resolve => setTimeout(resolve, 300))
 
     // Both peers should have counter = 2 (both increments merged)
-    expect(handle1.doc.counter.value).toBe(2)
-    expect(handle2.doc.counter.value).toBe(2)
+    expect(doc1.counter.value).toBe(2)
+    expect(doc2.counter.value).toBe(2)
   })
 })

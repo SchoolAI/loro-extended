@@ -1,13 +1,13 @@
 import { change, loro, Shape } from "@loro-extended/change"
 import { beforeEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "./adapter/bridge-adapter.js"
-import { Handle } from "./handle.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
+import { sync } from "./sync.js"
 
 // Test schema for typed document tests
 const TestDocSchema = Shape.doc({
-  root: Shape.map({
+  root: Shape.struct({
     text: Shape.text().placeholder(""),
   }),
 })
@@ -46,45 +46,44 @@ describe("Repo", () => {
     })
   })
 
-  describe("get() - Unified Handle API", () => {
-    it("should create a Handle with typed document", () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema)
-      expect(handle).toBeInstanceOf(Handle)
-      expect(handle.doc).toBeDefined()
-      expect(handle.docId).toBe("test-doc")
+  describe("get() - Doc API", () => {
+    it("should create a Doc with typed document", () => {
+      const doc = repo.get("test-doc", TestDocSchema)
+      expect(doc).toBeDefined()
+      expect(doc.toJSON).toBeDefined()
+      expect(sync(doc).docId).toBe("test-doc")
     })
 
-    it("should provide typed access to document via doc.$", () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema)
+    it("should provide typed access to document", () => {
+      const doc = repo.get("test-doc", TestDocSchema)
 
-      // Change using typed API
-      change(handle.doc, draft => {
+      // Change using typed API - verifies Doc<D, E> works with change()
+      change(doc, draft => {
         draft.root.text.insert(0, "hello")
       })
 
       // Read using typed API
-      expect(handle.doc.toJSON().root.text).toBe("hello")
+      expect(doc.toJSON().root.text).toBe("hello")
     })
 
     it("should support Shape.any() for untyped documents", () => {
-      const handle = repo.getHandle("test-doc", AnyDocSchema)
-      expect(handle).toBeInstanceOf(Handle)
-      expect(handle.doc).toBeDefined()
+      const doc = repo.get("test-doc", AnyDocSchema)
+      expect(doc).toBeDefined()
 
       // Access raw LoroDoc via escape hatch
-      const loroDoc = loro(handle.doc)
+      const loroDoc = loro(doc)
       const map = loroDoc.getMap("doc")
       map.set("key", "value")
       expect(map.get("key")).toBe("value")
     })
 
-    it("should support ephemeral store declarations", () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema, {
+    it("should support ephemeral store declarations via sync()", () => {
+      const doc = repo.get("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
-      // Access ephemeral store via getTypedEphemeral
-      const presence = handle.getTypedEphemeral("presence")
+      // Access ephemeral store via sync()
+      const presence = sync(doc).presence
       expect(presence).toBeDefined()
 
       // Set and get presence
@@ -93,33 +92,32 @@ describe("Repo", () => {
     })
 
     it("should support multiple ephemeral stores", () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema, {
+      const doc = repo.get("test-doc", TestDocSchema, {
         presence: PresenceSchema,
         cursors: CursorSchema,
       })
 
-      // Both stores should be accessible
-      const presence = handle.getTypedEphemeral("presence")
-      const cursors = handle.getTypedEphemeral("cursors")
+      // Both stores should be accessible via sync()
+      const s = sync(doc)
 
-      presence.setSelf({ status: "online" })
-      cursors.setSelf({
+      s.presence.setSelf({ status: "online" })
+      s.cursors.setSelf({
         anchor: new Uint8Array([1, 2, 3]),
         focus: null,
         user: { name: "Alice", color: "#ff0000" },
       })
 
-      expect(presence.self).toEqual({ status: "online" })
-      expect(cursors.self?.user?.name).toBe("Alice")
+      expect(s.presence.self).toEqual({ status: "online" })
+      expect(s.cursors.self?.user?.name).toBe("Alice")
     })
 
-    it("should provide access to ephemeral stores as properties via proxy", () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema, {
+    it("should provide access to ephemeral stores as properties on sync()", () => {
+      const doc = repo.get("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
-      // Access via property (proxy) - TypeScript knows about this via HandleWithEphemerals type
-      const presence = handle.presence
+      // Access via sync().presence
+      const presence = sync(doc).presence
       expect(presence).toBeDefined()
       expect(presence.setSelf).toBeDefined()
     })
@@ -141,15 +139,15 @@ describe("Repo", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handleA = repoA.getHandle("test-doc", TestDocSchema)
-      change(handleA.doc, draft => {
+      const docA = repoA.get("test-doc", TestDocSchema)
+      change(docA, draft => {
         draft.root.text.insert(0, "hello")
       })
 
-      const handleB = repoB.getHandle("test-doc", TestDocSchema)
-      await handleB.waitForSync({ timeout: 0 })
+      const docB = repoB.get("test-doc", TestDocSchema)
+      await sync(docB).waitForSync({ timeout: 0 })
 
-      expect(handleB.doc.toJSON().root.text).toBe("hello")
+      expect(docB.toJSON().root.text).toBe("hello")
 
       // Cleanup
       repoA.synchronizer.stopHeartbeat()
@@ -171,24 +169,23 @@ describe("Repo", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handleA = repoA.getHandle("test-doc", TestDocSchema, {
+      const docA = repoA.get("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
-      const handleB = repoB.getHandle("test-doc", TestDocSchema, {
+      const docB = repoB.get("test-doc", TestDocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Set presence on A
-      handleA.getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(docA).presence.setSelf({ status: "online" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // B should see A's presence
-      const presenceB = handleB.getTypedEphemeral("presence")
-      expect(presenceB.get("1")).toEqual({ status: "online" })
+      expect(sync(docB).presence.get("1")).toEqual({ status: "online" })
 
       // Cleanup
       repoA.synchronizer.stopHeartbeat()
@@ -199,20 +196,21 @@ describe("Repo", () => {
   describe("document management", () => {
     it("should check if document exists with has()", () => {
       expect(repo.has("test-doc")).toBe(false)
-      repo.getHandle("test-doc", TestDocSchema)
-      // Note: has() checks synchronizer state, not Handle cache
+      repo.get("test-doc", TestDocSchema)
+      // Note: has() checks synchronizer state, not Doc cache
       // The document state is created when we call get()
       expect(repo.has("test-doc")).toBe(true)
     })
 
     it("should delete documents", async () => {
-      const handle = repo.getHandle("test-doc", TestDocSchema)
-      expect(repo.has(handle.docId)).toBe(true)
+      const doc = repo.get("test-doc", TestDocSchema)
+      const docId = sync(doc).docId
+      expect(repo.has(docId)).toBe(true)
 
       await new Promise(resolve => setTimeout(resolve, 50))
-      await repo.delete(handle.docId)
+      await repo.delete(docId)
 
-      expect(repo.has(handle.docId)).toBe(false)
+      expect(repo.has(docId)).toBe(false)
     })
   })
 

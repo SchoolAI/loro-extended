@@ -167,17 +167,17 @@ describe("Subscription Hang Investigation", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Get handles (this creates doc state)
-      const handle1 = repo1.getHandle("doc-1", DocSchema)
-      const _handle2 = repo2.getHandle("doc-1", DocSchema)
+      const doc1 = repo1.get("doc-1", DocSchema)
+      const _handle2 = repo2.get("doc-1", DocSchema)
 
       // Modify document - this uses the existing sync mechanism
-      change(handle1.doc, draft => {
+      change(doc1, draft => {
         draft.title.insert(0, "Hello")
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      expect(handle1.doc.toJSON().title).toBe("Hello")
+      expect(doc1.toJSON().title).toBe("Hello")
     })
 
     it("Test 7: Manual ephemeral broadcast via BridgeAdapter", async () => {

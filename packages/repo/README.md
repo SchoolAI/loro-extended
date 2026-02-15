@@ -386,31 +386,17 @@ doc.title.increment(1);           // Error: increment doesn't exist on TextRef
 doc.count.insert(0, "x");         // Error: insert doesn't exist on CounterRef
 ```
 
-## Migration from Handle API
+## Removed in v6
 
-If upgrading from the previous handle-based API:
+The following APIs were removed in v6. If upgrading from v5, use the replacements shown:
 
-**Before (deprecated):**
-```typescript
-const handle = repo.getHandle(docId, schema, { presence: PresenceSchema });
-handle.doc.title.insert(0, "Hello");
-await handle.waitForSync();
-handle.presence.setSelf({ status: "online" });
-const snapshot = handle.doc.toJSON();
-```
-
-**After (recommended):**
-```typescript
-import { sync } from "@loro-extended/repo";
-
-const doc = repo.get(docId, schema, { presence: PresenceSchema });
-doc.title.insert(0, "Hello");
-await sync(doc).waitForSync();
-sync(doc).presence.setSelf({ status: "online" });
-const snapshot = doc.toJSON();
-```
-
-The `repo.getHandle()` method is still available for backward compatibility but is deprecated.
+| Removed | Replacement |
+|---------|-------------|
+| `repo.getHandle(id, schema)` | `repo.get(id, schema)` |
+| `handle.doc.field` | `doc.field` (direct access) |
+| `handle.waitForSync()` | `sync(doc).waitForSync()` |
+| `handle.presence` | `sync(doc).presence` |
+| `Handle<D, E>` type | `Doc<D, E>` + `sync()` |
 
 ## Logging
 

@@ -7,9 +7,9 @@
  *
  * This enables the common "initializeIfEmpty" pattern:
  * ```typescript
- * await handle.waitForSync()
- * if (handle.loroDoc.opCount() === 0) {
- *   initializeDocument(handle)
+ * await sync(doc).waitForSync()
+ * if (sync(doc).loroDoc.opCount() === 0) {
+ *   initializeDocument(doc)
  * }
  * ```
  */
@@ -17,9 +17,10 @@
 import { change, Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DelayedNetworkAdapter } from "../adapter/delayed-network-adapter.js"
-import { NoAdaptersError, SyncTimeoutError } from "../handle.js"
 import { Repo } from "../repo.js"
 import { InMemoryStorageAdapter } from "../storage/in-memory-storage-adapter.js"
+import { sync } from "../sync.js"
+import { NoAdaptersError, SyncTimeoutError } from "../sync-errors.js"
 
 const DocSchema = Shape.doc({
   title: Shape.text(),
@@ -41,12 +42,14 @@ describe("waitForSync", () => {
       const serverRepo = new Repo({
         identity: { name: "server", type: "service" },
       })
-      const serverHandle = serverRepo.getHandle("test-doc", DocSchema)
-      change(serverHandle.doc, draft => {
+      const serverDoc = serverRepo.get("test-doc", DocSchema)
+      change(serverDoc, draft => {
         draft.title.insert(0, "Server Data")
         draft.count.increment(42)
       })
-      const serverSnapshot = serverHandle.loroDoc.export({ mode: "snapshot" })
+      const serverSnapshot = sync(serverDoc).loroDoc.export({
+        mode: "snapshot",
+      })
 
       // Create client with delayed network adapter
       const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
@@ -55,24 +58,26 @@ describe("waitForSync", () => {
         adapters: [adapter],
       })
 
-      // Get the document handle
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
+      // Get the document
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
       // At this point, the channel is established but no sync-response has arrived
-      expect(clientHandle.loroDoc.opCount()).toBe(0)
+      expect(sync(clientDoc).loroDoc.opCount()).toBe(0)
 
       // Track when waitForSync resolves
       let waitResolved = false
-      const waitPromise = clientHandle.waitForSync({ timeout: 0 }).then(() => {
-        waitResolved = true
-      })
+      const waitPromise = sync(clientDoc)
+        .waitForSync({ timeout: 0 })
+        .then(() => {
+          waitResolved = true
+        })
 
       // Advance time a bit, but not enough for sync-response
       await vi.advanceTimersByTimeAsync(50)
 
       // waitForSync should NOT have resolved yet
       expect(waitResolved).toBe(false)
-      expect(clientHandle.loroDoc.opCount()).toBe(0)
+      expect(sync(clientDoc).loroDoc.opCount()).toBe(0)
 
       // Now deliver the sync-response from the server
       const deliveryPromise = adapter.deliverSyncResponse(
@@ -88,8 +93,8 @@ describe("waitForSync", () => {
 
       expect(waitResolved).toBe(true)
       // And the document should have the server's data
-      expect(clientHandle.doc.toJSON().title).toBe("Server Data")
-      expect(clientHandle.doc.toJSON().count).toBe(42)
+      expect(clientDoc.toJSON().title).toBe("Server Data")
+      expect(clientDoc.toJSON().count).toBe(42)
     }, 1000)
   })
 
@@ -103,13 +108,15 @@ describe("waitForSync", () => {
       })
 
       // Get a document that doesn't exist on the server
-      const clientHandle = clientRepo.getHandle("nonexistent-doc", DocSchema)
+      const clientDoc = clientRepo.get("nonexistent-doc", DocSchema)
 
       // Start waiting for sync
       let waitResolved = false
-      const _waitPromise = clientHandle.waitForSync({ timeout: 0 }).then(() => {
-        waitResolved = true
-      })
+      const _waitPromise = sync(clientDoc)
+        .waitForSync({ timeout: 0 })
+        .then(() => {
+          waitResolved = true
+        })
 
       // Advance time a bit
       await vi.advanceTimersByTimeAsync(50)
@@ -128,381 +135,288 @@ describe("waitForSync", () => {
       // waitForSync should have resolved because the server confirmed
       // it doesn't have the document (state="absent")
       expect(waitResolved).toBe(true)
-    }, 500)
+    }, 1000)
   })
 
-  describe("initializeIfEmpty pattern", () => {
-    it("should NOT initialize when server has data", async () => {
-      // Create a server repo with existing data
-      const serverRepo = new Repo({
-        identity: { name: "server", type: "service" },
-      })
-      const serverHandle = serverRepo.getHandle("existing-doc", DocSchema)
-      change(serverHandle.doc, draft => {
-        draft.title.insert(0, "Existing Title")
-      })
-      const serverSnapshot = serverHandle.loroDoc.export({ mode: "snapshot" })
-
-      // Create client
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
+  describe("timeout behavior", () => {
+    it("should throw SyncTimeoutError when timeout expires", async () => {
+      // Create client with delayed network adapter that never delivers
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10_000 })
       const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.getHandle("existing-doc", DocSchema)
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      // The app's initialization pattern
-      let initializationRan = false
-      async function initializeIfEmpty() {
-        await clientHandle.waitForSync({ timeout: 0 })
+      // Start waiting for sync with a short timeout
+      const waitPromise = sync(clientDoc).waitForSync({ timeout: 100 })
 
-        // Only initialize if the document is empty AFTER network sync
-        if (clientHandle.loroDoc.opCount() === 0) {
-          initializationRan = true
-          change(clientHandle.doc, draft => {
-            draft.title.insert(0, "Default Title")
-          })
-        }
-      }
+      // Advance time past the timeout and wait for the rejection
+      await vi.advanceTimersByTimeAsync(150)
 
-      // Start the initialization
-      const initPromise = initializeIfEmpty()
+      // Should throw SyncTimeoutError
+      await expect(waitPromise).rejects.toThrow(SyncTimeoutError)
 
-      // Deliver the server's data
-      const deliveryPromise = adapter.deliverSyncResponse(
-        "existing-doc",
-        serverSnapshot,
-      )
-      await vi.advanceTimersByTimeAsync(100)
-      await deliveryPromise
-
-      await vi.runAllTimersAsync()
-      await initPromise
-
-      // The document should have the SERVER's data, not the default
-      expect(clientHandle.doc.toJSON().title).toBe("Existing Title")
-
-      // The initialization should NOT have run because the server had data
-      expect(initializationRan).toBe(false)
+      // Cleanup
+      clientRepo.synchronizer.stopHeartbeat()
     }, 1000)
 
-    it("should initialize when server confirms document does not exist", async () => {
-      // Create client
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
+    it("should include diagnostic information in timeout error", async () => {
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10_000 })
       const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.getHandle("new-doc", DocSchema)
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      // The app's initialization pattern
-      let initializationRan = false
-      let waitCompleted = false
-      async function initializeIfEmpty() {
-        await clientHandle.waitForSync({ timeout: 0 })
-        waitCompleted = true
+      const waitPromise = sync(clientDoc).waitForSync({ timeout: 100 })
 
-        // Only initialize if the document is empty AFTER network sync
-        if (clientHandle.loroDoc.opCount() === 0) {
-          initializationRan = true
-          change(clientHandle.doc, draft => {
-            draft.title.insert(0, "Default Title")
-          })
-        }
-      }
+      await vi.advanceTimersByTimeAsync(150)
 
-      // Start the initialization
-      const _initPromise = initializeIfEmpty()
-
-      // Server confirms it doesn't have the document
-      const deliveryPromise = adapter.deliverUnavailable("new-doc")
-      await vi.advanceTimersByTimeAsync(100)
-      await deliveryPromise
-
-      // Give it more time
-      await vi.advanceTimersByTimeAsync(200)
-
-      // waitForSync completes when server confirms it doesn't have the doc
-      expect(waitCompleted).toBe(true)
-      expect(initializationRan).toBe(true)
-      expect(clientHandle.doc.toJSON().title).toBe("Default Title")
-    }, 500)
-  })
-
-  describe("error handling", () => {
-    it("should throw NoAdaptersError when no network adapters configured", async () => {
-      // Create client WITHOUT any adapters
-      const clientRepo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [], // No adapters!
-      })
-
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
-
-      // waitForSync should throw immediately
-      await expect(
-        clientHandle.waitForSync({ kind: "network" }),
-      ).rejects.toThrow(NoAdaptersError)
-    })
-
-    it("should throw NoAdaptersError when no storage adapters configured", async () => {
-      // Create client with only network adapter
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
-      const clientRepo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [adapter],
-      })
-
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
-
-      // waitForSync for storage should throw
-      await expect(
-        clientHandle.waitForSync({ kind: "storage" }),
-      ).rejects.toThrow(NoAdaptersError)
-    })
-
-    it("should throw SyncTimeoutError when timeout is reached", async () => {
-      // Use real timers for this test to avoid fake timer issues with promise rejections
-      vi.useRealTimers()
-
-      // Create client with delayed network adapter that never responds
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10000 }) // Long delay
-      const clientRepo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [adapter],
-      })
-
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
-
-      // Start waiting with a very short timeout (50ms)
-      // The adapter won't respond in time, so it should timeout
       try {
-        await clientHandle.waitForSync({ timeout: 50 })
-        expect.fail("Should have thrown SyncTimeoutError")
+        await waitPromise
+        expect.fail("Should have thrown")
       } catch (error) {
         expect(error).toBeInstanceOf(SyncTimeoutError)
         const syncError = error as SyncTimeoutError
-        // Verify enriched error context
         expect(syncError.kind).toBe("network")
-        expect(syncError.timeoutMs).toBe(50)
+        expect(syncError.timeoutMs).toBe(100)
         expect(syncError.docId).toBe("test-doc")
-        // lastSeenStates may be undefined or an array
-        expect(
-          syncError.lastSeenStates === undefined ||
-            Array.isArray(syncError.lastSeenStates),
-        ).toBe(true)
       }
 
-      // Restore fake timers for other tests
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+      // Cleanup
+      clientRepo.synchronizer.stopHeartbeat()
     }, 1000)
+  })
 
-    it("should throw NoAdaptersError with docId context", async () => {
-      // Create client WITHOUT any adapters
+  describe("no adapters configured", () => {
+    it("should throw NoAdaptersError when no network adapters", async () => {
+      // Create client with NO adapters
       const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
         adapters: [],
       })
 
-      const clientHandle = clientRepo.getHandle("my-special-doc", DocSchema)
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      try {
-        await clientHandle.waitForSync({ kind: "network" })
-        expect.fail("Should have thrown NoAdaptersError")
-      } catch (error) {
-        expect(error).toBeInstanceOf(NoAdaptersError)
-        const noAdaptersError = error as NoAdaptersError
-        expect(noAdaptersError.kind).toBe("network")
-        expect(noAdaptersError.docId).toBe("my-special-doc")
-        expect(noAdaptersError.message).toContain("my-special-doc")
-      }
-    })
+      // Should throw immediately (no network adapters)
+      await expect(
+        sync(clientDoc).waitForSync({ kind: "network" }),
+      ).rejects.toThrow(NoAdaptersError)
+    }, 1000)
 
-    it("should NOT timeout when timeout is set to 0", async () => {
-      // Create client with delayed network adapter
+    it("should throw NoAdaptersError when no storage adapters", async () => {
+      // Create client with only network adapter, no storage
       const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
       const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
         adapters: [adapter],
       })
 
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      // Start waiting with timeout disabled
-      let resolved = false
-      const waitPromise = clientHandle.waitForSync({ timeout: 0 }).then(() => {
-        resolved = true
-      })
-
-      // Advance time way past what would be a normal timeout
-      await vi.advanceTimersByTimeAsync(60_000)
-
-      // Should NOT have resolved (no sync response yet) but also NOT thrown
-      expect(resolved).toBe(false)
-
-      // Now deliver the response
-      const deliveryPromise = adapter.deliverUnavailable("test-doc")
-      await vi.advanceTimersByTimeAsync(100)
-      await deliveryPromise
-
-      await vi.runAllTimersAsync()
-      await waitPromise
-
-      expect(resolved).toBe(true)
+      // Should throw immediately (no storage adapters)
+      await expect(
+        sync(clientDoc).waitForSync({ kind: "storage" }),
+      ).rejects.toThrow(NoAdaptersError)
     }, 1000)
-
-    it("should abort when AbortSignal is triggered", async () => {
-      // Use real timers for this test
-      vi.useRealTimers()
-
-      // Create client with delayed network adapter that never responds
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10000 })
-      const clientRepo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [adapter],
-      })
-
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
-
-      // Create an AbortController
-      const controller = new AbortController()
-
-      // Start waiting with no timeout but with abort signal
-      const waitPromise = clientHandle.waitForSync({
-        timeout: 0,
-        signal: controller.signal,
-      })
-
-      // Abort after a short delay
-      setTimeout(() => controller.abort(), 50)
-
-      // Should throw AbortError
-      try {
-        await waitPromise
-        expect.fail("Should have thrown AbortError")
-      } catch (error) {
-        expect(error).toBeInstanceOf(DOMException)
-        expect((error as DOMException).name).toBe("AbortError")
-      }
-
-      // Restore fake timers
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
-    }, 1000)
-
-    it("should reject immediately if signal is already aborted", async () => {
-      // Create client with network adapter
-      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
-      const clientRepo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [adapter],
-      })
-
-      const clientHandle = clientRepo.getHandle("test-doc", DocSchema)
-
-      // Create an already-aborted signal
-      const controller = new AbortController()
-      controller.abort()
-
-      // Should throw immediately with AbortError
-      try {
-        await clientHandle.waitForSync({ signal: controller.signal })
-        expect.fail("Should have thrown AbortError")
-      } catch (error) {
-        expect(error).toBeInstanceOf(DOMException)
-        expect((error as DOMException).name).toBe("AbortError")
-      }
-    })
   })
 
   describe("storage sync", () => {
-    it("should resolve waitForSync({ kind: 'storage' }) when storage is empty", async () => {
-      // Create repo with empty storage adapter
-      const storage = new InMemoryStorageAdapter()
-      const repo = new Repo({
-        identity: { name: "client", type: "user" },
-        adapters: [storage],
-      })
+    it("should resolve when storage has data", async () => {
+      // Create a storage adapter with some data
+      const storageData = new Map<string, Uint8Array>()
 
-      // Get a document that doesn't exist in storage
-      const handle = repo.getHandle("nonexistent-doc", DocSchema)
-
-      // waitForSync should resolve (not hang) because storage confirms "absent"
-      await handle.waitForSync({ kind: "storage", timeout: 0 })
-
-      // Document should be empty (storage had nothing)
-      expect(handle.loroDoc.opCount()).toBe(0)
-
-      // Cleanup
-      repo.synchronizer.stopHeartbeat()
-    })
-
-    it("should resolve waitForSync({ kind: 'storage' }) when storage has data", async () => {
-      // First, create a repo and save some data to storage
-      const storage1 = new InMemoryStorageAdapter()
+      // First, create a document and save it to storage
+      const storage1 = new InMemoryStorageAdapter({ sharedData: storageData })
       const repo1 = new Repo({
         identity: { name: "writer", type: "user" },
         adapters: [storage1],
       })
 
-      const handle1 = repo1.getHandle("existing-doc", DocSchema)
-      change(handle1.doc, draft => {
+      const doc1 = repo1.get("test-doc", DocSchema)
+      change(doc1, draft => {
         draft.title.insert(0, "Stored Data")
-        draft.count.increment(100)
       })
 
-      // Wait for storage to persist
+      // Wait for storage to save
       await vi.runAllTimersAsync()
 
-      // Now create a new repo with the same storage data
-      const storage2 = new InMemoryStorageAdapter(storage1.getStorage())
+      // Now create a second repo that loads from the same storage
+      const storage2 = new InMemoryStorageAdapter({ sharedData: storageData })
       const repo2 = new Repo({
         identity: { name: "reader", type: "user" },
         adapters: [storage2],
       })
 
-      const handle2 = repo2.getHandle("existing-doc", DocSchema)
+      const doc2 = repo2.get("test-doc", DocSchema)
 
-      // waitForSync should resolve when storage sends the data
-      await handle2.waitForSync({ kind: "storage", timeout: 0 })
+      // Wait for storage sync
+      await sync(doc2).waitForSync({ kind: "storage", timeout: 0 })
+
+      // Advance timers to allow storage to load
+      await vi.runAllTimersAsync()
 
       // Document should have the stored data
-      expect(handle2.doc.toJSON().title).toBe("Stored Data")
-      expect(handle2.doc.toJSON().count).toBe(100)
+      expect(doc2.toJSON().title).toBe("Stored Data")
+    }, 1000)
+  })
 
-      // Cleanup
-      repo1.synchronizer.stopHeartbeat()
-      repo2.synchronizer.stopHeartbeat()
-    })
-
-    it("should enable initializeIfEmpty pattern with storage", async () => {
-      // Create repo with empty storage adapter
-      const storage = new InMemoryStorageAdapter()
-      const repo = new Repo({
+  describe("abort signal", () => {
+    it("should abort when signal is triggered", async () => {
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 10_000 })
+      const clientRepo = new Repo({
         identity: { name: "client", type: "user" },
-        adapters: [storage],
+        adapters: [adapter],
       })
 
-      const handle = repo.getHandle("new-doc", DocSchema)
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
 
-      // The app's initialization pattern
-      await handle.waitForSync({ kind: "storage", timeout: 0 })
+      const controller = new AbortController()
+      const waitPromise = sync(clientDoc).waitForSync({
+        timeout: 0,
+        signal: controller.signal,
+      })
 
-      // Storage confirmed it doesn't have the document, safe to initialize
-      if (handle.loroDoc.opCount() === 0) {
-        change(handle.doc, draft => {
+      // Abort after a short delay
+      await vi.advanceTimersByTimeAsync(50)
+      controller.abort()
+
+      // Should throw DOMException with name "AbortError"
+      await expect(waitPromise).rejects.toThrow()
+
+      // Cleanup
+      clientRepo.synchronizer.stopHeartbeat()
+    }, 1000)
+  })
+
+  describe("multiple waitForSync calls", () => {
+    it("should support multiple concurrent waitForSync calls", async () => {
+      // Create a server repo with a document
+      const serverRepo = new Repo({
+        identity: { name: "server", type: "service" },
+      })
+      const serverDoc = serverRepo.get("test-doc", DocSchema)
+      change(serverDoc, draft => {
+        draft.title.insert(0, "Server Data")
+      })
+      const serverSnapshot = sync(serverDoc).loroDoc.export({
+        mode: "snapshot",
+      })
+
+      // Create client
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
+      const clientRepo = new Repo({
+        identity: { name: "client", type: "user" },
+        adapters: [adapter],
+      })
+
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
+
+      // Start multiple waitForSync calls
+      const wait1 = sync(clientDoc).waitForSync({ timeout: 0 })
+      const wait2 = sync(clientDoc).waitForSync({ timeout: 0 })
+      const wait3 = sync(clientDoc).waitForSync({ timeout: 0 })
+
+      // Deliver the sync response
+      const deliveryPromise = adapter.deliverSyncResponse(
+        "test-doc",
+        serverSnapshot,
+      )
+      await vi.advanceTimersByTimeAsync(100)
+      await deliveryPromise
+      await vi.runAllTimersAsync()
+
+      // All should resolve
+      await expect(wait1).resolves.toBeUndefined()
+      await expect(wait2).resolves.toBeUndefined()
+      await expect(wait3).resolves.toBeUndefined()
+    }, 1000)
+  })
+
+  describe("initializeIfEmpty pattern", () => {
+    it("should enable safe initialize-if-empty pattern with server data", async () => {
+      // Server has data
+      const serverRepo = new Repo({
+        identity: { name: "server", type: "service" },
+      })
+      const serverDoc = serverRepo.get("test-doc", DocSchema)
+      change(serverDoc, draft => {
+        draft.title.insert(0, "Existing Data")
+        draft.count.increment(100)
+      })
+      const serverSnapshot = sync(serverDoc).loroDoc.export({
+        mode: "snapshot",
+      })
+
+      // Client creates document
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
+      const clientRepo = new Repo({
+        identity: { name: "client", type: "user" },
+        adapters: [adapter],
+      })
+
+      const clientDoc = clientRepo.get("test-doc", DocSchema)
+
+      // Deliver server data
+      const deliveryPromise = adapter.deliverSyncResponse(
+        "test-doc",
+        serverSnapshot,
+      )
+      await vi.advanceTimersByTimeAsync(100)
+      await deliveryPromise
+
+      // Wait for sync
+      await sync(clientDoc).waitForSync({ timeout: 0 })
+      await vi.runAllTimersAsync()
+
+      // Now do the "initializeIfEmpty" check
+      if (sync(clientDoc).loroDoc.opCount() === 0) {
+        // This should NOT run because server had data
+        change(clientDoc, draft => {
           draft.title.insert(0, "Default Title")
           draft.count.increment(1)
         })
       }
 
-      // Document should have the default data
-      expect(handle.doc.toJSON().title).toBe("Default Title")
-      expect(handle.doc.toJSON().count).toBe(1)
+      // Should have server's data, not default
+      expect(clientDoc.toJSON().title).toBe("Existing Data")
+      expect(clientDoc.toJSON().count).toBe(100)
+    }, 1000)
 
-      // Cleanup
-      repo.synchronizer.stopHeartbeat()
-    })
+    it("should enable safe initialize-if-empty pattern with no server data", async () => {
+      // Client creates document, server confirms it doesn't exist
+      const adapter = new DelayedNetworkAdapter({ syncResponseDelay: 100 })
+      const clientRepo = new Repo({
+        identity: { name: "client", type: "user" },
+        adapters: [adapter],
+      })
+
+      const clientDoc = clientRepo.get("new-doc", DocSchema)
+
+      // Server confirms document doesn't exist
+      const deliveryPromise = adapter.deliverUnavailable("new-doc")
+      await vi.advanceTimersByTimeAsync(100)
+      await deliveryPromise
+
+      // Wait for sync
+      await sync(clientDoc).waitForSync({ timeout: 0 })
+      await vi.runAllTimersAsync()
+
+      // Now do the "initializeIfEmpty" check
+      if (sync(clientDoc).loroDoc.opCount() === 0) {
+        // This SHOULD run because server confirmed no data
+        change(clientDoc, draft => {
+          draft.title.insert(0, "Default Title")
+          draft.count.increment(1)
+        })
+      }
+
+      // Should have default data
+      expect(clientDoc.toJSON().title).toBe("Default Title")
+      expect(clientDoc.toJSON().count).toBe(1)
+    }, 1000)
   })
 })

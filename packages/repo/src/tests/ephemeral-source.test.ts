@@ -2,6 +2,7 @@ import { Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 /**
  * Tests for ephemeral event source tracking.
@@ -45,19 +46,19 @@ describe("Ephemeral Event Source", () => {
     it("should emit source: 'local' when setSelf is called", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.getHandle(docId, DocSchema, {
+      const doc = client.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
       const events: Array<{ source: string }> = []
 
       // Subscribe to presence changes
-      handle.presence.subscribe(event => {
+      sync(doc).presence.subscribe(event => {
         events.push({ source: event.source })
       })
 
       // Trigger a local change via presence.setSelf()
-      handle.presence.setSelf({ cursor: "test-value" })
+      sync(doc).presence.setSelf({ cursor: "test-value" })
 
       // Wait for event processing
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -75,11 +76,11 @@ describe("Ephemeral Event Source", () => {
       const { server, client } = createConnectedPair()
       const docId = "test-doc"
 
-      // Both need to get handles to establish subscription
-      const serverHandle = server.getHandle(docId, DocSchema, {
+      // Both need to get docs to establish subscription
+      const serverDoc = server.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
-      const clientHandle = client.getHandle(docId, DocSchema, {
+      const clientDoc = client.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -89,12 +90,12 @@ describe("Ephemeral Event Source", () => {
       const clientEvents: Array<{ source: string; key: string }> = []
 
       // Subscribe to client's presence changes
-      clientHandle.presence.subscribe(event => {
+      sync(clientDoc).presence.subscribe(event => {
         clientEvents.push({ source: event.source, key: event.key })
       })
 
       // Server sets presence (this should propagate to client as "remote")
-      serverHandle.presence.setSelf({ cursor: "server-cursor" })
+      sync(serverDoc).presence.setSelf({ cursor: "server-cursor" })
 
       // Wait for propagation
       await new Promise(resolve => setTimeout(resolve, 200))
@@ -110,17 +111,17 @@ describe("Ephemeral Event Source", () => {
     it("should pass source: 'initial' on first subscribe callback", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.getHandle(docId, DocSchema, {
+      const doc = client.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
       // Set some presence first
-      handle.presence.setSelf({ cursor: "initial-cursor" })
+      sync(doc).presence.setSelf({ cursor: "initial-cursor" })
 
       const sources: string[] = []
 
       // Subscribe to presence - first callback should be "initial"
-      handle.presence.subscribe(event => {
+      sync(doc).presence.subscribe(event => {
         sources.push(event.source)
       })
 
@@ -135,10 +136,10 @@ describe("Ephemeral Event Source", () => {
       const { server, client } = createConnectedPair()
       const docId = "test-doc"
 
-      const serverHandle = server.getHandle(docId, DocSchema, {
+      const serverDoc = server.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
-      const clientHandle = client.getHandle(docId, DocSchema, {
+      const clientDoc = client.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -149,7 +150,7 @@ describe("Ephemeral Event Source", () => {
       const maxCalls = 50 // If we hit this, we're likely looping
 
       // Simulate the bridge pattern on client side
-      clientHandle.presence.subscribe(event => {
+      sync(clientDoc).presence.subscribe(event => {
         callCount++
 
         if (callCount > maxCalls) {
@@ -165,11 +166,11 @@ describe("Ephemeral Event Source", () => {
         // This simulates what the bridge does: when receiving remote data,
         // it updates local state, which triggers another event.
         // Without source filtering, this would loop infinitely.
-        clientHandle.presence.setSelf({ cursor: `updated-${callCount}` })
+        sync(clientDoc).presence.setSelf({ cursor: `updated-${callCount}` })
       })
 
       // Server sends presence update (triggers remote event on client)
-      serverHandle.presence.setSelf({ cursor: "initial" })
+      sync(serverDoc).presence.setSelf({ cursor: "initial" })
 
       // Wait for propagation and any potential loops
       await new Promise(resolve => setTimeout(resolve, 300))
@@ -184,19 +185,19 @@ describe("Ephemeral Event Source", () => {
     it("demonstrates that source filtering prevents the loop", async () => {
       const { client } = createConnectedPair()
       const docId = "test-doc"
-      const handle = client.getHandle(docId, DocSchema, {
+      const doc = client.get(docId, DocSchema, {
         presence: PresenceSchema,
       })
 
       const sources: string[] = []
 
       // Subscribe first
-      handle.presence.subscribe(event => {
+      sync(doc).presence.subscribe(event => {
         sources.push(event.source)
       })
 
       // Now trigger a local change
-      handle.presence.setSelf({ cursor: "test" })
+      sync(doc).presence.setSelf({ cursor: "test" })
 
       // Wait for event processing
       await new Promise(resolve => setTimeout(resolve, 50))

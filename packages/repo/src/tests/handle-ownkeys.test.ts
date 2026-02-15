@@ -2,21 +2,15 @@ import { Shape } from "@loro-extended/change"
 import { afterEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 /**
- * Tests for Handle proxy ownKeys behavior.
+ * Tests for SyncRef proxy ownKeys behavior.
  *
- * Issue: The Handle proxy (created by createHandle in handle.ts lines 767-792)
- * is MISSING an ownKeys trap entirely. This means Reflect.ownKeys() falls through
- * to the target Handle class, which may have Symbol properties.
- *
- * Additionally, when ephemeralShapes are provided, the proxy should include
+ * When ephemeralShapes are provided, the SyncRef proxy should include
  * those keys in the ownKeys result so they appear in Object.keys().
- *
- * Fix: Add ownKeys and getOwnPropertyDescriptor traps to the Handle proxy.
- * Location: packages/repo/src/handle.ts lines 767-792
  */
-describe("Handle proxy ownKeys", () => {
+describe("SyncRef proxy ownKeys", () => {
   const DocSchema = Shape.doc({
     title: Shape.text(),
     count: Shape.counter(),
@@ -47,30 +41,30 @@ describe("Handle proxy ownKeys", () => {
     return repo
   }
 
-  describe("Handle without ephemeral stores", () => {
+  describe("SyncRef without ephemeral stores", () => {
     it("Reflect.ownKeys() should return only string keys", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema)
+      const doc = repo.get("test-doc", DocSchema)
+      const syncRef = sync(doc)
 
-      const keys = Reflect.ownKeys(handle)
+      const keys = Reflect.ownKeys(syncRef)
 
       // All keys should be strings (no Symbols)
-      // This test will FAIL if the proxy doesn't filter Symbols
       for (const key of keys) {
         expect(typeof key).toBe("string")
       }
     })
 
-    it("Object.keys() should return handle properties", () => {
+    it("Object.keys() should return SyncRef properties", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema)
+      const doc = repo.get("test-doc", DocSchema)
+      const syncRef = sync(doc)
 
-      const keys = Object.keys(handle)
+      const keys = Object.keys(syncRef)
 
-      // Should include standard Handle own properties (not getters)
-      // Note: 'doc' is a getter, not an own property, so it won't appear in Object.keys()
-      expect(keys).toContain("docId")
+      // Should include standard SyncRef own properties
       expect(keys).toContain("peerId")
+      expect(keys).toContain("docId")
 
       // All keys should be strings
       for (const key of keys) {
@@ -79,14 +73,15 @@ describe("Handle proxy ownKeys", () => {
     })
   })
 
-  describe("Handle with ephemeral stores", () => {
+  describe("SyncRef with ephemeral stores", () => {
     it("Reflect.ownKeys() should return only string keys", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema, {
+      const doc = repo.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
+      const syncRef = sync(doc)
 
-      const keys = Reflect.ownKeys(handle)
+      const keys = Reflect.ownKeys(syncRef)
 
       // All keys should be strings (no Symbols)
       for (const key of keys) {
@@ -96,14 +91,14 @@ describe("Handle proxy ownKeys", () => {
 
     it("Object.keys() should include ephemeral store names", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema, {
+      const doc = repo.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
+      const syncRef = sync(doc)
 
-      const keys = Object.keys(handle)
+      const keys = Object.keys(syncRef)
 
       // Should include the ephemeral store name
-      // This test will FAIL if ownKeys doesn't include ephemeral stores
       expect(keys).toContain("presence")
 
       // All keys should be strings
@@ -114,12 +109,13 @@ describe("Handle proxy ownKeys", () => {
 
     it("for...in should iterate ephemeral store names", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema, {
+      const doc = repo.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
+      const syncRef = sync(doc)
 
       const keys: string[] = []
-      for (const key in handle) {
+      for (const key in syncRef) {
         keys.push(key)
       }
 
@@ -129,12 +125,13 @@ describe("Handle proxy ownKeys", () => {
 
     it("spread operator should include ephemeral stores", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema, {
+      const doc = repo.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
+      const syncRef = sync(doc)
 
       // This should not throw
-      const spread = { ...handle }
+      const spread = { ...syncRef }
 
       // Should have the ephemeral store
       expect("presence" in spread).toBe(true)
@@ -144,10 +141,11 @@ describe("Handle proxy ownKeys", () => {
   describe("Object.entries()", () => {
     it("should work without errors", () => {
       const repo = createRepo()
-      const handle = repo.getHandle("test-doc", DocSchema)
+      const doc = repo.get("test-doc", DocSchema)
+      const syncRef = sync(doc)
 
       // This should not throw "Object keys must be strings"
-      const entries = Object.entries(handle)
+      const entries = Object.entries(syncRef)
 
       // All keys should be strings
       for (const [key] of entries) {

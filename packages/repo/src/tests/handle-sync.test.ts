@@ -2,10 +2,11 @@ import { Shape } from "@loro-extended/change"
 import { afterEach, describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 /**
- * Integration tests for Handle ephemeral store sync.
- * These tests verify that the new Handle API correctly syncs
+ * Integration tests for ephemeral store sync via sync() API.
+ * These tests verify that the repo.get() + sync() API correctly syncs
  * ephemeral stores between peers.
  */
 
@@ -23,7 +24,7 @@ const MouseSchema = Shape.plain.struct({
   y: Shape.plain.number(),
 })
 
-describe("Handle Ephemeral Sync", () => {
+describe("Ephemeral Sync via sync()", () => {
   let repo1: Repo
   let repo2: Repo
 
@@ -48,24 +49,24 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Create handles with presence
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      // Create docs with presence
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Set presence on peer1
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Verify peer2 sees peer1's presence
-      const peer1Presence = handle2.getTypedEphemeral("presence").get("1")
+      const peer1Presence = sync(doc2).getTypedEphemeral("presence").get("1")
       expect(peer1Presence).toEqual({ status: "online" })
     })
 
@@ -84,25 +85,25 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Both peers set their presence
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
-      handle2.getTypedEphemeral("presence").setSelf({ status: "away" })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc2).getTypedEphemeral("presence").setSelf({ status: "away" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Verify both see each other
-      const presence1 = handle1.getTypedEphemeral("presence")
-      const presence2 = handle2.getTypedEphemeral("presence")
+      const presence1 = sync(doc1).getTypedEphemeral("presence")
+      const presence2 = sync(doc2).getTypedEphemeral("presence")
 
       expect(presence1.get("2")).toEqual({ status: "away" })
       expect(presence2.get("1")).toEqual({ status: "online" })
@@ -125,13 +126,13 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Create handles with multiple ephemeral stores
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      // Create docs with multiple ephemeral stores
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
@@ -139,14 +140,14 @@ describe("Handle Ephemeral Sync", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Set different data in different stores
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
-      handle1.getTypedEphemeral("mouse").setSelf({ x: 100, y: 200 })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc1).getTypedEphemeral("mouse").setSelf({ x: 100, y: 200 })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Verify both stores synced
-      const presence2 = handle2.getTypedEphemeral("presence")
-      const mouse2 = handle2.getTypedEphemeral("mouse")
+      const presence2 = sync(doc2).getTypedEphemeral("presence")
+      const mouse2 = sync(doc2).getTypedEphemeral("mouse")
 
       expect(presence2.get("1")).toEqual({ status: "online" })
       expect(mouse2.get("1")).toEqual({ x: 100, y: 200 })
@@ -167,12 +168,12 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
@@ -180,21 +181,21 @@ describe("Handle Ephemeral Sync", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Set presence once
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
 
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Update mouse position
-      handle1.getTypedEphemeral("mouse").setSelf({ x: 100, y: 200 })
+      sync(doc1).getTypedEphemeral("mouse").setSelf({ x: 100, y: 200 })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Verify mouse synced
-      const mouse2 = handle2.getTypedEphemeral("mouse")
+      const mouse2 = sync(doc2).getTypedEphemeral("mouse")
       expect(mouse2.get("1")).toEqual({ x: 100, y: 200 })
 
       // Presence should still be intact
-      const presence2 = handle2.getTypedEphemeral("presence")
+      const presence2 = sync(doc2).getTypedEphemeral("presence")
       expect(presence2.get("1")).toEqual({ status: "online" })
     })
   })
@@ -215,9 +216,9 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Create handles without declared ephemeral stores
-      const handle1 = repo1.getHandle("doc-1", DocSchema)
-      const handle2 = repo2.getHandle("doc-1", DocSchema)
+      // Create docs without declared ephemeral stores
+      const doc1 = repo1.get("doc-1", DocSchema)
+      const doc2 = repo2.get("doc-1", DocSchema)
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -226,8 +227,8 @@ describe("Handle Ephemeral Sync", () => {
       const externalStore1 = new EphemeralStore(10000)
       const externalStore2 = new EphemeralStore(10000)
 
-      handle1.addEphemeral("custom", externalStore1)
-      handle2.addEphemeral("custom", externalStore2)
+      sync(doc1).addEphemeral("custom", externalStore1)
+      sync(doc2).addEphemeral("custom", externalStore2)
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -257,18 +258,18 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const presence1 = handle1.getTypedEphemeral("presence")
-      const presence2 = handle2.getTypedEphemeral("presence")
+      const presence1 = sync(doc1).getTypedEphemeral("presence")
+      const presence2 = sync(doc2).getTypedEphemeral("presence")
 
       // Set using setSelf
       presence1.setSelf({ status: "online" })
@@ -307,23 +308,23 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
-      handle2.getTypedEphemeral("presence").setSelf({ status: "away" })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc2).getTypedEphemeral("presence").setSelf({ status: "away" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // getAll should include both self and peers
-      const all1 = handle1.getTypedEphemeral("presence").getAll()
+      const all1 = sync(doc1).getTypedEphemeral("presence").getAll()
       expect(all1.size).toBe(2)
       expect(all1.get("1")).toEqual({ status: "online" })
       expect(all1.get("2")).toEqual({ status: "away" })
@@ -344,33 +345,35 @@ describe("Handle Ephemeral Sync", () => {
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const handle1 = repo1.getHandle("doc-1", DocSchema, {
+      const doc1 = repo1.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      const handle2 = repo2.getHandle("doc-1", DocSchema, {
+      const doc2 = repo2.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Set initial presence for both peers
-      handle1.getTypedEphemeral("presence").setSelf({ status: "online" })
-      handle2.getTypedEphemeral("presence").setSelf({ status: "away" })
+      sync(doc1).getTypedEphemeral("presence").setSelf({ status: "online" })
+      sync(doc2).getTypedEphemeral("presence").setSelf({ status: "away" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Track events on handle1's subscription
+      // Track events on doc1's subscription
       const events: Array<{ key: string; source: string }> = []
-      const unsub = handle1.getTypedEphemeral("presence").subscribe(event => {
-        // Skip initial events
-        if (event.source !== "initial") {
-          events.push({ key: event.key, source: event.source })
-        }
-      })
+      const unsub = sync(doc1)
+        .getTypedEphemeral("presence")
+        .subscribe(event => {
+          // Skip initial events
+          if (event.source !== "initial") {
+            events.push({ key: event.key, source: event.source })
+          }
+        })
 
       // Update only peer2's presence
-      handle2.getTypedEphemeral("presence").setSelf({ status: "busy" })
+      sync(doc2).getTypedEphemeral("presence").setSelf({ status: "busy" })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 

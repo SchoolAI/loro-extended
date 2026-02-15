@@ -1,11 +1,6 @@
 import { getLogger, type Logger } from "@logtape/logtape"
 import type { DocShape, ValueShape } from "@loro-extended/change"
 import type { AnyAdapter } from "./adapter/adapter.js"
-import {
-  createHandle,
-  type EphemeralDeclarations,
-  type HandleWithEphemerals,
-} from "./handle.js"
 import type { Middleware } from "./middleware.js"
 import { createPermissions, type Permissions } from "./permissions.js"
 import {
@@ -84,16 +79,6 @@ interface DocCacheEntry {
 }
 
 /**
- * Cache entry for legacy handle instances.
- * @deprecated Handles are deprecated - use Doc with sync() instead
- */
-interface HandleCacheEntry {
-  handle: HandleWithEphemerals<any, any>
-  schema: DocShape
-  ephemeralShapes: Record<string, ValueShape> | undefined
-}
-
-/**
  * The Repo class is the central orchestrator for the Loro state synchronization system.
  * It manages the lifecycle of documents, coordinates subsystems, and provides the main
  * public API for document operations.
@@ -113,9 +98,6 @@ export class Repo {
 
   // Document cache - ensures same Doc instance for same docId
   readonly #docCache: Map<DocId, DocCacheEntry> = new Map()
-
-  // Legacy handle cache for backward compatibility
-  readonly #handleCache: Map<DocId, HandleCacheEntry> = new Map()
 
   constructor({
     identity = {},
@@ -216,7 +198,7 @@ export class Repo {
       if (cached.schema !== docShape) {
         throw new Error(
           `Document '${docId}' already exists with a different schema. ` +
-            `Use the same schema object when calling repo.getHandle() for the same document.`,
+            `Use the same schema object when calling repo.get() for the same document.`,
         )
       }
 
@@ -231,7 +213,7 @@ export class Repo {
       if (cachedEphKeys !== newEphKeys) {
         throw new Error(
           `Document '${docId}' already exists with different ephemeral stores. ` +
-            `Use the same ephemeral configuration when calling repo.getHandle() for the same document.`,
+            `Use the same ephemeral configuration when calling repo.get() for the same document.`,
         )
       }
 
@@ -260,77 +242,6 @@ export class Repo {
     return doc as unknown as Doc<D, E>
   }
 
-  //
-  // PUBLIC API - Legacy Handle API (deprecated)
-  //
-
-  /**
-   * Gets (or creates) a unified handle with typed document and ephemeral stores.
-   *
-   * @deprecated Use `repo.get()` instead which returns a `Doc<D>`.
-   * Access sync features via `sync(doc)` from `@loro-extended/repo`.
-   *
-   * @param docId The document ID
-   * @param docShape The shape of the document (use Shape.any() for untyped)
-   * @param ephemeralShapes Optional ephemeral store declarations
-   * @returns A Handle with typed document and ephemeral store access
-   */
-  getHandle<
-    D extends DocShape,
-    E extends EphemeralDeclarations = Record<string, never>,
-  >(
-    docId: DocId,
-    docShape: D,
-    ephemeralShapes?: E,
-  ): HandleWithEphemerals<D, E> {
-    // Check cache first
-    const cached = this.#handleCache.get(docId)
-
-    if (cached) {
-      // Validate schema matches
-      if (cached.schema !== docShape) {
-        throw new Error(
-          `Document '${docId}' already exists with a different schema. ` +
-            `Use the same schema object when calling repo.getHandle() for the same document.`,
-        )
-      }
-
-      // Check ephemeral shapes match
-      const cachedEphKeys = cached.ephemeralShapes
-        ? Object.keys(cached.ephemeralShapes).sort().join(",")
-        : ""
-      const newEphKeys = ephemeralShapes
-        ? Object.keys(ephemeralShapes).sort().join(",")
-        : ""
-
-      if (cachedEphKeys !== newEphKeys) {
-        throw new Error(
-          `Document '${docId}' already exists with different ephemeral stores. ` +
-            `Use the same ephemeral configuration when calling repo.getHandle() for the same document.`,
-        )
-      }
-
-      return cached.handle as HandleWithEphemerals<D, E>
-    }
-
-    // Create new handle and cache it
-    const handle = createHandle({
-      docId,
-      docShape,
-      ephemeralShapes,
-      synchronizer: this.#synchronizer,
-      logger: this.logger,
-    })
-
-    this.#handleCache.set(docId, {
-      handle,
-      schema: docShape,
-      ephemeralShapes,
-    })
-
-    return handle
-  }
-
   /**
    * Check if a document exists in the repo.
    * @param docId The document ID
@@ -345,9 +256,7 @@ export class Repo {
    * @param docId The ID of the document to delete
    */
   async delete(docId: DocId): Promise<void> {
-    // Clear from both caches
     this.#docCache.delete(docId)
-    this.#handleCache.delete(docId)
     await this.#synchronizer.removeDocument(docId)
   }
 
@@ -360,10 +269,7 @@ export class Repo {
    * app shutdown or between test sessions), use {@link shutdown} instead.
    */
   reset(): void {
-    // Clear caches
     this.#docCache.clear()
-    this.#handleCache.clear()
-    // Clear synchronizer model
     this.#synchronizer.reset()
   }
 
@@ -395,7 +301,7 @@ export class Repo {
    * ```typescript
    * // Session 1: create and save
    * const repo = new Repo({ adapters: [storage] })
-   * const doc = repo.getHandle('doc', DocSchema)
+   * const doc = repo.get('doc', DocSchema)
    * doc.title.insert(0, 'Hello')
    * await repo.shutdown() // Data is safely persisted
    *

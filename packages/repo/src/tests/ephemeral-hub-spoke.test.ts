@@ -2,6 +2,7 @@ import { Shape } from "@loro-extended/change"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 // Schema for test documents
 const DocSchema = Shape.doc({
@@ -108,26 +109,26 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const docId = "hub-spoke-doc"
 
       // All three repos get the same document
-      const handleA = clientA.getHandle(docId, DocSchema, {
+      const docA = clientA.get(docId, DocSchema, {
         presence: CursorPresenceSchema,
       })
-      const handleB = clientB.getHandle(docId, DocSchema, {
+      const docB = clientB.get(docId, DocSchema, {
         presence: CursorPresenceSchema,
       })
-      server.getHandle(docId, DocSchema, { presence: CursorPresenceSchema })
+      server.get(docId, DocSchema, { presence: CursorPresenceSchema })
 
       // Wait for all connections to establish and sync
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Subscribe to presence changes on clientB
       const onChangeB = vi.fn()
-      handleB.presence.subscribe(onChangeB)
+      sync(docB).presence.subscribe(onChangeB)
 
       // Clear the initial call from subscribe
       onChangeB.mockClear()
 
       // ClientA sets presence
-      handleA.presence.setSelf({
+      sync(docA).presence.setSelf({
         status: "online",
         cursor: { x: 100, y: 200 },
       })
@@ -138,7 +139,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // ClientB should have received clientA's presence
       const peerIdA = clientA.identity.peerId
-      const clientAPresenceOnB = handleB.presence.get(peerIdA)
+      const clientAPresenceOnB = sync(docB).presence.get(peerIdA)
 
       expect(clientAPresenceOnB).toEqual({
         status: "online",
@@ -152,20 +153,20 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
     it("should propagate presence updates bidirectionally through hub", async () => {
       const docId = "bidirectional-doc"
 
-      const handleA = clientA.getHandle(docId, DocSchema, {
+      const docA = clientA.get(docId, DocSchema, {
         presence: UserPresenceSchema,
       })
-      const handleB = clientB.getHandle(docId, DocSchema, {
+      const docB = clientB.get(docId, DocSchema, {
         presence: UserPresenceSchema,
       })
-      server.getHandle(docId, DocSchema, { presence: UserPresenceSchema })
+      server.get(docId, DocSchema, { presence: UserPresenceSchema })
 
       // Wait for connections
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Both clients set presence
-      handleA.presence.setSelf({ user: "Alice" })
-      handleB.presence.setSelf({ user: "Bob" })
+      sync(docA).presence.setSelf({ user: "Alice" })
+      sync(docB).presence.setSelf({ user: "Bob" })
 
       // Wait for propagation
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -174,10 +175,10 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const peerIdB = clientB.identity.peerId
 
       // ClientA should see ClientB's presence
-      expect(handleA.presence.get(peerIdB)).toEqual({ user: "Bob" })
+      expect(sync(docA).presence.get(peerIdB)).toEqual({ user: "Bob" })
 
       // ClientB should see ClientA's presence
-      expect(handleB.presence.get(peerIdA)).toEqual({ user: "Alice" })
+      expect(sync(docB).presence.get(peerIdA)).toEqual({ user: "Alice" })
     })
   })
 
@@ -186,22 +187,22 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       const docId = "late-joiner-doc"
 
       // ClientA connects and sets presence BEFORE clientB connects
-      const handleA = clientA.getHandle(docId, DocSchema, {
+      const docA = clientA.get(docId, DocSchema, {
         presence: StatusPresenceSchema,
       })
-      server.getHandle(docId, DocSchema, { presence: StatusPresenceSchema })
+      server.get(docId, DocSchema, { presence: StatusPresenceSchema })
 
       // Wait for A to connect to server
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // ClientA sets presence while B is not yet connected
-      handleA.presence.setSelf({ status: "active", name: "Alice" })
+      sync(docA).presence.setSelf({ status: "active", name: "Alice" })
 
       // Wait a bit for the presence to be stored on server
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Now clientB connects and gets the document
-      const handleB = clientB.getHandle(docId, DocSchema, {
+      const docB = clientB.get(docId, DocSchema, {
         presence: StatusPresenceSchema,
       })
 
@@ -210,7 +211,7 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // ClientB should have received ClientA's presence via the sync-request handler
       const peerIdA = clientA.identity.peerId
-      const clientAPresenceOnB = handleB.presence.get(peerIdA)
+      const clientAPresenceOnB = sync(docB).presence.get(peerIdA)
 
       expect(clientAPresenceOnB).toEqual({ status: "active", name: "Alice" })
     })
@@ -222,40 +223,40 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
 
       // Helper to count users with presence
       const countUsers = (
-        handle: ReturnType<
-          typeof clientA.getHandle<
+        doc: ReturnType<
+          typeof clientA.get<
             typeof DocSchema,
             { presence: typeof TypePresenceSchema }
           >
         >,
       ) => {
-        const all = handle.presence.getAll()
+        const all = sync(doc).presence.getAll()
         return Array.from(all.values()).filter(v => v != null).length
       }
 
       // ClientA connects and sets presence
-      const handleA = clientA.getHandle(docId, DocSchema, {
+      const docA = clientA.get(docId, DocSchema, {
         presence: TypePresenceSchema,
       })
-      server.getHandle(docId, DocSchema, { presence: TypePresenceSchema })
+      server.get(docId, DocSchema, { presence: TypePresenceSchema })
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      handleA.presence.setSelf({ type: "user" })
+      sync(docA).presence.setSelf({ type: "user" })
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // ClientB connects
-      const handleB = clientB.getHandle(docId, DocSchema, {
+      const docB = clientB.get(docId, DocSchema, {
         presence: TypePresenceSchema,
       })
-      handleB.presence.setSelf({ type: "user" })
+      sync(docB).presence.setSelf({ type: "user" })
 
       // Wait for sync
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Both clients should see 2 users (themselves + the other)
       // Note: The server's presence is not set, so it shouldn't count
-      expect(countUsers(handleA)).toBeGreaterThanOrEqual(2)
-      expect(countUsers(handleB)).toBeGreaterThanOrEqual(2)
+      expect(countUsers(docA)).toBeGreaterThanOrEqual(2)
+      expect(countUsers(docB)).toBeGreaterThanOrEqual(2)
     })
   })
 
@@ -280,21 +281,21 @@ describe("Ephemeral Store - Hub and Spoke Topology", () => {
       })
 
       const docId = "direct-peer-doc"
-      const handle1 = peer1.getHandle(docId, DocSchema, {
+      const doc1 = peer1.get(docId, DocSchema, {
         presence: DirectPresenceSchema,
       })
-      const handle2 = peer2.getHandle(docId, DocSchema, {
+      const doc2 = peer2.get(docId, DocSchema, {
         presence: DirectPresenceSchema,
       })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      handle1.presence.setSelf({ direct: true })
+      sync(doc1).presence.setSelf({ direct: true })
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const peerId1 = peer1.identity.peerId
-      expect(handle2.presence.get(peerId1)).toEqual({ direct: true })
+      expect(sync(doc2).presence.get(peerId1)).toEqual({ direct: true })
 
       // Cleanup
       peer1.synchronizer.stopHeartbeat()

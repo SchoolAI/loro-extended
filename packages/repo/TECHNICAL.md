@@ -1,11 +1,11 @@
-# Technical Learnings: React API Simplification for Loro-Extended
+# Technical Learnings: React API for Loro-Extended
 
 ## Key Facts
 
 ### Architecture
 - **`TypedDoc` is a Proxy** - The `@loro-extended/change` package creates TypedDoc instances using JavaScript Proxy with custom `ownKeys` trap that filters out Symbol properties
 - **WeakMap beats Symbol for cross-package state** - When attaching metadata to proxied objects, use WeakMap instead of Symbol properties to avoid Proxy invariant violations
-- **`repo.get()` returns `Doc<D>`** - The new API returns the TypedDoc directly, not a Handle wrapper
+- **`repo.get()` returns `Doc<D>`** - The API returns the TypedDoc directly
 - **`sync(doc)` is the escape hatch** - Sync/network capabilities are accessed via a function call, not properties on the doc
 
 ### Type System
@@ -18,7 +18,7 @@
 - **Ephemeral shapes are compared by key names** - Not deep equality, just sorted key comparison
 - **Cache cleared on delete/reset** - Both `repo.delete(docId)` and `repo.reset()` clear the document cache
 
-## New Findings and Insights
+## Findings and Insights
 
 ### Proxy Invariant Violations
 When using `Object.defineProperty` with `configurable: false` on a Proxy target, the property MUST appear in `ownKeys`. This caused test failures:
@@ -41,13 +41,10 @@ if ((globalThis as any).__LORO_DEV_WARNINGS__ !== false) { ... }
 ```
 
 ### Hook Return Value Simplification
-The old `useRefValue` returned `{ value, placeholder }` which required destructuring even when placeholder wasn't needed. The new API separates concerns:
+The `useValue` hook returns the value directly (not wrapped in an object):
 
 ```typescript
-// Old (verbose)
-const { value } = useRefValue(doc.title)
-
-// New (direct)
+// Direct access
 const value = useValue(doc.title)
 const placeholder = usePlaceholder(doc.title) // only when needed
 ```
@@ -58,6 +55,8 @@ To distinguish a `TypedDoc` from a `TypedRef` at runtime, check for the loro sym
 ```typescript
 function isTypedDoc(value: unknown): value is TypedDoc<DocShape> {
   const loroSymbol = Symbol.for("loro-extended:loro")
+  return loroSymbol in value && hasToJSON(value)
+}
 ```
 
 ### Phantom Type for Ephemeral Declarations
@@ -88,43 +87,28 @@ export function sync<T extends Doc<DocShape, EphemeralDeclarations>>(
 // Type inference just works - no explicit type parameters needed
 const doc = repo.get(docId, MySchema, { presence: PresenceSchema })
 sync(doc).presence.setSelf({ status: 'online' })  // ✅ Type-safe!
-  return value && typeof value === "object" && loroSymbol in value
-}
 ```
 
-## Corrections to Previous Assumptions
+### The `[EXT_SYMBOL]` Overload for change()
 
-### ❌ "Attach sync via symbol property"
-**Correction**: While the symbol property approach works for `in` checks and direct property access, it fails when tools (like vitest) enumerate object keys via `ownKeys`. Use WeakMap as primary storage.
-
-### ❌ "repo.get() should return Handle for backward compatibility"
-**Correction**: Breaking the return type is acceptable when:
-1. A separate method (`repo.getHandle()`) maintains backward compatibility
-2. The new type (`Doc<D>`) is actually a subset of what users typically need
-3. Migration is straightforward (remove `.doc` accessor)
-
-### ❌ "Deprecation warnings need build-time transforms"
-**Correction**: Runtime warnings using global flags work fine and don't require bundler configuration. Users can disable via `globalThis.__LORO_DEV_WARNINGS__ = false`.
-
-### ❌ "useDocument needs useState for stability"
-**Correction**: Since `repo.get()` caches documents, the hook can use `useMemo` directly:
+`Doc<D, E>` (which is `TypedDoc<D> & { __ephemeralType?: E }`) does not match a function overload expecting `TypedDoc<Shape>`. The `[EXT_SYMBOL]` overload handles all `TypedDoc`-like objects correctly because it extracts the draft type from the symbol property rather than trying to structurally match `TypedDoc<Shape>`:
 
 ```typescript
-// Works because repo.get() returns same instance for same docId
-const doc = useMemo(() => repo.get(docId, schema), [repo, docId, schema])
+type ExtractDraft<T> = T extends {
+  [EXT_SYMBOL]: { change: (fn: (draft: infer D) => void, ...) => void }
+} ? D : never
+
+// This single overload handles TypedDoc, Doc<D, E>, Lens, and anything with [EXT_SYMBOL]
+export function change<T extends { [EXT_SYMBOL]: { change: ... } }>(
+  target: T,
+  fn: (draft: ExtractDraft<T>) => void,
+): T
 ```
 
-## Migration Patterns
+## API Reference
 
-### From Handle to Doc
+### From Doc to Sync
 ```typescript
-// Before
-const handle = useHandle(docId, schema)
-handle.doc.title.insert(0, "Hello")
-await handle.waitForSync()
-handle.presence.setSelf({ ... })
-
-// After
 const doc = useDocument(docId, schema)
 doc.title.insert(0, "Hello")
 await sync(doc).waitForSync()
@@ -134,7 +118,83 @@ sync(doc).presence.setSelf({ ... })
 ### Test File Updates
 When changing API return types, use targeted sed replacements:
 ```bash
-sed -i '' 's/repo\.get(/repo.getHandle(/g' file.test.ts
+sed -i '' 's/repo\.getHandle(/repo.get(/g' file.test.ts
 ```
 
-But be careful not to replace in files testing the new API (like sync.test.ts).
+### change() Works with Doc<D, E>
+
+The `[EXT_SYMBOL]` overload handles `Doc<D, E>` correctly:
+
+```typescript
+const doc = repo.get("test", Schema)
+
+// ✅ change() works - draft is properly typed as Mutable<typeof Schema>
+change(doc, draft => {
+  draft.title.insert(0, "Hello")
+})
+
+// ✅ Direct mutation also works for simple cases
+doc.title.insert(0, "Hello")
+```
+
+Both patterns are valid. Use `change()` when you need to batch mutations into a single commit or attach commit messages. Use direct mutation for simple one-off changes.
+
+## Removed in v6
+
+The following APIs were removed in v6:
+
+### From `@loro-extended/repo`
+- `Handle` class - Use `Doc<D>` from `repo.get()` instead
+- `repo.getHandle()` - Use `repo.get()` instead
+- `createHandle()` - Use `createRepoDoc()` instead
+- `HandleWithEphemerals<D, E>` type - Use `Doc<D, E>` instead
+- `EphemeralDeclarations` type (from handle.ts) - Moved to sync.ts
+- `ReadinessCheck` type - Not needed with new API
+
+### From `@loro-extended/hooks-core` and `@loro-extended/react`
+- `useHandle()` - Use `useDocument()` instead
+- `useDoc()` - Use `useValue()` instead
+- `useRefValue()` - Use `useValue()` for value, `usePlaceholder()` for placeholder
+- `UseRefValueReturn` type - Not needed with new API
+
+### From `@loro-extended/change`
+- `Shape.map()` - Use `Shape.struct()` instead
+- `Shape.plain.object()` - Use `Shape.plain.struct()` instead
+- `MapContainerShape` type - Use `StructContainerShape` instead
+- `ObjectValueShape` type - Use `StructValueShape` instead
+- `isMapShape()` - Use `isStructShape()` instead
+
+### Migration Examples
+
+```typescript
+// Before (v5)
+const handle = useHandle(docId, schema)
+handle.doc.title.insert(0, "Hello")
+await handle.waitForSync()
+const { value, placeholder } = useRefValue(handle.doc.title)
+
+// After (v6)
+const doc = useDocument(docId, schema)
+doc.title.insert(0, "Hello")
+await sync(doc).waitForSync()
+const value = useValue(doc.title)
+const placeholder = usePlaceholder(doc.title)
+```
+
+```typescript
+// Before (v5)
+const Schema = Shape.doc({
+  root: Shape.map({ text: Shape.text() })
+})
+const PresenceSchema = Shape.plain.object({
+  cursor: Shape.plain.object({ x: Shape.plain.number(), y: Shape.plain.number() })
+})
+
+// After (v6)
+const Schema = Shape.doc({
+  root: Shape.struct({ text: Shape.text() })
+})
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({ x: Shape.plain.number(), y: Shape.plain.number() })
+})
+```

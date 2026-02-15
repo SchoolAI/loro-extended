@@ -2,6 +2,7 @@ import { change, loro, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Bridge, BridgeAdapter } from "../adapter/bridge-adapter.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 // Test schemas
 const DocSchema = Shape.doc({
@@ -27,65 +28,65 @@ const AnyDocSchema = Shape.doc({
   doc: Shape.any(),
 })
 
-describe("Handle", () => {
+describe("Doc from repo.get()", () => {
   describe("get() with typed document", () => {
-    it("should create a handle with typed document access", () => {
+    it("should create a typed document", () => {
       const repo = new Repo({
         identity: { name: "test", type: "user" },
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema)
+      const doc = repo.get("doc-1", DocSchema)
 
       // doc should be a TypedDoc
-      expect(handle.doc).toBeDefined()
-      expect(loro(handle.doc)).toBeDefined()
-      expect(loro(handle.doc)).toBeDefined()
+      expect(doc).toBeDefined()
+      expect(loro(doc)).toBeDefined()
+      expect(loro(doc)).toBeDefined()
 
       // Can use typed mutations
-      change(handle.doc, draft => {
+      change(doc, draft => {
         draft.title.insert(0, "Hello")
         draft.count.increment(5)
       })
 
       // Can read typed values
-      const json = handle.doc.toJSON()
+      const json = doc.toJSON()
       expect(json.title).toBe("Hello")
       expect(json.count).toBe(5)
     })
 
-    it("should provide docId and peerId", () => {
+    it("should provide docId and peerId via sync()", () => {
       const repo = new Repo({
         identity: { name: "test", type: "user", peerId: "123" as `${number}` },
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema)
+      const doc = repo.get("doc-1", DocSchema)
 
-      expect(handle.docId).toBe("doc-1")
-      expect(handle.peerId).toBe("123")
+      expect(sync(doc).docId).toBe("doc-1")
+      expect(sync(doc).peerId).toBe("123")
     })
   })
 
   describe("get() with Shape.any() in doc schema", () => {
-    it("should create a handle with untyped document access via Shape.any()", () => {
+    it("should create a document with untyped access via Shape.any()", () => {
       const repo = new Repo({
         identity: { name: "test", type: "user" },
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", AnyDocSchema)
+      const doc = repo.get("doc-1", AnyDocSchema)
 
       // doc should still be a TypedDoc (with unknown types for the 'doc' field)
-      expect(handle.doc).toBeDefined()
-      expect(loro(handle.doc)).toBeDefined()
-      expect(loro(handle.doc)).toBeDefined()
+      expect(doc).toBeDefined()
+      expect(loro(doc)).toBeDefined()
+      expect(loro(doc)).toBeDefined()
 
       // Can use raw LoroDoc access for the 'doc' container
-      loro(handle.doc).getMap("doc").set("key", "value")
+      loro(doc).getMap("doc").set("key", "value")
 
       // Can read via loroDoc
-      const docMap = loro(handle.doc).getMap("doc")
+      const docMap = loro(doc).getMap("doc")
       expect(docMap.get("key")).toBe("value")
     })
   })
@@ -97,29 +98,29 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: PresenceSchema,
         mouse: MouseSchema,
       })
 
-      // Ephemeral stores should be accessible as properties
-      expect(handle.presence).toBeDefined()
-      expect(handle.mouse).toBeDefined()
+      // Ephemeral stores should be accessible via sync()
+      expect(sync(doc).presence).toBeDefined()
+      expect(sync(doc).mouse).toBeDefined()
 
       // Can set values using setSelf
-      handle.presence.setSelf({
+      sync(doc).presence.setSelf({
         status: "online",
         cursor: { x: 100, y: 200 },
       })
 
-      handle.mouse.setSelf({ x: 50, y: 75 })
+      sync(doc).mouse.setSelf({ x: 50, y: 75 })
 
       // Can read values using self
-      expect(handle.presence.self).toEqual({
+      expect(sync(doc).presence.self).toEqual({
         status: "online",
         cursor: { x: 100, y: 200 },
       })
-      expect(handle.mouse.self).toEqual({ x: 50, y: 75 })
+      expect(sync(doc).mouse.self).toEqual({ x: 50, y: 75 })
     })
 
     it("should support set/get with arbitrary keys", () => {
@@ -128,18 +129,18 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       // Can set with arbitrary keys (not just peerId)
-      handle.presence.set("custom-key", {
+      sync(doc).presence.set("custom-key", {
         status: "away",
         cursor: { x: 0, y: 0 },
       })
 
       // Can get with arbitrary keys
-      expect(handle.presence.get("custom-key")).toEqual({
+      expect(sync(doc).presence.get("custom-key")).toEqual({
         status: "away",
         cursor: { x: 0, y: 0 },
       })
@@ -151,24 +152,24 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
       // Set my presence
-      handle.presence.setSelf({
+      sync(doc).presence.setSelf({
         status: "online",
         cursor: { x: 100, y: 200 },
       })
 
       // Set another peer's presence (simulating remote)
-      handle.presence.set("456", {
+      sync(doc).presence.set("456", {
         status: "away",
         cursor: { x: 50, y: 50 },
       })
 
       // peers should exclude self
-      const peers = handle.presence.peers
+      const peers = sync(doc).presence.peers
       expect(peers.has("123")).toBe(false)
       expect(peers.has("456")).toBe(true)
       expect(peers.get("456")).toEqual({
@@ -183,21 +184,21 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
-      handle.presence.setSelf({
+      sync(doc).presence.setSelf({
         status: "online",
         cursor: { x: 100, y: 200 },
       })
 
-      handle.presence.set("456", {
+      sync(doc).presence.set("456", {
         status: "away",
         cursor: { x: 50, y: 50 },
       })
 
-      const all = handle.presence.getAll()
+      const all = sync(doc).presence.getAll()
       expect(all.size).toBe(2)
       expect(all.has("123")).toBe(true)
       expect(all.has("456")).toBe(true)
@@ -221,7 +222,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         cursors: CursorPresenceSchema,
       })
 
@@ -229,30 +230,30 @@ describe("Handle", () => {
       const anchorData = new Uint8Array([1, 2, 3, 4, 5])
       const focusData = new Uint8Array([6, 7, 8, 9, 10])
 
-      handle.cursors.setSelf({
+      sync(doc).cursors.setSelf({
         anchor: anchorData,
         focus: focusData,
         user: { name: "Alice", color: "#ff0000" },
       })
 
       // Verify Uint8Array values are preserved
-      expect(handle.cursors.self?.anchor).toEqual(anchorData)
-      expect(handle.cursors.self?.focus).toEqual(focusData)
-      expect(handle.cursors.self?.user).toEqual({
+      expect(sync(doc).cursors.self?.anchor).toEqual(anchorData)
+      expect(sync(doc).cursors.self?.focus).toEqual(focusData)
+      expect(sync(doc).cursors.self?.user).toEqual({
         name: "Alice",
         color: "#ff0000",
       })
 
       // Simulate peer presence with Uint8Array
       const peerAnchor = new Uint8Array([11, 12, 13])
-      handle.cursors.set("456", {
+      sync(doc).cursors.set("456", {
         anchor: peerAnchor,
         focus: null,
         user: { name: "Bob", color: "#00ff00" },
       })
 
       // Verify peer's Uint8Array is accessible
-      const peerCursors = handle.cursors.get("456")
+      const peerCursors = sync(doc).cursors.get("456")
       expect(peerCursors?.anchor).toEqual(peerAnchor)
       expect(peerCursors?.focus).toBeNull()
       expect(peerCursors?.user).toEqual({ name: "Bob", color: "#00ff00" })
@@ -270,29 +271,29 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: FlexiblePresenceSchema,
       })
 
       // Set various types of metadata
-      handle.presence.setSelf({
+      sync(doc).presence.setSelf({
         name: "Alice",
         metadata: { custom: "data", nested: { value: 123 } },
       })
 
-      expect(handle.presence.self?.name).toBe("Alice")
-      expect(handle.presence.self?.metadata).toEqual({
+      expect(sync(doc).presence.self?.name).toBe("Alice")
+      expect(sync(doc).presence.self?.metadata).toEqual({
         custom: "data",
         nested: { value: 123 },
       })
 
       // Update with different metadata type
-      handle.presence.setSelf({
+      sync(doc).presence.setSelf({
         name: "Alice",
         metadata: [1, 2, 3],
       })
 
-      expect(handle.presence.self?.metadata).toEqual([1, 2, 3])
+      expect(sync(doc).presence.self?.metadata).toEqual([1, 2, 3])
     })
   })
 
@@ -305,17 +306,17 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema)
+      const doc = repo.get("doc-1", DocSchema)
 
       // Create an external store (like loro-prosemirror would)
       const externalStore = new EphemeralStore()
       externalStore.set("cursor", { position: 42 })
 
-      // Register it with the handle
-      handle.addEphemeral("cursors", externalStore)
+      // Register it with sync()
+      sync(doc).addEphemeral("cursors", externalStore)
 
       // Should be retrievable via getEphemeral
-      const retrieved = handle.getEphemeral("cursors")
+      const retrieved = sync(doc).getEphemeral("cursors")
       expect(retrieved).toBe(externalStore)
       expect(retrieved?.get("cursor")).toEqual({ position: 42 })
     })
@@ -328,7 +329,7 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema, {
+      const doc = repo.get("doc-1", DocSchema, {
         presence: PresenceSchema,
       })
 
@@ -336,7 +337,7 @@ describe("Handle", () => {
 
       // Should throw because 'presence' already exists
       expect(() => {
-        handle.addEphemeral("presence", externalStore)
+        sync(doc).addEphemeral("presence", externalStore)
       }).toThrow('Ephemeral store "presence" already exists')
     })
   })
@@ -348,12 +349,12 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema)
+      const doc = repo.get("doc-1", DocSchema)
 
       // With no adapters, readyStates includes the local "aware" state
-      expect(handle.readyStates.length).toBeGreaterThanOrEqual(0)
+      expect(sync(doc).readyStates.length).toBeGreaterThanOrEqual(0)
       // The readyStates array is available
-      expect(Array.isArray(handle.readyStates)).toBe(true)
+      expect(Array.isArray(sync(doc).readyStates)).toBe(true)
     })
 
     it("should support onReadyStateChange subscription", () => {
@@ -362,10 +363,10 @@ describe("Handle", () => {
         adapters: [],
       })
 
-      const handle = repo.getHandle("doc-1", DocSchema)
+      const doc = repo.get("doc-1", DocSchema)
 
       const changes: unknown[] = []
-      const unsubscribe = handle.onReadyStateChange(states => {
+      const unsubscribe = sync(doc).onReadyStateChange(states => {
         changes.push(states)
       })
 
@@ -390,11 +391,11 @@ describe("Handle", () => {
       })
 
       try {
-        const handle1 = repo1.getHandle("doc-1", DocSchema, {
+        const doc1 = repo1.get("doc-1", DocSchema, {
           presence: PresenceSchema,
         })
 
-        const _handle2 = repo2.getHandle("doc-1", DocSchema, {
+        const _doc2 = repo2.get("doc-1", DocSchema, {
           presence: PresenceSchema,
         })
 
@@ -402,7 +403,7 @@ describe("Handle", () => {
         await new Promise(resolve => setTimeout(resolve, 100))
 
         // Set presence on peer1
-        handle1.presence.setSelf({
+        sync(doc1).presence.setSelf({
           status: "online",
           cursor: { x: 100, y: 200 },
         })

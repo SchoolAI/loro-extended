@@ -14,6 +14,7 @@ import {
 } from "../middleware/rate-limiter.js"
 import type { Middleware } from "../middleware.js"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 
 const DocSchema = Shape.doc({
   title: Shape.text(),
@@ -67,8 +68,8 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make initial change
-      const handle1 = repo1.getHandle("test-doc", DocSchema)
-      change(handle1.doc, draft => {
+      const doc1 = repo1.get("test-doc", DocSchema)
+      change(doc1, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -76,12 +77,12 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2 first to establish subscription
-      const handle2 = repo2.getHandle("test-doc", DocSchema)
+      const doc2 = repo2.get("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Now make rapid changes - these channel/update messages will be rate limited
       for (let i = 0; i < 10; i++) {
-        change(handle1.doc, draft => {
+        change(doc1, draft => {
           draft.count.increment(1)
         })
         await vi.advanceTimersByTimeAsync(10) // Small delay between changes
@@ -94,16 +95,16 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(1000)
 
       // Make one more change to trigger sync
-      change(handle1.doc, draft => {
+      change(doc1, draft => {
         draft.count.increment(1)
       })
 
       await vi.advanceTimersByTimeAsync(100)
 
       // The document should have the initial content
-      expect(handle2.doc.toJSON().title).toBe("hello")
+      expect(doc2.toJSON().title).toBe("hello")
       // Count may vary depending on which updates got through
-      expect(handle2.doc.toJSON().count).toBeGreaterThanOrEqual(1)
+      expect(doc2.toJSON().count).toBeGreaterThanOrEqual(1)
 
       // Verify some update messages were rate limited
       expect(rejectedMessages.length).toBeGreaterThan(0)
@@ -139,8 +140,8 @@ describe("Rate Limiter Integration", () => {
         adapters: [new BridgeAdapter({ bridge, adapterType: "adapter1" })],
       })
 
-      const handle1 = repo1.getHandle("test-doc", DocSchema)
-      change(handle1.doc, draft => {
+      const doc1 = repo1.get("test-doc", DocSchema)
+      change(doc1, draft => {
         draft.title.insert(0, "initial content")
       })
 
@@ -158,11 +159,11 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Request the document (this will trigger a sync-request)
-      const handle2 = repo2.getHandle("test-doc", DocSchema)
+      const doc2 = repo2.get("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Document should be empty because sync-response was blocked
-      expect(handle2.doc.toJSON().title).toBe("")
+      expect(doc2.toJSON().title).toBe("")
 
       // Some messages should have been blocked
       expect(blockedCount).toBeGreaterThan(0)
@@ -208,19 +209,19 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make changes
-      const handle1 = repo1.getHandle("test-doc", DocSchema)
-      change(handle1.doc, draft => {
+      const doc1 = repo1.get("test-doc", DocSchema)
+      change(doc1, draft => {
         draft.title.insert(0, "hello")
       })
 
       await vi.advanceTimersByTimeAsync(100)
 
       // Get handle in repo2
-      const handle2 = repo2.getHandle("test-doc", DocSchema)
+      const doc2 = repo2.get("test-doc", DocSchema)
       await vi.advanceTimersByTimeAsync(100)
 
       // Sync should work (not rate limited)
-      expect(handle2.doc.toJSON().title).toBe("hello")
+      expect(doc2.toJSON().title).toBe("hello")
 
       // Only ephemeral messages should be blocked (if any were sent)
       for (const type of blockedTypes) {
@@ -273,11 +274,11 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document and make rapid changes
-      const handle1 = repo1.getHandle("test-doc", DocSchema)
+      const doc1 = repo1.get("test-doc", DocSchema)
 
       // Make 10 rapid changes
       for (let i = 0; i < 10; i++) {
-        change(handle1.doc, draft => {
+        change(doc1, draft => {
           draft.count.increment(1)
         })
       }
@@ -338,8 +339,8 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document in repo2 and make changes
-      const handle2 = repo2.getHandle("test-doc", DocSchema)
-      change(handle2.doc, draft => {
+      const doc2 = repo2.get("test-doc", DocSchema)
+      change(doc2, draft => {
         draft.title.insert(0, "hello")
       })
 
@@ -347,7 +348,7 @@ describe("Rate Limiter Integration", () => {
 
       // Make more changes
       for (let i = 0; i < 5; i++) {
-        change(handle2.doc, draft => {
+        change(doc2, draft => {
           draft.count.increment(1)
         })
       }
@@ -411,17 +412,17 @@ describe("Rate Limiter Integration", () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Create document with ephemeral store declared
-      const handle1 = repo1.getHandle("test-doc", DocSchema, {
+      const doc1 = repo1.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
-      const handle2 = repo2.getHandle("test-doc", DocSchema, {
+      const doc2 = repo2.get("test-doc", DocSchema, {
         presence: PresenceSchema,
       })
 
       await vi.advanceTimersByTimeAsync(100)
 
       // Get ephemeral stores
-      const presence1 = handle1.getTypedEphemeral("presence")
+      const presence1 = sync(doc1).getTypedEphemeral("presence")
 
       // Simulate high-frequency presence updates (like 60fps cursor)
       // In a real scenario, this would be 60 updates per second
@@ -441,7 +442,7 @@ describe("Rate Limiter Integration", () => {
 
       // The system should still be functional (no crashes)
       // And repo2 should have received some presence updates
-      const presence2 = handle2.getTypedEphemeral("presence")
+      const presence2 = sync(doc2).getTypedEphemeral("presence")
       const _peers = presence2.peers
 
       // We may or may not have received updates depending on timing

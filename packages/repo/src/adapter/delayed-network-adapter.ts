@@ -10,7 +10,7 @@
  *   adapters: [adapter],
  * })
  *
- * const handle = repo.getHandle("test-doc", DocSchema)
+ * const doc = repo.get("test-doc", DocSchema)
  *
  * // Later, simulate server response
  * await adapter.deliverSyncResponse("test-doc", serverSnapshot)

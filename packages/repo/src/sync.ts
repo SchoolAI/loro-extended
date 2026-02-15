@@ -13,7 +13,7 @@
  * ```typescript
  * import { sync } from "@loro-extended/repo"
  *
- * const doc = repo.getHandle(docId, schema, { presence: PresenceSchema })
+ * const doc = repo.get(docId, schema, { presence: PresenceSchema })
  *
  * // Access sync capabilities
  * sync(doc).peerId           // Local peer ID
@@ -32,14 +32,10 @@ import type {
   ValueShape,
 } from "@loro-extended/change"
 import { createTypedDoc } from "@loro-extended/change"
-import type { LoroDoc } from "loro-crdt"
-import {
-  createTypedEphemeral,
-  NoAdaptersError,
-  SyncTimeoutError,
-  type TypedEphemeral,
-} from "./handle.js"
+import type { EphemeralStore, LoroDoc } from "loro-crdt"
+import { NoAdaptersError, SyncTimeoutError } from "./sync-errors.js"
 import type { Synchronizer } from "./synchronizer.js"
+import { createTypedEphemeral, type TypedEphemeral } from "./typed-ephemeral.js"
 import type { DocId, ReadyState } from "./types.js"
 import { withTimeout } from "./utils/with-timeout.js"
 
@@ -147,6 +143,35 @@ export interface SyncRef<
    * @returns Unsubscribe function
    */
   subscribe(listener: () => void): () => void
+
+  /**
+   * Register an external ephemeral store for network sync.
+   * Use this for libraries that bring their own EphemeralStore (like loro-prosemirror).
+   *
+   * @param name - The store name (namespace)
+   * @param store - The EphemeralStore to register
+   * @throws Error if store name already exists
+   */
+  addEphemeral(name: string, store: EphemeralStore): void
+
+  /**
+   * Get a raw ephemeral store by name.
+   *
+   * @param name - The store name
+   * @returns The EphemeralStore or undefined if not found
+   */
+  getEphemeral(name: string): EphemeralStore | undefined
+
+  /**
+   * Get a typed ephemeral store by name.
+   * This is primarily used internally - prefer accessing ephemeral stores
+   * as properties (e.g., `sync(doc).presence`) when possible.
+   *
+   * @param name - The store name (must be a declared ephemeral store)
+   * @returns The TypedEphemeral wrapper
+   * @throws Error if store name is not found
+   */
+  getTypedEphemeral<K extends keyof _E>(name: K): TypedEphemeral<Infer<_E[K]>>
 }
 
 /**
@@ -322,6 +347,21 @@ class SyncRefImpl<E extends EphemeralDeclarations = Record<string, never>>
     return this.#loroDoc.subscribe(listener)
   }
 
+  addEphemeral(name: string, store: EphemeralStore): void {
+    // Check if store already exists in Synchronizer
+    const existing = this.#synchronizer.getNamespacedStore(this.docId, name)
+    if (existing) {
+      throw new Error(`Ephemeral store "${name}" already exists`)
+    }
+
+    // Register with synchronizer for network sync
+    this.#synchronizer.registerExternalStore(this.docId, name, store)
+  }
+
+  getEphemeral(name: string): EphemeralStore | undefined {
+    return this.#synchronizer.getNamespacedStore(this.docId, name)
+  }
+
   /**
    * Get a typed ephemeral store by name.
    * Called via proxy when accessing ephemeral properties.
@@ -386,9 +426,12 @@ function createSyncRef<
     return impl as SyncRefWithEphemerals<E>
   }
 
+  // Get ephemeral store keys for ownKeys trap
+  const ephemeralKeys = Object.keys(params.ephemeralShapes)
+
   // Create a proxy to handle ephemeral store property access
   return new Proxy(impl, {
-    get(target, prop, receiver) {
+    get(target, prop, _receiver) {
       // Check if it's an ephemeral store name
       if (
         typeof prop === "string" &&
@@ -398,8 +441,15 @@ function createSyncRef<
         return target.getTypedEphemeral(prop as keyof E)
       }
 
-      // Otherwise delegate to the impl
-      return Reflect.get(target, prop, receiver)
+      // Get the value from target directly (not receiver) to support private fields
+      const value = Reflect.get(target, prop, target)
+
+      // If it's a function, bind it to the target to preserve private field access
+      if (typeof value === "function") {
+        return value.bind(target)
+      }
+
+      return value
     },
 
     has(target, prop) {
@@ -411,6 +461,29 @@ function createSyncRef<
         return true
       }
       return Reflect.has(target, prop)
+    },
+
+    ownKeys(target) {
+      // Get the impl's own keys (filter out symbols)
+      const implKeys = Reflect.ownKeys(target).filter(
+        key => typeof key === "string",
+      )
+      // Add ephemeral store keys
+      return [...new Set([...implKeys, ...ephemeralKeys])]
+    },
+
+    getOwnPropertyDescriptor(target, prop) {
+      // For ephemeral store keys, return a descriptor
+      if (typeof prop === "string" && ephemeralKeys.includes(prop)) {
+        return {
+          value: target.getTypedEphemeral(prop as keyof E),
+          writable: false,
+          enumerable: true,
+          configurable: true,
+        }
+      }
+      // Otherwise delegate to the impl
+      return Reflect.getOwnPropertyDescriptor(target, prop)
     },
   }) as SyncRefWithEphemerals<E>
 }
@@ -503,15 +576,15 @@ export function createRepoDoc<
  * - `onReadyStateChange()` - Subscribe to sync status changes
  * - Ephemeral stores (e.g., `sync(doc).presence`)
  *
- * @param doc - A document obtained from `repo.getHandle()`
+ * @param doc - A document obtained from `repo.get()`
  * @returns SyncRef with sync capabilities
- * @throws {Error} If the document was not created via `repo.getHandle()`
+ * @throws {Error} If the document was not created via `repo.get()`
  *
  * @example
  * ```typescript
  * import { sync } from "@loro-extended/repo"
  *
- * const doc = repo.getHandle(docId, schema)
+ * const doc = repo.get(docId, schema)
  *
  * // Access sync capabilities
  * sync(doc).peerId
@@ -519,7 +592,7 @@ export function createRepoDoc<
  * await sync(doc).waitForSync()
  *
  * // With ephemeral stores
- * const doc2 = repo.getHandle(docId, schema, { presence: PresenceSchema })
+ * const doc2 = repo.get(docId, schema, { presence: PresenceSchema })
  * sync(doc2).presence.setSelf({ status: "online" })
  * ```
  */
@@ -533,9 +606,9 @@ export function sync<T extends Doc<DocShape, EphemeralDeclarations>>(
 
   if (!syncRef) {
     throw new Error(
-      "sync() requires a document from repo.getHandle(). " +
+      "sync() requires a document from repo.get(). " +
         "Documents created with createTypedDoc() don't have sync capabilities. " +
-        "Use repo.getHandle(docId, schema) to get a document with sync support.",
+        "Use repo.get(docId, schema) to get a document with sync support.",
     )
   }
 
@@ -543,7 +616,7 @@ export function sync<T extends Doc<DocShape, EphemeralDeclarations>>(
 }
 
 /**
- * Check if a document has sync capabilities (was created via repo.getHandle()).
+ * Check if a document has sync capabilities (was created via repo.get()).
  *
  * @param doc - A document to check
  * @returns true if the document has sync capabilities

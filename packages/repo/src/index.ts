@@ -6,7 +6,6 @@ export * from "./adapter/interceptor.js"
 export * from "./adapter/types.js"
 export * from "./channel.js"
 export * from "./channel-json.js"
-export * from "./handle.js"
 export * from "./middleware/rate-limiter.js"
 export * from "./middleware.js"
 export * from "./permissions.js"
@@ -15,6 +14,7 @@ export * from "./storage/in-memory-storage-adapter.js"
 export * from "./storage/storage-adapter.js"
 export {
   Doc,
+  type EphemeralDeclarations,
   type ExtractEphemeral,
   hasSync,
   type SyncRef,
@@ -22,6 +22,8 @@ export {
   sync,
   type WaitForSyncOptions,
 } from "./sync.js"
+export * from "./sync-errors.js"
+export * from "./typed-ephemeral.js"
 export * from "./types.js"
 export * from "./utils/generate-peer-id.js"
 export * from "./utils/generate-uuid.js"

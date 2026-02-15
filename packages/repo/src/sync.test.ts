@@ -1,6 +1,5 @@
 import { createTypedDoc, Shape } from "@loro-extended/change"
 import { beforeEach, describe, expect, it } from "vitest"
-import { Handle } from "./handle.js"
 import { Repo } from "./repo.js"
 import { InMemoryStorageAdapter } from "./storage/in-memory-storage-adapter.js"
 import { hasSync, sync } from "./sync.js"
@@ -305,59 +304,5 @@ describe("Doc-first API", () => {
     const doc = repo.get("test", TestSchema)
 
     expect(sync(doc).peerId).toBe(repo.identity.peerId)
-  })
-})
-
-// ============================================================================
-// Legacy Handle API Tests (backward compatibility)
-// ============================================================================
-
-describe("Legacy Handle API (getHandle)", () => {
-  let repo: Repo
-
-  beforeEach(() => {
-    repo = new Repo({
-      adapters: [new InMemoryStorageAdapter()],
-      identity: { name: "test-repo", type: "user" },
-    })
-  })
-
-  it("getHandle returns a Handle instance", () => {
-    const handle = repo.getHandle("test", TestSchema)
-    expect(handle).toBeInstanceOf(Handle)
-    expect(handle.doc).toBeDefined()
-    expect(handle.docId).toBe("test")
-  })
-
-  it("getHandle caches handles", () => {
-    const handle1 = repo.getHandle("test", TestSchema)
-    const handle2 = repo.getHandle("test", TestSchema)
-
-    expect(handle1).toBe(handle2)
-  })
-
-  it("getHandle throws on schema mismatch", () => {
-    repo.getHandle("test", TestSchema)
-
-    expect(() => repo.getHandle("test", OtherSchema)).toThrow(
-      /Document 'test' already exists with a different schema/,
-    )
-  })
-
-  it("handle.doc can be mutated", () => {
-    const handle = repo.getHandle("test", TestSchema)
-
-    handle.doc.title.insert(0, "Hello")
-    expect(handle.doc.toJSON().title).toBe("Hello")
-  })
-
-  it("handle provides ephemeral stores directly", () => {
-    const handle = repo.getHandle("test", TestSchema, {
-      presence: PresenceSchema,
-    })
-
-    expect(handle.presence).toBeDefined()
-    handle.presence.setSelf({ status: "online" })
-    expect(handle.presence.self).toEqual({ status: "online" })
   })
 })

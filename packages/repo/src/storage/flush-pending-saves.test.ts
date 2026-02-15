@@ -1,6 +1,7 @@
 import { change, Shape } from "@loro-extended/change"
 import { describe, expect, it } from "vitest"
 import { Repo } from "../repo.js"
+import { sync } from "../sync.js"
 import { InMemoryStorageAdapter } from "./in-memory-storage-adapter.js"
 
 const DocSchema = Shape.doc({ content: Shape.text() })
@@ -17,11 +18,11 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle1 = repo1.getHandle("doc", DocSchema)
-    change(handle1.doc, draft => {
+    const doc1 = repo1.get("doc", DocSchema)
+    change(doc1, draft => {
       draft.content.insert(0, "Hello, world!")
     })
-    expect(handle1.doc.content.toString()).toBe("Hello, world!")
+    expect(doc1.content.toString()).toBe("Hello, world!")
 
     // Graceful shutdown - should await pending storage saves
     await repo1.shutdown()
@@ -36,10 +37,10 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle2 = repo2.getHandle("doc", DocSchema)
-    await handle2.waitForSync({ kind: "storage", timeout: 5000 })
+    const doc2 = repo2.get("doc", DocSchema)
+    await sync(doc2).waitForSync({ kind: "storage", timeout: 5000 })
 
-    expect(handle2.doc.content.toString()).toBe("Hello, world!")
+    expect(doc2.content.toString()).toBe("Hello, world!")
 
     await repo2.shutdown()
   })
@@ -53,8 +54,8 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
       identity: { name: "test", type: "user" },
     })
 
-    const handle = repo.getHandle("doc", DocSchema)
-    change(handle.doc, draft => {
+    const doc = repo.get("doc", DocSchema)
+    change(doc, draft => {
       draft.content.insert(0, "Hello!")
     })
 
@@ -65,7 +66,7 @@ describe("Repo.shutdown() flushes pending storage saves", () => {
     expect(sharedData.size).toBeGreaterThan(0)
 
     // Repo should still be usable after flush
-    change(handle.doc, draft => {
+    change(doc, draft => {
       draft.content.insert(6, " World!")
     })
 
