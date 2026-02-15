@@ -186,13 +186,13 @@ export type RepoDoc<
 }
 
 // ============================================================================
-// Doc type - public API, clean TypedDoc alias
+// Doc type - public API, clean TypedDoc alias with phantom ephemeral type
 // ============================================================================
 
 /**
  * A collaborative document with sync capabilities.
  *
- * `Doc<D>` is the public type alias for documents returned by `repo.getHandle()`.
+ * `Doc<D, E>` is the public type alias for documents returned by `repo.get()`.
  * It's a TypedDoc that can be used for reading values and mutations.
  *
  * For sync/network features, use `sync(doc)`:
@@ -201,9 +201,34 @@ export type RepoDoc<
  * await sync(doc).waitForSync()
  * ```
  *
+ * When ephemeral stores are declared, the `E` type parameter carries that
+ * information so `sync(doc)` can infer the correct ephemeral store types:
+ * ```typescript
+ * const doc = repo.get(docId, schema, { presence: PresenceSchema })
+ * sync(doc).presence.setSelf({ ... })  // Type-safe without explicit type params
+ * ```
+ *
  * @typeParam D - The document shape
+ * @typeParam E - The ephemeral store declarations (optional, defaults to empty)
  */
-export type Doc<D extends DocShape> = TypedDoc<D>
+export type Doc<
+  D extends DocShape,
+  E extends EphemeralDeclarations = Record<string, never>,
+> = TypedDoc<D> & { readonly __ephemeralType?: E }
+
+// ============================================================================
+// ExtractEphemeral - utility type for sync() to extract E from Doc<D, E>
+// ============================================================================
+
+/**
+ * Extracts the ephemeral type parameter from a Doc type.
+ * Used by `sync()` to infer the correct SyncRefWithEphemerals type.
+ */
+export type ExtractEphemeral<T> = T extends {
+  __ephemeralType?: infer E extends EphemeralDeclarations
+}
+  ? E
+  : Record<string, never>
 
 // ============================================================================
 // SyncRefImpl - implementation of SyncRef
@@ -498,12 +523,13 @@ export function createRepoDoc<
  * sync(doc2).presence.setSelf({ status: "online" })
  * ```
  */
-export function sync<
-  D extends DocShape,
-  E extends EphemeralDeclarations = Record<string, never>,
->(doc: Doc<D>): SyncRefWithEphemerals<E> {
+export function sync<T extends Doc<DocShape, EphemeralDeclarations>>(
+  doc: T,
+): SyncRefWithEphemerals<ExtractEphemeral<T>> {
   // Try WeakMap first (primary storage)
-  const syncRef = syncRefMap.get(doc) as SyncRefWithEphemerals<E> | undefined
+  const syncRef = syncRefMap.get(doc) as
+    | SyncRefWithEphemerals<ExtractEphemeral<T>>
+    | undefined
 
   if (!syncRef) {
     throw new Error(

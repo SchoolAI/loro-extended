@@ -166,7 +166,8 @@ export class Repo {
    * - Typed documents (use Shape.any() for untyped)
    * - Multiple typed ephemeral stores via sync(doc)
    *
-   * Returns a `Doc<D>` which is a TypedDoc with sync capabilities.
+   * Returns a `Doc<D>` (or `Doc<D, E>` when ephemeral stores are provided) which
+   * is a TypedDoc with sync capabilities.
    * Use `sync(doc)` to access sync features like waitForSync, readyStates, and ephemeral stores.
    *
    * @param docId The document ID
@@ -179,22 +180,34 @@ export class Repo {
    * import { sync } from "@loro-extended/repo"
    *
    * // Get a typed document
-   * const doc = repo.getHandle('my-doc', DocSchema)
+   * const doc = repo.get('my-doc', DocSchema)
    * doc.title.insert(0, "Hello")  // Direct mutation
    *
    * // Access sync capabilities
    * await sync(doc).waitForSync()
    * sync(doc).readyStates
    *
-   * // With ephemeral stores
-   * const doc = repo.getHandle('my-doc', DocSchema, { presence: PresenceSchema })
-   * sync(doc).presence.setSelf({ status: 'online' })
+   * // With ephemeral stores - sync() infers the ephemeral types automatically
+   * const doc = repo.get('my-doc', DocSchema, { presence: PresenceSchema })
+   * sync(doc).presence.setSelf({ status: 'online' })  // Type-safe!
    * ```
    */
-  get<
-    D extends DocShape,
-    E extends SyncEphemeralDeclarations = Record<string, never>,
-  >(docId: DocId, docShape: D, ephemeralShapes?: E): Doc<D> {
+  // Overload: without ephemeral stores - returns Doc<D>
+  get<D extends DocShape>(docId: DocId, docShape: D): Doc<D>
+
+  // Overload: with ephemeral stores - returns Doc<D, E> for type inference in sync()
+  get<D extends DocShape, E extends SyncEphemeralDeclarations>(
+    docId: DocId,
+    docShape: D,
+    ephemeralShapes: E,
+  ): Doc<D, E>
+
+  // Implementation
+  get<D extends DocShape, E extends SyncEphemeralDeclarations>(
+    docId: DocId,
+    docShape: D,
+    ephemeralShapes?: E,
+  ): Doc<D, E> {
     // Check cache first
     const cached = this.#docCache.get(docId)
 
@@ -222,9 +235,9 @@ export class Repo {
         )
       }
 
-      // RepoDoc<D, E> extends TypedDoc<D> which is Doc<D>
+      // RepoDoc<D, E> extends TypedDoc<D> which is Doc<D, E>
       // The cast is safe because we're just hiding the SYNC_SYMBOL from the public type
-      return cached.doc as unknown as Doc<D>
+      return cached.doc as unknown as Doc<D, E>
     }
 
     // Create new RepoDoc and cache it
@@ -242,9 +255,9 @@ export class Repo {
       ephemeralShapes,
     })
 
-    // RepoDoc<D, E> extends TypedDoc<D> which is Doc<D>
+    // RepoDoc<D, E> extends TypedDoc<D> which is Doc<D, E>
     // The cast is safe because we're just hiding the SYNC_SYMBOL from the public type
-    return doc as unknown as Doc<D>
+    return doc as unknown as Doc<D, E>
   }
 
   //
@@ -254,7 +267,7 @@ export class Repo {
   /**
    * Gets (or creates) a unified handle with typed document and ephemeral stores.
    *
-   * @deprecated Use `repo.getHandle()` instead which returns a `Doc<D>`.
+   * @deprecated Use `repo.get()` instead which returns a `Doc<D>`.
    * Access sync features via `sync(doc)` from `@loro-extended/repo`.
    *
    * @param docId The document ID

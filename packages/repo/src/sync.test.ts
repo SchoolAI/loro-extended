@@ -127,7 +127,8 @@ describe("sync() accessor with ephemeral stores", () => {
   it("provides access to ephemeral stores", () => {
     const doc = repo.get("test", TestSchema, { presence: PresenceSchema })
 
-    const s = sync<typeof TestSchema, { presence: typeof PresenceSchema }>(doc)
+    // Type inference now works automatically - no explicit type parameters needed!
+    const s = sync(doc)
     expect(s.presence).toBeDefined()
     s.presence.setSelf({ status: "online" })
     expect(s.presence.self).toEqual({ status: "online" })
@@ -136,7 +137,8 @@ describe("sync() accessor with ephemeral stores", () => {
   it("ephemeral store has all expected methods", () => {
     const doc = repo.get("test", TestSchema, { presence: PresenceSchema })
 
-    const s = sync<typeof TestSchema, { presence: typeof PresenceSchema }>(doc)
+    // Type inference now works automatically - no explicit type parameters needed!
+    const s = sync(doc)
     const presence = s.presence
 
     expect(typeof presence.set).toBe("function")
@@ -154,6 +156,26 @@ describe("sync() accessor with ephemeral stores", () => {
     const s = sync(doc) as { cursors?: unknown }
     // Accessing undeclared ephemeral returns undefined (no throw)
     expect(s.cursors).toBeUndefined()
+  })
+
+  it("type inference works without explicit type parameters", () => {
+    // This test verifies that Doc<D, E> carries ephemeral type info
+    // so that sync() can infer the correct SyncRefWithEphemerals type
+    const doc = repo.get("test", TestSchema, { presence: PresenceSchema })
+
+    // If type inference is working, this should compile without errors
+    // and s.presence should be TypedEphemeral<{ status: string }>
+    const s = sync(doc)
+
+    // Runtime verification
+    expect(s.presence).toBeDefined()
+
+    // This line would fail to compile if type inference wasn't working:
+    // sync(doc).presence.setSelf({ status: 123 }) // Error: number not assignable to string
+
+    // Correct usage compiles fine
+    s.presence.setSelf({ status: "active" })
+    expect(s.presence.self).toEqual({ status: "active" })
   })
 })
 

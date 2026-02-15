@@ -9,9 +9,9 @@
 - **`sync(doc)` is the escape hatch** - Sync/network capabilities are accessed via a function call, not properties on the doc
 
 ### Type System
-- **`Doc<D>` is just `TypedDoc<D>`** - The public type alias hides sync implementation details
+- **`Doc<D, E>` uses phantom types for ephemeral inference** - The `E` type parameter is carried via an optional `__ephemeralType` property that exists only at the type level
 - **`RepoDoc<D, E>` is internal** - Extends TypedDoc with `[SYNC_SYMBOL]` for sync ref storage
-- **Ephemeral type parameter `E` doesn't flow through `Doc<D>`** - Users must explicitly type `sync<D, E>(doc)` calls or let inference work from the SyncRef properties
+- **`sync()` extracts ephemeral type automatically** - Uses `ExtractEphemeral<T>` conditional type to infer `E` from `Doc<D, E>`
 
 ### Caching Behavior
 - **Schema comparison is by reference** - `repo.get()` throws if the same docId is requested with a different schema object
@@ -58,6 +58,36 @@ To distinguish a `TypedDoc` from a `TypedRef` at runtime, check for the loro sym
 ```typescript
 function isTypedDoc(value: unknown): value is TypedDoc<DocShape> {
   const loroSymbol = Symbol.for("loro-extended:loro")
+```
+
+### Phantom Type for Ephemeral Declarations
+
+`Doc<D, E>` uses a phantom type property to carry ephemeral type information without affecting runtime:
+
+```typescript
+export type Doc<
+  D extends DocShape,
+  E extends EphemeralDeclarations = Record<string, never>
+> = TypedDoc<D> & { readonly __ephemeralType?: E }
+```
+
+This allows `sync()` to extract `E` via conditional type inference:
+
+```typescript
+type ExtractEphemeral<T> = T extends { __ephemeralType?: infer E } ? E : Record<string, never>
+
+export function sync<T extends Doc<DocShape, EphemeralDeclarations>>(
+  doc: T
+): SyncRefWithEphemerals<ExtractEphemeral<T>>
+```
+
+**Why phantom types?** We can't store `E` in the WeakMap (it's a type-only concept), and we can't add real properties to the Proxy without triggering `ownKeys` invariant violations. The optional `__ephemeralType` property is never set at runtime but carries type information through the type system.
+
+**Usage:**
+```typescript
+// Type inference just works - no explicit type parameters needed
+const doc = repo.get(docId, MySchema, { presence: PresenceSchema })
+sync(doc).presence.setSelf({ status: 'online' })  // ✅ Type-safe!
   return value && typeof value === "object" && loroSymbol in value
 }
 ```

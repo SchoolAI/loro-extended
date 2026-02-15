@@ -86,22 +86,22 @@ export function createHooks(framework: FrameworkHooks) {
    * }
    * ```
    */
-  // Overload: without ephemeral stores
+  // Overload: without ephemeral stores - returns Doc<D>
   function useDocument<D extends DocShape>(docId: DocId, docSchema: D): Doc<D>
 
-  // Overload: with ephemeral stores
+  // Overload: with ephemeral stores - returns Doc<D, E> for type inference in sync()
   function useDocument<D extends DocShape, E extends EphemeralDeclarations>(
     docId: DocId,
     docSchema: D,
     ephemeralShapes: E,
-  ): Doc<D>
+  ): Doc<D, E>
 
   // Implementation
   function useDocument<D extends DocShape, E extends EphemeralDeclarations>(
     docId: DocId,
     docSchema: D,
     ephemeralShapes?: E,
-  ): Doc<D> {
+  ): Doc<D, E> {
     const repo = useRepo()
 
     // repo.get() is cached, so we can call it directly without useState
@@ -110,7 +110,9 @@ export function createHooks(framework: FrameworkHooks) {
       if (ephemeralShapes) {
         return repo.get(docId, docSchema, ephemeralShapes)
       }
-      return repo.get(docId, docSchema)
+      // When no ephemeralShapes, E defaults to Record<string, never> via overload
+      // The cast is safe because the overloads ensure correct return types
+      return repo.get(docId, docSchema) as Doc<D, E>
     }, [repo, docId, docSchema, ephemeralShapes])
 
     return doc

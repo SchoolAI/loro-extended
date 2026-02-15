@@ -15,6 +15,7 @@ export * from "./storage/in-memory-storage-adapter.js"
 export * from "./storage/storage-adapter.js"
 export {
   Doc,
+  type ExtractEphemeral,
   hasSync,
   type SyncRef,
   type SyncRefWithEphemerals,
