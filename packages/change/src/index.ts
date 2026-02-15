@@ -23,7 +23,7 @@ export {
 } from "./ext.js"
 export type { Transition } from "./functional-helpers.js"
 // Functional helpers (recommended API)
-export { change, getTransition } from "./functional-helpers.js"
+export { change, getTransition, subscribe } from "./functional-helpers.js"
 // The loro() escape hatch for native Loro types
 export { LORO_SYMBOL, loro } from "./loro.js"
 export type { LoroExtendedMeta } from "./metadata.js"
@@ -57,6 +57,11 @@ export type {
   PathSegment,
   PathSelector,
 } from "./path-selector.js"
+// Path subscription utilities
+export {
+  requiresGlobalSubscription,
+  subscribeToPath,
+} from "./path-subscription.js"
 
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
 

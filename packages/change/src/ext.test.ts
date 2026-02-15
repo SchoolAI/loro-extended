@@ -5,14 +5,14 @@
  * part of the native Loro API. This includes:
  * - Document-level operations: fork, forkAt, shallowForkAt, initialize, applyPatch
  * - Document properties: docShape, rawValue, mergeable
- * - Ref-level operations: doc access, subscribe
+ * - Ref-level operations: doc access
  * - Container operations: pushContainer, insertContainer, setContainer
  */
 
 import { LoroMap } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { ext } from "./ext.js"
-import { change } from "./functional-helpers.js"
+import { change, subscribe } from "./functional-helpers.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -154,11 +154,11 @@ describe("ext() function", () => {
       expect(ext(nonMergeableDoc).mergeable).toBe(false)
     })
 
-    it("subscribe() subscribes to document changes", () => {
+    it("subscribe() subscribes to document changes (standalone function)", () => {
       const doc = createTypedDoc(TestSchema)
       const events: unknown[] = []
 
-      const unsubscribe = ext(doc).subscribe(event => {
+      const unsubscribe = subscribe(doc, event => {
         events.push(event)
       })
 
@@ -230,12 +230,12 @@ describe("ext() function", () => {
       expect(loroDoc).toBe(loro(doc))
     })
 
-    it("subscribe() subscribes to ref changes", () => {
+    it("subscribe() subscribes to ref changes via subscribe() helper", () => {
       const schema = Shape.doc({ text: Shape.text() })
       const doc = createTypedDoc(schema)
       const callback = vi.fn()
 
-      const unsubscribe = ext(doc.text).subscribe(callback)
+      const unsubscribe = subscribe(doc.text, callback)
 
       doc.text.insert(0, "Hello")
 

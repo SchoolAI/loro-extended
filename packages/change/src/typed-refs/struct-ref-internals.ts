@@ -1,12 +1,4 @@
-import type {
-  Container,
-  LoroDoc,
-  LoroEventBatch,
-  LoroMap,
-  MapDiff,
-  Subscription,
-  Value,
-} from "loro-crdt"
+import type { Container, LoroDoc, LoroMap, MapDiff, Value } from "loro-crdt"
 import type { ExtMapRef } from "../ext.js"
 import type {
   ContainerOrValueShape,
@@ -255,9 +247,6 @@ export class StructRefInternals<
     return {
       get doc(): LoroDoc {
         return self.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        return (self.getContainer() as LoroMap).subscribe(callback)
       },
       setContainer(key: string, container: Container): Container {
         const result = (self.getContainer() as LoroMap).setContainer(

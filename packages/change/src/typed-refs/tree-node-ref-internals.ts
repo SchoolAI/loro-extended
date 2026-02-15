@@ -1,9 +1,4 @@
-import type {
-  LoroDoc,
-  LoroEventBatch,
-  LoroTreeNode,
-  Subscription,
-} from "loro-crdt"
+import type { LoroDoc, LoroTreeNode } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
 import type { ExtRefBase } from "../ext.js"
 import type { StructContainerShape } from "../shape.js"
@@ -142,16 +137,6 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
     return {
       get doc(): LoroDoc {
         return self.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        // LoroTreeNode doesn't have subscribe, but we can subscribe to the tree
-        // However, ExtRefBase expects subscribe.
-        // For now, we can throw or return a dummy subscription if LoroTreeNode doesn't support it.
-        // But wait, LoroTreeNode is just a handle.
-        // Let's check if LoroTreeNode has subscribe.
-        // If not, we might need to subscribe to the tree and filter?
-        // Or maybe we just cast it if it exists at runtime.
-        return (self.getNode() as any).subscribe?.(callback) || (() => {})
       },
     }
   }

@@ -692,7 +692,7 @@ function createRuntime<Schema, Msg>(program: Program<Schema, Msg>) {
   }
 
   // Subscribe to document changes - the SINGLE path for reactor invocation
-  const unsubscribe = ext(doc).subscribe((event) => {
+  const unsubscribe = subscribe(doc, (event) => {
     if (!isRunning) return;
 
     // Skip checkout events (time travel doesn't trigger reactors)

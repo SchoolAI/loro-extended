@@ -8,7 +8,14 @@
  * 4. Client 2 should see the changes via the server relay
  */
 
-import { change, type PeerID, Repo, Shape, sync } from "@loro-extended/repo"
+import {
+  change,
+  loro,
+  type PeerID,
+  Repo,
+  Shape,
+  sync,
+} from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -137,8 +144,8 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
         return
       }
 
-      sync(doc2).subscribe(() => {
-        const text = sync(doc2).loroDoc.getText("text")
+      loro(doc2).subscribe(() => {
+        const text = loro(doc2).getText("text")
         if (text && text.toString() === "Hello from client 1") {
           clearTimeout(timeout)
           resolve()
@@ -206,8 +213,8 @@ describe("Hub-Spoke Synchronization (Server as Relay)", () => {
         return
       }
 
-      sync(doc2).subscribe(() => {
-        const text = sync(doc2).loroDoc.getText("text")
+      loro(doc2).subscribe(() => {
+        const text = loro(doc2).getText("text")
         if (text && text.toString() === "Hello from client 1") {
           clearTimeout(timeout)
           resolve()

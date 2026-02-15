@@ -92,25 +92,8 @@ describe("sync() accessor", () => {
     unsubscribe()
   })
 
-  it("provides subscribe method for doc changes", () => {
-    const doc = repo.get("test", TestSchema)
-
-    const s = sync(doc)
-    let callCount = 0
-    const unsubscribe = s.subscribe(() => {
-      callCount++
-    })
-
-    expect(typeof unsubscribe).toBe("function")
-
-    // Make a change
-    doc.title.insert(0, "Hello")
-
-    // The subscription should have been called
-    expect(callCount).toBeGreaterThan(0)
-
-    unsubscribe()
-  })
+  // Note: sync(doc).subscribe() was removed - use subscribe(doc, callback) from @loro-extended/change instead
+  // See packages/repo/src/tests/handle-subscribe.test.ts for subscription tests
 })
 
 describe("sync() accessor with ephemeral stores", () => {

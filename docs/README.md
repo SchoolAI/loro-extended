@@ -10,9 +10,10 @@ This directory contains architecture documentation and design documents for the 
 
 ## Getting Started
 
-| Document                                  | Description                                                    |
-| :---------------------------------------- | :------------------------------------------------------------- |
-| [Getting Started Guide](./getting-started.md) | Quick start guide for new users - installation, setup, first app |
+| Document                                      | Description                                                        |
+| :-------------------------------------------- | :----------------------------------------------------------------- |
+| [Getting Started Guide](./getting-started.md) | Quick start guide for new users - installation, setup, first app   |
+| [Migration Guide: v5 to v6](./migration-v5-to-v6.md) | Complete guide for upgrading from v5.x to v6.x                |
 
 ---
 

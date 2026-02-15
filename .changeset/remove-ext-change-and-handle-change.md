@@ -262,14 +262,20 @@ ext(doc).applyPatch(patch); // Apply JSON patch
 ext(doc).docShape; // Get the schema
 ext(doc).rawValue; // Get raw JSON value, no overlay or diff
 ext(doc).mergeable; // Check mergeable flag
-ext(doc).subscribe(callback); // Subscribe to changes
 
 // Ref-level features
 ext(ref).doc; // Get LoroDoc from any ref
-ext(ref).subscribe(callback); // Subscribe to ref changes
 ext(listRef).pushContainer(c); // Push container to list
 ext(listRef).insertContainer(i, c); // Insert container at index
 ext(mapRef).setContainer(key, c); // Set container on map
+
+// Subscriptions via subscribe() functional helper
+subscribe(doc, callback); // Subscribe to all document changes
+subscribe(doc, p => p.config.theme, callback); // Subscribe to specific path
+subscribe(ref, callback); // Subscribe to container changes
+
+// Or use loro() for native Loro subscription access
+loro(doc).subscribe(callback); // Native LoroDoc subscription
 ```
 
 ---

@@ -26,7 +26,6 @@ describe("TreeRef loro() and ext() support", () => {
     const treeExt = ext(doc.states)
     expect(treeExt).toBeDefined()
     expect(treeExt.doc).toBeDefined()
-    expect(typeof treeExt.subscribe).toBe("function")
   })
 
   it("should support loro() and ext() on TreeNodeRef", () => {
@@ -51,8 +50,6 @@ describe("TreeRef loro() and ext() support", () => {
       const nodeExt = ext(root) as ExtRefBase
       expect(nodeExt).toBeDefined()
       expect(nodeExt.doc).toBeDefined()
-      // subscribe might be a no-op or undefined depending on LoroTreeNode support
-      expect(typeof nodeExt.subscribe).toBe("function")
     })
   })
 })

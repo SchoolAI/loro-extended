@@ -1,11 +1,11 @@
-import { change, ext, loro, Shape } from "@loro-extended/change"
+import { change, loro, Shape, subscribe } from "@loro-extended/change"
 import { describe, expect, it, vi } from "vitest"
 import { Repo } from "../repo.js"
 
 const crdt = Shape
 const value = Shape.plain
 
-describe("Document subscription via ext()/loro()", () => {
+describe("Document subscription via subscribe()/loro()", () => {
   // Path selector subscriptions don't yet support flattened (mergeable) storage,
   // so we use mergeable: false here to keep hierarchical container paths.
   const docShape = Shape.doc(
@@ -30,7 +30,7 @@ describe("Document subscription via ext()/loro()", () => {
     { mergeable: false },
   )
 
-  describe("regular subscription via ext(doc).subscribe()", () => {
+  describe("regular subscription via subscribe()", () => {
     it("should subscribe to all document changes", async () => {
       const repo = new Repo({
         identity: { name: "test", type: "user" },
@@ -40,7 +40,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc).subscribe(listener)
+      const unsubscribe = subscribe(doc, listener)
 
       // Make a change
       change(doc, draft => {
@@ -245,7 +245,7 @@ describe("Document subscription via ext()/loro()", () => {
     })
   })
 
-  describe("ref-level subscription via ext(ref).subscribe()", () => {
+  describe("ref-level subscription via subscribe(ref)", () => {
     it("should subscribe to changes on a specific ref", async () => {
       const repo = new Repo({
         identity: { name: "test", type: "user" },
@@ -255,7 +255,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc.config).subscribe(listener)
+      const unsubscribe = subscribe(doc.config, listener)
 
       // Make a change to config
       change(doc, draft => {
@@ -277,7 +277,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc.config).subscribe(listener)
+      const unsubscribe = subscribe(doc.config, listener)
 
       // Make a change to books (not config)
       change(doc, draft => {
@@ -304,7 +304,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc.books).subscribe(listener)
+      const unsubscribe = subscribe(doc.books, listener)
 
       change(doc, draft => {
         draft.books.push({
@@ -329,7 +329,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc.users).subscribe(listener)
+      const unsubscribe = subscribe(doc.users, listener)
 
       change(doc, draft => {
         draft.users.set("user-1", { name: "Alice", score: 0 })
@@ -354,8 +354,8 @@ describe("Document subscription via ext()/loro()", () => {
       const listener1 = vi.fn()
       const listener2 = vi.fn()
 
-      const unsub1 = ext(doc).subscribe(listener1)
-      const unsub2 = ext(doc).subscribe(listener2)
+      const unsub1 = subscribe(doc, listener1)
+      const unsub2 = subscribe(doc, listener2)
 
       change(doc, draft => {
         draft.config.theme = "dark"
@@ -380,8 +380,8 @@ describe("Document subscription via ext()/loro()", () => {
       const listener1 = vi.fn()
       const listener2 = vi.fn()
 
-      const unsub1 = ext(doc).subscribe(listener1)
-      const unsub2 = ext(doc).subscribe(listener2)
+      const unsub1 = subscribe(doc, listener1)
+      const unsub2 = subscribe(doc, listener2)
 
       // Unsubscribe first listener
       unsub1()
@@ -409,7 +409,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc).subscribe(listener)
+      const unsubscribe = subscribe(doc, listener)
 
       // First change - should trigger
       change(doc, draft => {
@@ -439,7 +439,7 @@ describe("Document subscription via ext()/loro()", () => {
       const doc = repo.get("doc-1", docShape)
 
       const listener = vi.fn()
-      const unsubscribe = ext(doc).subscribe(listener)
+      const unsubscribe = subscribe(doc, listener)
 
       // Multiple unsubscribes should not throw
       unsubscribe()

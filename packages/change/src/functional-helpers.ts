@@ -1,8 +1,10 @@
-import type { LoroEventBatch } from "loro-crdt"
+import type { LoroEventBatch, Subscription } from "loro-crdt"
 import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { createDiffOverlay } from "./diff-overlay.js"
 import { EXT_SYMBOL, ext } from "./ext.js"
-import { loro } from "./loro.js"
+import { LORO_SYMBOL, loro } from "./loro.js"
+import type { PathBuilder, PathSelector } from "./path-selector.js"
+import { subscribeToPath } from "./path-subscription.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -212,6 +214,142 @@ function changeRef<T extends TypedRef<any> | TreeRef<any>>(
 
   // Return the original ref for chaining
   return ref
+}
+
+// ============================================================================
+// subscribe() function
+// ============================================================================
+
+/**
+ * Subscribe to changes on a TypedDoc or TypedRef.
+ *
+ * @overload subscribe(doc, callback) - Subscribe to all document changes
+ * @overload subscribe(doc, selector, callback) - Subscribe to path-selected changes with type inference
+ * @overload subscribe(ref, callback) - Subscribe to a specific container's changes
+ *
+ * @example
+ * ```typescript
+ * import { subscribe, change } from "@loro-extended/change"
+ *
+ * // Whole document subscription
+ * const unsubscribe = subscribe(doc, (event) => {
+ *   console.log("Document changed:", event)
+ * })
+ *
+ * // Path-selector subscription (type-safe!)
+ * subscribe(doc, p => p.config.theme, (theme) => {
+ *   console.log("Theme changed:", theme)  // theme is typed as string
+ * })
+ *
+ * // Wildcard path returns array
+ * subscribe(doc, p => p.books.$each.title, (titles) => {
+ *   console.log("Book titles:", titles)  // titles is typed as string[]
+ * })
+ *
+ * // Ref subscription - subscribes to specific container only
+ * subscribe(doc.config, (event) => {
+ *   console.log("Config changed")
+ * })
+ *
+ * // Unsubscribe when done
+ * unsubscribe()
+ * ```
+ */
+
+// Overload 1: Whole document subscription (2 args, first is TypedDoc)
+export function subscribe<D extends DocShape>(
+  doc: TypedDoc<D>,
+  callback: (event: LoroEventBatch) => void,
+): () => void
+
+// Overload 2: Path-selector subscription (3 args)
+export function subscribe<D extends DocShape, R>(
+  doc: TypedDoc<D>,
+  selector: (p: PathBuilder<D>) => PathSelector<R>,
+  callback: (value: R) => void,
+): () => void
+
+// Overload 3a: StructRef subscription
+export function subscribe<
+  NestedShapes extends Record<string, ContainerOrValueShape>,
+>(
+  ref: StructRef<NestedShapes>,
+  callback: (event: LoroEventBatch) => void,
+): () => void
+
+// Overload 3b: TreeRef subscription
+export function subscribe<DataShape extends StructContainerShape>(
+  ref: TreeRef<DataShape>,
+  callback: (event: LoroEventBatch) => void,
+): () => void
+
+// Overload 3c: TreeRefInterface subscription
+export function subscribe<DataShape extends StructContainerShape>(
+  ref: TreeRefInterface<DataShape>,
+  callback: (event: LoroEventBatch) => void,
+): () => void
+
+// Overload 3d: Generic TypedRef subscription (2 args, first is TypedRef)
+export function subscribe<Shape extends ContainerShape>(
+  ref: TypedRef<Shape>,
+  callback: (event: LoroEventBatch) => void,
+): () => void
+
+// Implementation
+export function subscribe(
+  target:
+    | TypedDoc<any>
+    | TypedRef<any>
+    | StructRef<any>
+    | TreeRef<any>
+    | TreeRefInterface<any>,
+  selectorOrCallback:
+    | ((p: PathBuilder<any>) => PathSelector<any>)
+    | ((event: LoroEventBatch) => void)
+    | (() => void),
+  callback?: ((value: any) => void) | ((event: LoroEventBatch) => void),
+): () => void {
+  // Detect which overload based on argument count and type
+  const hasThreeArgs = callback !== undefined
+
+  if (hasThreeArgs) {
+    // Overload 2: Path-selector subscription (doc, selector, callback)
+    const doc = target as TypedDoc<any>
+    const selector = selectorOrCallback as (
+      p: PathBuilder<any>,
+    ) => PathSelector<any>
+    const cb = callback as (value: any) => void
+    return subscribeToPath(doc, selector, cb)
+  }
+
+  // Two arguments - need to distinguish between doc and ref
+  const extNs = (target as any)[EXT_SYMBOL]
+  const isDoc = extNs && "docShape" in extNs
+  const isRef = LORO_SYMBOL in target && !isDoc
+
+  if (isDoc) {
+    // Overload 1: Whole document subscription
+    // Access the LoroDoc directly via symbol to avoid type issues with TypedDoc<any>
+    const loroDoc = (target as any)[LORO_SYMBOL]
+    const cb = selectorOrCallback as (event: LoroEventBatch) => void
+    const subscription: Subscription = loroDoc.subscribe(cb)
+    return () => subscription()
+  }
+
+  if (isRef) {
+    // Overload 3: Ref subscription
+    // Access the Loro container directly via symbol to avoid type issues
+    const loroContainer = (target as any)[LORO_SYMBOL]
+    const cb = selectorOrCallback as (event: LoroEventBatch) => void
+    // Loro containers have a subscribe method
+    const subscription: Subscription = loroContainer.subscribe(cb)
+    return () => subscription()
+  }
+
+  throw new Error(
+    "subscribe() requires a TypedDoc or TypedRef. " +
+      "Make sure you're passing a valid typed document or container reference.",
+  )
 }
 
 export type Transition<Shape extends DocShape> = {

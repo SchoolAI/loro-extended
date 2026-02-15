@@ -607,9 +607,36 @@ loroText.length;
 loroText.toString();
 ```
 
+### The `subscribe()` Function
+
+The `subscribe()` function is the recommended way to listen to document and container changes. It supports three modes:
+
+```typescript
+import { subscribe, loro } from "@loro-extended/change";
+
+// 1. Whole document subscription
+const unsubscribe = subscribe(doc, (event) => {
+  console.log("Document changed:", event.by); // "local" | "import" | "checkout"
+});
+
+// 2. Ref-level subscription (specific container)
+const unsubscribe = subscribe(doc.title, (event) => {
+  console.log("Title changed");
+});
+
+// 3. Path-selector subscription (type-safe, fine-grained)
+const unsubscribe = subscribe(doc, p => p.config.theme, (theme) => {
+  console.log("Theme changed to:", theme);
+});
+
+// For native Loro access, use loro().subscribe() directly:
+loro(doc).subscribe(callback);      // LoroDoc subscription
+loro(doc.title).subscribe(callback); // LoroText subscription
+```
+
 ### The `ext()` Function
 
-The `ext()` function provides access to **loro-extended-specific features** that go beyond native Loro. Use it for forking, subscribing, and accessing document metadata.
+The `ext()` function provides access to **loro-extended-specific features** that go beyond native Loro. Use it for forking and accessing document metadata.
 
 ```typescript
 import { ext } from "@loro-extended/change";
@@ -618,7 +645,6 @@ import { ext } from "@loro-extended/change";
 ext(doc).fork();                     // Fork the document
 ext(doc).forkAt(frontiers);          // Fork at a specific version
 ext(doc).shallowForkAt(frontiers);   // Fork with shallow snapshot
-ext(doc).subscribe(callback);        // Subscribe to changes
 ext(doc).applyPatch(patch);          // Apply JSON Patch operations
 ext(doc).docShape;                   // Access the schema
 ext(doc).rawValue;                   // CRDT state without placeholders
@@ -627,7 +653,6 @@ ext(doc).initialize();               // Write metadata (if skipInitialize was us
 
 // Ref-level features
 ext(ref).doc;                        // Get LoroDoc from any ref
-ext(ref).subscribe(callback);        // Subscribe to container changes
 ext(list).pushContainer(container);  // Push a pre-existing Loro container
 ext(list).insertContainer(i, c);     // Insert a pre-existing Loro container
 ext(struct).setContainer("key", c);  // Set a pre-existing Loro container
@@ -642,8 +667,8 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 | ---------------------- | ----------------------------------- | ----------------------------------- |
 | `push(item)`           | Native `LoroList` / `LoroMovableList` methods | `pushContainer(container)`          |
 | `insert(index, item)`  |                                     | `insertContainer(index, container)` |
-| `delete(index, len)`   |                                     | `subscribe(callback)`               |
-| `find(predicate)`      |                                     | `doc`                               |
+| `delete(index, len)`   |                                     | `doc`                               |
+| `find(predicate)`      |                                     |                                     |
 | `filter(predicate)`    |                                     |                                     |
 | `map(callback)`        |                                     |                                     |
 | `forEach(callback)`    |                                     |                                     |
@@ -659,8 +684,8 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 | Direct Access                | Via `loro()` (native)    | Via `ext()` (extended)         |
 | ---------------------------- | ------------------------ | ------------------------------ |
 | `obj.property` (get)         | Native `LoroMap` methods | `setContainer(key, container)` |
-| `obj.property = value` (set) |                          | `subscribe(callback)`          |
-| `Object.keys(obj)`           |                          | `doc`                          |
+| `obj.property = value` (set) |                          | `doc`                          |
+| `Object.keys(obj)`           |                          |                                |
 | `'key' in obj`               |                          |                                |
 | `delete obj.key`             |                          |                                |
 | `toJSON()`                   |                          |                                |
@@ -670,8 +695,8 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 | Direct Access                     | Via `loro()` (native)    | Via `ext()` (extended)         |
 | --------------------------------- | ------------------------ | ------------------------------ |
 | `get(key)`                        | Native `LoroMap` methods | `setContainer(key, container)` |
-| `set(key, value)`                 |                          | `subscribe(callback)`          |
-| `delete(key)`                     |                          | `doc`                          |
+| `set(key, value)`                 |                          | `doc`                          |
+| `delete(key)`                     |                          |                                |
 | `has(key)`                        |                          |                                |
 | `keys()`, `values()`, `entries()` |                          |                                |
 | `size`                            |                          |                                |
@@ -684,8 +709,8 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 
 | Direct Access                    | Via `loro()` (native)    | Via `ext()` (extended)  |
 | -------------------------------- | ------------------------ | ----------------------- |
-| `insert(index, content)`         | Native `LoroText` methods | `subscribe(callback)`  |
-| `delete(index, len)`             |                          | `doc`                   |
+| `insert(index, content)`         | Native `LoroText` methods | `doc`                   |
+| `delete(index, len)`             |                          |                         |
 | `update(text)`                   |                          |                         |
 | `mark(range, key, value)`        |                          |                         |
 | `unmark(range, key)`             |                          |                         |
@@ -697,8 +722,8 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 
 | Direct Access        | Via `loro()` (native)       | Via `ext()` (extended) |
 | -------------------- | --------------------------- | ---------------------- |
-| `increment(value)`   | Native `LoroCounter` methods | `subscribe(callback)` |
-| `decrement(value)`   |                             | `doc`                  |
+| `increment(value)`   | Native `LoroCounter` methods | `doc`                  |
+| `decrement(value)`   |                             |                        |
 | `value`, `valueOf()` |                             |                        |
 | `toJSON()`           |                             |                        |
 
@@ -706,22 +731,20 @@ ext(record).setContainer("key", c);  // Set a pre-existing Loro container
 
 | Direct Access                  | Via `loro()` (native)  | Via `ext()` (extended)  |
 | ------------------------------ | ---------------------- | ----------------------- |
-| `doc.property` (schema access) | Native `LoroDoc` methods | `subscribe(callback)` |
-| `toJSON()`                     |                        | `fork()`, `forkAt()`    |
-|                                |                        | `applyPatch(patch)`     |
+| `doc.property` (schema access) | Native `LoroDoc` methods | `fork()`, `forkAt()`  |
+| `toJSON()`                     | `subscribe(callback)`  | `applyPatch(patch)`     |
 |                                |                        | `docShape`, `rawValue`  |
 
 ### Subscribing to Ref Changes
 
-The `loro()` function enables the "pass around a ref" pattern where components can receive a ref and subscribe to its changes without needing the full document. Since `loro()` returns the native Loro container, you call `.subscribe()` directly on it:
+Use the `subscribe()` helper to subscribe to container-level changes:
 
 ```typescript
-import { loro } from "@loro-extended/change";
+import { subscribe } from "@loro-extended/change";
 
 function TextEditor({ textRef }: { textRef: TextRef }) {
   useEffect(() => {
-    // loro(textRef) returns a LoroText — call subscribe on it directly
-    return loro(textRef).subscribe((event) => {
+    return subscribe(textRef, (event) => {
       // Handle text changes
     });
   }, [textRef]);

@@ -3,11 +3,11 @@
  *
  * Design Principle:
  * > `loro()` returns native Loro types directly (LoroDoc, LoroText, etc.)
- * > `ext()` provides loro-extended-specific features (fork, subscribe with jsonpath, etc.)
+ * > `ext()` provides loro-extended-specific features (fork, applyPatch, container ops, etc.)
  *
  * For mutations, use the `change()` functional helper:
  * ```typescript
- * import { change, ext, loro } from "@loro-extended/change"
+ * import { change, ext, loro, subscribe } from "@loro-extended/change"
  *
  * // Mutations via change() functional helper
  * change(doc, draft => { draft.count.increment(10) })
@@ -16,19 +16,17 @@
  * const loroDoc = loro(doc)  // LoroDoc
  * const loroText = loro(doc.title)  // LoroText
  *
+ * // Subscribe to changes
+ * subscribe(doc, callback)  // Document-level subscription
+ * subscribe(ref, callback)  // Container-level subscription
+ *
  * // Access loro-extended features
  * ext(doc).forkAt(frontiers)
- * ext(doc).subscribe(callback)
  * ext(ref).doc  // Get LoroDoc from any ref
  * ```
  */
 
-import type {
-  Container,
-  LoroDoc,
-  LoroEventBatch,
-  Subscription,
-} from "loro-crdt"
+import type { Container, LoroDoc } from "loro-crdt"
 import type { ChangeOptions } from "./change-options.js"
 import type { JsonPatch } from "./json-patch.js"
 import type {
@@ -66,18 +64,11 @@ export const EXT_SYMBOL = Symbol.for("loro-extended:ext")
 
 /**
  * Base interface for all ext() return types on refs.
- * Provides access to the underlying LoroDoc and subscribe functionality.
+ * Provides access to the underlying LoroDoc.
  */
 export interface ExtRefBase {
   /** The underlying LoroDoc */
   readonly doc: LoroDoc
-
-  /**
-   * Subscribe to container-level changes.
-   * @param callback - Function called when the container changes
-   * @returns Subscription that can be used to unsubscribe
-   */
-  subscribe(callback: (event: LoroEventBatch) => void): Subscription
 }
 
 /**
@@ -178,13 +169,6 @@ export interface ExtDocRef<Shape extends DocShape> {
   readonly mergeable: boolean
 
   /**
-   * Subscribe to document-level changes.
-   * @param callback - Function called when the document changes
-   * @returns Subscription that can be used to unsubscribe
-   */
-  subscribe(callback: (event: LoroEventBatch) => void): Subscription
-
-  /**
    * Batch mutations into a single transaction.
    * All changes commit together at the end.
    *
@@ -279,7 +263,6 @@ export function ext<Shape extends ContainerShape>(
  * - initialize() for document initialization
  * - applyPatch() for JSON Patch operations
  * - docShape, rawValue, mergeable for document metadata
- * - subscribe() for change subscriptions
  * - pushContainer(), insertContainer(), setContainer() for container operations
  * - doc property to access LoroDoc from any ref
  *
@@ -301,7 +284,6 @@ export function ext<Shape extends ContainerShape>(
  *
  * // Document-level features
  * ext(doc).forkAt(frontiers)
- * ext(doc).subscribe(callback)
  *
  * // Ref-level features
  * ext(ref).doc  // Get LoroDoc from any ref

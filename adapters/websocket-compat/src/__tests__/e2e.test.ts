@@ -1,4 +1,11 @@
-import { change, Repo, Shape, sync, validatePeerId } from "@loro-extended/repo"
+import {
+  change,
+  loro,
+  Repo,
+  Shape,
+  sync,
+  validatePeerId,
+} from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -131,8 +138,8 @@ describe("WebSocket Adapter E2E", () => {
         return
       }
 
-      sync(doc2).subscribe(() => {
-        const text = sync(doc2).loroDoc.getText("text")
+      loro(doc2).subscribe(() => {
+        const text = loro(doc2).getText("text")
         if (text && text.toString() === "Hello") {
           clearTimeout(timeout)
           resolve()

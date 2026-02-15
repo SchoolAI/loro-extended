@@ -5,7 +5,7 @@
 
 import { LoroCounter, LoroDoc, LoroList, LoroMap, LoroText } from "loro-crdt"
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, ext, loro, Shape } from "./index.js"
+import { change, createTypedDoc, ext, loro, Shape, subscribe } from "./index.js"
 
 describe("loro() function", () => {
   describe("with TypedDoc", () => {
@@ -277,18 +277,18 @@ describe("ext() function", () => {
       expect(ext(nonMergeableDoc).mergeable).toBe(false)
     })
 
-    it("should subscribe to doc-level changes via ext()", () => {
+    it("should subscribe to doc-level changes via standalone subscribe()", () => {
       const doc = createTypedDoc(schema)
       const events: unknown[] = []
 
-      const subscription = ext(doc).subscribe(event => {
+      const unsubscribe = subscribe(doc, event => {
         events.push(event)
       })
 
       doc.title.insert(0, "Hello")
 
       expect(events.length).toBeGreaterThan(0)
-      subscription()
+      unsubscribe()
     })
 
     describe("change(doc, fn) helper", () => {
@@ -413,11 +413,11 @@ describe("ext() function", () => {
       expect(loroDoc).toBe(loro(doc))
     })
 
-    it("should subscribe to changes via ext(ref)", () => {
+    it("should subscribe to changes via subscribe(ref)", () => {
       const doc = createTypedDoc(schema)
       const events: unknown[] = []
 
-      const subscription = ext(doc.title).subscribe(event => {
+      const subscription = subscribe(doc.title, event => {
         events.push(event)
       })
 

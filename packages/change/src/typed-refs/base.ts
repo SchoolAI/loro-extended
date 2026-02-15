@@ -1,10 +1,4 @@
-import type {
-  ContainerID,
-  Diff,
-  LoroDoc,
-  LoroEventBatch,
-  Subscription,
-} from "loro-crdt"
+import type { ContainerID, Diff, LoroDoc } from "loro-crdt"
 import { EXT_SYMBOL, type ExtRefBase } from "../ext.js"
 import { LORO_SYMBOL } from "../loro.js"
 import { buildRootContainerName } from "../path-encoding.js"
@@ -204,9 +198,6 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return {
       get doc(): LoroDoc {
         return self.params.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        return (self.getContainer() as any).subscribe(callback)
       },
     }
   }

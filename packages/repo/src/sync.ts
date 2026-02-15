@@ -96,7 +96,6 @@ export type WaitForSyncOptions = {
  * - `loroDoc` - The underlying LoroDoc (for advanced use)
  * - `waitForSync()` - Wait for sync to complete
  * - `onReadyStateChange()` - Subscribe to sync status changes
- * - `subscribe()` - Subscribe to document changes
  * - Ephemeral stores as properties (when declared)
  *
  * @typeParam E - Ephemeral store declarations
@@ -136,13 +135,6 @@ export interface SyncRef<
    * @returns Unsubscribe function
    */
   onReadyStateChange(cb: (readyStates: ReadyState[]) => void): () => void
-
-  /**
-   * Subscribe to document changes.
-   * @param listener Callback invoked on each document change
-   * @returns Unsubscribe function
-   */
-  subscribe(listener: () => void): () => void
 
   /**
    * Register an external ephemeral store for network sync.
@@ -341,10 +333,6 @@ class SyncRefImpl<E extends EphemeralDeclarations = Record<string, never>>
         cb(event.readyStates)
       }
     })
-  }
-
-  subscribe(listener: () => void): () => void {
-    return this.#loroDoc.subscribe(listener)
   }
 
   addEphemeral(name: string, store: EphemeralStore): void {

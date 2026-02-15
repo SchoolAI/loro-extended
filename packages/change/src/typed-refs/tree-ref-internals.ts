@@ -1,11 +1,4 @@
-import type {
-  LoroDoc,
-  LoroEventBatch,
-  LoroTree,
-  LoroTreeNode,
-  Subscription,
-  TreeID,
-} from "loro-crdt"
+import type { LoroDoc, LoroTree, LoroTreeNode, TreeID } from "loro-crdt"
 import type { ExtRefBase } from "../ext.js"
 import type { StructContainerShape, TreeContainerShape } from "../shape.js"
 import { BaseRefInternals, INTERNAL_SYMBOL } from "./base.js"
@@ -99,9 +92,6 @@ export class TreeRefInternals<
     return {
       get doc(): LoroDoc {
         return self.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        return (self.getContainer() as LoroTree).subscribe(callback)
       },
     }
   }

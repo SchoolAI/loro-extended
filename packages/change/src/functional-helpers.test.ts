@@ -10,7 +10,7 @@ import {
 import { describe, expect, it, vi } from "vitest"
 import type { ChangeOptions } from "./change-options.js"
 import { EXT_SYMBOL, type ExtRefBase, ext } from "./ext.js"
-import { change, getTransition } from "./functional-helpers.js"
+import { change, getTransition, subscribe } from "./functional-helpers.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc, type TypedDoc } from "./typed-doc.js"
@@ -364,7 +364,7 @@ describe("functional helpers", () => {
     })
   })
 
-  describe("loro(ref).subscribe() for imported (remote) changes", () => {
+  describe("subscribe(ref) for imported (remote) changes", () => {
     it("should fire TextRef subscription when changes are imported", () => {
       // Create two documents - simulating two clients
       const doc1 = createTypedDoc(fullSchema)
@@ -372,7 +372,7 @@ describe("functional helpers", () => {
 
       // Set up subscription on doc2's title ref
       const callback = vi.fn()
-      const unsubscribe = ext(doc2.title).subscribe(callback)
+      const unsubscribe = subscribe(doc2.title, callback)
 
       // Make changes on doc1
       doc1.title.insert(0, "Hello from doc1")
@@ -396,7 +396,7 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       const callback = vi.fn()
-      const unsubscribe = ext(doc2.count).subscribe(callback)
+      const unsubscribe = subscribe(doc2.count, callback)
 
       doc1.count.increment(42)
       loro(doc1).commit()
@@ -415,7 +415,7 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       const callback = vi.fn()
-      const unsubscribe = ext(doc2.items).subscribe(callback)
+      const unsubscribe = subscribe(doc2.items, callback)
 
       doc1.items.push("item1")
       doc1.items.push("item2")
@@ -454,7 +454,7 @@ describe("functional helpers", () => {
 
       // Subscribe to count, but only change title
       const countCallback = vi.fn()
-      const unsubscribe = ext(doc2.count).subscribe(countCallback)
+      const unsubscribe = subscribe(doc2.count, countCallback)
 
       doc1.title.insert(0, "Hello")
       loro(doc1).commit()
@@ -473,7 +473,7 @@ describe("functional helpers", () => {
       const doc2 = createTypedDoc(fullSchema)
 
       let capturedValue: string | undefined
-      const unsubscribe = ext(doc2.title).subscribe(() => {
+      const unsubscribe = subscribe(doc2.title, () => {
         capturedValue = doc2.title.toString()
       })
 
@@ -1208,6 +1208,224 @@ describe("functional helpers", () => {
         acceptsAlias(doc)
 
         expect(doc.toJSON().count).toBe(10)
+      })
+    })
+  })
+
+  describe("subscribe()", () => {
+    describe("whole document subscription", () => {
+      it("should subscribe to all document changes", () => {
+        const doc = createTypedDoc(schema)
+        const listener = vi.fn()
+
+        const unsubscribe = subscribe(doc, listener)
+
+        change(doc, d => {
+          d.title.insert(0, "Hello")
+        })
+
+        expect(listener).toHaveBeenCalled()
+        expect(listener.mock.calls[0][0]).toHaveProperty("by", "local")
+
+        unsubscribe()
+        listener.mockClear()
+
+        change(doc, d => {
+          d.title.insert(5, " World")
+        })
+
+        expect(listener).not.toHaveBeenCalled()
+      })
+
+      it("should handle multiple subscriptions", () => {
+        const doc = createTypedDoc(schema)
+        const listener1 = vi.fn()
+        const listener2 = vi.fn()
+
+        const unsub1 = subscribe(doc, listener1)
+        const unsub2 = subscribe(doc, listener2)
+
+        change(doc, d => {
+          d.title.insert(0, "Test")
+        })
+
+        expect(listener1).toHaveBeenCalled()
+        expect(listener2).toHaveBeenCalled()
+
+        unsub1()
+        unsub2()
+      })
+    })
+
+    describe("path-selector subscription", () => {
+      it("should subscribe to path with correct type", () => {
+        const DocSchema = Shape.doc(
+          {
+            config: Shape.struct({ theme: Shape.plain.string() }),
+          },
+          { mergeable: false },
+        )
+        const doc = createTypedDoc(DocSchema)
+        let receivedValue: string | undefined
+
+        subscribe(
+          doc,
+          p => p.config.theme,
+          value => {
+            receivedValue = value
+          },
+        )
+
+        change(doc, d => {
+          d.config.theme = "dark"
+        })
+
+        expect(receivedValue).toBe("dark")
+      })
+
+      it("should return array for wildcard paths", () => {
+        const DocSchema = Shape.doc(
+          {
+            books: Shape.list(Shape.struct({ title: Shape.text() })),
+          },
+          { mergeable: false },
+        )
+        const doc = createTypedDoc(DocSchema)
+        let titles: string[] = []
+
+        subscribe(
+          doc,
+          p => p.books.$each.title,
+          value => {
+            titles = value
+          },
+        )
+
+        change(doc, d => {
+          d.books.push({ title: "Book 1" })
+          d.books.push({ title: "Book 2" })
+        })
+
+        expect(titles).toEqual(["Book 1", "Book 2"])
+      })
+
+      it("should not fire callback when value unchanged", () => {
+        const DocSchema = Shape.doc(
+          {
+            config: Shape.struct({ theme: Shape.plain.string() }),
+            title: Shape.text(),
+          },
+          { mergeable: false },
+        )
+        const doc = createTypedDoc(DocSchema)
+        const listener = vi.fn()
+
+        change(doc, d => {
+          d.config.theme = "light"
+        })
+
+        subscribe(doc, p => p.config.theme, listener)
+
+        // Change something else
+        change(doc, d => {
+          d.title.insert(0, "Hello")
+        })
+
+        // Should not fire because config.theme didn't change
+        expect(listener).not.toHaveBeenCalled()
+      })
+    })
+
+    describe("ref subscription", () => {
+      it("should subscribe to ref container changes only", () => {
+        const doc = createTypedDoc(fullSchema)
+        const titleListener = vi.fn()
+        const countListener = vi.fn()
+
+        const unsubTitle = subscribe(doc.title, titleListener)
+        const unsubCount = subscribe(doc.count, countListener)
+
+        change(doc, d => {
+          d.title.insert(0, "Hello")
+        })
+
+        expect(titleListener).toHaveBeenCalled()
+        expect(countListener).not.toHaveBeenCalled()
+
+        titleListener.mockClear()
+        countListener.mockClear()
+
+        change(doc, d => {
+          d.count.increment(5)
+        })
+
+        expect(titleListener).not.toHaveBeenCalled()
+        expect(countListener).toHaveBeenCalled()
+
+        unsubTitle()
+        unsubCount()
+      })
+
+      it("should work with list refs", () => {
+        const doc = createTypedDoc(fullSchema)
+        const listener = vi.fn()
+
+        const unsubscribe = subscribe(doc.items, listener)
+
+        change(doc, d => {
+          d.items.push("item1")
+        })
+
+        expect(listener).toHaveBeenCalled()
+
+        unsubscribe()
+      })
+
+      it("should work with struct refs", () => {
+        const doc = createTypedDoc(fullSchema)
+        const listener = vi.fn()
+
+        const unsubscribe = subscribe(doc.profile, listener)
+
+        change(doc, d => {
+          d.profile.bio.insert(0, "My bio")
+        })
+
+        expect(listener).toHaveBeenCalled()
+
+        unsubscribe()
+      })
+    })
+
+    describe("unsubscribe cleanup", () => {
+      it("should clean up when unsubscribed", () => {
+        const doc = createTypedDoc(schema)
+        const listener = vi.fn()
+
+        const unsubscribe = subscribe(doc, listener)
+
+        change(doc, d => {
+          d.title.insert(0, "First")
+        })
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        unsubscribe()
+        listener.mockClear()
+
+        change(doc, d => {
+          d.title.insert(5, " Second")
+        })
+        expect(listener).not.toHaveBeenCalled()
+      })
+
+      it("should handle multiple unsubscribe calls gracefully", () => {
+        const doc = createTypedDoc(schema)
+        const listener = vi.fn()
+
+        const unsubscribe = subscribe(doc, listener)
+
+        unsubscribe()
+        expect(() => unsubscribe()).not.toThrow()
       })
     })
   })

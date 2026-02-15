@@ -1,12 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
 
-import {
-  LoroDoc,
-  type LoroEventBatch,
-  type PeerID,
-  type Subscription,
-  type Value,
-} from "loro-crdt"
+import { LoroDoc, type PeerID, type Value } from "loro-crdt"
 import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { derivePlaceholder } from "./derive-placeholder.js"
 import { EXT_SYMBOL, type ExtDocRef } from "./ext.js"
@@ -550,9 +544,6 @@ export function createTypedDoc<Shape extends DocShape>(
     },
     get mergeable(): boolean {
       return internal.mergeable
-    },
-    subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-      return internal.loroDoc.subscribe(callback)
     },
     change(
       fn: (draft: Mutable<Shape>) => void,

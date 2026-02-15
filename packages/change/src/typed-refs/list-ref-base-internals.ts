@@ -1,11 +1,4 @@
-import type {
-  Container,
-  LoroDoc,
-  LoroEventBatch,
-  LoroList,
-  LoroMovableList,
-  Subscription,
-} from "loro-crdt"
+import type { Container, LoroDoc, LoroList, LoroMovableList } from "loro-crdt"
 import { convertInputToRef } from "../conversion.js"
 import type { ExtListRef } from "../ext.js"
 import type { ContainerOrValueShape, ContainerShape } from "../shape.js"
@@ -253,11 +246,6 @@ export class ListRefBaseInternals<
     return {
       get doc(): LoroDoc {
         return self.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        return (self.getContainer() as LoroList | LoroMovableList).subscribe(
-          callback,
-        )
       },
       pushContainer(container: Container): Container {
         const result = (

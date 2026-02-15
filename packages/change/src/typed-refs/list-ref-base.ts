@@ -3,10 +3,8 @@ import type {
   Delta,
   ListDiff,
   LoroDoc,
-  LoroEventBatch,
   LoroList,
   LoroMovableList,
-  Subscription,
 } from "loro-crdt"
 import { convertInputToRef } from "../conversion.js"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
@@ -317,11 +315,6 @@ export class ListRefBaseInternals<
     return {
       get doc(): LoroDoc {
         return self.getDoc()
-      },
-      subscribe(callback: (event: LoroEventBatch) => void): Subscription {
-        return (self.getContainer() as LoroList | LoroMovableList).subscribe(
-          callback,
-        )
       },
       pushContainer(container: Container): Container {
         const result = (
