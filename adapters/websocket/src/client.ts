@@ -562,6 +562,13 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       return
     }
 
+    // Handle race condition: if we receive "ready" while still in "connecting" state,
+    // the server sent the ready signal before our open promise resolved.
+    // We need to transition through "connected" first to maintain valid state machine transitions.
+    if (currentState.status === "connecting") {
+      this.stateMachine.transition({ status: "connected" })
+    }
+
     // Transition to ready state
     this.stateMachine.transition({ status: "ready" })
     this.wasConnectedBefore = true

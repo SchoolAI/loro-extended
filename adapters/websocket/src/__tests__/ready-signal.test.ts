@@ -4,6 +4,7 @@
  * These tests verify that:
  * 1. The client waits for the server's "ready" signal before creating its channel
  * 2. The server does NOT send binary messages before the client sends establish-request
+ * 3. The client handles "ready" signal even when received before open promise resolves
  *
  * This prevents a race condition where binary messages could arrive before
  * the client has processed "ready" and created its channel.
@@ -167,6 +168,79 @@ describe("WebSocket Ready Signal", () => {
       expect((clientAdapter as any).serverChannel).toBeDefined()
       expect(clientAdapter.isReady).toBe(true)
       expect(clientAdapter.connectionState).toBe("connected")
+
+      // Cleanup
+      await clientAdapter.onStop()
+    })
+  })
+
+  describe("Race condition: ready signal before open promise resolves", () => {
+    it("should handle ready signal received while still in connecting state", async () => {
+      // This test verifies the fix for a race condition where:
+      // 1. Client attaches message handler BEFORE open promise resolves
+      // 2. Server sends "ready" immediately on connection
+      // 3. Client receives "ready" while still in "connecting" state
+      //
+      // The fix ensures we transition through "connected" before "ready"
+      // when this race occurs.
+
+      let clientAdapter: WsClientNetworkAdapter | undefined
+      const stateTransitions: string[] = []
+
+      // Server setup - calls start() immediately which sends "ready"
+      wss.on("connection", (ws: WsWebSocket, req) => {
+        if (!req.url) throw new Error("request URL is required")
+        const url = new URL(req.url, `http://localhost:${port}`)
+        const peerId = url.searchParams.get("peerId")
+        if (!peerId) throw new Error("peerId is required")
+        validatePeerId(peerId)
+
+        const { start } = serverAdapter.handleConnection({
+          socket: wrapWsSocket(ws),
+          peerId,
+        })
+        // Call start immediately - this sends "ready" right away
+        start()
+      })
+
+      // Create server repo
+      const _serverRepo = new Repo({
+        identity: { peerId: "1000", name: "server", type: "service" },
+        adapters: [serverAdapter],
+      })
+
+      // Create client adapter
+      clientAdapter = new WsClientNetworkAdapter({
+        url: `ws://localhost:${port}?peerId=2000`,
+        reconnect: { enabled: false },
+        WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
+      })
+
+      // Track state transitions to verify we go through connected -> ready
+      clientAdapter.subscribeToTransitions(transition => {
+        stateTransitions.push(
+          `${transition.from.status} -> ${transition.to.status}`,
+        )
+      })
+
+      // Create client repo (this starts the adapter)
+      const _clientRepo = new Repo({
+        identity: { peerId: "2000", name: "client", type: "user" },
+        adapters: [clientAdapter],
+      })
+
+      // Wait for ready state
+      await clientAdapter.waitForStatus("ready", { timeoutMs: 5000 })
+
+      // Verify we reached ready state without errors
+      expect(clientAdapter.isReady).toBe(true)
+      expect(clientAdapter.getState().status).toBe("ready")
+
+      // Verify the state machine transitions are valid
+      // Should include: disconnected -> connecting, connecting -> connected, connected -> ready
+      // (or the race condition path: connecting -> connected -> ready happens atomically)
+      expect(stateTransitions).toContain("disconnected -> connecting")
+      expect(stateTransitions).toContain("connected -> ready")
 
       // Cleanup
       await clientAdapter.onStop()
