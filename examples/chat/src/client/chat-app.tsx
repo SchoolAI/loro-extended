@@ -1,13 +1,19 @@
 import {
   change,
-  useDoc,
+  useDocument,
   useEphemeral,
-  useHandle,
   useRepo,
+  useValue,
 } from "@loro-extended/react"
-import { type DocId, generateUUID, type ReadyState } from "@loro-extended/repo"
+import {
+  type DocId,
+  generateUUID,
+  type ReadyState,
+  sync,
+} from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
+  type ChatDoc,
   ChatEphemeralDeclarations,
   ChatSchema,
   type Message,
@@ -92,19 +98,20 @@ function ChatApp() {
     }
   }, [docId])
 
-  // NEW API: Get handle with both doc and ephemeral schemas
-  const handle = useHandle(docId, ChatSchema, ChatEphemeralDeclarations)
-  const doc = useDoc(handle)
-  const { self, peers } = useEphemeral(handle.presence)
+  // Get document with both doc and ephemeral schemas
+  const doc = useDocument(docId, ChatSchema, ChatEphemeralDeclarations)
+  // Cast snapshot to ChatDoc to help TypeScript infer the schema type
+  const snapshot = useValue(doc) as ChatDoc
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
   // Set self presence with name
   useEffect(() => {
-    handle.presence.setSelf({ type: "user", name: userName })
-  }, [handle, userName])
+    sync(doc).presence.setSelf({ type: "user", name: userName })
+  }, [doc, userName])
 
   // Check if the current user has sent any messages in this conversation
-  // doc.messages is already a plain array (useDoc returns JSON)
-  const messages = doc.messages
+  // snapshot.messages is already a plain array (useValue returns JSON)
+  const messages = snapshot.messages
   const hasUserSentMessages = messages.some(
     msg => msg.role === "user" && msg.author === repo.identity.peerId,
   )
@@ -121,7 +128,7 @@ function ChatApp() {
       // Update to new name
       localStorage.setItem(NAME_STORAGE_KEY, newName)
       setUserName(newName)
-      handle.presence.setSelf({ type: "user", name: newName })
+      sync(doc).presence.setSelf({ type: "user", name: newName })
     }
     setIsEditingName(false)
   }
@@ -146,7 +153,7 @@ function ChatApp() {
       localStorage.removeItem(PREVIOUS_NAME_KEY) // Fulfill the responsibility
     }
 
-    change(handle.doc, d => {
+    change(doc, d => {
       d.messages.push({
         id: generateUUID(),
         role: "user",
@@ -182,14 +189,14 @@ function ChatApp() {
   const myPeerId = repo.identity.peerId
 
   const tip: "share" | "at-ai" | "none" =
-    doc.preferences[myPeerId]?.showTip !== false
+    snapshot.preferences[myPeerId]?.showTip !== false
       ? memberCount >= 2
         ? "at-ai"
         : "share"
       : "none"
 
   const dismissTip = () => {
-    change(handle.doc, d => {
+    change(doc, d => {
       const prefs = d.preferences.get(myPeerId)
       if (prefs) {
         prefs.showTip = false
@@ -207,12 +214,14 @@ function ChatApp() {
       setIsConnected(connected)
     }
 
+    const syncRef = sync(doc)
+
     // Initial check
-    updateConnectionStatus(handle.readyStates)
+    updateConnectionStatus(syncRef.readyStates)
 
     // Subscribe to changes
-    return handle.onReadyStateChange(updateConnectionStatus)
-  }, [handle])
+    return syncRef.onReadyStateChange(updateConnectionStatus)
+  }, [doc])
 
   return (
     <div className="flex flex-col h-screen bg-amber-50 text-gray-800 font-sans">

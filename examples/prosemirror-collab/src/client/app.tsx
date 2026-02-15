@@ -9,13 +9,14 @@
  *
  * This example demonstrates integrating loro-extended with loro-prosemirror:
  * - Document uses Shape.any() because loro-prosemirror manages its structure
- * - Cursor sync uses handle.addEphemeral() for automatic network sync
+ * - Cursor sync uses sync(doc).addEphemeral() for automatic network sync
  *
  * No typed presence schema needed! The CursorEphemeralStore from loro-prosemirror
- * is registered directly via handle.addEphemeral() in the Editor component.
+ * is registered directly via sync(doc).addEphemeral() in the Editor component.
  */
 
 import { useRepo } from "@loro-extended/react"
+import { sync } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ProseMirrorDocSchema } from "../shared/schemas.js"
 import { Editor } from "./editor.js"
@@ -161,12 +162,15 @@ export function App() {
   const [userName, setUserName] = useState(getOrCreateUserName)
   const repo = useRepo()
 
-  // Get handle with untyped document (loro-prosemirror manages structure)
-  // No ephemeral declarations needed - cursor store is added via handle.addEphemeral()
-  const handle = useMemo(
-    () => repo.getHandle(docId, ProseMirrorDocSchema),
+  // Get document with untyped structure (loro-prosemirror manages structure)
+  // No ephemeral declarations needed - cursor store is added via sync(doc).addEphemeral()
+  const doc = useMemo(
+    () => repo.get(docId, ProseMirrorDocSchema),
     [repo, docId],
   )
+
+  // Get peerId from sync ref
+  const peerId = sync(doc).peerId
 
   // Listen for hash changes
   useEffect(() => {
@@ -194,7 +198,7 @@ export function App() {
             <UserNameEditor
               userName={userName}
               onUserNameChange={setUserName}
-              peerId={handle.peerId}
+              peerId={peerId}
             />
             <ShareButton docId={docId} />
           </div>
@@ -203,7 +207,7 @@ export function App() {
 
       {/* Main content */}
       <main className="max-w-4xl mx-auto py-8 px-4">
-        <Editor handle={handle} userName={userName} />
+        <Editor doc={doc} userName={userName} />
 
         {/* Instructions */}
         <div className="mt-8 p-4 bg-white rounded-lg border border-gray-200">

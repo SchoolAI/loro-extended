@@ -3,12 +3,13 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/express"
-import { change } from "@loro-extended/change"
+import { change, loro } from "@loro-extended/change"
 import {
+  type Doc,
   type DocId,
   generateUUID,
-  type HandleWithEphemerals,
   Repo,
+  sync,
 } from "@loro-extended/repo"
 import { streamText } from "ai"
 import cors from "cors"
@@ -35,23 +36,20 @@ app.use(requestLogger())
 const subscriptions = new Map<DocId, () => void>()
 const presences = new Map<DocId, Record<string, Presence>>()
 
-type ChatHandle = HandleWithEphemerals<
-  typeof ChatSchema,
-  typeof ChatEphemeralDeclarations
->
+type ChatDoc = Doc<typeof ChatSchema, typeof ChatEphemeralDeclarations>
 
 /**
  * Stream LLM response directly into a mutable message reference.
  * This is the efficient "targetMessage" pattern - no repeated lookups needed.
  */
 async function streamLLMResponse(
-  handle: ChatHandle,
+  doc: ChatDoc,
   targetMessage: MutableMessage,
 ): Promise<void> {
   try {
     // Convert chat history in document to LLM message context
     const messages: Array<{ role: "user" | "assistant"; content: string }> =
-      handle.doc.messages.toArray().flatMap((msg: Message) =>
+      doc.messages.toArray().flatMap((msg: Message) =>
         msg.id === targetMessage.id
           ? []
           : [
@@ -74,7 +72,7 @@ async function streamLLMResponse(
 
     for await (const chunk of textStream) {
       // Stream directly into the mutable reference - no find() needed!
-      change(handle.doc, () => {
+      change(doc, () => {
         targetMessage.content.insert(targetMessage.content.length, chunk)
       })
     }
@@ -89,13 +87,10 @@ async function streamLLMResponse(
  * Append an assistant message and return a mutable reference to it.
  * The returned reference can be used for efficient streaming.
  */
-function appendAssistantMessage(
-  handle: ChatHandle,
-  content: string,
-): MutableMessage {
+function appendAssistantMessage(doc: ChatDoc, content: string): MutableMessage {
   const id = generateUUID()
 
-  change(handle.doc, (draft: MutableChatDoc) => {
+  change(doc, (draft: MutableChatDoc) => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -108,7 +103,7 @@ function appendAssistantMessage(
   })
 
   // Return mutable reference to the newly added message
-  const msg = handle.doc.messages.get(handle.doc.messages.length - 1)
+  const msg = doc.messages.get(doc.messages.length - 1)
   if (!msg) {
     throw new Error("Failed to get newly added message")
   }
@@ -118,9 +113,9 @@ function appendAssistantMessage(
 /**
  * Process document updates to trigger AI responses.
  */
-function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
+function processDocumentUpdate(docId: DocId, doc: ChatDoc) {
   try {
-    const messagesRef = handle.doc.messages
+    const messagesRef = doc.messages
     logger.debug`Processing doc ${docId}. Message count: ${messagesRef.length}`
 
     if (messagesRef.length === 0) return
@@ -137,7 +132,7 @@ function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
     if (!lastMsg.needsAiReply) return
 
     // Check this off as taken care of
-    change(handle.doc, () => {
+    change(doc, () => {
       lastMsg.needsAiReply = false
     })
 
@@ -158,10 +153,10 @@ function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
     }
 
     // Append an empty assistant message and get a mutable reference
-    const targetMessage = appendAssistantMessage(handle, "")
+    const targetMessage = appendAssistantMessage(doc, "")
 
     // Stream LLM response directly into the target message
-    streamLLMResponse(handle, targetMessage)
+    streamLLMResponse(doc, targetMessage)
   } catch (error) {
     logger.error`Error in document processing: ${error}`
   }
@@ -169,7 +164,7 @@ function processDocumentUpdate(docId: DocId, handle: ChatHandle) {
 
 /**
  * Subscribe to a document to react to changes.
- * Uses HandleWithEphemerals for type-safe document and presence access.
+ * Uses Doc + sync() for type-safe document and presence access.
  */
 function subscribeToDocument(repo: Repo, docId: DocId) {
   if (subscriptions.has(docId)) {
@@ -179,24 +174,22 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
 
   logger.info("Subscribing to document {docId}", { docId })
 
-  const handle = repo.getHandle(docId, ChatSchema, ChatEphemeralDeclarations)
+  const doc = repo.get(docId, ChatSchema, ChatEphemeralDeclarations)
+  const syncRef = sync(doc)
 
-  // Subscribe to messages changes using path-based subscription
-  const unsubscribeDoc = handle.subscribe(
-    p => p.messages,
-    () => {
-      processDocumentUpdate(docId, handle)
-    },
-  )
+  // Subscribe to messages changes using loro() to access the LoroDoc
+  const unsubscribeDoc = loro(doc).subscribe(() => {
+    processDocumentUpdate(docId, doc)
+  })
 
   // Subscribe to presence changes - update the presences map on each change
-  const unsubscribePresence = handle.presence.subscribe(() => {
+  const unsubscribePresence = syncRef.presence.subscribe(() => {
     const all: Record<string, Presence> = {}
-    const self = handle.presence.self
+    const self = syncRef.presence.self
     if (self) {
-      all[handle.peerId] = self
+      all[syncRef.peerId] = self
     }
-    for (const [peerId, presence] of handle.presence.peers.entries()) {
+    for (const [peerId, presence] of syncRef.presence.peers.entries()) {
       all[peerId] = presence
     }
     presences.set(docId, all)
@@ -208,7 +201,7 @@ function subscribeToDocument(repo: Repo, docId: DocId) {
   })
 
   // Check current state immediately (in case we missed the initial sync event)
-  processDocumentUpdate(docId, handle)
+  processDocumentUpdate(docId, doc)
 }
 
 // Create the adapter instances

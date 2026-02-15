@@ -36,7 +36,7 @@ This directory contains architecture documentation and design documents for the 
 | [**@loro-extended/change**](../packages/change/README.md)         | Schema-driven, type-safe wrapper for Loro CRDT. Provides the `Shape` schema builders and `TypedDoc` for natural JavaScript mutations. |
 | [**@loro-extended/repo**](../packages/repo/README.md)             | The sync engine. Manages document lifecycle, storage, and network synchronization through a channel-based adapter architecture.       |
 | [**@loro-extended/hooks-core**](../packages/hooks-core/README.md) | Framework-agnostic hooks for building reactive collaborative UIs.                                                                     |
-| [**@loro-extended/react**](../packages/react/README.md)           | React hooks (`useHandle`, `useDoc`, `useEphemeral`) for building reactive collaborative UIs.                                          |
+| [**@loro-extended/react**](../packages/react/README.md)           | React hooks (`useDocument`, `useValue`, `useEphemeral`) for building reactive collaborative UIs.                                      |
 | [**@loro-extended/hono**](../packages/hono/README.md)             | Hono JSX hooks mirroring the React API for Hono-based applications.                                                                   |
 
 ### Additional Repo Documentation

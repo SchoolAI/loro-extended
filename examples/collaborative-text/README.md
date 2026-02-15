@@ -4,8 +4,8 @@ This example demonstrates best practices for building collaborative forms with `
 
 ## Features
 
-- **Atomic controls**: Dropdown, counter using `useRefValue`
-- **Text controls**: Switchable between `useRefValue` and `useCollaborativeText`
+- **Atomic controls**: Dropdown, counter using `useValue`
+- **Text controls**: Switchable between `useValue` and `useCollaborativeText`
 - **Network delay simulation**: Slider to add 0-10s delay to outgoing messages
 - **Undo/Redo**: Full undo/redo support with keyboard shortcuts
 - **Real-time sync**: Changes sync instantly across browser tabs
@@ -28,19 +28,19 @@ The key insight: **choose your hook based on the control type and collaboration 
 
 | Control Type | Hook | Why |
 |--------------|------|-----|
-| Dropdown, Checkbox, Radio | `useRefValue` | Atomic values - last-write-wins is intuitive |
-| Counter, Slider | `useRefValue` | CRDT counter handles concurrent increments |
-| Text (rarely concurrent) | `useRefValue` | Simpler, controlled inputs work fine |
+| Dropdown, Checkbox, Radio | `useValue` | Atomic values - last-write-wins is intuitive |
+| Counter, Slider | `useValue` | CRDT counter handles concurrent increments |
+| Text (rarely concurrent) | `useValue` | Simpler, controlled inputs work fine |
 | Text (concurrent editing) | `useCollaborativeText` | Character-level merge preserves all edits |
 
-### Atomic Controls (Always `useRefValue`)
+### Atomic Controls (Always `useValue`)
 
-For controls with discrete/atomic values, `useRefValue` is the natural choice because "last-write-wins" is the intuitive behavior:
+For controls with discrete/atomic values, `useValue` is the natural choice because "last-write-wins" is the intuitive behavior:
 
 ```tsx
 // Dropdown - selecting an option is atomic
 function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
-  const { value } = useRefValue(statusRef);
+  const value = useValue(statusRef);
   return (
     <select value={value} onChange={(e) => statusRef.update(e.target.value)}>
       <option value="draft">Draft</option>
@@ -51,7 +51,7 @@ function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
 
 // Counter - increment/decrement operations merge via CRDT
 function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
-  const { value } = useRefValue(priorityRef);
+  const value = useValue(priorityRef);
   return (
     <div>
       <button onClick={() => priorityRef.decrement(1)}>−</button>
@@ -66,11 +66,12 @@ function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
 
 For text inputs, the choice depends on whether concurrent editing is expected:
 
-#### `useRefValue` - For Single-User Sync or Turn-Based Editing
+#### `useValue` - For Single-User Sync or Turn-Based Editing
 
 ```tsx
 function ControlledInput({ textRef }: { textRef: TextRef }) {
-  const { value, placeholder } = useRefValue(textRef);
+  const value = useValue(textRef);
+  const placeholder = usePlaceholder(textRef);
   return (
     <input
       value={value}
@@ -113,7 +114,7 @@ function CollaborativeInput({ textRef }: { textRef: TextRef }) {
 
 ## Network Delay Simulation
 
-The difference between `useRefValue` and `useCollaborativeText` is **hard to see** when testing locally because messages sync almost instantly. To make the merge behavior visible, use the **Network Delay slider** in the toolbar.
+The difference between `useValue` and `useCollaborativeText` is **hard to see** when testing locally because messages sync almost instantly. To make the merge behavior visible, use the **Network Delay slider** in the toolbar.
 
 ### How It Works
 
@@ -134,7 +135,7 @@ wsAdapter.addSendInterceptor((ctx, next) => {
 4. Immediately in Tab B, type "Hello There" in the same field
 5. Wait for sync and observe the merge result
 
-**With `useRefValue`:** You'll see unexpected character interleaving because each keystroke replaces the entire text.
+**With `useValue`:** You'll see unexpected character interleaving because each keystroke replaces the entire text.
 
 **With `useCollaborativeText`:** Both edits are preserved at their insertion points because operations are character-level.
 
@@ -160,7 +161,7 @@ During a partition:
 
 **This is expected!** There's no meaningful "merge" of two dropdown selections.
 
-### Text with `useRefValue`
+### Text with `useValue`
 
 During a partition:
 1. User A: "Hello" → "Hello World"
@@ -198,8 +199,8 @@ const FormSchema = Shape.doc({
 The `useUndoManager` hook provides undo/redo functionality:
 
 ```tsx
-function Editor({ handle }) {
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle);
+function Editor({ doc }) {
+  const { undo, redo, canUndo, canRedo } = useUndoManager(doc);
 
   return (
     <div>
@@ -219,7 +220,7 @@ function Editor({ handle }) {
 │                      Browser Client                          │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐    ┌──────────────────┐    ┌────────────┐ │
-│  │ Form Input  │───▶│   useRefValue    │───▶│  TypedRef  │ │
+│  │ Form Input  │───▶│     useValue     │───▶│  TypedRef  │ │
 │  │  (atomic)   │◀───│                  │◀───│            │ │
 │  └─────────────┘    └──────────────────┘    └────────────┘ │
 │                                                             │

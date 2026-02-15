@@ -1,6 +1,6 @@
 import { Shape } from "@loro-extended/change"
 
-export const TodoSchema = Shape.plain.object({
+export const TodoSchema = Shape.plain.struct({
   id: Shape.plain.string(),
   text: Shape.plain.string(),
   completed: Shape.plain.boolean(),

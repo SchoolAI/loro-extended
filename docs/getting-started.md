@@ -37,7 +37,7 @@ import { Shape } from "@loro-extended/change"
 const TodoSchema = Shape.doc({
   title: Shape.text().placeholder("My Todo List"),
   todos: Shape.list(
-    Shape.map({
+    Shape.struct({
       id: Shape.plain.string(),
       text: Shape.plain.string(),
       completed: Shape.plain.boolean(),
@@ -46,9 +46,9 @@ const TodoSchema = Shape.doc({
 })
 
 // Define presence (ephemeral state shared between users)
-const PresenceSchema = Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
   name: Shape.plain.string(),
-  cursor: Shape.plain.object({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
@@ -72,40 +72,51 @@ const repo = new Repo({
 })
 ```
 
-### 3. Get a Document Handle
+### 3. Get a Document
 
-Use `repo.get()` to access documents. The handle is immediately available:
+Use `repo.get()` to access documents. The document is immediately available:
 
 ```typescript
-// Get a typed handle
-const handle = repo.get("my-todo-list", TodoSchema, { 
+import { sync } from "@loro-extended/repo"
+
+// Get a typed document
+const doc = repo.get("my-todo-list", TodoSchema, { 
   presence: PresenceSchema 
 })
 
 // The document is ready to use immediately
-console.log(handle.doc.toJSON())
+console.log(doc.toJSON())
 // { title: "My Todo List", todos: [] }
+
+// Access sync capabilities
+const syncRef = sync(doc)
+await syncRef.waitForSync()
 ```
 
 ### 4. Mutate the Document
 
-Use `handle.change()` to make mutations:
+Mutate directly on refs or use `change()` for batched updates:
 
 ```typescript
-// Add a todo
-handle.change(draft => {
-  draft.todos.push({
-    id: crypto.randomUUID(),
-    text: "Learn Loro Extended",
-    completed: false,
-  })
+import { change } from "@loro-extended/change"
+
+// Direct mutation on refs
+doc.todos.push({
+  id: crypto.randomUUID(),
+  text: "Learn Loro Extended",
+  completed: false,
 })
 
-// Toggle completion
-handle.change(draft => {
+// Batched mutation with change()
+change(doc, draft => {
+  draft.todos.push({
+    id: crypto.randomUUID(),
+    text: "Build something awesome",
+    completed: false,
+  })
   const todo = draft.todos.get(0)
   if (todo) {
-    todo.completed = !todo.completed
+    todo.completed = true
   }
 })
 ```
@@ -115,18 +126,15 @@ handle.change(draft => {
 Listen for document changes:
 
 ```typescript
+import { loro } from "@loro-extended/change"
+
 // Subscribe to all changes
-const unsubscribe = handle.subscribe(() => {
-  console.log("Document changed:", handle.doc.toJSON())
+const unsubscribe = loro(doc).subscribe(() => {
+  console.log("Document changed:", doc.toJSON())
 })
 
-// Subscribe to specific paths
-handle.subscribe(
-  p => p.todos.$each.completed,
-  (completedStates) => {
-    console.log("Completion states:", completedStates)
-  }
-)
+// Clean up when done
+unsubscribe()
 ```
 
 ## React Integration
@@ -134,42 +142,40 @@ handle.subscribe(
 For React applications, use the provided hooks:
 
 ```tsx
-import { Shape, useHandle, useDoc, useEphemeral, RepoProvider } from "@loro-extended/react"
+import { Shape, change } from "@loro-extended/change"
+import { sync } from "@loro-extended/repo"
+import { useDocument, useValue, useEphemeral, RepoProvider } from "@loro-extended/react"
 
 function TodoApp() {
-  // Get a stable handle (never re-renders)
-  const handle = useHandle("my-todos", TodoSchema, { presence: PresenceSchema })
+  // Get a typed document (stable reference)
+  const doc = useDocument("my-todos", TodoSchema, { presence: PresenceSchema })
   
   // Subscribe to document changes
-  const doc = useDoc(handle)
+  const snapshot = useValue(doc)
   
   // Subscribe to presence
-  const { self, peers } = useEphemeral(handle.presence)
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
   const addTodo = (text: string) => {
-    handle.change(draft => {
-      draft.todos.push({
-        id: crypto.randomUUID(),
-        text,
-        completed: false,
-      })
+    doc.todos.push({
+      id: crypto.randomUUID(),
+      text,
+      completed: false,
     })
   }
 
   return (
     <div>
-      <h1>{doc.title}</h1>
+      <h1>{snapshot.title}</h1>
       <ul>
-        {doc.todos.map((todo, i) => (
+        {snapshot.todos.map((todo, i) => (
           <li key={todo.id}>
             <input
               type="checkbox"
               checked={todo.completed}
               onChange={() => {
-                handle.change(d => {
-                  const t = d.todos.get(i)
-                  if (t) t.completed = !t.completed
-                })
+                const t = doc.todos.get(i)
+                if (t) t.completed = !t.completed
               }}
             />
             {todo.text}
@@ -266,14 +272,18 @@ const repo = new Repo({
 Share transient state like cursors or user status:
 
 ```typescript
+import { sync } from "@loro-extended/repo"
+
+const syncRef = sync(doc)
+
 // Update your presence
-handle.presence.setSelf({
+syncRef.presence.setSelf({
   name: "Alice",
   cursor: { x: 100, y: 200 },
 })
 
-// Read others' presence
-const { self, peers } = useEphemeral(handle.presence)
+// In React, use useEphemeral
+const { self, peers } = useEphemeral(sync(doc).presence)
 
 // self: your own presence state
 // peers: Map<peerId, presence> of other users
@@ -284,16 +294,15 @@ const { self, peers } = useEphemeral(handle.presence)
 Documents are immediately available, but you can wait for specific sync states:
 
 ```typescript
-// Wait for storage to load
-await handle.waitForStorage()
+import { sync } from "@loro-extended/repo"
 
-// Wait for network sync
-await handle.waitForNetwork()
+const syncRef = sync(doc)
 
-// Custom readiness check
-await handle.waitUntilReady(readyStates =>
-  readyStates.some(s => s.state === "loaded")
-)
+// Wait for sync to complete
+await syncRef.waitForSync()
+
+// Check ready states
+console.log(syncRef.readyStates)
 ```
 
 ## Next Steps

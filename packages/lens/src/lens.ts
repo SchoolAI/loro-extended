@@ -14,7 +14,6 @@
 
 import {
   type ChangeOptions,
-  change,
   createTypedDoc,
   type DocShape,
   EXT_SYMBOL,
@@ -302,7 +301,9 @@ export function createLens<D extends DocShape>(
     const frontiersBefore = worldviewLoroDoc.frontiers()
 
     // Apply change to worldview
-    change(worldviewDoc, fn)
+    // Use ext().change() directly to avoid TypeScript overload resolution issues
+    // with generic type parameters in the change() function
+    ext(worldviewDoc).change(fn)
 
     // Capture FRESH frontiers after change
     const frontiersAfter = worldviewLoroDoc.frontiers()

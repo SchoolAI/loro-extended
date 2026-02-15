@@ -1,7 +1,7 @@
-import { change, Shape, useDoc, useHandle } from "@loro-extended/react"
+import { change, Shape, useDocument, useValue } from "@loro-extended/react"
 import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
-import { TodoSchema } from "../shared/types"
+import { type Todo, TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
 import { TodoList } from "./components/todo-list"
 import { useConnectionState } from "./use-connection-state"
@@ -19,19 +19,19 @@ function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
   const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
 
-  // Get handle for mutations, doc for reading (JSON snapshot)
-  const handle = useHandle(docId, schema)
-  const doc = useDoc(handle)
-  const { doc: mutate } = handle
+  // Get doc for mutations and reading
+  const doc = useDocument(docId, schema)
+  // Cast snapshot to help TypeScript infer the schema type
+  const snapshot = useValue(doc) as { todos: readonly Todo[] }
   const connectionState = useConnectionState()
 
   useEffect(() => {
-    console.log("doc state", doc)
-    console.log("handle state", handle)
-  }, [doc, handle])
+    console.log("doc state", snapshot)
+    console.log("doc", doc)
+  }, [snapshot, doc])
 
   const addTodo = (text: string) => {
-    mutate.todos.push({
+    doc.todos.push({
       id: generateUUID(),
       text,
       completed: false,
@@ -39,7 +39,7 @@ function TodoApp() {
   }
 
   const toggleTodo = (id: string) => {
-    change(handle.doc, d => {
+    change(doc, d => {
       const todo = d.todos.find((t: { id: string }) => t.id === id)
       if (todo) {
         todo.completed = !todo.completed
@@ -48,7 +48,7 @@ function TodoApp() {
   }
 
   const deleteTodo = (id: string) => {
-    change(handle.doc, d => {
+    change(doc, d => {
       const index = d.todos.findIndex((t: { id: string }) => t.id === id)
       if (index > -1) {
         d.todos.delete(index, 1)
@@ -73,7 +73,7 @@ function TodoApp() {
       <div className="todo-app">
         <TodoInput onAdd={addTodo} />
         <TodoList
-          todos={doc.todos}
+          todos={snapshot.todos}
           onToggle={toggleTodo}
           onDelete={deleteTodo}
         />

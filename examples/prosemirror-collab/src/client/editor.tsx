@@ -6,7 +6,7 @@
  * This demonstrates the elegant external store integration pattern:
  * - Document uses Shape.any() (loro-prosemirror manages its structure)
  * - Cursor store is loro-prosemirror's CursorEphemeralStore
- * - Network sync is automatic via handle.addEphemeral()
+ * - Network sync is automatic via sync(doc).addEphemeral()
  *
  * No bridge code needed! The CursorEphemeralStore extends EphemeralStore,
  * so when loro-prosemirror calls store.set(), the Synchronizer automatically
@@ -14,7 +14,7 @@
  * and loro-prosemirror sees the update.
  */
 
-import type { HandleWithEphemerals } from "@loro-extended/repo"
+import { type Doc, sync } from "@loro-extended/repo"
 import type { PeerID } from "loro-crdt"
 import {
   CursorEphemeralStore,
@@ -55,11 +55,11 @@ const basePlugins = exampleSetup({
 
 interface EditorProps {
   /**
-   * The document handle.
+   * The document.
    * Document is untyped (Shape.any()) - loro-prosemirror manages its structure.
-   * Cursor sync uses handle.addEphemeral() for automatic network sync.
+   * Cursor sync uses sync(doc).addEphemeral() for automatic network sync.
    */
-  handle: HandleWithEphemerals<ProseMirrorDocShape, Record<string, never>>
+  doc: Doc<ProseMirrorDocShape>
 
   /**
    * The user's display name for cursor labels.
@@ -75,33 +75,37 @@ interface EditorProps {
  * - LoroUndoPlugin for collaborative undo/redo
  * - LoroEphemeralCursorPlugin for cursor presence (via addEphemeral)
  */
-export function Editor({ handle, userName }: EditorProps) {
+export function Editor({ doc, userName }: EditorProps) {
   const editorRef = useRef<EditorView | null>(null)
   const editorDomRef = useRef<HTMLDivElement>(null)
   const cursorStoreRef = useRef<CursorEphemeralStore | null>(null)
 
+  // Get sync ref for accessing peerId and addEphemeral
+  const syncRef = sync(doc)
+  const peerId = syncRef.peerId
+
   // Get user color based on peerId
-  const userColor = useMemo(() => getUserColor(handle.peerId), [handle.peerId])
+  const userColor = useMemo(() => getUserColor(peerId), [peerId])
 
   // Initialize the editor
   useEffect(() => {
     if (editorRef.current || !editorDomRef.current) return
 
     // Access the raw LoroDoc - this is the escape hatch for Shape.any()
-    const loroDoc = handle.loroDoc
+    const loroDoc = syncRef.loroDoc
 
     // Get the container ID for the "doc" map - this is where ProseMirror stores its content
     const containerId = loroDoc.getMap("doc").id
 
     // Create loro-prosemirror's cursor store
-    const cursorStore = new CursorEphemeralStore(handle.peerId as PeerID)
+    const cursorStore = new CursorEphemeralStore(peerId as PeerID)
     cursorStoreRef.current = cursorStore
 
     // Register it for network sync - ONE LINE!
     // The Synchronizer automatically:
     // - Subscribes to store changes (by='local' triggers broadcast)
     // - Applies incoming network data (by='import' updates the store)
-    handle.addEphemeral("cursors", cursorStore)
+    syncRef.addEphemeral("cursors", cursorStore)
 
     // Build plugins array
     // Note: We cast loroDoc to LoroDocType because loro-prosemirror expects
@@ -144,7 +148,7 @@ export function Editor({ handle, userName }: EditorProps) {
       }
       cursorStoreRef.current = null
     }
-  }, [handle, userName, userColor])
+  }, [syncRef, peerId, userName, userColor])
 
   return (
     <div className="editor-container">

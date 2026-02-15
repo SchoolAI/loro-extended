@@ -13,7 +13,7 @@ import {
   WsServerNetworkAdapter,
   wrapWsSocket,
 } from "@loro-extended/adapter-websocket/server"
-import { type PeerID, Repo } from "@loro-extended/repo"
+import { type PeerID, Repo, sync } from "@loro-extended/repo"
 import cors from "cors"
 import express from "express"
 import { WebSocketServer } from "ws"
@@ -55,14 +55,10 @@ logger.info`Repo created with peerId: ${repo.identity.peerId}`
 
 // Get or create the arena document with typed schemas
 // This provides type-safe access to both document and presence data
-const arenaHandle = repo.getHandle(
-  ARENA_DOC_ID,
-  ArenaSchema,
-  GameEphemeralDeclarations,
-)
+const arenaDoc = repo.get(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
 
-// Create game loop with the typed handle - no manual presence wiring needed
-const gameLoop = new GameLoop(arenaHandle)
+// Create game loop with the typed doc - uses sync() for presence access
+const gameLoop = new GameLoop(arenaDoc)
 
 // Start game loop
 gameLoop.start()
@@ -97,8 +93,8 @@ wss.on("connection", (ws, req) => {
 
 // Health check endpoint
 app.get("/health", (_req, res) => {
-  // Access server presence through the typed handle
-  const serverPresence = arenaHandle.presence.self as ServerPresence
+  // Access server presence through sync()
+  const serverPresence = sync(arenaDoc).presence.self as ServerPresence
   res.json({
     status: "ok",
     connections: wss.clients.size,

@@ -45,16 +45,16 @@ const TodoSchema = Shape.doc({
 })
 ```
 
-### 2. Use the Handle
+### 2. Use the Document
 
 ```tsx
 function App() {
-  const handle = useHandle("todos", TodoSchema)
-  const { todos } = useDoc(handle)
+  const doc = useDocument("todos", TodoSchema)
+  const { todos } = useValue(doc)
 
-  // Mutate with handle.doc (direct) or handle.change (batch)
+  // Mutate directly on the doc
   const add = (text: string) => {
-    handle.doc.todos.push({ id: generateUUID(), text, done: false })
+    doc.todos.push({ id: generateUUID(), text, done: false })
   }
 }
 ```

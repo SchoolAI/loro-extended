@@ -2,7 +2,7 @@
  * End-to-end tests for the native WebSocket adapter.
  */
 
-import { change, Repo, Shape, validatePeerId } from "@loro-extended/repo"
+import { change, Repo, Shape, sync, validatePeerId } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -102,17 +102,17 @@ describe("WebSocket Adapter E2E", () => {
     })
 
     // Server also needs to have the document for relay to work
-    serverRepo.getHandle(docId, DocSchema)
+    serverRepo.get(docId, DocSchema)
 
     // Both clients need to "join" the document
-    const handle1 = clientRepo1.getHandle(docId, DocSchema)
-    const handle2 = clientRepo2.getHandle(docId, DocSchema)
+    const doc1 = clientRepo1.get(docId, DocSchema)
+    const doc2 = clientRepo2.get(docId, DocSchema)
 
     // Wait for all parties to sync
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Client 1 makes changes
-    change(handle1.doc, draft => {
+    change(doc1, draft => {
       draft.text.insert(0, "Hello")
     })
 
@@ -121,15 +121,15 @@ describe("WebSocket Adapter E2E", () => {
       const timeout = setTimeout(() => reject(new Error("Sync timeout")), 5000)
 
       // Check if already synced
-      const text = handle2.loroDoc.getText("text")
+      const text = sync(doc2).loroDoc.getText("text")
       if (text && text.toString() === "Hello") {
         clearTimeout(timeout)
         resolve()
         return
       }
 
-      handle2.subscribe(() => {
-        const text = handle2.loroDoc.getText("text")
+      sync(doc2).subscribe(() => {
+        const text = sync(doc2).loroDoc.getText("text")
         if (text && text.toString() === "Hello") {
           clearTimeout(timeout)
           resolve()
@@ -137,7 +137,7 @@ describe("WebSocket Adapter E2E", () => {
       })
     })
 
-    expect(handle2.loroDoc.getText("text").toString()).toBe("Hello")
+    expect(sync(doc2).loroDoc.getText("text").toString()).toBe("Hello")
   }, 10000)
 
   it.skip("should handle reconnection", async () => {

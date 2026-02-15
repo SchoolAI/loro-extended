@@ -44,11 +44,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const wsAdapter = new WsServerNetworkAdapter()
 const repo = new Repo({ adapters: [wsAdapter] })
 
-// 2. Get handle for game document
-const handle = repo.getHandle("rps-game", GameSchema)
+// 2. Get document for game
+const doc = repo.get("rps-game", GameSchema)
 
 let i = 0
-handle.subscribe(event => {
+loro(doc).subscribe(event => {
   i++
   console.dir({ [`${i}: world event`]: event }, { depth: null })
 })
@@ -56,7 +56,7 @@ handle.subscribe(event => {
 // 3. Create Lens attached to Repo's doc
 // The lens will filter world imports into its worldview
 const gameFilter = makeGameFilter()
-const lens = createLens<GameDocShape>(handle.doc, { filter: gameFilter })
+const lens = createLens<GameDocShape>(doc, { filter: gameFilter })
 
 function changeAsServer(fn: GameChangeFn) {
   change(lens, fn, { commitMessage: createIdentityMessage(SERVER_PLAYER_ID) })

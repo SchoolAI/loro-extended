@@ -1,13 +1,19 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import {
   change,
+  type Infer,
   Shape,
-  useDoc,
+  useDocument,
   useEphemeral,
-  useHandle,
   useRepo,
+  useValue,
 } from "@loro-extended/react"
-import { type DocId, generateUUID, type PeerID } from "@loro-extended/repo"
+import {
+  type DocId,
+  generateUUID,
+  type PeerID,
+  sync,
+} from "@loro-extended/repo"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   RoomSchema,
@@ -75,10 +81,10 @@ export default function VideoConferenceApp({
     }
   }, [roomId])
 
-  // NEW API: Get handle with doc and ephemeral schemas
-  const handle = useHandle(roomId, RoomSchema, UserEphemeralDeclarations)
-  const doc = useDoc(handle)
-  const { self: userSelf, peers: userPeers } = useEphemeral(handle.presence)
+  // Get document with doc and ephemeral schemas
+  const doc = useDocument(roomId, RoomSchema, UserEphemeralDeclarations)
+  const snapshot = useValue(doc) as Infer<typeof RoomSchema>
+  const { self: userSelf, peers: userPeers } = useEphemeral(sync(doc).presence)
 
   // Convert to the old format for backward compatibility with existing code
   const userPresence: Record<string, UserPresence> = {}
@@ -101,13 +107,13 @@ export default function VideoConferenceApp({
   // Signaling presence - high-frequency WebRTC signals
   // Uses a separate channel to avoid mixing with user metadata
   const signalingChannelId = `${roomId}:signaling` as DocId
-  const signalingHandle = useHandle(
+  const signalingDoc = useDocument(
     signalingChannelId,
     SignalingDocSchema,
     SignalingEphemeralDeclarations,
   )
   const { self: signalingSelf, peers: signalingPeers } = useEphemeral(
-    signalingHandle.presence,
+    sync(signalingDoc).presence,
   )
 
   // Convert to the old format for backward compatibility
@@ -127,9 +133,9 @@ export default function VideoConferenceApp({
   // Wrapper for setSignalingPresence to match old API
   const setSignalingPresence = useCallback(
     (value: Partial<SignalingPresence>) => {
-      signalingHandle.presence.setSelf(value as SignalingPresence)
+      sync(signalingDoc).presence.setSelf(value as SignalingPresence)
     },
-    [signalingHandle],
+    [signalingDoc],
   )
 
   // Local media (camera/microphone)
@@ -150,8 +156,8 @@ export default function VideoConferenceApp({
   } = useLocalMedia(true, true)
 
   // Get participant peer IDs from the document
-  // doc.participants is already a plain array (useDoc returns JSON)
-  const participants = doc.participants
+  // snapshot.participants is already a plain array (useValue returns JSON)
+  const participants = snapshot.participants
   const participantPeerIds = participants.map(p => p.peerId as PeerID)
 
   // WebRTC mesh for video connections - only needs signaling presence
@@ -178,18 +184,18 @@ export default function VideoConferenceApp({
   // Update user presence with media preferences
   // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
   useEffect(() => {
-    handle.presence.setSelf({
+    sync(doc).presence.setSelf({
       name: displayName,
       wantsAudio: wantsAudio,
       wantsVideo: wantsVideo,
     })
-  }, [displayName, wantsAudio, wantsVideo, handle])
+  }, [displayName, wantsAudio, wantsVideo, doc])
 
   // Join room
   const joinRoom = useCallback(() => {
     const alreadyJoined = participants.some(p => p.peerId === myPeerId)
     if (!alreadyJoined) {
-      change(handle.doc, draft => {
+      change(doc, draft => {
         draft.participants.push({
           peerId: myPeerId,
           name: displayName,
@@ -198,30 +204,30 @@ export default function VideoConferenceApp({
       })
     }
     setHasJoined(true)
-  }, [participants, myPeerId, displayName, handle])
+  }, [participants, myPeerId, displayName, doc])
 
   // Leave room
   const leaveRoom = useCallback(() => {
-    change(handle.doc, draft => {
+    change(doc, draft => {
       const index = draft.participants.findIndex(p => p.peerId === myPeerId)
       if (index !== -1) {
         draft.participants.delete(index, 1)
       }
     })
     setHasJoined(false)
-  }, [myPeerId, handle])
+  }, [myPeerId, doc])
 
   // Remove a participant from the document (used by cleanup hook)
   const removeParticipant = useCallback(
     (peerId: string) => {
-      change(handle.doc, draft => {
+      change(doc, draft => {
         const index = draft.participants.findIndex(p => p.peerId === peerId)
         if (index !== -1) {
           draft.participants.delete(index, 1)
         }
       })
     },
-    [handle],
+    [doc],
   )
 
   // Connection status monitoring

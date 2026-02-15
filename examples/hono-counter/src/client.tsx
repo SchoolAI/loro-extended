@@ -1,6 +1,6 @@
 import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb"
 import { SseClientNetworkAdapter } from "@loro-extended/adapter-sse/client"
-import { RepoProvider, Shape, useDoc, useHandle } from "@loro-extended/hono"
+import { RepoProvider, Shape, useDocument, useValue } from "@loro-extended/hono"
 import {
   generatePeerId,
   type PeerID,
@@ -48,21 +48,21 @@ function App() {
 }
 
 function SyncedCounter() {
-  // NEW API: Get handle first, then subscribe to doc
-  const handle = useHandle("counter", counterSchema)
-  const doc = useDoc(handle)
+  // Get document for mutations and subscribe to value changes
+  const doc = useDocument("counter", counterSchema)
+  const snapshot = useValue(doc)
 
   const increment = () => {
-    handle.doc.count.increment(1)
+    doc.count.increment(1)
   }
 
   const decrement = () => {
-    handle.doc.count.decrement(1)
+    doc.count.decrement(1)
   }
 
   return (
     <div>
-      <div className="counter">{doc.count}</div>
+      <div className="counter">{snapshot.count}</div>
       <div className="btn-group">
         <button type="button" className="btn btn-primary" onClick={decrement}>
           &ndash;

@@ -5,8 +5,13 @@
  * methods for making choices and locking in.
  */
 
-import { change, loro, type Mutable } from "@loro-extended/change"
-import { useHandle, useLens } from "@loro-extended/react"
+import {
+  EXT_SYMBOL,
+  loro,
+  type Mutable,
+  type TypedDoc,
+} from "@loro-extended/change"
+import { useDocument, useLens } from "@loro-extended/react"
 import { useEffect } from "react"
 import { createIdentityMessage } from "../shared/identity.js"
 import { type Choice, type GameDocShape, GameSchema } from "../shared/schema.js"
@@ -19,10 +24,12 @@ import { createClientLensFilter } from "./filters.js"
  * @returns Game state and actions
  */
 export function useRpsGame(playerId: string) {
-  // Get the document handle from Repo
-  const handle = useHandle("rps-game", GameSchema)
+  // Get the document from Repo
+  const doc = useDocument("rps-game", GameSchema)
 
-  const { lens, doc: worldview } = useLens(handle.doc, {
+  // Cast to TypedDoc to help TypeScript infer the schema type correctly
+  // (Doc<D> extends TypedDoc<D> but inference doesn't always propagate)
+  const { lens, doc: worldview } = useLens(doc as TypedDoc<GameDocShape>, {
     filter: createClientLensFilter(playerId),
   })
 
@@ -51,11 +58,19 @@ export function useRpsGame(playerId: string) {
    * Uses commitMessage option for identity-based server filtering.
    */
   const makeChoice = (choice: Choice) => {
-    if (myLocked || phase !== "choosing") return
-
-    change(
-      lens,
-      (d: Mutable<GameDocShape>): void => {
+    if (myLocked || phase !== "choosing")
+      return // Use lens[EXT_SYMBOL].change directly with explicit type annotation
+    ;(
+      lens as {
+        [EXT_SYMBOL]: {
+          change: (
+            fn: (d: Mutable<GameDocShape>) => void,
+            opts?: { commitMessage?: unknown },
+          ) => void
+        }
+      }
+    )[EXT_SYMBOL].change(
+      (d: Mutable<GameDocShape>) => {
         const player = d.game.players.get(playerId)
         if (player) {
           player.choice = choice
@@ -72,11 +87,19 @@ export function useRpsGame(playerId: string) {
    * Once locked, the choice cannot be changed.
    */
   const lockIn = () => {
-    if (!myChoice || myLocked || phase !== "choosing") return
-
-    change(
-      lens,
-      (d: Mutable<GameDocShape>): void => {
+    if (!myChoice || myLocked || phase !== "choosing")
+      return // Use lens[EXT_SYMBOL].change directly with explicit type annotation
+    ;(
+      lens as {
+        [EXT_SYMBOL]: {
+          change: (
+            fn: (d: Mutable<GameDocShape>) => void,
+            opts?: { commitMessage?: unknown },
+          ) => void
+        }
+      }
+    )[EXT_SYMBOL].change(
+      (d: Mutable<GameDocShape>) => {
         const player = d.game.players.get(playerId)
         if (player) {
           player.locked = true
@@ -95,7 +118,7 @@ export function useRpsGame(playerId: string) {
     opponentId,
     opponentLocked,
     opponentChoice: phase === "resolved" ? (opponent?.choice ?? null) : null,
-    isReady: !!handle && !!lens,
+    isReady: !!doc && !!lens,
 
     // Actions
     makeChoice,

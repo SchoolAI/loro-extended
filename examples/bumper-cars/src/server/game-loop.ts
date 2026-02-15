@@ -1,5 +1,5 @@
 import { change } from "@loro-extended/change"
-import type { HandleWithEphemerals, PeerID } from "@loro-extended/repo"
+import { type Doc, type PeerID, sync } from "@loro-extended/repo"
 import {
   type ArenaSchema,
   type CarState,
@@ -33,10 +33,7 @@ export class GameLoop {
   private readonly COLLISION_COOLDOWN = 500 // ms
 
   constructor(
-    private handle: HandleWithEphemerals<
-      typeof ArenaSchema,
-      typeof GameEphemeralDeclarations
-    >,
+    private doc: Doc<typeof ArenaSchema, typeof GameEphemeralDeclarations>,
   ) {}
 
   /**
@@ -70,12 +67,13 @@ export class GameLoop {
     this.tick++
 
     // Get all client presences - combine self and peers
+    const syncRef = sync(this.doc)
     const allPresence: Record<string, GamePresence | undefined> = {}
-    const self = this.handle.presence.self
+    const self = syncRef.presence.self
     if (self) {
-      allPresence[this.handle.peerId] = self
+      allPresence[syncRef.peerId] = self
     }
-    for (const [peerId, presence] of this.handle.presence.peers.entries()) {
+    for (const [peerId, presence] of syncRef.presence.peers.entries()) {
       allPresence[peerId] = presence
     }
     const clientInputs = this.getClientInputs(allPresence)
@@ -261,7 +259,7 @@ export class GameLoop {
    */
   private ensurePlayerScore(peerId: PeerID, name: string, color: string): void {
     // Use change() functional helper for type-safe document mutations
-    change(this.handle.doc, draft => {
+    change(this.doc, draft => {
       if (!draft.scores.has(peerId)) {
         // Use set() to create the entry with initial values
         // Counter starts at 0 by default
@@ -275,7 +273,7 @@ export class GameLoop {
    */
   private incrementScore(peerId: PeerID): void {
     // Use change() functional helper for type-safe document mutations
-    change(this.handle.doc, draft => {
+    change(this.doc, draft => {
       const score = draft.scores.get(peerId)
       if (score) {
         score.bumps.increment(1)
@@ -293,7 +291,7 @@ export class GameLoop {
     }
 
     // TypedPresence provides type-safe presence updates
-    this.handle.presence.setSelf({
+    sync(this.doc).presence.setSelf({
       type: "server",
       cars: carsRecord,
       tick: this.tick,

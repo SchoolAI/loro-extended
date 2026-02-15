@@ -1,4 +1,4 @@
-import { change, Repo, Shape, validatePeerId } from "@loro-extended/repo"
+import { change, Repo, Shape, sync, validatePeerId } from "@loro-extended/repo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { WebSocketServer } from "ws"
 import { WsClientNetworkAdapter } from "../client.js"
@@ -105,17 +105,17 @@ describe("WebSocket Adapter E2E", () => {
 
     // Server also needs to have the document for relay to work
     // The server acts as a hub - it needs to know about the document
-    serverRepo.getHandle(docId, DocSchema)
+    serverRepo.get(docId, DocSchema)
 
     // Both clients need to "join" the document
-    const handle1 = clientRepo1.getHandle(docId, DocSchema)
-    const handle2 = clientRepo2.getHandle(docId, DocSchema)
+    const doc1 = clientRepo1.get(docId, DocSchema)
+    const doc2 = clientRepo2.get(docId, DocSchema)
 
     // Wait for all parties to sync
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Client 1 makes changes
-    change(handle1.doc, draft => {
+    change(doc1, draft => {
       draft.text.insert(0, "Hello")
     })
 
@@ -124,15 +124,15 @@ describe("WebSocket Adapter E2E", () => {
       const timeout = setTimeout(() => reject(new Error("Sync timeout")), 5000)
 
       // Check if already synced
-      const text = handle2.loroDoc.getText("text")
+      const text = sync(doc2).loroDoc.getText("text")
       if (text && text.toString() === "Hello") {
         clearTimeout(timeout)
         resolve()
         return
       }
 
-      handle2.subscribe((_event: any) => {
-        const text = handle2.loroDoc.getText("text")
+      sync(doc2).subscribe(() => {
+        const text = sync(doc2).loroDoc.getText("text")
         if (text && text.toString() === "Hello") {
           clearTimeout(timeout)
           resolve()
@@ -140,7 +140,7 @@ describe("WebSocket Adapter E2E", () => {
       })
     })
 
-    expect(handle2.loroDoc.getText("text").toString()).toBe("Hello")
+    expect(sync(doc2).loroDoc.getText("text").toString()).toBe("Hello")
   }, 10000)
 
   // TODO: Ephemeral presence sync over websocket needs investigation
@@ -157,10 +157,10 @@ describe("WebSocket Adapter E2E", () => {
     })
 
     // Both clients join the document
-    const handle1 = clientRepo1.getHandle(docId, DocSchema, {
+    const doc1 = clientRepo1.get(docId, DocSchema, {
       presence: PresenceSchema,
     })
-    const handle2 = clientRepo2.getHandle(docId, DocSchema, {
+    const doc2 = clientRepo2.get(docId, DocSchema, {
       presence: PresenceSchema,
     })
 
@@ -168,10 +168,10 @@ describe("WebSocket Adapter E2E", () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Client 1 sets presence
-    const presence1 = handle1.presence
+    const presence1 = sync(doc1).presence
 
     // Client 2 listens for presence
-    const presence2 = handle2.presence
+    const presence2 = sync(doc2).presence
 
     // Set presence first, then subscribe
     presence1.setSelf({ cursor: 10 })
@@ -179,29 +179,11 @@ describe("WebSocket Adapter E2E", () => {
     // Wait a bit for sync
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    const presencePromise = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error("Presence timeout")),
-        5000,
-      )
-
-      // Check if already synced (from initial state)
-      const peer1Presence = presence2.get("2000")
-      if (peer1Presence?.cursor === 10) {
-        clearTimeout(timeout)
-        resolve()
-        return
-      }
-
-      presence2.subscribe(event => {
-        // Check if peer1 (peerId "2000") has cursor 10
-        if (event.key === "2000" && event.value?.cursor === 10) {
-          clearTimeout(timeout)
-          resolve()
-        }
-      })
-    })
-
-    await presencePromise
+    // Client 2 should see client 1's presence
+    expect(presence2.get("2000")).toEqual({ cursor: 10 })
   }, 10000)
+
+  it.skip("should handle reconnection", async () => {
+    // This test is skipped for now as reconnection testing is complex
+  })
 })

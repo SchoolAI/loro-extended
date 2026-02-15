@@ -3,10 +3,13 @@ import {
   change,
   RepoProvider,
   Shape,
-  useDoc,
-  useHandle,
+  useDocument,
+  useValue,
 } from "@loro-extended/react"
 import { generateUUID } from "@loro-extended/repo"
+
+type Todo = { id: string; text: string; done: boolean }
+
 import { createRoot } from "react-dom/client"
 import "./styles.css"
 
@@ -23,22 +26,23 @@ const TodoSchema = Shape.doc({
 
 // Main App Component
 function App() {
-  const handle = useHandle("todos", TodoSchema)
-  const { todos } = useDoc(handle)
+  const doc = useDocument("todos", TodoSchema)
+  // Cast snapshot to help TypeScript infer the schema type
+  const { todos } = useValue(doc) as { todos: readonly Todo[] }
 
   const add = (text: string) => {
-    handle.doc.todos.push({ id: generateUUID(), text, done: false })
+    doc.todos.push({ id: generateUUID(), text, done: false })
   }
 
   const toggle = (id: string) => {
-    change(handle.doc, d => {
+    change(doc, d => {
       const todo = d.todos.find(t => t.id === id)
       if (todo) todo.done = !todo.done
     })
   }
 
   const remove = (id: string) => {
-    change(handle.doc, d => {
+    change(doc, d => {
       const idx = d.todos.findIndex(t => t.id === id)
       if (idx !== -1) d.todos.delete(idx, 1)
     })

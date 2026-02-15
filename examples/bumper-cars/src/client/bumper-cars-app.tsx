@@ -1,6 +1,12 @@
-import { useDoc, useEphemeral, useHandle, useRepo } from "@loro-extended/react"
-import type { PeerID } from "@loro-extended/repo"
+import {
+  useDocument,
+  useEphemeral,
+  useRepo,
+  useValue,
+} from "@loro-extended/react"
+import { type PeerID, sync } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { PlayerScore } from "../shared/types"
 import {
   ARENA_DOC_ID,
   ArenaSchema,
@@ -40,10 +46,10 @@ export default function BumperCarsApp({
       CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
   )
 
-  // NEW API: Get handle with both doc and ephemeral schemas
-  const handle = useHandle(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
-  const doc = useDoc(handle)
-  const { self, peers } = useEphemeral(handle.presence)
+  // Get document with both doc and ephemeral schemas
+  const doc = useDocument(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
+  const snapshot = useValue(doc)
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
   // Get server presence (game state) - type-safe filtering
   // Combine self and peers into allPresence for backward compatibility
@@ -129,8 +135,8 @@ export default function BumperCarsApp({
       input: currentInput,
     }
 
-    handle.presence.setSelf(presence)
-  }, [hasJoined, playerName, playerColor, currentInput, handle])
+    sync(doc).presence.setSelf(presence)
+  }, [hasJoined, playerName, playerColor, currentInput, doc])
 
   // Handle join
   const handleJoin = useCallback(
@@ -149,11 +155,11 @@ export default function BumperCarsApp({
         color,
         input: { force: 0, angle: 0 },
       }
-      handle.presence.setSelf(presence)
+      sync(doc).presence.setSelf(presence)
 
       setHasJoined(true)
     },
-    [handle],
+    [doc],
   )
 
   // Handle leaving the game (Escape key)
@@ -165,9 +171,9 @@ export default function BumperCarsApp({
       color: playerColor,
       input: { force: 0, angle: 0 },
     }
-    handle.presence.setSelf(presence)
+    sync(doc).presence.setSelf(presence)
     setHasJoined(false)
-  }, [playerColor, handle])
+  }, [playerColor, doc])
 
   // Listen for Escape key to leave the game
   useEffect(() => {
@@ -185,8 +191,9 @@ export default function BumperCarsApp({
 
   // Get scores sorted by bumps
   const sortedScores = useMemo(() => {
-    // doc.scores is already a plain object (useDoc returns JSON)
-    return Object.entries(doc.scores)
+    // snapshot.scores is already a plain object (useValue returns JSON)
+    const scores = snapshot.scores as Record<string, PlayerScore>
+    return Object.entries(scores)
       .map(([peerId, score]) => ({
         peerId: peerId as PeerID,
         name: score.name,
@@ -195,7 +202,7 @@ export default function BumperCarsApp({
       }))
       .sort((a, b) => b.bumps - a.bumps)
       .slice(0, 5)
-  }, [doc.scores])
+  }, [snapshot.scores])
 
   // Get active players from client presences
   const activePlayers = useMemo(() => {

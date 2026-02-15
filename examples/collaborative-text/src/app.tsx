@@ -4,14 +4,15 @@ import {
 } from "@loro-extended/adapter-websocket/client"
 import {
   type CounterRef,
+  type Infer,
   RepoProvider,
   Shape,
   type TextRef,
   useCollaborativeText,
-  useDoc,
-  useHandle,
-  useRefValue,
+  useDocument,
+  usePlaceholder,
   useUndoManager,
+  useValue,
 } from "@loro-extended/react"
 import { useCallback, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
@@ -45,19 +46,19 @@ const SettingsSchema = Shape.doc({
 // This schema demonstrates the two categories of form controls:
 //
 // 1. ATOMIC CONTROLS (status, priority)
-//    - Use `useRefValue` - values are discrete/atomic
+//    - Use `useValue` - values are discrete/atomic
 //    - "Last-write-wins" is intuitive for dropdowns, checkboxes, counters
 //    - Example: If User A selects "review" and User B selects "published"
 //      during a network partition, one must win - there's no meaningful merge
 //
 // 2. TEXT CONTROLS (title, description, notes)
-//    - Can use either `useRefValue` or `useCollaborativeText`
-//    - useRefValue: Simpler, replaces entire text on each keystroke
+//    - Can use either `useValue` or `useCollaborativeText`
+//    - useValue: Simpler, replaces entire text on each keystroke
 //    - useCollaborativeText: Character-level operations preserve user intent
 //    - Choose based on whether concurrent editing is expected
 //
 const FormSchema = Shape.doc({
-  // Atomic controls - always use useRefValue
+  // Atomic controls - always use useValue
   status: Shape.text().placeholder("draft"), // Dropdown selection
   priority: Shape.counter(), // Numeric counter (0-5)
 
@@ -110,7 +111,7 @@ function ConnectionBar({ state }: { state: ConnectionState }) {
 }
 
 // ============================================
-// Atomic Controls - Always use useRefValue
+// Atomic Controls - Always use useValue
 // ============================================
 // These controls have discrete/atomic values where "last-write-wins"
 // is the intuitive and expected behavior during concurrent edits.
@@ -123,10 +124,10 @@ function ConnectionBar({ state }: { state: ConnectionState }) {
 // merge naturally via CRDT semantics. The UI shows a single value.
 
 /**
- * Status Dropdown - demonstrates useRefValue for atomic selection.
+ * Status Dropdown - demonstrates useValue for atomic selection.
  */
 function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
-  const { value } = useRefValue(statusRef)
+  const value = useValue(statusRef)
 
   return (
     <select
@@ -142,11 +143,11 @@ function StatusDropdown({ statusRef }: { statusRef: TextRef }) {
 }
 
 /**
- * Priority Selector - demonstrates useRefValue with CounterRef.
+ * Priority Selector - demonstrates useValue with CounterRef.
  * CRDT counter handles concurrent increments/decrements automatically.
  */
 function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
-  const { value } = useRefValue(priorityRef) as { value: number }
+  const value = useValue(priorityRef) as number
   const displayValue = Math.max(0, Math.min(5, value))
 
   return (
@@ -179,7 +180,7 @@ function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
 // Text Controls - Choice depends on collaboration pattern
 // ============================================
 //
-// useRefValue (RefValueInput):
+// useValue (RefValueInput):
 //   - Controlled inputs with automatic value/placeholder
 //   - Best for: Single-user sync, form fields, settings
 //   - Tradeoff: Replaces entire text on each keystroke, which can produce
@@ -194,7 +195,7 @@ function PrioritySelector({ priorityRef }: { priorityRef: CounterRef }) {
 // undo/redo will restore cursor position to the correct field automatically.
 
 /**
- * RefValueInput - Controlled input using useRefValue.
+ * RefValueInput - Controlled input using useValue.
  * Simpler code, but replaces entire text on each keystroke.
  */
 function RefValueInput({
@@ -204,7 +205,8 @@ function RefValueInput({
   textRef: TextRef
   multiline?: boolean
 }) {
-  const { value, placeholder } = useRefValue(textRef)
+  const value = useValue(textRef)
+  const placeholder = usePlaceholder(textRef)
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -351,18 +353,23 @@ function SettingsPanel({
 // Main App Component
 // ============================================
 
-function App() {
-  const settingsHandle = useHandle(SETTINGS_DOC_ID, SettingsSchema)
-  const formHandle = useHandle(FORM_DOC_ID, FormSchema)
+// Type alias for settings snapshot
+type SettingsSnapshot = Infer<typeof SettingsSchema>
 
+function App() {
+  // Get documents for mutations and reading
+  const settingsDoc = useDocument(SETTINGS_DOC_ID, SettingsSchema)
+  const formDoc = useDocument(FORM_DOC_ID, FormSchema)
+
+  // Cast to help TypeScript infer the schema type
   const {
     settings: {
       textApproach: textApproachValue,
       networkDelay: networkDelayValue,
     },
-  } = useDoc(settingsHandle)
+  } = useValue(settingsDoc) as SettingsSnapshot
 
-  const { undo, redo, canUndo, canRedo } = useUndoManager(formHandle)
+  const { undo, redo, canUndo, canRedo } = useUndoManager(formDoc)
 
   // Settings state
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -374,7 +381,7 @@ function App() {
       : "collaborative"
 
   const setTextApproach = (approach: TextApproach) => {
-    settingsHandle.doc.settings.textApproach = approach
+    settingsDoc.settings.textApproach = approach
   }
 
   const networkDelay = Math.max(0, Math.min(10000, networkDelayValue ?? 0))
@@ -384,12 +391,12 @@ function App() {
       const currentValue = networkDelayValue ?? 0
       const delta = delay - currentValue
       if (delta > 0) {
-        settingsHandle.doc.settings.networkDelay.increment(delta)
+        settingsDoc.settings.networkDelay.increment(delta)
       } else if (delta < 0) {
-        settingsHandle.doc.settings.networkDelay.decrement(-delta)
+        settingsDoc.settings.networkDelay.decrement(-delta)
       }
     },
-    [settingsHandle.doc.settings, networkDelayValue],
+    [settingsDoc.settings, networkDelayValue],
   )
 
   // Connection status
@@ -464,12 +471,12 @@ function App() {
         <div className="form-section">
           <div className="field">
             <span className="field-label">Status</span>
-            <StatusDropdown statusRef={formHandle.doc.status} />
+            <StatusDropdown statusRef={formDoc.status} />
           </div>
 
           <div className="field">
             <span className="field-label">Priority</span>
-            <PrioritySelector priorityRef={formHandle.doc.priority} />
+            <PrioritySelector priorityRef={formDoc.priority} />
           </div>
         </div>
 
@@ -479,17 +486,17 @@ function App() {
         <div className="form-section">
           <div className="field">
             <span className="field-label">Title</span>
-            {renderTextInput(formHandle.doc.title)}
+            {renderTextInput(formDoc.title)}
           </div>
 
           <div className="field">
             <span className="field-label">Description</span>
-            {renderTextInput(formHandle.doc.description, true)}
+            {renderTextInput(formDoc.description, true)}
           </div>
 
           <div className="field">
             <span className="field-label">Notes</span>
-            {renderTextInput(formHandle.doc.notes, true)}
+            {renderTextInput(formDoc.notes, true)}
           </div>
         </div>
 

@@ -35,14 +35,14 @@ async function main() {
 
   // Create and modify a document
   console.log("\n📝 Creating document...")
-  const handle = repo.getHandle("my-doc", DocSchema)
-  change(handle.doc, doc => {
-    doc.root.message = "Hello from PostgreSQL!"
-    doc.root.timestamp = Date.now()
+  const doc = repo.get("my-doc", DocSchema)
+  change(doc, d => {
+    d.root.message = "Hello from PostgreSQL!"
+    d.root.timestamp = Date.now()
   })
 
-  console.log("✅ Document created:", handle.docId)
-  console.log("📄 Content:", JSON.stringify(handle.doc.toJSON(), null, 2))
+  console.log("✅ Document created:", "my-doc")
+  console.log("📄 Content:", JSON.stringify(doc.toJSON(), null, 2))
 
   // Wait for storage to persist
   console.log("\n⏳ Waiting for storage to persist...")
@@ -60,15 +60,12 @@ async function main() {
 
   // Make another change
   console.log("\n📝 Making another change...")
-  change(handle.doc, doc => {
-    doc.root.updated = true
-    doc.root.updateTime = Date.now()
+  change(doc, d => {
+    d.root.updated = true
+    d.root.updateTime = Date.now()
   })
 
-  console.log(
-    "📄 Updated content:",
-    JSON.stringify(handle.doc.toJSON(), null, 2),
-  )
+  console.log("📄 Updated content:", JSON.stringify(doc.toJSON(), null, 2))
 
   // Wait for storage to persist
   await new Promise(resolve => setTimeout(resolve, 200))
