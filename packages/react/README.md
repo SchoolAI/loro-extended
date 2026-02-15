@@ -377,44 +377,18 @@ doc.count.increment(1)              // OK
 doc.items.push("new item")          // OK
 ```
 
-## Migration from Previous API
+## Removed in v6
 
-If you're upgrading from the handle-based API:
+The following APIs were removed in v6. If upgrading from v5, use the replacements shown:
 
-**Before (deprecated):**
-```typescript
-const handle = useHandle(docId, schema, { presence: PresenceSchema })
-const snapshot = useDoc(handle)
-const { value, placeholder } = useRefValue(handle.doc.title)
-handle.doc.title.insert(0, "Hello")
-await handle.waitForSync()
-handle.presence.setSelf({ status: "online" })
-```
-
-**After (recommended):**
-```typescript
-import { sync } from "@loro-extended/react"
-
-const doc = useDocument(docId, schema, { presence: PresenceSchema })
-const snapshot = useValue(doc)
-const title = useValue(doc.title)
-const placeholder = usePlaceholder(doc.title)
-doc.title.insert(0, "Hello")
-await sync(doc).waitForSync()
-sync(doc).presence.setSelf({ status: "online" })
-```
-
-## Deprecated Hooks
-
-The following hooks are deprecated but still exported for backward compatibility:
-
-| Deprecated | Replacement |
-|------------|-------------|
+| Removed | Replacement |
+|---------|-------------|
 | `useHandle(docId, schema)` | `useDocument(docId, schema)` |
 | `useDoc(handle)` | `useValue(doc)` |
 | `useRefValue(ref)` | `useValue(ref)` + `usePlaceholder(ref)` |
-
-These deprecated hooks will emit console warnings in development.
+| `handle.doc.field` | `doc.field` (direct access) |
+| `handle.waitForSync()` | `sync(doc).waitForSync()` |
+| `handle.presence` | `sync(doc).presence` |
 
 ## Examples
 

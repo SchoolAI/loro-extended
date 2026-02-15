@@ -4,20 +4,21 @@ Hono JSX hooks for building real-time collaborative applications with [Loro CRDT
 
 ## What This Package Does
 
-This package provides Hono JSX-specific bindings for Loro CRDT documents with a handle-first pattern:
+This package provides Hono JSX-specific bindings for Loro CRDT documents with a Doc-first pattern:
 
-- **`useHandle`** - Get a stable, typed document handle
-- **`useDoc`** - Subscribe to document changes with optional selectors
+- **`useDocument`** - Get a typed document with sync capabilities
+- **`useValue`** - Subscribe to document or ref changes
+- **`usePlaceholder`** - Get placeholder values from schema definitions
 - **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 This package mirrors the API of `@loro-extended/react` but uses Hono's JSX implementation (`hono/jsx`) instead of React.
 
 ### Key Features
 
-- **Stable References** - Handles never change, preventing unnecessary re-renders
-- **Fine-Grained Reactivity** - Use selectors to only re-render when specific data changes
 - **Type Safety** - Full TypeScript support with schema-driven type inference
-- **Unified Presence** - Document and presence are managed together through the handle
+- **Fine-Grained Reactivity** - Subscribe to entire documents or specific refs
+- **Unified Sync** - Use `sync(doc)` for sync capabilities like `waitForSync()` and presence
+- **Placeholder Support** - Extract placeholders defined in your schema
 
 ## Installation
 
@@ -30,7 +31,7 @@ pnpm add @loro-extended/hono @loro-extended/change @loro-extended/repo loro-crdt
 ## Quick Start
 
 ```tsx
-import { Shape, useHandle, useDoc, RepoProvider } from "@loro-extended/hono"
+import { Shape, useDocument, useValue, RepoProvider } from "@loro-extended/hono"
 import { useMemo } from "hono/jsx"
 import { render } from "hono/jsx/dom"
 import type { RepoParams } from "@loro-extended/repo"
@@ -41,27 +42,23 @@ const CounterSchema = Shape.doc({
 })
 
 function Counter() {
-  // Get a stable handle (never re-renders)
-  const handle = useHandle("counter", CounterSchema)
+  // Get a typed document
+  const doc = useDocument("counter", CounterSchema)
   
   // Subscribe to document changes
-  const doc = useDoc(handle)
+  const snapshot = useValue(doc)
 
   const increment = () => {
-    handle.change(d => {
-      d.count.increment(1)
-    })
+    doc.count.increment(1)
   }
 
   const decrement = () => {
-    handle.change(d => {
-      d.count.decrement(1)
-    })
+    doc.count.decrement(1)
   }
 
   return (
     <div>
-      <div>{doc.count}</div>
+      <div>{snapshot.count}</div>
       <button onClick={decrement}>-</button>
       <button onClick={increment}>+</button>
     </div>
@@ -87,76 +84,81 @@ render(<App />, document.getElementById("root")!)
 
 ## Core Hooks
 
-### `useHandle(docId, docSchema, presenceSchema?)`
+### `useDocument(docId, docSchema, ephemeralDeclarations?)`
 
-Returns a stable `TypedDocHandle` for the given document. The handle is created synchronously and never changes.
+Returns a typed `Doc` for the given document. The document is created synchronously and provides direct access to typed refs.
 
 ```typescript
-// Without presence
-const handle = useHandle(docId, docSchema)
+import { sync } from "@loro-extended/repo"
 
-// With presence
-const handle = useHandle(docId, docSchema, presenceSchema)
+// Without ephemeral stores
+const doc = useDocument(docId, docSchema)
+
+// With ephemeral stores (e.g., presence)
+const doc = useDocument(docId, docSchema, { presence: PresenceSchema })
+
+// Access sync capabilities
+await sync(doc).waitForSync()
+sync(doc).presence.setSelf({ status: "online" })
 ```
 
 **Parameters:**
 - `docId: DocId` - The document identifier
 - `docSchema: DocShape` - The document schema
-- `presenceSchema?: ValueShape` - Optional presence schema
+- `ephemeralDeclarations?: EphemeralDeclarations` - Optional ephemeral store declarations
 
-**Returns:** `Handle<D, E>` with:
-- `handle.doc` - The typed document (TypedDoc)
-- `handle.change(fn)` - Mutate the document (batched transaction)
-- `handle.loroDoc` - Raw LoroDoc for untyped access
-- `handle.docId` - The document ID
-- `handle.readyStates` - Sync status information
+**Returns:** `Doc<D, E>` - A typed document with direct ref access
 
-### `useDoc(handle, selector?)`
+### `useValue(docOrRef)`
 
-Subscribes to document changes and returns the current value.
+Subscribes to document or ref changes and returns the current value.
 
 ```typescript
-// Full document
-const doc = useDoc(handle)
+// Full document snapshot
+const snapshot = useValue(doc)
 
-// With selector (fine-grained updates)
-const count = useDoc(handle, d => d.count)
+// Single ref value (fine-grained updates)
+const count = useValue(doc.count)
+const title = useValue(doc.title)
+const items = useValue(doc.items)
 ```
 
 **Parameters:**
-- `handle: TypedDocHandle<D>` - The document handle
-- `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector
+- `docOrRef: Doc | TypedRef` - A document or typed ref
 
-**Returns:** The document value or selected value
+**Returns:** The current value (type inferred from input)
+
+### `usePlaceholder(ref)`
+
+Returns the placeholder value defined in the schema for a ref.
+
+```typescript
+const placeholder = usePlaceholder(doc.title) // From Shape.text().placeholder("...")
+```
+
+**Parameters:**
+- `ref: TypedRef` - A typed ref with a placeholder defined
+
+**Returns:** The placeholder value or `undefined`
 
 ### `useEphemeral(ephemeral)`
 
 Subscribes to any ephemeral store and returns the current state. This is the preferred way to subscribe to presence and other ephemeral data.
 
 ```typescript
+import { sync } from "@loro-extended/repo"
+
 // For presence
-const { self, peers } = useEphemeral(handle.presence)
+const { self, peers } = useEphemeral(sync(doc).presence)
 
 // Update your value
-handle.presence.setSelf({ cursor: { x: 100, y: 200 } })
+sync(doc).presence.setSelf({ cursor: { x: 100, y: 200 } })
 ```
 
 **Parameters:**
-- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store from the handle
+- `ephemeral: TypedEphemeral<T>` - A typed ephemeral store
 
 **Returns:** `{ self: T | undefined, peers: Map<string, T> }`
-
-### `usePresence(handle)` (Deprecated)
-
-> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
-
-Subscribes to presence changes.
-
-```typescript
-const { self, peers } = usePresence(handle)
-```
-
-**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
 
 ### `useRepo()`
 
@@ -170,12 +172,14 @@ const myPeerId = repo.identity.peerId
 ## Presence Example
 
 ```tsx
+import { sync } from "@loro-extended/repo"
+
 const DocSchema = Shape.doc({
   content: Shape.text(),
 })
 
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
@@ -183,21 +187,21 @@ const PresenceSchema = Shape.plain.object({
 })
 
 function CollaborativeEditor() {
-  const handle = useHandle("doc", DocSchema, { presence: PresenceSchema })
-  const doc = useDoc(handle)
-  const { self, peers } = useEphemeral(handle.presence)
+  const doc = useDocument("doc", DocSchema, { presence: PresenceSchema })
+  const snapshot = useValue(doc)
+  const { self, peers } = useEphemeral(sync(doc).presence)
 
   const handleMouseMove = (e: MouseEvent) => {
-    handle.presence.setSelf({
+    sync(doc).presence.setSelf({
       cursor: { x: e.clientX, y: e.clientY }
     })
   }
 
   return (
     <div onMouseMove={handleMouseMove}>
-      <div>Content: {doc.content}</div>
+      <div>Content: {snapshot.content}</div>
       <div>
-        Users: {self.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
+        Users: {self?.name}, {Array.from(peers.values()).map(p => p.name).join(", ")}
       </div>
     </div>
   )
@@ -232,23 +236,6 @@ function App() {
 }
 ```
 
-## Migration from Previous API
-
-If you're upgrading from the previous `useDocument` API:
-
-**Before:**
-```typescript
-const [doc, changeDoc, handle] = useDocument(docId, schema, emptyState)
-changeDoc(d => { d.count.increment(1) })
-```
-
-**After:**
-```typescript
-const handle = useHandle(docId, schema)
-const doc = useDoc(handle)
-handle.change(d => { d.count.increment(1) })
-```
-
 ## Differences from @loro-extended/react
 
 This package is nearly identical to `@loro-extended/react`, with the following differences:
@@ -264,7 +251,7 @@ The API surface is intentionally kept the same to make it easy to switch between
 For a full collaborative Hono application, see the [Hono Counter Example](../../examples/hono-counter/README.md) which demonstrates:
 
 - Setting up the Repo with network adapters
-- Using `useHandle` and `useDoc` for reactive document state
+- Using `useDocument` and `useValue` for reactive document state
 - Building collaborative UI components with Hono JSX
 
 ## Requirements

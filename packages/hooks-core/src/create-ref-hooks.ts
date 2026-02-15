@@ -31,22 +31,6 @@ import { hasToJSON } from "./utils/type-guards"
  */
 export type AnyTypedRef = Exclude<ContainerShape, AnyContainerShape>["_mutable"]
 
-/**
- * Return type for useRefValue hook (deprecated).
- *
- * Returns an object with:
- * - `value`: The current JSON value of the ref (via `toJSON()`)
- * - `placeholder`: Optional placeholder value if defined in the shape
- *
- * @deprecated Use `useValue(ref)` for value and `usePlaceholder(ref)` for placeholder instead.
- */
-export type UseRefValueReturn<R extends AnyTypedRef> = {
-  /** The current value (from ref.toJSON()) */
-  value: ReturnType<R["toJSON"]>
-  /** The placeholder value, if defined in the shape */
-  placeholder?: ReturnType<R["toJSON"]>
-}
-
 // ============================================================================
 // Helper to check if something is a TypedDoc
 // ============================================================================
@@ -91,13 +75,13 @@ function getVersionKey(loroDoc: LoroDoc): string {
  * Creates ref-level hooks for subscribing to individual typed refs and docs.
  *
  * @param framework - Framework-specific hook implementations
- * @returns Object containing useValue, usePlaceholder, and useRefValue hooks
+ * @returns Object containing useValue and usePlaceholder hooks
  */
 export function createRefHooks(framework: FrameworkHooks) {
   const { useRef, useMemo, useSyncExternalStore } = framework
 
   // ============================================
-  // useValue - Subscribe to value (NEW PRIMARY API)
+  // useValue - Subscribe to value (PRIMARY API)
   // ============================================
 
   /**
@@ -237,85 +221,5 @@ export function createRefHooks(framework: FrameworkHooks) {
     }, [ref])
   }
 
-  // ============================================
-  // useRefValue - DEPRECATED
-  // ============================================
-
-  /**
-   * @deprecated Use `useValue(ref)` for value and `usePlaceholder(ref)` for placeholder.
-   *
-   * Migration:
-   * ```tsx
-   * // Before
-   * const { value, placeholder } = useRefValue(doc.title)
-   *
-   * // After
-   * const value = useValue(doc.title)
-   * const placeholder = usePlaceholder(doc.title)
-   * ```
-   *
-   * @param ref - A typed ref (TextRef, ListRef, CounterRef, etc.)
-   * @returns Object with the current value and placeholder (if applicable)
-   */
-  function useRefValue<R extends AnyTypedRef>(ref: R): UseRefValueReturn<R> {
-    // Emit deprecation warning in development
-    if (
-      typeof globalThis !== "undefined" &&
-      (globalThis as Record<string, unknown>).__LORO_DEV_WARNINGS__ !== false
-    ) {
-      console.warn(
-        "[loro-extended] useRefValue is deprecated. " +
-          "Use useValue(ref) for value and usePlaceholder(ref) for placeholder.",
-      )
-    }
-
-    // Get the loro container for subscription
-    const loroRef = useMemo(
-      () => loro(ref as Parameters<typeof loro>[0]) as Container,
-      [ref],
-    )
-
-    // Cache ref for the sync store
-    const cacheRef = useRef<UseRefValueReturn<R> | null>(null)
-
-    const store = useMemo(() => {
-      // Compute the current value
-      const computeValue = (): UseRefValueReturn<R> => {
-        // For TextRef, use raw CRDT value to avoid placeholder overlay
-        if (isTextRef(ref)) {
-          const value = getRawTextValue(ref)
-          const placeholder = getPlaceholder<string>(ref)
-          if (placeholder) {
-            return { value, placeholder } as UseRefValueReturn<R>
-          }
-          return { value } as UseRefValueReturn<R>
-        }
-
-        // For other ref types, use toJSON()
-        if (hasToJSON(ref)) {
-          const value = ref.toJSON()
-          const placeholder = getPlaceholder(ref)
-          if (placeholder) {
-            return { value, placeholder } as UseRefValueReturn<R>
-          }
-          return { value } as UseRefValueReturn<R>
-        }
-
-        throw new Error(
-          "[useRefValue] Ref does not have a toJSON method. This is likely a bug.",
-        )
-      }
-
-      // Subscribe to container changes
-      const subscribeToSource = (onChange: () => void) => {
-        return loroRef.subscribe(onChange)
-      }
-
-      return createSyncStore(computeValue, subscribeToSource, cacheRef)
-    }, [ref, loroRef])
-
-    return useSyncExternalStore(store.subscribe, store.getSnapshot)
-  }
-
-  return { useValue, usePlaceholder, useRefValue }
+  return { useValue, usePlaceholder }
 }

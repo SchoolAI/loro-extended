@@ -14,15 +14,10 @@
  *
  * const frameworkHooks = { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore, useContext, createContext }
  *
- * // New API (recommended)
  * export const { RepoContext, useRepo, useDocument, useEphemeral, useLens } = createHooks(frameworkHooks)
  * export const { useValue, usePlaceholder } = createRefHooks(frameworkHooks)
  * export const { useCollaborativeText } = createTextHooks(frameworkHooks)
  * export const { useUndoManager } = createUndoHooks(frameworkHooks)
- *
- * // Deprecated (still exported for backward compatibility)
- * export const { useHandle, useDoc } = createHooks(frameworkHooks)
- * export const { useRefValue } = createRefHooks(frameworkHooks)
  * ```
  */
 
@@ -30,7 +25,7 @@
 export type { ChangeOptions, Lens, LensOptions } from "@loro-extended/lens"
 // Core hooks factory
 export { createHooks } from "./create-hooks"
-export type { AnyTypedRef, UseRefValueReturn } from "./create-ref-hooks"
+export type { AnyTypedRef } from "./create-ref-hooks"
 // Ref hooks factory and types
 export { createRefHooks } from "./create-ref-hooks"
 export type {

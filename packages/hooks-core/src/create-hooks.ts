@@ -10,11 +10,10 @@ import type {
   Doc,
   DocId,
   EphemeralDeclarations,
-  Handle,
-  HandleWithEphemerals,
   Repo,
   TypedEphemeral,
 } from "@loro-extended/repo"
+import type { LoroDoc } from "loro-crdt"
 import type { FrameworkHooks } from "./types"
 import { createSyncStore } from "./utils/create-sync-store"
 
@@ -23,17 +22,11 @@ import { createSyncStore } from "./utils/create-sync-store"
  * These hooks provide repository context, document access, and ephemeral state.
  *
  * @param framework - Framework-specific hook implementations
- * @returns Object containing RepoContext, useRepo, useDocument, useHandle, useDoc, and useEphemeral
+ * @returns Object containing RepoContext, useRepo, useDocument, useLens, and useEphemeral
  */
 export function createHooks(framework: FrameworkHooks) {
-  const {
-    useState,
-    useMemo,
-    useRef,
-    useSyncExternalStore,
-    useContext,
-    createContext,
-  } = framework
+  const { useMemo, useRef, useSyncExternalStore, useContext, createContext } =
+    framework
 
   // ============================================
   // RepoContext & useRepo
@@ -48,7 +41,7 @@ export function createHooks(framework: FrameworkHooks) {
   }
 
   // ============================================
-  // useDocument - Get typed document (NEW PRIMARY API)
+  // useDocument - Get typed document (PRIMARY API)
   // ============================================
 
   /**
@@ -119,83 +112,12 @@ export function createHooks(framework: FrameworkHooks) {
   }
 
   // ============================================
-  // useHandle - Get typed handle (DEPRECATED)
-  // ============================================
-
-  // Overload: without ephemeral stores
-  function useHandle<D extends DocShape>(
-    docId: DocId,
-    docSchema: D,
-  ): Handle<D, Record<string, never>>
-
-  // Overload: with ephemeral stores (including presence)
-  function useHandle<D extends DocShape, E extends EphemeralDeclarations>(
-    docId: DocId,
-    docSchema: D,
-    ephemeralShapes: E,
-  ): HandleWithEphemerals<D, E>
-
-  /**
-   * @deprecated Use `useDocument(docId, schema)` instead.
-   *
-   * Migration:
-   * ```tsx
-   * // Before
-   * const handle = useHandle(docId, schema)
-   * handle.doc.title.insert(0, "Hello")
-   *
-   * // After
-   * const doc = useDocument(docId, schema)
-   * doc.title.insert(0, "Hello")
-   * ```
-   *
-   * For sync access, use `sync(doc)` from `@loro-extended/repo`:
-   * ```tsx
-   * import { sync } from "@loro-extended/repo"
-   * sync(doc).waitForSync()
-   * sync(doc).presence.setSelf({ ... })
-   * ```
-   */
-  function useHandle<D extends DocShape, E extends EphemeralDeclarations>(
-    docId: DocId,
-    docSchema: D,
-    ephemeralShapes?: E,
-  ): HandleWithEphemerals<D, E> | Handle<D, Record<string, never>> {
-    // Emit deprecation warning in development
-    if (
-      typeof globalThis !== "undefined" &&
-      (globalThis as Record<string, unknown>).__LORO_DEV_WARNINGS__ !== false
-    ) {
-      console.warn(
-        "[loro-extended] useHandle is deprecated. Use useDocument(docId, schema) instead. " +
-          "For sync access, use sync(doc) from @loro-extended/repo.",
-      )
-    }
-
-    const repo = useRepo()
-
-    // Synchronous initialization - no null state, no flickering
-    const [handle] = useState(() => {
-      if (ephemeralShapes) {
-        return repo.getHandle(docId, docSchema, ephemeralShapes)
-      }
-      return repo.getHandle(docId, docSchema)
-    })
-
-    return handle as
-      | HandleWithEphemerals<D, E>
-      | Handle<D, Record<string, never>>
-  }
-
-  // ============================================
-  // useDoc - Get document JSON snapshot (DEPRECATED)
+  // useLens - Create lens + Get worldview snapshot (reactive)
   // ============================================
 
   // Helper to create a version key that changes on checkout
   // This combines opCount (changes on edits) with frontiers (changes on checkout)
-  function getVersionKey(
-    loroDoc: Handle<DocShape, EphemeralDeclarations>["loroDoc"],
-  ): string {
+  function getVersionKey(loroDoc: LoroDoc): string {
     const opCount = loroDoc.opCount()
     const frontiers = loroDoc.frontiers()
     // Serialize frontiers to a stable string
@@ -205,93 +127,6 @@ export function createHooks(framework: FrameworkHooks) {
       .join(",")
     return `${opCount}|${frontiersKey}`
   }
-
-  // Overload: with selector (fine-grained)
-  function useDoc<D extends DocShape, R>(
-    handle: Handle<D, EphemeralDeclarations>,
-    selector: (doc: Infer<D>) => R,
-  ): R
-
-  // Overload: without selector (full doc JSON)
-  function useDoc<D extends DocShape>(
-    handle: Handle<D, EphemeralDeclarations>,
-  ): Infer<D>
-
-  /**
-   * @deprecated Use `useValue(doc)` instead.
-   *
-   * Migration:
-   * ```tsx
-   * // Before
-   * const handle = useHandle(docId, schema)
-   * const snapshot = useDoc(handle)
-   *
-   * // After
-   * const doc = useDocument(docId, schema)
-   * const snapshot = useValue(doc)
-   * ```
-   */
-  function useDoc<D extends DocShape, R>(
-    handle: Handle<D, EphemeralDeclarations>,
-    selector?: (doc: Infer<D>) => R,
-  ): R | Infer<D> {
-    // Emit deprecation warning in development
-    if (
-      typeof globalThis !== "undefined" &&
-      (globalThis as Record<string, unknown>).__LORO_DEV_WARNINGS__ !== false
-    ) {
-      console.warn(
-        "[loro-extended] useDoc(handle) is deprecated. Use useValue(doc) instead. " +
-          "Get the doc via useDocument(docId, schema).",
-      )
-    }
-
-    // Use a ref to cache the snapshot and track version
-    const cacheRef = useRef<{
-      version: string
-      value: R | Infer<D>
-    } | null>(null)
-
-    const store = useMemo(() => {
-      // Compute the current snapshot value
-      // Optimization: Check version first to avoid unnecessary toJSON() calls
-      // Version includes both opCount and frontiers to detect checkout changes
-      const computeValue = (): { version: string; value: R | Infer<D> } => {
-        const newVersion = getVersionKey(handle.loroDoc)
-
-        // If we have a cached value with the same version, return it
-        // This avoids expensive toJSON() calls when the document hasn't changed
-        if (cacheRef.current && cacheRef.current.version === newVersion) {
-          return cacheRef.current
-        }
-
-        // Version changed or no cache - compute new value
-        const json = handle.doc.toJSON()
-        return {
-          version: newVersion,
-          value: selector ? selector(json) : json,
-        }
-      }
-
-      // Subscribe to document changes
-      // Note: We always call onChange() and let createSyncStore handle the caching.
-      // The version check in computeValue() will prevent unnecessary re-renders.
-      const subscribeToSource = (onChange: () => void) => {
-        return handle.loroDoc.subscribe(() => {
-          onChange()
-        })
-      }
-
-      return createSyncStore(computeValue, subscribeToSource, cacheRef)
-    }, [handle, selector])
-
-    const result = useSyncExternalStore(store.subscribe, store.getSnapshot)
-    return result.value
-  }
-
-  // ============================================
-  // useLens - Create lens + Get worldview snapshot (reactive)
-  // ============================================
 
   function useLens<D extends DocShape>(
     world: TypedDoc<D>,
@@ -375,10 +210,6 @@ export function createHooks(framework: FrameworkHooks) {
    *
    * const doc = useDocument(docId, DocSchema, { presence: PresenceSchema })
    * const { self, peers } = useEphemeral(sync(doc).presence)
-   *
-   * // Or with legacy useHandle
-   * const handle = useHandle(docId, DocSchema, { mouse: MouseSchema })
-   * const { self, peers } = useEphemeral(handle.mouse)
    * ```
    */
   function useEphemeral<T>(ephemeral: TypedEphemeral<T>): {
@@ -417,8 +248,6 @@ export function createHooks(framework: FrameworkHooks) {
     RepoContext,
     useRepo,
     useDocument,
-    useHandle,
-    useDoc,
     useLens,
     useEphemeral,
   }

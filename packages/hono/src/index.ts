@@ -10,23 +10,22 @@ export { change, ext, loro, Shape } from "@loro-extended/change"
 export type {
   UseCollaborativeTextOptions,
   UseCollaborativeTextReturn,
-  UseRefValueReturn,
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
-// Re-export handle types
-export type { DocId, Handle } from "@loro-extended/repo"
-
+// Re-export doc types
+export type { Doc, DocId } from "@loro-extended/repo"
 // Hooks
 export {
   RepoContext,
   useCollaborativeText,
-  useDoc,
+  useDocument,
   useEphemeral,
-  useHandle,
-  useRefValue,
+  useLens,
+  usePlaceholder,
   useRepo,
   useUndoManager,
+  useValue,
 } from "./hooks-core.js"
 
 // Context provider

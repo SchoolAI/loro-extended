@@ -7,12 +7,13 @@ import {
   RepoProvider,
   Shape,
   useCollaborativeText,
-  useDoc,
+  useDocument,
   useEphemeral,
-  useHandle,
-  useRefValue,
+  useLens,
+  usePlaceholder,
   useRepo,
   useUndoManager,
+  useValue,
 } from "./index.js"
 
 describe("@loro-extended/hono exports", () => {
@@ -30,14 +31,19 @@ describe("@loro-extended/hono exports", () => {
     expect(typeof useRepo).toBe("function")
   })
 
-  it("exports useHandle hook", () => {
-    expect(useHandle).toBeDefined()
-    expect(typeof useHandle).toBe("function")
+  it("exports useDocument hook", () => {
+    expect(useDocument).toBeDefined()
+    expect(typeof useDocument).toBe("function")
   })
 
-  it("exports useDoc hook", () => {
-    expect(useDoc).toBeDefined()
-    expect(typeof useDoc).toBe("function")
+  it("exports useValue hook", () => {
+    expect(useValue).toBeDefined()
+    expect(typeof useValue).toBe("function")
+  })
+
+  it("exports usePlaceholder hook", () => {
+    expect(usePlaceholder).toBeDefined()
+    expect(typeof usePlaceholder).toBe("function")
   })
 
   it("exports useEphemeral hook", () => {
@@ -45,9 +51,9 @@ describe("@loro-extended/hono exports", () => {
     expect(typeof useEphemeral).toBe("function")
   })
 
-  it("exports useRefValue hook", () => {
-    expect(useRefValue).toBeDefined()
-    expect(typeof useRefValue).toBe("function")
+  it("exports useLens hook", () => {
+    expect(useLens).toBeDefined()
+    expect(typeof useLens).toBe("function")
   })
 
   it("exports useCollaborativeText hook", () => {

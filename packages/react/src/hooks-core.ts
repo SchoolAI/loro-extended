@@ -1,5 +1,10 @@
 import type { DocShape, Infer, TypedDoc } from "@loro-extended/change"
-import type { Lens, LensOptions } from "@loro-extended/hooks-core"
+import type {
+  Lens,
+  LensOptions,
+  UseUndoManagerOptions,
+  UseUndoManagerReturn,
+} from "@loro-extended/hooks-core"
 import {
   CursorRegistry,
   createCursorRegistryContext,
@@ -20,11 +25,7 @@ export { CursorRegistry, CursorRegistryContext, useCursorRegistry }
 // Create core hooks
 const coreHooks = createHooks(React)
 
-// New API (recommended)
 export const { RepoContext, useRepo, useDocument, useEphemeral } = coreHooks
-
-// Deprecated (still exported for backward compatibility)
-export const { useHandle, useDoc } = coreHooks
 
 export function useLens<D extends DocShape>(
   world: TypedDoc<D>,
@@ -52,11 +53,7 @@ export function useLens<D extends DocShape, R>(
 // Create ref hooks
 const refHooks = createRefHooks(React)
 
-// New API (recommended)
 export const { useValue, usePlaceholder } = refHooks
-
-// Deprecated (still exported for backward compatibility)
-export const { useRefValue } = refHooks
 
 // Create text hooks with a stable getter that reads from a ref
 // This avoids recreating the hooks on every render
@@ -86,18 +83,16 @@ export function useCollaborativeText<
 
 // Wrapper hook that updates the ref and delegates to the real hook
 export function useUndoManager(
-  handle: Parameters<typeof undoHooksWithRegistry.useUndoManager>[0],
-  namespaceOrOptions?: Parameters<
-    typeof undoHooksWithRegistry.useUndoManager
-  >[1],
-  optionsArg?: Parameters<typeof undoHooksWithRegistry.useUndoManager>[2],
-) {
+  doc: TypedDoc<DocShape>,
+  namespaceOrOptions?: string | UseUndoManagerOptions,
+  optionsArg?: UseUndoManagerOptions,
+): UseUndoManagerReturn {
   // Get cursor registry from context and update the ref
   const cursorRegistry = useCursorRegistry()
   cursorRegistryRef.current = cursorRegistry
 
   return undoHooksWithRegistry.useUndoManager(
-    handle,
+    doc,
     namespaceOrOptions,
     optionsArg,
   )

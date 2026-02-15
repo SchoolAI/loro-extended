@@ -1,11 +1,12 @@
 import { Shape } from "@loro-extended/change"
+import { sync } from "@loro-extended/repo"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import {
   createRepoWrapper,
   createTestDocumentId,
+  useDocument,
   useEphemeral,
-  useHandle,
 } from "../test-utils"
 
 // Document schema
@@ -14,8 +15,8 @@ const DocSchema = Shape.doc({
 })
 
 // Presence schema
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
@@ -30,10 +31,10 @@ describe("useEphemeral (presence)", () => {
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, {
+        const doc = useDocument(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        return useEphemeral(handle.presence)
+        return useEphemeral(sync(doc).presence)
       },
       {
         wrapper: RepoWrapper,
@@ -46,17 +47,17 @@ describe("useEphemeral (presence)", () => {
     expect(result.current.peers.size).toBe(0)
   })
 
-  it("should update self state via handle.presence.setSelf", async () => {
+  it("should update self state via sync(doc).presence.setSelf", async () => {
     const documentId = createTestDocumentId()
     const RepoWrapper = createRepoWrapper()
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, {
+        const doc = useDocument(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        const presence = useEphemeral(handle.presence)
-        return { handle, presence }
+        const presence = useEphemeral(sync(doc).presence)
+        return { doc, presence }
       },
       {
         wrapper: RepoWrapper,
@@ -64,7 +65,7 @@ describe("useEphemeral (presence)", () => {
     )
 
     act(() => {
-      result.current.handle.presence.setSelf({
+      sync(result.current.doc).presence.setSelf({
         cursor: { x: 10, y: 20 },
         name: "Anonymous",
         status: "offline",
@@ -83,11 +84,11 @@ describe("useEphemeral (presence)", () => {
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, {
+        const doc = useDocument(documentId, DocSchema, {
           presence: PresenceSchema,
         })
-        const presence = useEphemeral(handle.presence)
-        return { handle, presence }
+        const presence = useEphemeral(sync(doc).presence)
+        return { doc, presence }
       },
       {
         wrapper: RepoWrapper,
@@ -95,7 +96,7 @@ describe("useEphemeral (presence)", () => {
     )
 
     act(() => {
-      result.current.handle.presence.setSelf({
+      sync(result.current.doc).presence.setSelf({
         cursor: { x: 0, y: 0 },
         name: "Alice",
         status: "offline",
@@ -107,7 +108,7 @@ describe("useEphemeral (presence)", () => {
     })
 
     act(() => {
-      result.current.handle.presence.setSelf({
+      sync(result.current.doc).presence.setSelf({
         cursor: { x: 0, y: 0 },
         name: "Alice",
         status: "online",
@@ -122,11 +123,11 @@ describe("useEphemeral (presence)", () => {
 
   it("should work with discriminated unions", () => {
     // Schema with placeholder on the discriminated union
-    const ClientSchema = Shape.plain.object({
+    const ClientSchema = Shape.plain.struct({
       type: Shape.plain.string("client"),
       name: Shape.plain.string().placeholder("test"),
     })
-    const ServerSchema = Shape.plain.object({
+    const ServerSchema = Shape.plain.struct({
       type: Shape.plain.string("server"),
       tick: Shape.plain.number(),
     })
@@ -140,10 +141,10 @@ describe("useEphemeral (presence)", () => {
 
     const { result } = renderHook(
       () => {
-        const handle = useHandle(documentId, DocSchema, {
+        const doc = useDocument(documentId, DocSchema, {
           presence: UnionSchema,
         })
-        return useEphemeral(handle.presence)
+        return useEphemeral(sync(doc).presence)
       },
       {
         wrapper: RepoWrapper,

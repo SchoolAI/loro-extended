@@ -20,7 +20,6 @@ export type {
   LensOptions,
   UseCollaborativeTextOptions,
   UseCollaborativeTextReturn,
-  UseRefValueReturn,
   UseUndoManagerOptions,
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
@@ -29,7 +28,6 @@ export type {
 export type {
   Doc,
   DocId,
-  Handle,
   SyncRef,
   SyncRefWithEphemerals,
   WaitForSyncOptions,
@@ -37,21 +35,18 @@ export type {
 
 // Re-export sync function from @loro-extended/repo
 export { hasSync, sync } from "@loro-extended/repo"
-// New API hooks (recommended)
-// Deprecated hooks (still exported for backward compatibility)
+
+// Hooks
 export {
   CursorRegistry,
   CursorRegistryContext,
   RepoContext,
   useCollaborativeText,
   useCursorRegistry,
-  useDoc,
   useDocument,
   useEphemeral,
-  useHandle,
   useLens,
   usePlaceholder,
-  useRefValue,
   useRepo,
   useUndoManager,
   useValue,

@@ -12,20 +12,17 @@ import {
   sync,
   useCollaborativeText,
   useCursorRegistry,
-  useDoc,
   useDocument,
   useEphemeral,
-  useHandle,
   useLens,
   usePlaceholder,
-  useRefValue,
   useRepo,
   useUndoManager,
   useValue,
 } from "./index.js"
 
 describe("@loro-extended/react exports", () => {
-  describe("New API (recommended)", () => {
+  describe("Document API", () => {
     it("exports useDocument hook", () => {
       expect(useDocument).toBeDefined()
       expect(typeof useDocument).toBe("function")
@@ -99,23 +96,6 @@ describe("@loro-extended/react exports", () => {
     it("exports useUndoManager hook", () => {
       expect(useUndoManager).toBeDefined()
       expect(typeof useUndoManager).toBe("function")
-    })
-  })
-
-  describe("Deprecated exports (backward compatibility)", () => {
-    it("exports useHandle hook (deprecated)", () => {
-      expect(useHandle).toBeDefined()
-      expect(typeof useHandle).toBe("function")
-    })
-
-    it("exports useDoc hook (deprecated)", () => {
-      expect(useDoc).toBeDefined()
-      expect(typeof useDoc).toBe("function")
-    })
-
-    it("exports useRefValue hook (deprecated)", () => {
-      expect(useRefValue).toBeDefined()
-      expect(typeof useRefValue).toBe("function")
     })
   })
 

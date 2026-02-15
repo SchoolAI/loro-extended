@@ -1,5 +1,5 @@
-import type { DocShape } from "@loro-extended/change"
-import type { EphemeralDeclarations, Handle } from "@loro-extended/repo"
+import type { DocShape, TypedDoc } from "@loro-extended/change"
+import { loro } from "@loro-extended/change"
 import type { Cursor } from "loro-crdt"
 import { UndoManager } from "loro-crdt"
 import type { CursorRegistry } from "./cursor-registry"
@@ -105,16 +105,16 @@ export function createUndoHooks(
    * Hook for managing undo/redo with Loro's UndoManager.
    * Automatically sets up keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y).
    *
-   * @param handle - The document handle
+   * @param doc - The document (TypedDoc or Doc from repo.get())
    * @param namespaceOrOptions - Optional namespace string or options object
    * @param options - Optional configuration (when namespace is provided as second arg)
    * @returns Object with undo, redo functions and canUndo, canRedo state
    *
    * @example
    * ```tsx
-   * // Basic usage
-   * function Editor({ handle }: { handle: Handle<DocSchema> }) {
-   *   const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
+   * // Basic usage with Doc
+   * function Editor({ doc }: { doc: Doc<DocSchema> }) {
+   *   const { undo, redo, canUndo, canRedo } = useUndoManager(doc)
    *   return (
    *     <div>
    *       <button onClick={undo} disabled={!canUndo}>Undo</button>
@@ -124,18 +124,21 @@ export function createUndoHooks(
    * }
    *
    * // With namespace for scoped undo
-   * function HeaderEditor({ handle }: { handle: Handle<DocSchema> }) {
-   *   const { undo, redo } = useUndoManager(handle, "header")
+   * function HeaderEditor({ doc }: { doc: Doc<DocSchema> }) {
+   *   const { undo, redo } = useUndoManager(doc, "header")
    *   // This undo only affects changes made with undoNamespace="header"
    * }
    * ```
    */
   function useUndoManager(
-    handle: Handle<DocShape, EphemeralDeclarations>,
+    doc: TypedDoc<DocShape>,
     namespaceOrOptions?: string | UseUndoManagerOptions,
     optionsArg?: UseUndoManagerOptions,
   ): UseUndoManagerReturn {
-    // Parse arguments - support both (handle, options) and (handle, namespace, options)
+    // Get the LoroDoc from TypedDoc
+    const loroDoc = useMemo(() => loro(doc), [doc])
+
+    // Parse arguments - support both (doc, options) and (doc, namespace, options)
     const namespace =
       typeof namespaceOrOptions === "string" ? namespaceOrOptions : undefined
     const options =
@@ -198,7 +201,7 @@ export function createUndoHooks(
           const start = element.selectionStart ?? 0
 
           // Create a Loro cursor at the current position
-          const loroText = handle.loroDoc.getText(focused.containerId)
+          const loroText = loroDoc.getText(focused.containerId)
           if (!loroText || start > loroText.length) {
             return { value: null, cursors: [] }
           }
@@ -217,7 +220,7 @@ export function createUndoHooks(
       }
 
       return undefined
-    }, [getCursorsOption, getCursorRegistry, handle.loroDoc])
+    }, [getCursorsOption, getCursorRegistry, loroDoc])
 
     // Create stable onPop callback that restores cursor to the correct element
     // We use the getter function pattern so the callback always gets the latest registry
@@ -230,7 +233,7 @@ export function createUndoHooks(
         ) => {
           const positions: Array<{ offset: number; side: -1 | 0 | 1 }> = []
           for (const cursor of meta.cursors) {
-            const pos = handle.loroDoc.getCursorPos(cursor)
+            const pos = loroDoc.getCursorPos(cursor)
             if (pos) {
               positions.push({ offset: pos.offset, side: pos.side })
             }
@@ -265,7 +268,7 @@ export function createUndoHooks(
 
           // Resolve the cursor position
           const cursor = meta.cursors[0]
-          const pos = handle.loroDoc.getCursorPos(cursor)
+          const pos = loroDoc.getCursorPos(cursor)
           if (!pos) return
 
           // Restore cursor to the correct element
@@ -277,7 +280,7 @@ export function createUndoHooks(
       }
 
       return undefined
-    }, [setCursorsOption, getCursorRegistry, handle.loroDoc])
+    }, [setCursorsOption, getCursorRegistry, loroDoc])
 
     const undoManager = useMemo(() => {
       // If we have an undo manager registry, use it for namespace coordination
@@ -290,14 +293,14 @@ export function createUndoHooks(
       }
 
       // Otherwise create a standalone UndoManager
-      return new UndoManager(handle.loroDoc, {
+      return new UndoManager(loroDoc, {
         mergeInterval,
         excludeOriginPrefixes,
         onPush,
         onPop,
       })
     }, [
-      handle.loroDoc,
+      loroDoc,
       mergeInterval,
       excludeOriginPrefixes,
       onPush,
@@ -333,13 +336,13 @@ export function createUndoHooks(
       // The filtering logic was causing issues because it compared against
       // the old cache value before createSyncStore updated it.
       const subscribeToSource = (onChange: () => void) => {
-        return handle.loroDoc.subscribe(() => {
+        return loroDoc.subscribe(() => {
           onChange()
         })
       }
 
       return createSyncStore(computeValue, subscribeToSource, cacheRef)
-    }, [handle.loroDoc, undoManager])
+    }, [loroDoc, undoManager])
 
     const { canUndo, canRedo } = useSyncExternalStore(
       store.subscribe,

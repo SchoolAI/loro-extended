@@ -4,12 +4,12 @@ Framework-agnostic hooks for building real-time collaborative applications with 
 
 ## Overview
 
-This package implements a "handle-first" pattern for working with Loro documents:
+This package implements a "Doc-first" pattern for working with Loro documents:
 
-1. **`useHandle`** - Get a stable, typed document handle (never re-renders)
-2. **`useDoc`** - Subscribe to document changes with optional selectors
-3. **`useLens`** - Create a Lens and subscribe to worldview snapshots
-4. **`useRefValue`** - Subscribe to a single typed ref (fine-grained reactivity)
+1. **`useDocument`** - Get a typed document from the repo (stable reference)
+2. **`useValue`** - Subscribe to document or ref changes
+3. **`usePlaceholder`** - Get placeholder values from schema definitions
+4. **`useLens`** - Create a Lens and subscribe to worldview snapshots
 5. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
 
 ## Installation
@@ -38,11 +38,11 @@ import * as React from "react"
 export const {
   RepoContext,
   useRepo,
-  useHandle,
-  useDoc,
+  useDocument,
+  useValue,
+  usePlaceholder,
   useLens,
   useEphemeral,
-  usePresence, // deprecated
 } = createHooks(React)
 ```
 
@@ -86,16 +86,16 @@ Returns the Repo instance from context.
 const repo = useRepo()
 ```
 
-#### `useHandle(docId, docSchema, ephemeralShapes?)`
+#### `useDocument(docId, docSchema, ephemeralShapes?)`
 
-Returns a stable `Handle` for the given document. The handle is created synchronously and never changes, preventing unnecessary re-renders.
+Returns a typed `Doc` for the given document. The document reference is stable and never changes, preventing unnecessary re-renders.
 
 ```typescript
 // Without ephemeral stores
-const handle = useHandle(docId, docSchema)
+const doc = useDocument(docId, docSchema)
 
 // With ephemeral stores (e.g., presence)
-const handle = useHandle(docId, docSchema, { presence: PresenceSchema })
+const doc = useDocument(docId, docSchema, { presence: PresenceSchema })
 ```
 
 **Parameters:**
@@ -103,46 +103,65 @@ const handle = useHandle(docId, docSchema, { presence: PresenceSchema })
 - `docSchema: DocShape` - The document schema (from `@loro-extended/change`)
 - `ephemeralShapes?: EphemeralDeclarations` - Optional ephemeral store declarations
 
-**Returns:** `Handle<D, E>` - A typed handle with:
-- `handle.doc` - The typed document (TypedDoc)
-- `handle.change(fn)` - Mutate the document
-- `handle.loroDoc` - Raw LoroDoc for untyped access
-- `handle.docId` - The document ID
-- `handle.readyStates` - Sync status information
+**Returns:** `Doc<D, E>` - A typed document with:
+- Direct field access (e.g., `doc.title`, `doc.todos`)
+- Mutation methods on refs (e.g., `doc.title.insert()`, `doc.todos.push()`)
 
-#### `useDoc(handle, selector?)`
+For sync operations, use `sync(doc)`:
+- `sync(doc).waitForSync()` - Wait for network sync
+- `sync(doc).presence` - Access presence store
+- `sync(doc).peerId` - Get the local peer ID
 
-Subscribes to document changes and returns the current value. Re-renders when the document changes.
+#### `useValue(docOrRef, selector?)`
+
+Subscribes to document or ref changes and returns the current value. Re-renders when the value changes.
 
 ```typescript
-// Full document
-const doc = useDoc(handle)
+// Full document snapshot
+const snapshot = useValue(doc)
+
+// Single ref value
+const title = useValue(doc.title)
+const todos = useValue(doc.todos)
 
 // With selector (fine-grained updates)
-const title = useDoc(handle, d => d.title)
-const todoCount = useDoc(handle, d => d.todos.length)
+const todoCount = useValue(doc, d => d.todos.length)
 ```
 
 **Parameters:**
-- `handle: TypedDocHandle<D>` - The document handle from `useHandle`
-- `selector?: (doc: DeepReadonly<Infer<D>>) => R` - Optional selector function
+- `docOrRef: Doc<D> | AnyTypedRef` - The document or typed ref to subscribe to
+- `selector?: (value: Infer<D>) => R` - Optional selector function (for documents only)
 
-**Returns:** The document value or selected value
+**Returns:** The current value or selected value
+
+#### `usePlaceholder(ref)`
+
+Returns the placeholder value for a typed ref, as defined in the schema.
+
+```typescript
+const placeholder = usePlaceholder(doc.title)
+// Returns the value from Shape.text().placeholder("Enter title...")
+```
+
+**Parameters:**
+- `ref: AnyTypedRef` - A typed ref (`TextRef`, `ListRef`, etc.)
+
+**Returns:** The placeholder value from the schema, or `undefined` if not defined
 
 #### `useLens(world, options?, selector?)`
 
 Creates a Lens from a world `TypedDoc` and returns both the lens and a reactive JSON snapshot
-of the lens worldview. Uses the same snapshot caching behavior as `useDoc` to avoid
+of the lens worldview. Uses the same snapshot caching behavior as `useValue` to avoid
 unnecessary renders.
 
 ```typescript
-const handle = useHandle(docId, DocSchema)
-const { lens, doc } = useLens(handle.doc, {
+const doc = useDocument(docId, DocSchema)
+const { lens, worldview } = useLens(doc, {
   filter: info => info.message?.userId === myUserId,
 })
 
 // Optional selector form
-const { lens, doc: title } = useLens(handle.doc, undefined, d => d.title)
+const { lens, worldview: title } = useLens(doc, undefined, d => d.title)
 ```
 
 **Parameters:**
@@ -150,76 +169,16 @@ const { lens, doc: title } = useLens(handle.doc, undefined, d => d.title)
 - `options?: LensOptions` - Optional lens configuration (e.g., filter)
 - `selector?: (doc: Infer<D>) => R` - Optional selector for fine-grained updates
 
-**Returns:** `{ lens: Lens<D>; doc: Infer<D> | R }`
-
-#### `useRefValue(ref)`
-
-Subscribes to a single typed ref and returns its current value. Provides fine-grained reactivity - only re-renders when this specific container changes.
-
-```typescript
-// For TextRef - returns value and placeholder
-const { value, placeholder } = useRefValue(handle.doc.title)
-
-// For CounterRef - returns value
-const { value } = useRefValue(handle.doc.count)
-
-// For ListRef - returns value array
-const { value } = useRefValue(handle.doc.items)
-```
-
-**Parameters:**
-- `ref: AnyTypedRef` - A typed ref (`TextRef`, `ListRef`, `CounterRef`, `RecordRef`, `StructRef`, `MovableListRef`, or `TreeRef`)
-
-**Returns:** An object with:
-- `value` - The current value (type depends on ref type)
-- `placeholder` - (TextRef only) The placeholder from `Shape.text().placeholder()`
-
-**Use Cases:**
-- Building controlled inputs without prop drilling
-- Fine-grained subscriptions to specific containers
-- Accessing Shape placeholders automatically
-
-```tsx
-// Example: Controlled input without prop drilling
-function TitleInput({ textRef }: { textRef: TextRef }) {
-  const { value, placeholder } = useRefValue(textRef)
-  
-  return (
-    <input
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => textRef.update(e.target.value)}
-    />
-  )
-}
-```
-
-#### `usePresence(handle)` (Deprecated)
-
-> **Deprecated:** Use `useEphemeral(handle.presence)` instead.
-
-Subscribes to presence changes and returns the current presence state.
-
-```typescript
-const { self, peers } = usePresence(handle)
-
-// self: P | undefined - Your own presence state
-// peers: Map<string, P> - Other peers' presence states
-```
-
-**Parameters:**
-- `handle` - A handle with a `presence` ephemeral store
-
-**Returns:** `{ self: P | undefined, peers: Map<string, P> }`
+**Returns:** `{ lens: Lens<D>; worldview: Infer<D> | R }`
 
 #### `useEphemeral(ephemeral)`
 
 Subscribes to any ephemeral store and returns the current state.
 
 ```typescript
-const { self, peers } = useEphemeral(handle.presence)
+const { self, peers } = useEphemeral(sync(doc).presence)
 // Or for other ephemeral stores:
-const { self, peers } = useEphemeral(handle.cursors)
+const { self, peers } = useEphemeral(sync(doc).cursors)
 ```
 
 **Parameters:**
@@ -275,13 +234,13 @@ import * as React from "react"
 export const { useUndoManager } = createUndoHooks(React)
 ```
 
-#### `useUndoManager(handle, options?)`
+#### `useUndoManager(doc, options?)`
 
 Manages undo/redo with Loro's UndoManager. Automatically sets up keyboard shortcuts.
 
 ```tsx
-function Editor({ handle }: { handle: Handle<DocSchema> }) {
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle)
+function Editor({ doc }: { doc: Doc<DocSchema> }) {
+  const { undo, redo, canUndo, canRedo } = useUndoManager(doc)
   return (
     <div>
       <button onClick={undo} disabled={!canUndo}>Undo</button>
@@ -303,10 +262,10 @@ function Editor({ handle }: { handle: Handle<DocSchema> }) {
 When building forms or editors with multiple independent text fields, you may want each field to have its own undo stack. Use the `namespace` option to isolate undo operations:
 
 ```tsx
-function FormEditor({ handle }: { handle: Handle<FormSchema> }) {
+function FormEditor({ doc }: { doc: Doc<FormSchema> }) {
   // Each field gets its own undo stack
-  const { undo: undoTitle } = useUndoManager(handle, { namespace: "title" })
-  const { undo: undoBody } = useUndoManager(handle, { namespace: "body" })
+  const { undo: undoTitle } = useUndoManager(doc, { namespace: "title" })
+  const { undo: undoBody } = useUndoManager(doc, { namespace: "body" })
   
   // Undo in title field won't affect body field
 }
@@ -317,11 +276,11 @@ function FormEditor({ handle }: { handle: Handle<FormSchema> }) {
 **Cursor Restoration Example:**
 
 ```tsx
-function EditorWithCursorRestore({ handle, textRef }: Props) {
+function EditorWithCursorRestore({ doc, textRef }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const loroText = loro(textRef).container
   
-  const { undo, redo, canUndo, canRedo } = useUndoManager(handle, {
+  const { undo, redo, canUndo, canRedo } = useUndoManager(doc, {
     getCursors: () => {
       const input = inputRef.current
       if (!input) return []
@@ -344,16 +303,17 @@ function EditorWithCursorRestore({ handle, textRef }: Props) {
 ## Usage Pattern
 
 ```typescript
-import { Shape } from "@loro-extended/change"
-import { useHandle, useDoc, useEphemeral } from "@loro-extended/react"
+import { Shape, change } from "@loro-extended/change"
+import { sync } from "@loro-extended/repo"
+import { useDocument, useValue, useEphemeral } from "@loro-extended/react"
 
 const DocSchema = Shape.doc({
   title: Shape.text().placeholder("Untitled"),
   items: Shape.list(Shape.plain.string()),
 })
 
-const PresenceSchema = Shape.plain.object({
-  cursor: Shape.plain.object({
+const PresenceSchema = Shape.plain.struct({
+  cursor: Shape.plain.struct({
     x: Shape.plain.number(),
     y: Shape.plain.number(),
   }),
@@ -361,32 +321,32 @@ const PresenceSchema = Shape.plain.object({
 })
 
 function MyComponent({ docId }) {
-  // Get stable handle with ephemeral stores
-  const handle = useHandle(docId, DocSchema, { presence: PresenceSchema })
+  // Get typed document with ephemeral stores
+  const doc = useDocument(docId, DocSchema, { presence: PresenceSchema })
   
-  // Subscribe to document
-  const doc = useDoc(handle)
+  // Subscribe to document snapshot
+  const snapshot = useValue(doc)
   
   // Subscribe to presence
-  const { self, peers } = useEphemeral(handle.presence)
+  const { self, peers } = useEphemeral(sync(doc).presence)
   
   // Mutate document
   const addItem = (text) => {
-    handle.change(d => {
+    change(doc, d => {
       d.items.push(text)
     })
   }
   
   // Update presence
   const updateCursor = (x, y) => {
-    handle.presence.setSelf({ cursor: { x, y } })
+    sync(doc).presence.setSelf({ cursor: { x, y } })
   }
   
   return (
     <div>
-      <h1>{doc.title}</h1>
+      <h1>{snapshot.title}</h1>
       <ul>
-        {doc.items.map((item, i) => (
+        {snapshot.items.map((item, i) => (
           <li key={i}>{item}</li>
         ))}
       </ul>
@@ -400,19 +360,22 @@ function MyComponent({ docId }) {
 }
 ```
 
-## Benefits of Handle-First Pattern
+## Benefits of Doc-First Pattern
 
-1. **Stable References** - The handle never changes, so you can safely pass it to child components or use it in callbacks without causing re-renders.
+1. **Stable References** - The document never changes identity, so you can safely pass it to child components or use it in callbacks without causing re-renders.
 
-2. **Separation of Concerns** - Reading (`useDoc`) and writing (`handle.change`) are clearly separated.
+2. **Separation of Concerns** - Reading (`useValue`) and writing (`change()` or direct mutation) are clearly separated.
 
-3. **Fine-Grained Reactivity** - Use selectors to only re-render when specific data changes:
+3. **Fine-Grained Reactivity** - Subscribe to specific refs or use selectors to only re-render when specific data changes:
    ```typescript
    // Only re-renders when title changes
-   const title = useDoc(handle, d => d.title)
+   const title = useValue(doc.title)
+   
+   // Only re-renders when todo count changes
+   const count = useValue(doc, d => d.todos.length)
    ```
 
-4. **Unified Presence** - Presence is tied to the handle, making it easy to manage document and presence together.
+4. **Unified Sync API** - Use `sync(doc)` for all sync-related operations (presence, waitForSync, etc.).
 
 5. **Type Safety** - Full TypeScript support with proper type inference from schemas.
 
