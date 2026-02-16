@@ -4,17 +4,14 @@ import {
   useRepo,
   useValue,
 } from "@loro-extended/react"
-import { type PeerID, sync } from "@loro-extended/repo"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { PlayerScore } from "../shared/types"
+import { sync } from "@loro-extended/repo"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ARENA_DOC_ID,
   ArenaSchema,
   CAR_COLORS,
   type CarColor,
-  type ClientPresence,
   GameEphemeralDeclarations,
-  type ServerPresence,
 } from "../shared/types"
 import { ArenaCanvas } from "./components/arena-canvas"
 import { JoinScreen } from "./components/join-screen"
@@ -22,9 +19,15 @@ import { PlayerList } from "./components/player-list"
 import { Scoreboard } from "./components/scoreboard"
 import { useJoystick } from "./hooks/use-joystick"
 import { useKeyboardInput } from "./hooks/use-keyboard-input"
-
-// Throttle interval for presence updates (ms)
-const PRESENCE_UPDATE_INTERVAL = 50 // 20 updates per second
+import { usePresenceSender } from "./hooks/use-presence-sender"
+import {
+  combineInputs,
+  createClientPresence,
+  getActivePlayers,
+  partitionPresences,
+  sortScores,
+  ZERO_INPUT,
+} from "./logic"
 
 type BumperCarsAppProps = {
   initialName: string
@@ -48,95 +51,37 @@ export default function BumperCarsApp({
 
   // Get document with both doc and ephemeral schemas
   const doc = useDocument(ARENA_DOC_ID, ArenaSchema, GameEphemeralDeclarations)
-  const snapshot = useValue(doc)
+
+  // Get `scores` as a snapshot read-only value
+  const scores = useValue(doc.scores)
+
+  // Get presence data
   const { self, peers } = useEphemeral(sync(doc).presence)
 
-  // Get server presence (game state) - type-safe filtering
-  // Combine self and peers into allPresence for backward compatibility
-  const allPresence = useMemo(() => {
-    const all: Record<string, typeof self> = {}
-    all[myPeerId] = self
-    for (const [peerId, presence] of peers.entries()) {
-      all[peerId] = presence
-    }
-    return all
-  }, [self, peers, myPeerId])
+  // Partition presences into server and client (pure function)
+  const { serverPresence, clientPresences } = useMemo(
+    () => partitionPresences(self, peers, myPeerId),
+    [self, peers, myPeerId],
+  )
 
-  const serverPresence = useMemo(() => {
-    for (const presence of Object.values(allPresence)) {
-      if (presence && presence.type === "server") {
-        return presence as ServerPresence
-      }
-    }
-    return null
-  }, [allPresence])
-
-  // Get client presences (other players) - type-safe filtering
-  const clientPresences = useMemo(() => {
-    const clients: Record<PeerID, ClientPresence> = {}
-    for (const [peerId, presence] of Object.entries(allPresence)) {
-      if (presence && presence.type === "client") {
-        clients[peerId as PeerID] = presence as ClientPresence
-      }
-    }
-    return clients
-  }, [allPresence])
-
-  // Input from joystick
+  // Input from joystick and keyboard
   const { input: joystickInput, zoneRef } = useJoystick()
-
-  // Input from keyboard (WASD/arrows)
   const keyboardInput = useKeyboardInput()
 
-  // Track last sent input to avoid unnecessary updates
-  const lastSentInputRef = useRef({ force: 0, angle: 0 })
-  const lastUpdateTimeRef = useRef(0)
-
   // Combine inputs (joystick takes priority if active)
-  const currentInput = useMemo(() => {
-    if (joystickInput.force > 0) {
-      return joystickInput
-    }
-    return keyboardInput
-  }, [joystickInput, keyboardInput])
+  const currentInput = useMemo(
+    () => combineInputs(joystickInput, keyboardInput),
+    [joystickInput, keyboardInput],
+  )
 
-  // Update presence with current input (throttled, but always send zero-force immediately)
-  useEffect(() => {
-    if (!hasJoined) return
-
-    const now = Date.now()
-    const lastInput = lastSentInputRef.current
-
-    // Check if input actually changed
-    const inputChanged =
-      lastInput.force !== currentInput.force ||
-      lastInput.angle !== currentInput.angle
-
-    if (!inputChanged) {
-      return
-    }
-
-    // Always send zero-force updates immediately (joystick released)
-    // Otherwise throttle updates
-    const isStopInput = currentInput.force === 0
-    const timeSinceLastUpdate = now - lastUpdateTimeRef.current
-    if (!isStopInput && timeSinceLastUpdate < PRESENCE_UPDATE_INTERVAL) {
-      return
-    }
-
-    // Update refs
-    lastSentInputRef.current = { ...currentInput }
-    lastUpdateTimeRef.current = now
-
-    const presence: ClientPresence = {
-      type: "client",
-      name: playerName,
-      color: playerColor,
-      input: currentInput,
-    }
-
-    sync(doc).presence.setSelf(presence)
-  }, [hasJoined, playerName, playerColor, currentInput, doc])
+  // Send throttled presence updates
+  usePresenceSender({
+    doc,
+    hasJoined,
+    playerName,
+    playerColor,
+    input: currentInput,
+  })
 
   // Handle join
   const handleJoin = useCallback(
@@ -149,14 +94,7 @@ export default function BumperCarsApp({
       localStorage.setItem("loro-bumper-cars-color", color)
 
       // Set initial presence
-      const presence: ClientPresence = {
-        type: "client",
-        name,
-        color,
-        input: { force: 0, angle: 0 },
-      }
-      sync(doc).presence.setSelf(presence)
-
+      sync(doc).presence.setSelf(createClientPresence(name, color, ZERO_INPUT))
       setHasJoined(true)
     },
     [doc],
@@ -164,14 +102,10 @@ export default function BumperCarsApp({
 
   // Handle leaving the game (Escape key)
   const handleLeave = useCallback(() => {
-    // Clear presence by setting empty input
-    const presence: ClientPresence = {
-      type: "client",
-      name: "",
-      color: playerColor,
-      input: { force: 0, angle: 0 },
-    }
-    sync(doc).presence.setSelf(presence)
+    // Clear presence by setting empty name
+    sync(doc).presence.setSelf(
+      createClientPresence("", playerColor, ZERO_INPUT),
+    )
     setHasJoined(false)
   }, [playerColor, doc])
 
@@ -189,29 +123,14 @@ export default function BumperCarsApp({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [hasJoined, handleLeave])
 
-  // Get scores sorted by bumps
-  const sortedScores = useMemo(() => {
-    // snapshot.scores is already a plain object (useValue returns JSON)
-    const scores = snapshot.scores as Record<string, PlayerScore>
-    return Object.entries(scores)
-      .map(([peerId, score]) => ({
-        peerId: peerId as PeerID,
-        name: score.name,
-        color: score.color,
-        bumps: score.bumps,
-      }))
-      .sort((a, b) => b.bumps - a.bumps)
-      .slice(0, 5)
-  }, [snapshot.scores])
+  // Get scores sorted by bumps (pure function)
+  const sortedScores = useMemo(() => sortScores(scores, 5), [scores])
 
-  // Get active players from client presences
-  const activePlayers = useMemo(() => {
-    return Object.entries(clientPresences).map(([peerId, presence]) => ({
-      peerId: peerId as PeerID,
-      name: presence.name,
-      color: presence.color,
-    }))
-  }, [clientPresences])
+  // Get active players from client presences (pure function)
+  const activePlayers = useMemo(
+    () => getActivePlayers(clientPresences),
+    [clientPresences],
+  )
 
   return (
     <div className="arena-container">
