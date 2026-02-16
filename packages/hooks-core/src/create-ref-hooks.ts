@@ -36,15 +36,22 @@ export type AnyTypedRef = Exclude<ContainerShape, AnyContainerShape>["_mutable"]
 // ============================================================================
 
 /**
- * Check if a value is a TypedDoc (has toJSON and the EXT_SYMBOL).
+ * Check if a value is a TypedDoc (has toJSON and the EXT_SYMBOL with docShape).
  * TypedDocs have a specific structure that distinguishes them from refs.
+ * Both TypedDocs and refs have LORO_SYMBOL, but only TypedDocs have docShape in EXT_SYMBOL.
  */
 function isTypedDoc(value: unknown): value is TypedDoc<DocShape> {
   if (!value || typeof value !== "object") return false
-  // TypedDocs have toJSON and are created with specific shape properties
-  // We check for the loro symbol which is present on TypedDocs
-  const loroSymbol = Symbol.for("loro-extended:loro")
-  return loroSymbol in value && hasToJSON(value)
+  // TypedDocs have an EXT_SYMBOL namespace containing docShape
+  // Refs also have LORO_SYMBOL but don't have docShape in their EXT namespace
+  const extSymbol = Symbol.for("loro-extended:ext")
+  const extNs = (value as Record<symbol, unknown>)[extSymbol]
+  return (
+    !!extNs &&
+    typeof extNs === "object" &&
+    "docShape" in extNs &&
+    hasToJSON(value)
+  )
 }
 
 /**
