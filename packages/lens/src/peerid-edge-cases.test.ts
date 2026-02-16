@@ -4,7 +4,7 @@
  * with separate peer IDs vs. shared peer IDs.
  */
 
-import { createTypedDoc, loro, Shape } from "@loro-extended/change"
+import { createTypedDoc, loro, Shape, unwrap } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { createLens, change as lensChange } from "./index.js"
@@ -47,8 +47,8 @@ describe("peer ID separation edge cases", () => {
       const worldviewItem = lens.worldview.items.get("item-1")
       const worldItem = world.items.get("item-1")
 
-      expect(worldviewItem?.id).toBe("item-1")
-      expect(worldItem?.id).toBe("item-1")
+      expect(unwrap(worldviewItem?.id)).toBe("item-1")
+      expect(unwrap(worldItem?.id)).toBe("item-1")
       expect(worldviewItem?.name.toString()).toBe("First Item")
       expect(worldItem?.name.toString()).toBe("First Item")
       expect(worldviewItem?.tags.toJSON()).toEqual(["a", "b"])
@@ -98,9 +98,9 @@ describe("peer ID separation edge cases", () => {
       })
 
       expect(lens.worldview.items.size).toBe(1)
+      expect(unwrap(lens.worldview.items.get("2")?.id)).toBe("2")
       expect(world.items.size).toBe(1)
-      expect(lens.worldview.items.get("2")?.id).toBe("2")
-      expect(world.items.get("2")?.id).toBe("2")
+      expect(unwrap(world.items.get("2")?.id)).toBe("2")
 
       lens.dispose()
     })

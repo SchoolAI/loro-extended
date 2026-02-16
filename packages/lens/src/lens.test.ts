@@ -1,4 +1,10 @@
-import { change, createTypedDoc, loro, Shape } from "@loro-extended/change"
+import {
+  change,
+  createTypedDoc,
+  loro,
+  Shape,
+  unwrap,
+} from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { filterAll, filterNone } from "./filters.js"
@@ -36,7 +42,7 @@ describe("createLens", () => {
 
       expect(lens.worldview.counter.value).toBe(5)
       expect(lens.worldview.text.toString()).toBe("Hello")
-      expect(lens.worldview.data.get("key")).toBe("value")
+      expect(unwrap(lens.worldview.data.get("key"))).toBe("value")
 
       lens.dispose()
     })
