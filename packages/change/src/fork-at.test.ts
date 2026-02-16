@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
 import { change } from "./functional-helpers.js"
-import { createTypedDoc, loro, Shape } from "./index.js"
+import { createTypedDoc, loro, Shape, unwrap } from "./index.js"
 
 describe("forkAt", () => {
   describe("TypedDoc.forkAt() method", () => {
@@ -58,7 +58,7 @@ describe("forkAt", () => {
       const firstItem = forkedDoc.items[0]
       if (firstItem) {
         expect(firstItem.name.toString()).toBe("Task 1")
-        expect(firstItem.done).toBe(false)
+        expect(unwrap(firstItem.done)).toBe(false)
       }
 
       // Can mutate forked doc independently
@@ -115,7 +115,7 @@ describe("forkAt", () => {
 
       const forkedDoc = ext(doc).forkAt(frontiers)
 
-      expect(forkedDoc.settings.get("theme")).toBe("dark")
+      expect(unwrap(forkedDoc.settings.get("theme"))).toBe("dark")
       // "lang" was not set before the fork, so it should not exist
       // Note: Record returns placeholder value (empty string) for missing keys
       expect(forkedDoc.settings.has("lang")).toBe(false)

@@ -2,7 +2,7 @@ import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
 import { change } from "./functional-helpers.js"
-import { createTypedDoc, loro, Shape } from "./index.js"
+import { createTypedDoc, loro, Shape, unwrap } from "./index.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Shallow Fork Tests
@@ -212,8 +212,8 @@ describe("shallow fork", () => {
 
       // Verify state is correct
       expect(shallowDoc.counter.value).toBe(5)
-      expect(shallowDoc.data.name).toBe("test")
-      expect(shallowDoc.data.value).toBe(100)
+      expect(unwrap(shallowDoc.data.name)).toBe("test")
+      expect(unwrap(shallowDoc.data.value)).toBe(100)
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
@@ -231,8 +231,8 @@ describe("shallow fork", () => {
 
       // Verify merge worked
       expect(doc.counter.value).toBe(15)
-      expect(doc.data.name).toBe("modified")
-      expect(doc.data.value).toBe(200)
+      expect(unwrap(doc.data.name)).toBe("modified")
+      expect(unwrap(doc.data.value)).toBe(200)
     })
 
     it("should work with shallowForkAt helper function", () => {
@@ -255,8 +255,8 @@ describe("shallow fork", () => {
 
       // Verify state is correct
       expect(shallowDoc.counter.value).toBe(5)
-      expect(shallowDoc.data.name).toBe("test")
-      expect(shallowDoc.data.value).toBe(100)
+      expect(unwrap(shallowDoc.data.name)).toBe("test")
+      expect(unwrap(shallowDoc.data.value)).toBe(100)
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
@@ -274,8 +274,8 @@ describe("shallow fork", () => {
 
       // Verify merge worked
       expect(doc.counter.value).toBe(15)
-      expect(doc.data.name).toBe("modified")
-      expect(doc.data.value).toBe(200)
+      expect(unwrap(doc.data.name)).toBe("modified")
+      expect(unwrap(doc.data.value)).toBe(200)
     })
 
     it("should create independent peer ID by default", () => {

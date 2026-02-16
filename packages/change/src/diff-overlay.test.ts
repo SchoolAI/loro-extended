@@ -2,7 +2,7 @@ import type { LoroEventBatch } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { createDiffOverlay } from "./diff-overlay.js"
 import { change } from "./functional-helpers.js"
-import { createTypedDoc, loro, Shape } from "./index.js"
+import { createTypedDoc, loro, Shape, unwrap } from "./index.js"
 
 describe("diff overlay", () => {
   it("should read before values via overlay without checkout", () => {
@@ -54,15 +54,15 @@ describe("diff overlay", () => {
       transitions.push({
         before: {
           counter: beforeDoc.counter.value,
-          name: beforeDoc.info.name,
-          count: beforeDoc.info.count,
+          name: unwrap(beforeDoc.info.name),
+          count: unwrap(beforeDoc.info.count),
           list: beforeDoc.list.toArray(),
           text: beforeDoc.text.toString(),
         },
         after: {
           counter: afterDoc.counter.value,
-          name: afterDoc.info.name,
-          count: afterDoc.info.count,
+          name: unwrap(afterDoc.info.name),
+          count: unwrap(afterDoc.info.count),
           list: afterDoc.list.toArray(),
           text: afterDoc.text.toString(),
         },

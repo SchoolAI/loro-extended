@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { change } from "./functional-helpers.js"
+import { unwrap } from "./index.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 
@@ -32,14 +33,14 @@ describe("TypedDoc Mutable Mode", () => {
     // Get a reference to the live view
     const liveMeta = doc.meta
 
-    expect(liveMeta.count).toBe(0)
+    expect(unwrap(liveMeta.count)).toBe(0)
 
     change(doc, d => {
       d.meta.count = 5
     })
 
     // Should see the update without re-fetching doc.value
-    expect(liveMeta.count).toBe(5)
+    expect(unwrap(liveMeta.count)).toBe(5)
   })
 
   it("should allow direct mutations via doc.value (auto-commit)", () => {

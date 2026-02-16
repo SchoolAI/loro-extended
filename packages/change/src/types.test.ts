@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
 import { change } from "./functional-helpers.js"
+import { unwrap } from "./index.js"
 import type { ContainerShape, ValueShape } from "./shape.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -212,9 +213,13 @@ describe("Mutable type helper", () => {
     // Object.values returns the values from the record
     const values = Object.values(participants)
 
-    // Runtime check - values are the plain objects
+    // Runtime check - outside change(), value shapes return PlainValueRef
+    // Use unwrap() to get plain values for comparison
     expect(values).toHaveLength(2)
-    expect(values.map((p: any) => p.name).sort()).toEqual(["Alice", "Bob"])
+    expect(values.map((p: any) => unwrap(p.name)).sort()).toEqual([
+      "Alice",
+      "Bob",
+    ])
   })
 
   it("toJSON is callable on Records", () => {

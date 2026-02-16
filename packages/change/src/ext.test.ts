@@ -13,6 +13,7 @@ import { LoroMap } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { ext } from "./ext.js"
 import { change, subscribe } from "./functional-helpers.js"
+import { unwrap } from "./index.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
@@ -119,8 +120,8 @@ describe("ext() function", () => {
         { op: "replace", path: "/data/value", value: 42 },
       ])
 
-      expect(doc.data.name).toBe("updated")
-      expect(doc.data.value).toBe(42)
+      expect(unwrap(doc.data.name)).toBe("updated")
+      expect(unwrap(doc.data.value)).toBe(42)
     })
 
     it("docShape returns the schema", () => {

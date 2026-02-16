@@ -28,6 +28,30 @@ The library uses well-known symbols to provide clean separation between differen
 
 **Design Rationale**: TypedDoc and TypedRef are Proxy objects where property names map to schema fields. Symbols provide a clean namespace for library functionality without polluting the user's schema namespace.
 
+### Distinguishing TypedDocs from Refs
+
+Both TypedDocs and TypedRefs have `LORO_SYMBOL` (for `loro()` access), but they must be distinguished for different handling in hooks and utilities:
+
+| Type | Has `LORO_SYMBOL` | Has `docShape` in `EXT_SYMBOL` |
+|------|-------------------|-------------------------------|
+| TypedDoc | ✅ | ✅ |
+| TypedRef | ✅ | ❌ |
+
+**Correct check for TypedDoc**:
+```typescript
+const extSymbol = Symbol.for("loro-extended:ext")
+const extNs = (value as Record<symbol, unknown>)[extSymbol]
+const isDoc = !!extNs && typeof extNs === "object" && "docShape" in extNs
+```
+
+**Incorrect check** (matches both docs and refs):
+```typescript
+const loroSymbol = Symbol.for("loro-extended:loro")
+const isDoc = loroSymbol in value // WRONG: refs also have this
+```
+
+This distinction is critical in `@loro-extended/hooks-core` where `useValue()` needs to determine whether to use document-level versioning (`opCount()` + `frontiers()`) or container-level subscription.
+
 **TypedDoc and Lens both expose `[EXT_SYMBOL]` in their types**: Both `TypedDoc<Shape>` and `Lens<D>` include `[EXT_SYMBOL]` with a `change` method signature in their type definitions. This serves as a fallback for the `change()` function when TypeScript's generic inference fails due to type flattening across module boundaries (e.g., in `.d.ts` files or re-exported type aliases). Users should always use `change(doc, fn)` or `ext(doc)` rather than accessing the symbol directly.
 
 ### The `loro()` and `ext()` Functions
@@ -97,17 +121,55 @@ The `change()` function creates draft refs by:
 
 This works for all ref types because `createContainerTypedRef()` handles the polymorphic creation.
 
-### Value Shape Caching
+### Value Shape Handling
 
 When `batchedMutation: true` (inside `change()` blocks):
 
-- **Value shapes** (plain objects, primitives) are cached so mutations persist
+- **Primitive values** (string, number, boolean, null) are returned as raw values
+  for ergonomic boolean logic (`if (draft.active)`, `!draft.published`)
+- **Object/array values** are wrapped in PlainValueRef with immediate write-back
+  to support nested mutation patterns (`item.metadata.author = "Alice"`)
 - **Container shapes** (refs) are cached as handles - mutations go directly to Loro
 
-When `batchedMutation: false` (direct access):
+When `batchedMutation: false` (direct access outside `change()`):
 
-- Values are read fresh from Loro on each access
-- No caching overhead for simple reads
+- All value shapes return PlainValueRef for reactive subscriptions
+- Use `value()` or `unwrap()` to get the raw value
+
+**Note:** The primitive vs object decision is made at runtime based on the actual
+value (`typeof`), not the schema type. This correctly handles `union` and `any`
+shapes that can contain either primitives or objects.
+
+**List items:** ListRef uses the same PlainValueRef mechanism as StructRef/RecordRef.
+Mutations are written immediately via `writeListValue()`, not deferred. For LoroList
+(which lacks `.set()`), this uses delete+insert. For LoroMovableList, it uses `.set()`.
+
+**Proxy Boilerplate Extraction:** All PlainValueRef proxy handlers share three extracted helpers:
+- `proxyGetPreamble` — handles symbol/existing-property checks (written once, used by all 8 proxies)
+- `unwrapForSet` — unwraps PlainValueRef values before writing
+- `runtimePrimitiveCheck` — returns raw values for primitives, enabling `!draft.completed` patterns
+
+The proxy functions themselves are split into two families:
+- **Schema-aware** (struct, record): recurse into the shape tree at construction time
+- **Runtime-inspecting** (generic/union/any): inspect `typeof` on each access, no shape to recurse into
+
+**Array values in any/union shapes:** When `Shape.plain.any()` or `Shape.plain.union()` contains
+an array value, the runtime check wraps it in PlainValueRef (since `typeof [] === 'object'`).
+The generic object proxy allows property access (e.g., `.length`, `["0"]`) but does NOT support
+index-based mutation (`ref[0] = "new"`). Arrays stored as plain value shapes should be
+replaced wholesale, not mutated element-by-element.
+
+**PlainValueRef in test assertions:** Outside `change()`, value shape properties return PlainValueRef.
+Use `unwrap()` or `value()` when comparing PlainValueRef values in test assertions:
+- `expect(unwrap(ref)).toBe("expected")` — unwrap first, then use `toBe` for primitives
+- `expect(unwrap(ref)).toEqual({ key: "value" })` — unwrap first, then use `toEqual` for objects
+- `expect(ref.toJSON()).toEqual("expected")` — alternatively, call `toJSON()` explicitly
+
+Comparing a PlainValueRef directly to a primitive will fail. Always unwrap first.
+
+**Known type gap:** `BaseRefInternals<any>` propagates through the proxy system. A future improvement
+could introduce branded phantom types (`BaseRefInternals<"map">`, `BaseRefInternals<"list">`) to
+make container-type misuse a compile error.
 
 ### TypedDoc Diff Overlay (Before/After Without Checkout)
 

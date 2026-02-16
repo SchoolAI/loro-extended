@@ -2,8 +2,10 @@ import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
 import { change } from "./functional-helpers.js"
+import { isPlainValueRef } from "./plain-value-ref/index.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
+import { value } from "./value.js"
 
 describe("CRDT Operations", () => {
   describe("Text Operations", () => {
@@ -242,7 +244,9 @@ describe("CRDT Operations", () => {
 
       // Test move operation: move first item to the end
       const result = change(typedDoc, draft => {
-        const valueToMove = draft.items.get(0)
+        const itemRef = draft.items.get(0)
+        // Unwrap PlainValueRef to get the actual string value for insert
+        const valueToMove = isPlainValueRef(itemRef) ? value(itemRef) : itemRef
         if (valueToMove !== undefined) {
           draft.items.delete(0, 1)
           draft.items.insert(2, valueToMove)
@@ -1507,9 +1511,10 @@ describe("Edge Cases and Error Handling", () => {
           draft.todos.push({ id: "2", text: "Walk dog", completed: true })
           draft.todos.push({ id: "3", text: "Write code", completed: false })
 
-          // Test find with objects
+          // Test find with objects - returns PlainValueRef for struct value shapes
           const foundTodo = draft.todos.find(todo => todo.id === "2")
-          expect(foundTodo).toEqual({
+          // Use valueOf() to get raw object for comparison (PlainValueRef wraps structs for mutation tracking)
+          expect(foundTodo?.valueOf()).toEqual({
             id: "2",
             text: "Walk dog",
             completed: true,
@@ -1519,9 +1524,10 @@ describe("Edge Cases and Error Handling", () => {
           const completedIndex = draft.todos.findIndex(todo => todo.completed)
           expect(completedIndex).toBe(1)
 
-          // Test filter with objects
+          // Test filter with objects - returns PlainValueRef[] for struct value shapes
           const incompleteTodos = draft.todos.filter(todo => !todo.completed)
           expect(incompleteTodos).toHaveLength(2)
+          // Access properties through PlainValueRef (returns raw primitives)
           expect(incompleteTodos[0].text).toBe("Buy milk")
           expect(incompleteTodos[1].text).toBe("Write code")
 
@@ -1904,13 +1910,15 @@ describe("Edge Cases and Error Handling", () => {
             const highScorer = draft.users.find(user => user.score > 110)
             if (highScorer) {
               highScorer.name = `${highScorer.name} (VIP)`
-              highScorer.score += 50
+              // Use Number() to coerce PlainValueRef to number for arithmetic
+              highScorer.score = Number(highScorer.score) + 50
             }
 
             // Pattern 3: Filter and modify multiple items
             const activeUsers = draft.users.filter(user => user.active)
             activeUsers.forEach(user => {
-              user.score += 10 // Bonus points for active users
+              // Use Number() to coerce PlainValueRef to number for arithmetic
+              user.score = Number(user.score) + 10 // Bonus points for active users
             })
 
             // Pattern 4: Find by index-based condition
@@ -1960,7 +1968,8 @@ describe("Edge Cases and Error Handling", () => {
             // Find existing item and mutate
             const existing = draft.items.find(item => item.id === "1")
             if (existing) {
-              existing.value *= 2
+              // Use Number() to coerce PlainValueRef to number for arithmetic
+              existing.value = Number(existing.value) * 2
             }
 
             // Use findIndex to locate and mutate
@@ -1970,7 +1979,8 @@ describe("Edge Cases and Error Handling", () => {
             if (index !== -1) {
               const item = draft.items.get(index)
               if (item) {
-                item.value += 5
+                // Use Number() to coerce PlainValueRef to number for arithmetic
+                item.value = Number(item.value) + 5
               }
             }
           }).toJSON()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { convertInputToRef } from "./conversion.js"
-import { createTypedDoc, loro, Shape } from "./index.js"
+import { createTypedDoc, loro, Shape, unwrap } from "./index.js"
 
 describe("Nested Container Materialization", () => {
   it("syncs correctly between peers when struct has nested empty record", () => {
@@ -166,7 +166,7 @@ describe("Nested Container Materialization", () => {
     // Access missing container
     const root = doc.root
     // Should not crash
-    expect(root.existing).toBe("value")
+    expect(unwrap(root.existing)).toBe("value")
 
     // Accessing the missing container ref should work (it creates the wrapper)
     const newField = root.newField
@@ -183,7 +183,7 @@ describe("Nested Container Materialization", () => {
     newField.set("k", "v")
 
     // It should create the container lazily (or eagerly on set)
-    expect(newField.get("k")).toBe("v")
+    expect(unwrap(newField.get("k"))).toBe("v")
 
     // Verify in raw doc
     const rawMap = loro(doc).getMap("root")
@@ -226,7 +226,9 @@ describe("Nested Container Materialization", () => {
     )
 
     // Verify the deeply nested value is visible in doc1
-    expect(doc1.root.level1.level2.level3.get("deep-key")).toBe("deep-value")
+    expect(unwrap(doc1.root.level1.level2.level3.get("deep-key"))).toBe(
+      "deep-value",
+    )
   })
 
   // Task 1.3: Test list push with nested empty container
@@ -263,7 +265,7 @@ describe("Nested Container Materialization", () => {
     )
 
     // Verify the nested value is visible in doc1
-    expect(doc1.items[0]?.metadata.get("key")).toBe("value")
+    expect(unwrap(doc1.items[0]?.metadata.get("key"))).toBe("value")
   })
 
   // Task 1.5: Test conversion API with nested empty container
@@ -331,6 +333,6 @@ describe("Nested Container Materialization", () => {
     )
 
     // Verify the tag is visible in doc1's node
-    expect(node.data.tags.get("important")).toBe(true)
+    expect(unwrap(node.data.tags.get("important"))).toBe(true)
   })
 })

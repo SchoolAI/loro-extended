@@ -169,7 +169,9 @@ export function createContainerTypedRef(
         placeholder: params.placeholder as never[],
         getContainer: params.getContainer as () => LoroTree,
         autoCommit: params.autoCommit,
+        batchedMutation: params.batchedMutation,
         getDoc: params.getDoc,
+        overlay: params.overlay,
       })
     }
     default:

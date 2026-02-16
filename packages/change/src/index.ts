@@ -5,7 +5,6 @@ export {
   type ChangeOptions,
   serializeCommitMessage,
 } from "./change-options.js"
-
 export {
   derivePlaceholder,
   deriveShapePlaceholder,
@@ -36,13 +35,10 @@ export {
   readMetadata,
   writeMetadata,
 } from "./metadata.js"
-
 // Regular placeholder overlay
 export { mergeValue, overlayPlaceholder } from "./overlay.js"
-
 // Path selector DSL exports
 export { createPathBuilder } from "./path-builder.js"
-
 export { compileToJsonPath, hasWildcard } from "./path-compiler.js"
 // Path encoding for flattened root container storage (mergeable containers)
 export {
@@ -62,9 +58,16 @@ export {
   requiresGlobalSubscription,
   subscribeToPath,
 } from "./path-subscription.js"
-
 export { createPlaceholderProxy } from "./placeholder-proxy.js"
-
+// PlainValueRef - Reactive subscriptions for plain values
+export type { PlainValueRef } from "./plain-value-ref/index.js"
+export {
+  createPlainValueRef,
+  getPlainValueRefParentInternals,
+  getPlainValueRefPath,
+  isPlainValueRef,
+  PLAIN_VALUE_REF_SYMBOL,
+} from "./plain-value-ref/index.js"
 export { replayDiff } from "./replay-diff.js"
 // Doc shapes
 // Container shapes
@@ -110,14 +113,10 @@ export type {
   // WithPlaceholder type for shapes that support .placeholder()
   WithPlaceholder,
 } from "./shape.js"
-
 // Schema and type exports
 export { Shape } from "./shape.js"
-
 export type { Frontiers, TypedDoc } from "./typed-doc.js"
-
 export { createTypedDoc } from "./typed-doc.js"
-
 // Typed ref types - for specifying types with the loro() function
 export type {
   CounterRef,
@@ -130,7 +129,6 @@ export type {
   TreeNodeRef,
   TreeRef,
 } from "./typed-refs/index.js"
-
 export type {
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
@@ -140,6 +138,8 @@ export type {
   InferRaw,
   Mutable,
 } from "./types.js"
-
 // Utility exports
 export { validatePlaceholder } from "./validation.js"
+// The value() function for unwrapping reactive wrappers
+// The unwrap() helper for conditionally unwrapping PlainValueRef
+export { unwrap, value } from "./value.js"

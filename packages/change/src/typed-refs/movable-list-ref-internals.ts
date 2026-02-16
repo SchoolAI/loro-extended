@@ -15,13 +15,6 @@ export class MovableListRefInternals<
   Item = NestedShape["_plain"],
   MutableItem = NestedShape["_mutable"],
 > extends ListRefBaseInternals<NestedShape, Item, MutableItem> {
-  /** Absorb value at specific index for LoroMovableList */
-  override absorbValueAtIndex(index: number, value: unknown): void {
-    // LoroMovableList has set method
-    const container = this.getContainer() as LoroMovableList
-    container.set(index, value)
-  }
-
   /** Move an item from one index to another */
   move(from: number, to: number): void {
     const container = this.getContainer() as LoroMovableList

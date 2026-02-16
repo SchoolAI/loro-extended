@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, Shape } from "../index.js"
+import { change, createTypedDoc, Shape, unwrap } from "../index.js"
 
 /**
  * Tests for StructRef value updates across multiple change() calls.
@@ -8,9 +8,8 @@ import { change, createTypedDoc, Shape } from "../index.js"
  * underlying container, preventing stale cache issues when mutations occur in
  * separate change() transactions.
  *
- * BUG: StructRef.getOrCreateRef() caches value shapes in propertyCache, causing
- * stale values to be returned when the underlying container is modified by a
- * different StructRef instance (e.g., drafts created by change()).
+ * Outside change(), value shape properties return PlainValueRef objects.
+ * Use unwrap() / value() to get the raw value for assertions.
  */
 describe("Struct value updates across change() calls", () => {
   describe("updating existing properties", () => {
@@ -28,16 +27,16 @@ describe("Struct value updates across change() calls", () => {
         draft.config.name = "initial"
         draft.config.count = 1
       })
-      expect(doc.config.name).toBe("initial")
-      expect(doc.config.count).toBe(1)
+      expect(unwrap(doc.config.name)).toBe("initial")
+      expect(unwrap(doc.config.count)).toBe(1)
 
       // Second change - BUG: values stay at initial values
       change(doc, draft => {
         draft.config.name = "updated"
         draft.config.count = 2
       })
-      expect(doc.config.name).toBe("updated") // FAILS: returns "initial"
-      expect(doc.config.count).toBe(2) // FAILS: returns 1
+      expect(unwrap(doc.config.name)).toBe("updated") // FAILS: returns "initial"
+      expect(unwrap(doc.config.count)).toBe(2) // FAILS: returns 1
     })
 
     it("handles multiple sequential updates to same property", () => {
@@ -53,7 +52,7 @@ describe("Struct value updates across change() calls", () => {
         change(doc, draft => {
           draft.settings.value = i
         })
-        expect(doc.settings.value).toBe(i) // FAILS on i > 1
+        expect(unwrap(doc.settings.value)).toBe(i) // FAILS on i > 1
       }
     })
 
@@ -69,12 +68,12 @@ describe("Struct value updates across change() calls", () => {
       change(doc, draft => {
         draft.flags.enabled = true
       })
-      expect(doc.flags.enabled).toBe(true)
+      expect(unwrap(doc.flags.enabled)).toBe(true)
 
       change(doc, draft => {
         draft.flags.enabled = false
       })
-      expect(doc.flags.enabled).toBe(false) // FAILS: returns true
+      expect(unwrap(doc.flags.enabled)).toBe(false) // FAILS: returns true
     })
   })
 
@@ -93,12 +92,12 @@ describe("Struct value updates across change() calls", () => {
       change(doc, draft => {
         draft.outer.inner.value = 100
       })
-      expect(doc.outer.inner.value).toBe(100)
+      expect(unwrap(doc.outer.inner.value)).toBe(100)
 
       change(doc, draft => {
         draft.outer.inner.value = 200
       })
-      expect(doc.outer.inner.value).toBe(200) // FAILS: returns 100
+      expect(unwrap(doc.outer.inner.value)).toBe(200) // FAILS: returns 100
     })
   })
 
@@ -118,8 +117,8 @@ describe("Struct value updates across change() calls", () => {
       change(doc, draft => {
         draft.users.user1 = { name: "Alice", age: 30 }
       })
-      expect(doc.users.user1?.name).toBe("Alice")
-      expect(doc.users.user1?.age).toBe(30)
+      expect(unwrap(doc.users.user1?.name)).toBe("Alice")
+      expect(unwrap(doc.users.user1?.age)).toBe(30)
 
       // Update the struct's value properties
       change(doc, draft => {
@@ -129,8 +128,8 @@ describe("Struct value updates across change() calls", () => {
           user.age = 25
         }
       })
-      expect(doc.users.user1?.name).toBe("Bob") // FAILS: returns "Alice"
-      expect(doc.users.user1?.age).toBe(25) // FAILS: returns 30
+      expect(unwrap(doc.users.user1?.name)).toBe("Bob") // FAILS: returns "Alice"
+      expect(unwrap(doc.users.user1?.age)).toBe(25) // FAILS: returns 30
     })
   })
 
@@ -166,20 +165,20 @@ describe("Struct value updates across change() calls", () => {
 
       const doc = createTypedDoc(Schema)
 
-      // Read before any change - gets placeholder value
-      expect(doc.config.value).toBe(0)
+      // Read before any change - gets placeholder value via PlainValueRef
+      expect(unwrap(doc.config.value)).toBe(0)
 
       // First set
       change(doc, draft => {
         draft.config.value = 100
       })
-      expect(doc.config.value).toBe(100)
+      expect(unwrap(doc.config.value)).toBe(100)
 
-      // Second set - this is the key test for the stale cache bug
+      // Second set - PlainValueRef reads fresh from the container
       change(doc, draft => {
         draft.config.value = 200
       })
-      expect(doc.config.value).toBe(200) // FAILS: returns 100
+      expect(unwrap(doc.config.value)).toBe(200)
     })
   })
 

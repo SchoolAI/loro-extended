@@ -1,6 +1,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { change } from "../functional-helpers.js"
+import { unwrap } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 import type { Mutable } from "../types.js"
@@ -81,9 +82,10 @@ describe("JSON Compatibility", () => {
     expect(keys).toContain("tags")
     expect(keys).toContain("settings")
 
+    // Outside change(), value shape properties return PlainValueRef
     const entries = Object.entries(doc.meta)
     const entryMap = new Map(entries)
-    expect(entryMap.get("title")).toBe("Test")
+    expect(unwrap(entryMap.get("title"))).toBe("Test")
     expect(entryMap.get("count")).toBeDefined()
   })
 
@@ -156,14 +158,17 @@ describe("JSON Compatibility", () => {
       root.messages.push({ id: "2", content: "B", timestamp: 20 })
     })
 
+    // map() predicates receive plain objects via getPredicateItem
     const mapped = doc.messages.map(m => ({ id: m.id, txt: m.content }))
     expect(JSON.stringify(mapped)).toBe(
       '[{"id":"1","txt":"A"},{"id":"2","txt":"B"}]',
     )
 
+    // filter() predicates receive plain objects, but return MutableItems (StructRef)
     const filtered = doc.messages.filter(m => m.timestamp > 15)
     expect(filtered).toHaveLength(1)
-    expect(filtered[0].id).toBe("2")
+    // Outside change(), accessing value shape properties returns PlainValueRef
+    expect(unwrap(filtered[0].id)).toBe("2")
     // filtered returns MutableItems (TypedRefs), so JSON.stringify should work on them
     expect(JSON.stringify(filtered)).toBe(
       '[{"id":"2","content":"B","timestamp":20}]',
@@ -177,7 +182,8 @@ describe("JSON Compatibility", () => {
       root.settings.set("b", false)
     })
 
-    const values = Object.values(doc.settings)
+    // Outside change(), record value shapes return PlainValueRef
+    const values = Object.values(doc.settings).map(v => unwrap(v))
     expect(values).toContain(true)
     expect(values).toContain(false)
     expect(values).toHaveLength(2)

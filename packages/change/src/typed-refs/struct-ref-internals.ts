@@ -1,5 +1,6 @@
-import type { Container, LoroDoc, LoroMap, MapDiff, Value } from "loro-crdt"
+import type { Container, LoroDoc, LoroMap } from "loro-crdt"
 import type { ExtMapRef } from "../ext.js"
+import type { PlainValueRef } from "../plain-value-ref/index.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
@@ -13,6 +14,11 @@ import {
   type TypedRef,
   type TypedRefParams,
 } from "./base.js"
+import {
+  createPlainValueRefForProperty,
+  resolveValueForBatchedMutation,
+  unwrapPlainValueRef,
+} from "./plain-value-access.js"
 import {
   absorbCachedPlainValues,
   assignPlainValueToTypedRef,
@@ -28,7 +34,8 @@ import {
 export class StructRefInternals<
   NestedShapes extends Record<string, ContainerOrValueShape>,
 > extends BaseRefInternals<any> {
-  private propertyCache = new Map<string, TypedRef<ContainerShape> | Value>()
+  // Cache only container refs - value shapes now return PlainValueRef (no caching needed)
+  private propertyCache = new Map<string, TypedRef<ContainerShape>>()
 
   /** Get typed ref params for creating child refs at a key */
   getChildTypedRefParams(
@@ -109,62 +116,26 @@ export class StructRefInternals<
   ): unknown {
     const structShape = this.getShape() as StructContainerShape<NestedShapes>
     const actualShape = shape || structShape.shapes[key]
-    const container = this.getContainer() as LoroMap
 
     if (isValueShape(actualShape)) {
-      const overlay = this.getOverlay()
-      if (overlay) {
-        const containerId = (container as any).id
-        const diff = overlay.get(containerId)
-        if (diff && diff.type === "map") {
-          const mapDiff = diff as MapDiff
-          if (key in mapDiff.updated) {
-            return mapDiff.updated[key] as Value
-          }
-        }
+      if (this.getBatchedMutation()) {
+        // Inside change() — use runtime typeof check to decide:
+        // - Primitive values (string, number, boolean, null): return raw value
+        //   for ergonomic boolean logic (`if (draft.active)`, `!draft.published`)
+        // - Object/array values: return PlainValueRef for nested mutation tracking
+        //   (`item.metadata.author = "Alice"`)
+        //
+        // This replaces the old schema-based valueType heuristic which was
+        // semantically wrong for union and any shapes that can contain either
+        // primitives or objects at runtime.
+        return resolveValueForBatchedMutation(this, key, actualShape)
       }
-      // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
-      // from container (NEVER cache). This ensures we always get the latest value
-      // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
-      //
-      // When in batchedMutation mode (inside change()), we cache value shapes so that
-      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
-      if (!this.getBatchedMutation()) {
-        const containerValue = container.get(key)
-        if (containerValue !== undefined) {
-          return containerValue
-        }
-        // Only fall back to placeholder if the container doesn't have the value
-        const placeholder = (this.getPlaceholder() as any)?.[key]
-        if (placeholder === undefined) {
-          throw new Error("placeholder required")
-        }
-        return placeholder
-      }
-
-      // In batched mode (within change()), we cache value shapes so that
-      // mutations to nested objects persist back to the CRDT via absorbPlainValues()
-      let ref = this.propertyCache.get(key)
-      if (!ref) {
-        const containerValue = container.get(key)
-        if (containerValue !== undefined) {
-          // For objects, create a deep copy so mutations can be tracked
-          if (typeof containerValue === "object" && containerValue !== null) {
-            ref = JSON.parse(JSON.stringify(containerValue))
-          } else {
-            ref = containerValue as Value
-          }
-        } else {
-          // Only fall back to placeholder if the container doesn't have the value
-          const placeholder = (this.getPlaceholder() as any)?.[key]
-          if (placeholder === undefined) {
-            throw new Error("placeholder required")
-          }
-          ref = placeholder as Value
-        }
-        this.propertyCache.set(key, ref)
-      }
-      return ref
+      // Outside change() — return PlainValueRef for reactive subscriptions
+      return createPlainValueRefForProperty(
+        this,
+        key,
+        actualShape as ValueShape,
+      )
     }
 
     // Container shapes: safe to cache (handles)
@@ -176,7 +147,9 @@ export class StructRefInternals<
       this.propertyCache.set(key, ref)
     }
 
-    return ref as Shape extends ContainerShape ? TypedRef<Shape> : Value
+    return ref as Shape extends ContainerShape
+      ? TypedRef<Shape>
+      : PlainValueRef<any>
   }
 
   /** Set a property value */
@@ -190,8 +163,9 @@ export class StructRefInternals<
     }
 
     if (isValueShape(shape)) {
-      container.set(key, value)
-      this.propertyCache.set(key, value as Value)
+      // Unwrap PlainValueRef if the value is one (supports ref = otherRef assignment)
+      const unwrapped = unwrapPlainValueRef(value)
+      container.set(key, unwrapped)
       this.commitIfAuto()
     } else {
       // For container shapes, try to assign the plain value
@@ -217,6 +191,8 @@ export class StructRefInternals<
 
   /** Absorb mutated plain values back into Loro containers */
   absorbPlainValues(): void {
+    // Value shapes now use PlainValueRef with eager write-back, so we only need
+    // to recurse into container children (which may have their own cached values)
     absorbCachedPlainValues(
       this.propertyCache,
       () => this.getContainer() as LoroMap,

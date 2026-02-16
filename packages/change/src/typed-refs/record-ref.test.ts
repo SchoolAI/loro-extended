@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
-import { createTypedDoc, loro, Shape } from "../index.js"
+import { createTypedDoc, loro, Shape, unwrap } from "../index.js"
 
 describe("Record Types", () => {
   describe("Shape.record (Container)", () => {
@@ -84,8 +84,9 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.wrapper.config.theme = "dark"
-        draft.wrapper.config.lang = "en"
+        // Use type assertion for dynamic property access on plain record values
+        ;(draft.wrapper.config as any).theme = "dark"
+        ;(draft.wrapper.config as any).lang = "en"
       })
 
       expect(doc.toJSON().wrapper.config).toEqual({
@@ -94,8 +95,9 @@ describe("Record Types", () => {
       })
 
       change(doc, draft => {
-        delete draft.wrapper.config.theme
-        draft.wrapper.config.lang = "fr"
+        // Use type assertion for dynamic property access on plain record values
+        delete (draft.wrapper.config as any).theme
+        ;(draft.wrapper.config as any).lang = "fr"
       })
 
       expect(doc.toJSON().wrapper.config).toEqual({
@@ -113,8 +115,9 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.wrapper.stats.visits = 100
-        draft.wrapper.stats.clicks = 50
+        // Use type assertion for dynamic property access on plain record values
+        ;(draft.wrapper.stats as any).visits = 100
+        ;(draft.wrapper.stats as any).clicks = 50
       })
 
       expect(doc.toJSON().wrapper.stats).toEqual({
@@ -135,11 +138,12 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.wrapper.settings.ui = {
+        // Use type assertion for dynamic property access on plain record values
+        ;(draft.wrapper.settings as any).ui = {
           darkMode: true,
           sidebar: false,
         }
-        draft.wrapper.settings.notifications = {
+        ;(draft.wrapper.settings as any).notifications = {
           email: true,
           push: true,
         }
@@ -357,7 +361,7 @@ describe("Record Types", () => {
       })
 
       // This should work - accessing an existing key
-      expect(doc.preferences.peer1?.showTip).toBe(true)
+      expect(unwrap(doc.preferences.peer1?.showTip)).toBe(true)
 
       // Accessing a non-existent key should NOT throw "placeholder required"
       // It should return undefined so optional chaining works correctly
@@ -419,11 +423,15 @@ describe("Record Types", () => {
         draft.scores.bob = 50
       })
 
-      const values = doc.scores.values()
+      // Outside change(), value shapes return PlainValueRef
+      const values = doc.scores.values().map(v => unwrap(v))
       expect(values).toEqual([100, 50])
 
-      // Type check: values should be number[]
-      const _typeCheck: number[] = values
+      // Type check: values may include PlainValueRef due to union type
+      const _typeCheck: (
+        | number
+        | import("../plain-value-ref/index.js").PlainValueRef<number>
+      )[] = values
     })
 
     it("should return properly typed entries for value-shaped records", () => {
@@ -438,14 +446,17 @@ describe("Record Types", () => {
         draft.scores.bob = 50
       })
 
-      const entries = doc.scores.entries()
+      // Outside change(), value shapes return PlainValueRef
+      const entries = doc.scores
+        .entries()
+        .map(([k, v]) => [k, unwrap(v)] as const)
       expect(entries).toEqual([
         ["alice", 100],
         ["bob", 50],
       ])
 
-      // Type check: entries should be [string, number][]
-      const _typeCheck: [string, number][] = entries
+      // Type check: entries are now unwrapped plain values
+      const _typeCheck: readonly (readonly [string, number])[] = entries
     })
 
     it("should return properly typed refs for container-shaped records", () => {
@@ -467,11 +478,11 @@ describe("Record Types", () => {
 
       const values = doc.players.values()
       expect(values.length).toBe(2)
-      // Values should be StructRefs that we can access properties on
-      expect(values[0].name).toBe("Alice")
-      expect(values[0].score).toBe(100)
-      expect(values[1].name).toBe("Bob")
-      expect(values[1].score).toBe(50)
+      // Values are StructRefs; their value shape properties return PlainValueRef outside change()
+      expect(unwrap(values[0].name)).toBe("Alice")
+      expect(unwrap(values[0].score)).toBe(100)
+      expect(unwrap(values[1].name)).toBe("Bob")
+      expect(unwrap(values[1].score)).toBe(50)
     })
 
     it("should return properly typed entries for container-shaped records", () => {
@@ -494,9 +505,10 @@ describe("Record Types", () => {
       const entries = doc.players.entries()
       expect(entries.length).toBe(2)
       expect(entries[0][0]).toBe("alice")
-      expect(entries[0][1].name).toBe("Alice")
+      // Value shape properties return PlainValueRef outside change()
+      expect(unwrap(entries[0][1].name)).toBe("Alice")
       expect(entries[1][0]).toBe("bob")
-      expect(entries[1][1].name).toBe("Bob")
+      expect(unwrap(entries[1][1].name)).toBe("Bob")
     })
 
     it("should return empty arrays for empty records", () => {

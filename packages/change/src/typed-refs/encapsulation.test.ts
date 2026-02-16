@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { unwrap } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 import { INTERNAL_SYMBOL } from "./base.js"
@@ -70,7 +71,7 @@ describe("Internal State Encapsulation", () => {
 
       // Verify the ref still works
       recordRef.set("alice", 100)
-      expect(recordRef.get("alice")).toBe(100)
+      expect(unwrap(recordRef.get("alice"))).toBe(100)
     })
 
     it("StructRef has only schema keys (via proxy)", () => {
@@ -87,9 +88,9 @@ describe("Internal State Encapsulation", () => {
       const keys = Object.keys(structRef)
       expect(keys.sort()).toEqual(["darkMode", "fontSize"])
 
-      // Verify the ref still works
+      // Verify the ref still works — outside change(), value shapes return PlainValueRef
       structRef.darkMode = true
-      expect(structRef.darkMode).toBe(true)
+      expect(unwrap(structRef.darkMode)).toBe(true)
     })
 
     it("TreeRef has no enumerable internal state", () => {
@@ -106,9 +107,9 @@ describe("Internal State Encapsulation", () => {
       const keys = Object.keys(treeRef)
       expect(keys).toEqual([])
 
-      // Verify the ref still works
+      // Verify the ref still works — outside change(), value shapes return PlainValueRef
       const node = treeRef.createNode({ name: "root" })
-      expect(node.data.name).toBe("root")
+      expect(unwrap(node.data.name)).toBe("root")
     })
   })
 

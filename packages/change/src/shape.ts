@@ -12,6 +12,7 @@ import type {
 } from "loro-crdt"
 
 import { LORO_SYMBOL } from "./loro.js"
+import type { PlainValueRef } from "./plain-value-ref/types.js"
 import type { CounterRef } from "./typed-refs/counter-ref.js"
 import type { ListRef } from "./typed-refs/list-ref.js"
 import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
@@ -274,31 +275,42 @@ export type ContainerShape =
 export type ContainerType = ContainerShape["_type"]
 
 // LoroValue shape types - a shape for each of Loro's Value types
+// NOTE: _mutable types use a union of PlainValueRef<T> | T to:
+// - Enable reactive subscriptions via PlainValueRef when reading
+// - Allow direct assignment of raw values (T) for ergonomic writes
+// - The Proxy SET trap handles unwrapping PlainValueRef at runtime
 export interface StringValueShape<T extends string = string>
-  extends Shape<T, T, T> {
+  extends Shape<T, PlainValueRef<T> | T, T> {
   readonly _type: "value"
   readonly valueType: "string"
   readonly options?: T[]
 }
-export interface NumberValueShape extends Shape<number, number, number> {
+export interface NumberValueShape
+  extends Shape<number, PlainValueRef<number> | number, number> {
   readonly _type: "value"
   readonly valueType: "number"
 }
-export interface BooleanValueShape extends Shape<boolean, boolean, boolean> {
+export interface BooleanValueShape
+  extends Shape<boolean, PlainValueRef<boolean> | boolean, boolean> {
   readonly _type: "value"
   readonly valueType: "boolean"
 }
-export interface NullValueShape extends Shape<null, null, null> {
+export interface NullValueShape
+  extends Shape<null, PlainValueRef<null> | null, null> {
   readonly _type: "value"
   readonly valueType: "null"
 }
 export interface UndefinedValueShape
-  extends Shape<undefined, undefined, undefined> {
+  extends Shape<undefined, PlainValueRef<undefined> | undefined, undefined> {
   readonly _type: "value"
   readonly valueType: "undefined"
 }
 export interface Uint8ArrayValueShape
-  extends Shape<Uint8Array, Uint8Array, Uint8Array> {
+  extends Shape<
+    Uint8Array,
+    PlainValueRef<Uint8Array> | Uint8Array,
+    Uint8Array
+  > {
   readonly _type: "value"
   readonly valueType: "uint8array"
 }
@@ -307,6 +319,10 @@ export interface Uint8ArrayValueShape
  * Value shape for objects with fixed keys (structs).
  * This is the preferred way to define fixed-key plain value objects.
  * Identical structure to ObjectValueShape but with valueType: "struct".
+ *
+ * The _mutable type allows both:
+ * - Reading as PlainValueRef with nested property access via Proxy
+ * - Writing raw plain objects directly for ergonomic assignment
  */
 export interface StructValueShape<
   T extends Record<string, ValueShape> = Record<string, ValueShape>,
@@ -322,10 +338,11 @@ export interface StructValueShape<
 
 // NOTE: RecordValueShape and ArrayValueShape use Record<string, never> and never[]
 // for Placeholder to enforce that only empty values ({} and []) are valid.
+// The _mutable types use union to allow both PlainValueRef reads and raw value writes.
 export interface RecordValueShape<T extends ValueShape = ValueShape>
   extends Shape<
     Record<string, T["_plain"]>,
-    Record<string, T["_mutable"]>,
+    PlainValueRef<Record<string, T["_plain"]>> | Record<string, T["_plain"]>,
     Record<string, never>
   > {
   readonly _type: "value"
@@ -334,7 +351,11 @@ export interface RecordValueShape<T extends ValueShape = ValueShape>
 }
 
 export interface ArrayValueShape<T extends ValueShape = ValueShape>
-  extends Shape<T["_plain"][], T["_mutable"][], never[]> {
+  extends Shape<
+    T["_plain"][],
+    PlainValueRef<T["_plain"][]> | T["_plain"][],
+    never[]
+  > {
   readonly _type: "value"
   readonly valueType: "array"
   readonly shape: T
@@ -343,7 +364,7 @@ export interface ArrayValueShape<T extends ValueShape = ValueShape>
 export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
   extends Shape<
     T[number]["_plain"],
-    T[number]["_mutable"],
+    PlainValueRef<T[number]["_plain"]> | T[number]["_plain"],
     T[number]["_placeholder"]
   > {
   readonly _type: "value"
@@ -368,7 +389,7 @@ export interface DiscriminatedUnionValueShape<
   K extends string = string,
   T extends Record<string, StructValueShape> = Record<string, StructValueShape>,
   Plain = T[keyof T]["_plain"],
-  Mutable = T[keyof T]["_mutable"],
+  Mutable = PlainValueRef<Plain> | Plain,
   Placeholder = T[keyof T]["_placeholder"],
 > extends Shape<Plain, Mutable, Placeholder> {
   readonly _type: "value"
@@ -388,7 +409,8 @@ export interface DiscriminatedUnionValueShape<
  * })
  * ```
  */
-export interface AnyValueShape extends Shape<Value, Value, undefined> {
+export interface AnyValueShape
+  extends Shape<Value, PlainValueRef<Value> | Value, undefined> {
   readonly _type: "value"
   readonly valueType: "any"
 }

@@ -1,13 +1,18 @@
 import type { Container, LoroDoc, LoroList, LoroMovableList } from "loro-crdt"
 import { convertInputToRef } from "../conversion.js"
 import type { ExtListRef } from "../ext.js"
-import type { ContainerOrValueShape, ContainerShape } from "../shape.js"
+import type {
+  ContainerOrValueShape,
+  ContainerShape,
+  ValueShape,
+} from "../shape.js"
 import { isContainer, isValueShape } from "../utils/type-guards.js"
 import {
   BaseRefInternals,
   INTERNAL_SYMBOL,
   type TypedRefParams,
 } from "./base.js"
+import { createPlainValueRefForListItem } from "./plain-value-access.js"
 import { createContainerTypedRef } from "./utils.js"
 
 /**
@@ -92,49 +97,25 @@ export class ListRefBaseInternals<
     }
   }
 
-  /** Get mutable item for return values (returns ref or cached value) */
+  /** Get mutable item for return values (returns PlainValueRef for value shapes, TypedRef for container shapes) */
   getMutableItem(index: number): MutableItem | undefined {
     const shape = this.getShape()
     const container = this.getContainer() as LoroList | LoroMovableList
 
-    // Get the raw container item
+    // Get the raw container item to check if it exists
     const containerItem = container.get(index)
     if (containerItem === undefined) {
       return undefined as MutableItem
     }
 
     if (isValueShape(shape.shape)) {
-      // When NOT in batchedMutation mode (direct access outside of change()), ALWAYS read fresh
-      // from container (NEVER cache). This ensures we always get the latest value
-      // from the CRDT, even when modified by a different ref instance (e.g., drafts from change())
-      //
-      // When in batchedMutation mode (inside change()), we cache value shapes so that
-      // mutations to found/filtered items persist back to the CRDT via absorbPlainValues()
-      if (!this.getBatchedMutation()) {
-        return containerItem as MutableItem
-      }
-
-      // In batched mode (within change()), we need to cache value shapes
-      // so that mutations to found/filtered items persist back to the CRDT
-      // via absorbPlainValues() at the end of change()
-      let cachedItem = this.itemCache.get(index)
-      if (cachedItem) {
-        return cachedItem
-      }
-
-      // For value shapes, we need to ensure mutations persist
-      // The key insight: we must return the SAME object for the same index
-      // so that mutations to filtered/found items persist back to the cache
-      if (typeof containerItem === "object" && containerItem !== null) {
-        // Create a deep copy for objects so mutations can be tracked
-        // IMPORTANT: Only create the copy once, then always return the same cached object
-        cachedItem = JSON.parse(JSON.stringify(containerItem))
-      } else {
-        // For primitives, just use the value directly
-        cachedItem = containerItem
-      }
-      this.itemCache.set(index, cachedItem)
-      return cachedItem as MutableItem
+      // Always return PlainValueRef for value shapes
+      // PlainValueRef handles reads from the container and provides eager write-back on SET
+      return createPlainValueRefForListItem(
+        this,
+        index,
+        shape.shape as ValueShape,
+      ) as MutableItem
     }
 
     // Container shapes: safe to cache (handles)
@@ -215,15 +196,13 @@ export class ListRefBaseInternals<
 
   /** Absorb mutated plain values back into Loro containers */
   absorbPlainValues(): void {
-    // Critical function: absorb mutated plain values back into Loro containers
-    // This is called at the end of change() to persist mutations made to plain objects
+    // Value shapes now use PlainValueRef with eager write-back, so we only need
+    // to recurse into container children (which may have their own cached values)
     const shape = this.getShape()
-    for (const [index, cachedItem] of this.itemCache.entries()) {
+    for (const [_index, cachedItem] of this.itemCache.entries()) {
       if (cachedItem) {
-        if (isValueShape(shape.shape)) {
-          // For value shapes, delegate to subclass-specific absorption logic
-          this.absorbValueAtIndex(index, cachedItem)
-        } else {
+        // Only container shapes are cached now - value shapes return PlainValueRef
+        if (!isValueShape(shape.shape)) {
           // For container shapes, the item should be a typed ref that handles its own absorption
           if (
             cachedItem &&
