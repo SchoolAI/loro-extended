@@ -1,4 +1,4 @@
-import { change, createTypedDoc, loro } from "@loro-extended/change"
+import { change, createTypedDoc, loro, unwrap } from "@loro-extended/change"
 import { createLens } from "@loro-extended/lens"
 import { describe, expect, it } from "vitest"
 import { createClientLensFilter } from "../client/filters.js"
@@ -29,7 +29,7 @@ describe("lens sovereignty integration", () => {
       d.game.phase = "reveal"
     })
 
-    expect(aliceLens.worldview.game.phase).toBe("reveal")
+    expect(unwrap(aliceLens.worldview.game.phase)).toBe("reveal")
 
     // Bob modifies his own state - should be accepted by alice's lens
     loroDoc.setNextCommitMessage(createIdentityMessage("bob"))
@@ -42,8 +42,12 @@ describe("lens sovereignty integration", () => {
     })
 
     // Alice should see bob's changes
-    expect(aliceLens.worldview.game.players.get("bob")?.choice).toBe("rock")
-    expect(aliceLens.worldview.game.players.get("bob")?.locked).toBe(true)
+    expect(unwrap(aliceLens.worldview.game.players.get("bob")?.choice)).toBe(
+      "rock",
+    )
+    expect(unwrap(aliceLens.worldview.game.players.get("bob")?.locked)).toBe(
+      true,
+    )
 
     aliceLens.dispose()
   })
@@ -75,8 +79,12 @@ describe("lens sovereignty integration", () => {
     })
 
     // Server should see alice's changes
-    expect(serverLens.worldview.game.players.get("alice")?.choice).toBe("rock")
-    expect(serverLens.worldview.game.players.get("alice")?.locked).toBe(true)
+    expect(unwrap(serverLens.worldview.game.players.get("alice")?.choice)).toBe(
+      "rock",
+    )
+    expect(unwrap(serverLens.worldview.game.players.get("alice")?.locked)).toBe(
+      true,
+    )
 
     // Bob modifies his own state
     loroDoc.setNextCommitMessage(createIdentityMessage("bob"))
@@ -89,8 +97,12 @@ describe("lens sovereignty integration", () => {
     })
 
     // Server should see bob's changes
-    expect(serverLens.worldview.game.players.get("bob")?.choice).toBe("paper")
-    expect(serverLens.worldview.game.players.get("bob")?.locked).toBe(true)
+    expect(unwrap(serverLens.worldview.game.players.get("bob")?.choice)).toBe(
+      "paper",
+    )
+    expect(unwrap(serverLens.worldview.game.players.get("bob")?.locked)).toBe(
+      true,
+    )
 
     serverLens.dispose()
   })
@@ -122,8 +134,12 @@ describe("lens sovereignty integration", () => {
     })
 
     // Server should NOT see the malicious changes
-    expect(serverLens.worldview.game.players.get("bob")?.choice).toBeNull()
-    expect(serverLens.worldview.game.players.get("bob")?.locked).toBe(false)
+    expect(
+      unwrap(serverLens.worldview.game.players.get("bob")?.choice),
+    ).toBeNull()
+    expect(unwrap(serverLens.worldview.game.players.get("bob")?.locked)).toBe(
+      false,
+    )
 
     serverLens.dispose()
   })
@@ -144,7 +160,7 @@ describe("lens sovereignty integration", () => {
       filter: makeGameFilter(),
     })
 
-    expect(serverLens.worldview.game.phase).toBe("choosing")
+    expect(unwrap(serverLens.worldview.game.phase)).toBe("choosing")
 
     // Alice tries to modify phase (malicious)
     loroDoc.setNextCommitMessage(createIdentityMessage("alice"))
@@ -153,7 +169,7 @@ describe("lens sovereignty integration", () => {
     })
 
     // Server should NOT see the malicious phase change
-    expect(serverLens.worldview.game.phase).toBe("choosing")
+    expect(unwrap(serverLens.worldview.game.phase)).toBe("choosing")
 
     serverLens.dispose()
   })

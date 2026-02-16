@@ -5,6 +5,7 @@
  * They run on the server to ensure game rules are enforced consistently.
  */
 
+import { unwrap } from "@loro-extended/change"
 import type { Choice, GameChangeFn, GameDoc, Result } from "../shared/schema.js"
 
 /**
@@ -78,8 +79,10 @@ export const resolveGameReactor = (
 ) => {
   // Detect transition to reveal phase
   if (before.game.phase === "choosing" && after.game.phase === "reveal") {
-    const aliceChoice = after.game.players.get("alice")?.choice ?? null
-    const bobChoice = after.game.players.get("bob")?.choice ?? null
+    const aliceChoice = (unwrap(after.game.players.get("alice")?.choice) ??
+      null) as Choice | null
+    const bobChoice = (unwrap(after.game.players.get("bob")?.choice) ??
+      null) as Choice | null
 
     const result = calculateWinner(aliceChoice, bobChoice)
 
