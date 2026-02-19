@@ -8,14 +8,18 @@ import type {
   ValueShape,
 } from "../shape.js"
 import { isValueShape } from "../utils/type-guards.js"
-import { BaseRefInternals, type TypedRef, type TypedRefParams } from "./base.js"
+import {
+  BaseRefInternals,
+  INTERNAL_SYMBOL,
+  type TypedRef,
+  type TypedRefParams,
+} from "./base.js"
 import {
   createPlainValueRefForProperty,
   resolveValueForBatchedMutation,
   unwrapPlainValueRef,
 } from "./plain-value-access.js"
 import {
-  absorbCachedPlainValues,
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
@@ -299,11 +303,13 @@ export class RecordRefInternals<
     this.commitIfAuto()
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
-    // Value shapes now use PlainValueRef with eager write-back, so we only need
-    // to recurse into container children (which may have their own cached values)
-    absorbCachedPlainValues(this.refCache, () => this.getContainer() as LoroMap)
+  /** Recursively finalize nested container refs */
+  override finalizeTransaction(): void {
+    for (const ref of this.refCache.values()) {
+      if (ref && INTERNAL_SYMBOL in ref) {
+        ref[INTERNAL_SYMBOL].finalizeTransaction?.()
+      }
+    }
   }
 
   /** Create the ext namespace for record */

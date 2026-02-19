@@ -228,7 +228,8 @@ describe("ListRef PlainValueRef unification", () => {
 
     const item = doc.items.get(0)
     expect(isPlainValueRef(item)).toBe(true)
-    expect(unwrap(item?.value)).toBe(42)
+    const itemValue = unwrap(item)
+    expect(itemValue?.value).toBe(42)
   })
 
   it("list item boolean negation works correctly (!todo.completed)", () => {

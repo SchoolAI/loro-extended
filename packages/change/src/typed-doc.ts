@@ -29,7 +29,7 @@ import type {
 import { type DiffOverlay, INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc-ref.js"
 import { serializeRefToJSON } from "./typed-refs/utils.js"
-import type { Infer, InferPlaceholderType, Mutable } from "./types.js"
+import type { Draft, Infer, InferPlaceholderType, Mutable } from "./types.js"
 import { isValueShape } from "./utils/type-guards.js"
 import { validatePlaceholder } from "./validation.js"
 
@@ -285,7 +285,7 @@ class TypedDocInternal<Shape extends DocShape> {
     ) as Infer<Shape>
   }
 
-  change(fn: (draft: Mutable<Shape>) => void, options?: ChangeOptions): void {
+  change(fn: (draft: Draft<Shape>) => void, options?: ChangeOptions): void {
     const draft = new DocRef({
       shape: this.shape,
       placeholder: this.placeholder as any,
@@ -295,8 +295,8 @@ class TypedDocInternal<Shape extends DocShape> {
       overlay: this.overlay,
       mergeable: this._mergeable,
     })
-    fn(draft as unknown as Mutable<Shape>)
-    draft[INTERNAL_SYMBOL].absorbPlainValues()
+    fn(draft as unknown as Draft<Shape>)
+    draft[INTERNAL_SYMBOL].finalizeTransaction?.()
 
     // Set commit message if provided
     const serializedMessage = serializeCommitMessage(options?.commitMessage)
@@ -430,10 +430,7 @@ export type TypedDoc<Shape extends DocShape> = Mutable<Shape> & {
    * @internal
    */
   readonly [EXT_SYMBOL]: {
-    change: (
-      fn: (draft: Mutable<Shape>) => void,
-      options?: ChangeOptions,
-    ) => void
+    change: (fn: (draft: Draft<Shape>) => void, options?: ChangeOptions) => void
   }
 }
 
@@ -546,7 +543,7 @@ export function createTypedDoc<Shape extends DocShape>(
       return internal.mergeable
     },
     change(
-      fn: (draft: Mutable<Shape>) => void,
+      fn: (draft: Draft<Shape>) => void,
       options?: ChangeOptions,
     ): TypedDoc<Shape> {
       internal.change(fn, options)

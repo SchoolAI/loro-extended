@@ -114,12 +114,10 @@ export class DocRefInternals<
     return ref
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
-    // By iterating over the propertyCache, we achieve a small optimization
-    // by only absorbing values that have been 'touched' in some way
-    for (const [, ref] of this.propertyCache.entries()) {
-      ref[INTERNAL_SYMBOL].absorbPlainValues()
+  /** Recursively finalize nested container refs */
+  override finalizeTransaction(): void {
+    for (const ref of this.propertyCache.values()) {
+      ref[INTERNAL_SYMBOL].finalizeTransaction?.()
     }
   }
 }

@@ -176,13 +176,17 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        const alice = draft.users.get("u1")
+        const alice = draft.users.get("u1") as
+          | { name: string; age: number }
+          | undefined
         if (alice) {
           alice.name = "Alice"
           alice.age = 30
         }
 
-        const bob = draft.users.get("u2")
+        const bob = draft.users.get("u2") as
+          | { name: string; age: number }
+          | undefined
         if (bob) {
           bob.name = "Bob"
           bob.age = 25

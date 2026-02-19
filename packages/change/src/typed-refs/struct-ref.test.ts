@@ -122,7 +122,9 @@ describe("Struct value updates across change() calls", () => {
 
       // Update the struct's value properties
       change(doc, draft => {
-        const user = draft.users.get("user1")
+        const user = draft.users.get("user1") as
+          | { name: string; age: number }
+          | undefined
         if (user) {
           user.name = "Bob"
           user.age = 25

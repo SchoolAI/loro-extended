@@ -6,7 +6,7 @@ import { change, createTypedDoc, Shape, unwrap } from "../index.js"
  *
  * ListRefBase has a different caching pattern than RecordRef/StructRef:
  * - It caches items in itemCache
- * - The cache is cleared in absorbPlainValues() after each change()
+ * - The cache is cleared in finalizeTransaction() after each change()
  *
  * However, there may still be stale cache issues if:
  * 1. Items are accessed outside of change() (populating the cache)
@@ -91,8 +91,9 @@ describe("List value updates across change() calls", () => {
 
       // Access item outside of change() - this may populate cache
       const item0 = doc.items.get(0)
-      expect(unwrap(item0?.name)).toBe("item1")
-      expect(unwrap(item0?.value)).toBe(100)
+      const item0Value = unwrap(item0)
+      expect(item0Value?.name).toBe("item1")
+      expect(item0Value?.value).toBe(100)
 
       // Modify by replacing the item
       change(doc, draft => {
@@ -102,8 +103,9 @@ describe("List value updates across change() calls", () => {
 
       // Read again - should see updated values
       const item0After = doc.items.get(0)
-      expect(unwrap(item0After?.name)).toBe("updated")
-      expect(unwrap(item0After?.value)).toBe(999)
+      const item0AfterValue = unwrap(item0After)
+      expect(item0AfterValue?.name).toBe("updated")
+      expect(item0AfterValue?.value).toBe(999)
     })
   })
 

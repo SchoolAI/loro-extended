@@ -1,5 +1,5 @@
 import type { Container, LoroMap } from "loro-crdt"
-import type { ContainerOrValueShape } from "../shape.js"
+import type { ContainerOrValueShape, RefMode } from "../shape.js"
 import type { Infer, InferMutableType } from "../types.js"
 import { INTERNAL_SYMBOL, TypedRef, type TypedRefParams } from "./base.js"
 import { RecordRefInternals } from "./record-ref-internals.js"
@@ -162,17 +162,23 @@ export class RecordRef<
  *
  * At runtime, the Proxy wrapper (`recordProxyHandler`) handles bracket access
  * by delegating to the appropriate RecordRef methods.
+ *
+ * The `Mode` parameter controls element types:
+ * - `"mutable"` (default): Elements return `PlainValueRef<T>` for reactive access outside `change()`
+ * - `"draft"`: Elements return plain `T` for ergonomic mutation inside `change()` callbacks
  */
-export type IndexedRecordRef<NestedShape extends ContainerOrValueShape> =
-  RecordRef<NestedShape> & {
-    /**
-     * Access record entries by key using bracket notation.
-     *
-     * Reading returns the mutable ref type (e.g., StructRef) or undefined.
-     * Writing accepts the plain value type (e.g., { score: number }).
-     */
-    [key: string]:
-      | InferMutableType<NestedShape>
-      | Infer<NestedShape>
-      | undefined
-  }
+export type IndexedRecordRef<
+  NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
+> = RecordRef<NestedShape> & {
+  /**
+   * Access record entries by key using bracket notation.
+   *
+   * Reading returns the element type based on Mode.
+   * Writing accepts the plain value type (e.g., { score: number }).
+   */
+  [key: string]:
+    | (Mode extends "mutable" ? NestedShape["_mutable"] : NestedShape["_draft"])
+    | Infer<NestedShape>
+    | undefined
+}

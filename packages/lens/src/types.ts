@@ -12,8 +12,8 @@
 import type {
   ChangeOptions,
   DocShape,
+  Draft,
   EXT_SYMBOL,
-  Mutable,
   TypedDoc,
 } from "@loro-extended/change"
 import type { JsonChange } from "loro-crdt"
@@ -208,6 +208,6 @@ export interface Lens<D extends DocShape> {
    * @internal
    */
   readonly [EXT_SYMBOL]: {
-    change: (fn: (draft: Mutable<D>) => void, options?: ChangeOptions) => void
+    change: (fn: (draft: Draft<D>) => void, options?: ChangeOptions) => void
   }
 }

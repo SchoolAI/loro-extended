@@ -5,7 +5,6 @@ import {
   LoroMovableList,
   LoroText,
   LoroTree,
-  type Value,
 } from "loro-crdt"
 import type {
   ContainerShape,
@@ -74,38 +73,6 @@ export function unwrapReadonlyPrimitive(
     return (ref as any).toString()
   }
   return ref
-}
-
-/**
- * Type guard to check if a value has internal methods via INTERNAL_SYMBOL.
- */
-function hasInternalSymbol(
-  value: unknown,
-): value is { [INTERNAL_SYMBOL]: { absorbPlainValues(): void } } {
-  return value !== null && typeof value === "object" && INTERNAL_SYMBOL in value
-}
-
-/**
- * Absorbs cached plain values back into a LoroMap container.
- * For TypedRef entries (or any object with INTERNAL_SYMBOL), recursively calls absorbPlainValues().
- * For plain Value entries, sets them directly on the container.
- */
-export function absorbCachedPlainValues(
-  cache: Map<string, TypedRef<ContainerShape> | Value>,
-  getContainer: () => LoroMap,
-): void {
-  let container: LoroMap | undefined
-
-  for (const [key, ref] of cache.entries()) {
-    if (hasInternalSymbol(ref)) {
-      // Contains a TypedRef or TreeRef, not a plain Value: keep recursing
-      ref[INTERNAL_SYMBOL].absorbPlainValues()
-    } else {
-      // Plain value!
-      if (!container) container = getContainer()
-      container.set(key, ref)
-    }
-  }
 }
 
 /**

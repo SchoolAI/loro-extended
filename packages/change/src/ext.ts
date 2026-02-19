@@ -33,6 +33,7 @@ import type {
   ContainerOrValueShape,
   ContainerShape,
   DocShape,
+  RefMode,
   StructContainerShape,
   TreeRefInterface,
 } from "./shape.js"
@@ -46,7 +47,7 @@ import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TextRef } from "./typed-refs/text-ref.js"
 import type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
-import type { Mutable } from "./types.js"
+import type { Draft } from "./types.js"
 
 // ============================================================================
 // Symbol for ext() access
@@ -180,7 +181,7 @@ export interface ExtDocRef<Shape extends DocShape> {
    * @returns The same TypedDoc for chaining
    */
   change(
-    fn: (draft: Mutable<Shape>) => void,
+    fn: (draft: Draft<Shape>) => void,
     options?: ChangeOptions,
   ): TypedDoc<Shape>
 }
@@ -206,9 +207,10 @@ export function ext<NestedShape extends ContainerShape>(
 /**
  * Access loro-extended features for a StructRef.
  */
-export function ext<NestedShapes extends Record<string, ContainerOrValueShape>>(
-  ref: StructRef<NestedShapes>,
-): ExtMapRef
+export function ext<
+  NestedShapes extends Record<string, ContainerOrValueShape>,
+  Mode extends RefMode = "mutable",
+>(ref: StructRef<NestedShapes, Mode>): ExtMapRef
 
 /**
  * Access loro-extended features for a RecordRef.

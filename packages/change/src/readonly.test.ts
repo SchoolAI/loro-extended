@@ -46,14 +46,20 @@ describe("TypedDoc Mutable Mode", () => {
   it("should allow direct mutations via doc.value (auto-commit)", () => {
     const doc = createTypedDoc(schema)
 
-    // Direct mutations on doc.value should work and auto-commit
-    doc.meta.count = 10
+    // Direct mutations via change()
+    change(doc, draft => {
+      draft.meta.count = 10
+    })
     expect(doc.toJSON().meta.count).toBe(10)
 
-    doc.list.push("item1")
+    change(doc, draft => {
+      draft.list.push("item1")
+    })
     expect(doc.toJSON().list[0]).toBe("item1")
 
-    doc.list.push("item2")
+    change(doc, draft => {
+      draft.list.push("item2")
+    })
     expect(doc.toJSON().list).toEqual(["item1", "item2"])
   })
 

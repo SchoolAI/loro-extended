@@ -3,14 +3,16 @@ import type {
   ContainerShape,
   DocShape,
   Infer,
+  PlainValueRef,
   TypedDoc,
 } from "@loro-extended/change"
-import { loro } from "@loro-extended/change"
+import { isPlainValueRef, loro } from "@loro-extended/change"
 import type { Container, LoroDoc } from "loro-crdt"
 import type { FrameworkHooks } from "./types"
 import { createSyncStore } from "./utils/create-sync-store"
 import {
   getPlaceholder,
+  getPlainValueRefValue,
   getRawTextValue,
   isTextRef,
 } from "./utils/text-ref-helpers"
@@ -97,7 +99,7 @@ export function createRefHooks(framework: FrameworkHooks) {
    *
    * This is the primary hook for reactive subscriptions.
    *
-   * @param refOrDoc - A typed ref (TextRef, ListRef, etc.) or a Doc
+   * @param refOrDoc - A typed ref (TextRef, ListRef, etc.), PlainValueRef, or a Doc
    * @returns The current value
    *
    * @example Subscribe to a ref
@@ -105,6 +107,15 @@ export function createRefHooks(framework: FrameworkHooks) {
    * function TitleDisplay({ doc }: { doc: Doc<MySchema> }) {
    *   const title = useValue(doc.title)
    *   return <h1>{title}</h1>
+   * }
+   * ```
+   *
+   * @example Subscribe to a plain value property
+   * ```tsx
+   * function StatusDisplay({ doc }: { doc: Doc<MySchema> }) {
+   *   // doc.meta.active returns PlainValueRef<boolean> outside change()
+   *   const active = useValue(doc.meta.active)
+   *   return <span>{active ? "Active" : "Inactive"}</span>
    * }
    * ```
    *
@@ -116,6 +127,9 @@ export function createRefHooks(framework: FrameworkHooks) {
    * }
    * ```
    */
+  // Overload: for PlainValueRef (must come FIRST for proper overload resolution)
+  function useValue<T>(ref: PlainValueRef<T>): T
+
   // Overload: for typed refs
   function useValue<R extends AnyTypedRef>(ref: R): ReturnType<R["toJSON"]>
 
@@ -123,25 +137,38 @@ export function createRefHooks(framework: FrameworkHooks) {
   function useValue<D extends DocShape>(doc: TypedDoc<D>): Infer<D>
 
   // Implementation
-  function useValue<R extends AnyTypedRef, D extends DocShape>(
-    refOrDoc: R | TypedDoc<D>,
-  ): ReturnType<R["toJSON"]> | Infer<D> {
+  function useValue<T, R extends AnyTypedRef, D extends DocShape>(
+    refOrDoc: PlainValueRef<T> | R | TypedDoc<D>,
+  ): T | ReturnType<R["toJSON"]> | Infer<D> {
+    // Check if it's a PlainValueRef
+    const isPlainRef = isPlainValueRef(refOrDoc)
+
     // Check if it's a TypedDoc
-    const isDoc = isTypedDoc(refOrDoc)
+    const isDoc = !isPlainRef && isTypedDoc(refOrDoc)
 
     // Get the loro container/doc for subscription
     const loroTarget = useMemo(() => {
+      if (isPlainRef) {
+        // For PlainValueRef, get the parent container for subscription
+        return getPlainValueRefValue(refOrDoc as PlainValueRef<T>).container
+      }
       if (isDoc) {
         return getLoroDoc(refOrDoc as TypedDoc<D>)
       }
       return loro(refOrDoc as Parameters<typeof loro>[0]) as Container
-    }, [refOrDoc, isDoc])
+    }, [refOrDoc, isPlainRef, isDoc])
 
     // Cache ref for the sync store
     const cacheRef = useRef<{ version?: string; value: unknown } | null>(null)
 
     const store = useMemo(() => {
       const computeValue = (): { version?: string; value: unknown } => {
+        if (isPlainRef) {
+          // For PlainValueRef, extract the current value
+          const { value } = getPlainValueRefValue(refOrDoc as PlainValueRef<T>)
+          return { value }
+        }
+
         if (isDoc) {
           // For TypedDoc, use version-based caching
           const loroDoc = loroTarget as LoroDoc
@@ -176,6 +203,10 @@ export function createRefHooks(framework: FrameworkHooks) {
       }
 
       const subscribeToSource = (onChange: () => void) => {
+        if (isPlainRef) {
+          // For PlainValueRef, subscribe to the parent container
+          return (loroTarget as Container).subscribe(onChange)
+        }
         if (isDoc) {
           return (loroTarget as LoroDoc).subscribe(() => onChange())
         }
@@ -183,7 +214,7 @@ export function createRefHooks(framework: FrameworkHooks) {
       }
 
       return createSyncStore(computeValue, subscribeToSource, cacheRef)
-    }, [refOrDoc, loroTarget, isDoc])
+    }, [refOrDoc, loroTarget, isPlainRef, isDoc])
 
     const result = useSyncExternalStore(store.subscribe, store.getSnapshot)
     return result.value as ReturnType<R["toJSON"]> | Infer<D>

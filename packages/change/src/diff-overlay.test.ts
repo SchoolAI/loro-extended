@@ -19,12 +19,13 @@ describe("diff overlay", () => {
     const doc = createTypedDoc(schema)
     const loroDoc = loro(doc)
 
-    doc.counter.increment(10)
-    doc.info.name = "Alice"
-    doc.info.count = 1
-    doc.list.push(1)
-    doc.text.insert(0, "hello")
-    loroDoc.commit()
+    change(doc, draft => {
+      draft.counter.increment(10)
+      draft.info.name = "Alice"
+      draft.info.count = 1
+      draft.list.push(1)
+      draft.text.insert(0, "hello")
+    })
 
     const transitions: Array<{
       before: {

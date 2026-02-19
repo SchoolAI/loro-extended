@@ -194,28 +194,20 @@ export class ListRefBaseInternals<
     this.itemCache = newCache
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
-    // Value shapes now use PlainValueRef with eager write-back, so we only need
-    // to recurse into container children (which may have their own cached values)
-    const shape = this.getShape()
-    for (const [_index, cachedItem] of this.itemCache.entries()) {
-      if (cachedItem) {
-        // Only container shapes are cached now - value shapes return PlainValueRef
-        if (!isValueShape(shape.shape)) {
-          // For container shapes, the item should be a typed ref that handles its own absorption
-          if (
-            cachedItem &&
-            typeof cachedItem === "object" &&
-            INTERNAL_SYMBOL in cachedItem
-          ) {
-            ;(cachedItem as any)[INTERNAL_SYMBOL].absorbPlainValues()
-          }
-        }
+  /** Clear the item cache after change() to prevent stale refs */
+  override finalizeTransaction(): void {
+    // Recursively finalize nested container refs
+    for (const cachedItem of this.itemCache.values()) {
+      if (
+        cachedItem &&
+        typeof cachedItem === "object" &&
+        INTERNAL_SYMBOL in cachedItem
+      ) {
+        ;(cachedItem as any)[INTERNAL_SYMBOL].finalizeTransaction?.()
       }
     }
 
-    // Clear the cache after absorbing values
+    // Clear the cache to prevent stale refs after index-shifting operations
     this.itemCache.clear()
   }
 

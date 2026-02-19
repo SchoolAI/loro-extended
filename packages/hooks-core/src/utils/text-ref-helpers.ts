@@ -1,5 +1,10 @@
-import type { TextRef } from "@loro-extended/change"
-import { loro } from "@loro-extended/change"
+import type { PlainValueRef, TextRef } from "@loro-extended/change"
+import {
+  getPlainValueRefParentInternals,
+  getPlainValueRefPath,
+  loro,
+} from "@loro-extended/change"
+import type { Container } from "loro-crdt"
 import { getPlaceholderSafe } from "./type-guards"
 
 /**
@@ -33,4 +38,32 @@ export function getRawTextValue(textRef: TextRef): string {
  */
 export function getPlaceholder<T>(ref: unknown): T | undefined {
   return getPlaceholderSafe<T>(ref)
+}
+
+/**
+ * Extract value and parent container from a PlainValueRef.
+ * Used by useValue to subscribe to the parent container for changes.
+ */
+export function getPlainValueRefValue<T>(ref: PlainValueRef<T>): {
+  value: T
+  container: Container
+} {
+  const internals = getPlainValueRefParentInternals(ref)
+  const path = getPlainValueRefPath(ref)
+
+  // Get the parent container
+  const container = internals.getContainer() as Container
+
+  // Get the current value by traversing the path
+  let current: unknown = container.getShallowValue()
+  for (const segment of path) {
+    if (current && typeof current === "object") {
+      current = (current as Record<string, unknown>)[segment]
+    } else {
+      current = undefined
+      break
+    }
+  }
+
+  return { value: current as T, container }
 }

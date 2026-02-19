@@ -359,8 +359,8 @@ describe("TreeRef", () => {
     })
   })
 
-  describe("absorbPlainValues", () => {
-    it("should propagate absorbPlainValues to all nodes", () => {
+  describe("finalizeTransaction", () => {
+    it("should propagate finalizeTransaction to all nodes", () => {
       const typedDoc = createTypedDoc(ResmSchema)
 
       change(typedDoc, draft => {
@@ -372,7 +372,7 @@ describe("TreeRef", () => {
           description: null,
         })
 
-        // absorbPlainValues is called automatically at the end of change()
+        // finalizeTransaction is called automatically at the end of change()
       })
 
       // Verify data was persisted

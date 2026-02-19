@@ -1,10 +1,18 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
 import { change } from "./functional-helpers.js"
 import { unwrap } from "./index.js"
-import type { ContainerShape, ValueShape } from "./shape.js"
+import type { PlainValueRef } from "./plain-value-ref/types.js"
+import type {
+  ContainerShape,
+  NumberValueShape,
+  StringValueShape,
+  ValueShape,
+} from "./shape.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
-import type { Infer } from "./types.js"
+import type { ListRef } from "./typed-refs/list-ref.js"
+import type { StructRef } from "./typed-refs/struct-ref.js"
+import type { Draft, Infer, InferDraftType, InferMutableType } from "./types.js"
 
 describe("Infer type helper", () => {
   it("infers DocShape plain type", () => {
@@ -279,5 +287,135 @@ describe("Mutable type helper", () => {
 
     // Runtime check
     expect(json).toEqual({ title: "Test", count: 42 })
+  })
+})
+
+describe("RefMode type separation", () => {
+  describe("Value shapes", () => {
+    it("StringValueShape._mutable is PlainValueRef<string>", () => {
+      type Result = StringValueShape["_mutable"]
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
+    })
+
+    it("StringValueShape._draft is string", () => {
+      type Result = StringValueShape["_draft"]
+      expectTypeOf<Result>().toEqualTypeOf<string>()
+    })
+
+    it("NumberValueShape._mutable is PlainValueRef<number>", () => {
+      type Result = NumberValueShape["_mutable"]
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<number>>()
+    })
+
+    it("NumberValueShape._draft is number", () => {
+      type Result = NumberValueShape["_draft"]
+      expectTypeOf<Result>().toEqualTypeOf<number>()
+    })
+  })
+
+  describe("StructRef with mode", () => {
+    type TestShapes = {
+      title: StringValueShape
+      count: NumberValueShape
+    }
+
+    it("mutable mode returns PlainValueRef properties", () => {
+      type Ref = StructRef<TestShapes, "mutable">
+      type TitleType = Ref["title"]
+      expectTypeOf<TitleType>().toEqualTypeOf<PlainValueRef<string>>()
+    })
+
+    it("draft mode returns raw properties for primitives", () => {
+      type Ref = StructRef<TestShapes, "draft">
+      type TitleType = Ref["title"]
+      expectTypeOf<TitleType>().toEqualTypeOf<string>()
+    })
+  })
+
+  describe("ListRef with mode", () => {
+    it("mutable mode returns PlainValueRef elements", () => {
+      type Ref = ListRef<StringValueShape, "mutable">
+      type ElementType = Ref[0]
+      expectTypeOf<ElementType>().toEqualTypeOf<
+        PlainValueRef<string> | undefined
+      >()
+    })
+
+    it("draft mode returns raw elements", () => {
+      type Ref = ListRef<StringValueShape, "draft">
+      type ElementType = Ref[0]
+      expectTypeOf<ElementType>().toEqualTypeOf<string | undefined>()
+    })
+  })
+
+  describe("InferMutableType vs InferDraftType", () => {
+    it("InferMutableType extracts _mutable", () => {
+      type Result = InferMutableType<StringValueShape>
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
+    })
+
+    it("InferDraftType extracts _draft", () => {
+      type Result = InferDraftType<StringValueShape>
+      expectTypeOf<Result>().toEqualTypeOf<string>()
+    })
+  })
+
+  describe("Draft type helper", () => {
+    it("Draft<DocShape> returns draft types for properties", () => {
+      const schema = Shape.doc({
+        meta: Shape.struct({
+          title: Shape.plain.string(),
+          count: Shape.plain.number(),
+        }),
+      })
+
+      type DraftType = Draft<typeof schema>
+      type MetaType = DraftType["meta"]
+
+      // Inside change(), meta.title should be string, not PlainValueRef<string>
+      expectTypeOf<MetaType["title"]>().toEqualTypeOf<string>()
+      expectTypeOf<MetaType["count"]>().toEqualTypeOf<number>()
+    })
+  })
+
+  describe("change() callback types", () => {
+    it("draft inside change() uses _draft types", () => {
+      const schema = Shape.doc({
+        settings: Shape.struct({
+          darkMode: Shape.plain.boolean(),
+          fontSize: Shape.plain.number(),
+        }),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      change(doc, draft => {
+        // Inside change(), these should be plain types (boolean, number)
+        // not PlainValueRef<boolean>, PlainValueRef<number>
+        expectTypeOf(draft.settings.darkMode).toEqualTypeOf<boolean>()
+        expectTypeOf(draft.settings.fontSize).toEqualTypeOf<number>()
+
+        // Direct assignment should be valid (no type error)
+        draft.settings.darkMode = true
+        draft.settings.fontSize = 16
+      })
+    })
+
+    it("doc outside change() uses _mutable types", () => {
+      const schema = Shape.doc({
+        settings: Shape.struct({
+          darkMode: Shape.plain.boolean(),
+          fontSize: Shape.plain.number(),
+        }),
+      })
+
+      const doc = createTypedDoc(schema)
+
+      // Outside change(), these should be PlainValueRef types
+      expectTypeOf(doc.settings.darkMode).toEqualTypeOf<
+        PlainValueRef<boolean>
+      >()
+      expectTypeOf(doc.settings.fontSize).toEqualTypeOf<PlainValueRef<number>>()
+    })
   })
 })

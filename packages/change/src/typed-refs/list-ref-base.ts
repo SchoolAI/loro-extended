@@ -13,6 +13,7 @@ import { mergeValue } from "../overlay.js"
 import type {
   ContainerOrValueShape,
   ContainerShape,
+  RefMode,
   ValueShape,
 } from "../shape.js"
 import {
@@ -278,19 +279,16 @@ export class ListRefBaseInternals<
     this.itemCache = newCache
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
-    // Value shapes now use PlainValueRef with immediate write-back, so we only need
-    // to recurse into cached container shape refs (which may have their own cached values).
-    // The itemCache no longer contains value shape items — only container shape refs.
-    for (const [_index, cachedItem] of this.itemCache.entries()) {
-      // Container shape refs handle their own absorption
+  /** Clear the item cache after change() to prevent stale refs */
+  override finalizeTransaction(): void {
+    // Recursively finalize nested container refs
+    for (const cachedItem of this.itemCache.values()) {
       if (cachedItem && INTERNAL_SYMBOL in cachedItem) {
-        cachedItem[INTERNAL_SYMBOL].absorbPlainValues()
+        cachedItem[INTERNAL_SYMBOL].finalizeTransaction?.()
       }
     }
 
-    // Clear the cache after absorbing values
+    // Clear the cache to prevent stale refs after index-shifting operations
     this.itemCache.clear()
   }
 
@@ -328,10 +326,17 @@ export class ListRefBaseInternals<
  */
 export abstract class ListRefBase<
   NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
   Item = NestedShape["_plain"],
-  MutableItem = NestedShape["_mutable"],
+  MutableItem = Mode extends "mutable"
+    ? NestedShape["_mutable"]
+    : NestedShape["_draft"],
 > extends TypedRef<any> {
-  [INTERNAL_SYMBOL]: ListRefBaseInternals<NestedShape, Item, MutableItem>
+  [INTERNAL_SYMBOL]: ListRefBaseInternals<
+    NestedShape,
+    Item,
+    NestedShape["_mutable"]
+  >
 
   constructor(params: TypedRefParams<any>) {
     super()

@@ -2,7 +2,6 @@ import { LoroDoc, LoroMap } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { ext } from "./ext.js"
 import { change } from "./functional-helpers.js"
-import { isPlainValueRef } from "./plain-value-ref/index.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc } from "./typed-doc.js"
 import { value } from "./value.js"
@@ -244,9 +243,8 @@ describe("CRDT Operations", () => {
 
       // Test move operation: move first item to the end
       const result = change(typedDoc, draft => {
-        const itemRef = draft.items.get(0)
-        // Unwrap PlainValueRef to get the actual string value for insert
-        const valueToMove = isPlainValueRef(itemRef) ? value(itemRef) : itemRef
+        // Inside change(), list items are plain values (not PlainValueRef)
+        const valueToMove = draft.items.get(0)
         if (valueToMove !== undefined) {
           draft.items.delete(0, 1)
           draft.items.insert(2, valueToMove)
@@ -466,7 +464,7 @@ describe("Nested Operations", () => {
           metadata: Shape.struct({
             views: Shape.counter(),
             author: Shape.struct({
-              name: Shape.plain.string(),
+              name: Shape.plain.string().placeholder("anon"),
               email: Shape.plain.string(),
             }),
           }),
@@ -475,10 +473,13 @@ describe("Nested Operations", () => {
 
       const typedDoc = createTypedDoc(schema)
 
+      expect(value(typedDoc.article.metadata.author.name)).toBe("anon")
+
       const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "Nested Article")
         draft.article.metadata.views.increment(10)
-        draft.article.metadata.author.name = "John Doe"
+        if (draft.article.metadata.author.name === "anon")
+          draft.article.metadata.author.name = "John Doe"
         draft.article.metadata.author.email = "john@example.com"
       }).toJSON()
 

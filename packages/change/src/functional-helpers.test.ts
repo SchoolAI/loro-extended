@@ -545,7 +545,9 @@ describe("functional helpers", () => {
       })
 
       change(doc, draft => {
-        const bob = draft.game.players.get("bob")
+        const bob = draft.game.players.get("bob") as
+          | { locked: boolean }
+          | undefined
         if (bob) {
           bob.locked = true
         }

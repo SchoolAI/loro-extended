@@ -19,8 +19,8 @@ import { setAtPath } from "../utils/path-ops.js"
  * 2. Creates a new object with the nested value updated
  * 3. Writes the entire root value back
  *
- * This ensures that nested mutations are immediately persisted to Loro,
- * rather than relying on lazy absorption via absorbPlainValues().
+ * This eager write-back pattern ensures nested mutations are immediately
+ * persisted to Loro without requiring deferred batch processing.
  *
  * @param internals - The parent ref's internals
  * @param path - Path from the parent container to the value

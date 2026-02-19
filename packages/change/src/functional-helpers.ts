@@ -9,11 +9,15 @@ import type {
   ContainerOrValueShape,
   ContainerShape,
   DocShape,
+  RefMode,
   StructContainerShape,
   TreeRefInterface,
 } from "./shape.js"
 import { createTypedDoc, type TypedDoc } from "./typed-doc.js"
 import { INTERNAL_SYMBOL, type TypedRef } from "./typed-refs/base.js"
+import type { ListRef } from "./typed-refs/list-ref.js"
+import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
+import type { IndexedRecordRef } from "./typed-refs/record-ref.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TreeRef } from "./typed-refs/tree-ref.js"
 import { createContainerTypedRef } from "./typed-refs/utils.js"
@@ -107,13 +111,45 @@ export function change<DataShape extends StructContainerShape>(
 
 // Overload for StructRef (special case - uses Proxy, not a class extending TypedRef)
 // This must come before the generic TypedRef overload to match StructRef properly
+// Note: The draft uses "draft" mode for ergonomic plain value access inside change()
 export function change<
   NestedShapes extends Record<string, ContainerOrValueShape>,
+  Mode extends RefMode = "mutable",
 >(
-  ref: StructRef<NestedShapes>,
-  fn: (draft: StructRef<NestedShapes>) => void,
+  ref: StructRef<NestedShapes, Mode>,
+  fn: (draft: StructRef<NestedShapes, "draft">) => void,
   options?: ChangeOptions,
-): StructRef<NestedShapes>
+): StructRef<NestedShapes, Mode>
+
+// Overload for ListRef - draft uses "draft" mode for ergonomic element access
+export function change<
+  NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
+>(
+  ref: ListRef<NestedShape, Mode>,
+  fn: (draft: ListRef<NestedShape, "draft">) => void,
+  options?: ChangeOptions,
+): ListRef<NestedShape, Mode>
+
+// Overload for MovableListRef - draft uses "draft" mode for ergonomic element access
+export function change<
+  NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
+>(
+  ref: MovableListRef<NestedShape, Mode>,
+  fn: (draft: MovableListRef<NestedShape, "draft">) => void,
+  options?: ChangeOptions,
+): MovableListRef<NestedShape, Mode>
+
+// Overload for IndexedRecordRef - draft uses "draft" mode for ergonomic element access
+export function change<
+  NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
+>(
+  ref: IndexedRecordRef<NestedShape, Mode>,
+  fn: (draft: IndexedRecordRef<NestedShape, "draft">) => void,
+  options?: ChangeOptions,
+): IndexedRecordRef<NestedShape, Mode>
 
 // Overload for TypedRef (all container refs) - preserves concrete ref type
 export function change<T extends TypedRef<ContainerShape>>(
@@ -197,9 +233,9 @@ function changeRef<T extends TypedRef<any> | TreeRef<any>>(
   // Execute the user's function with the draft
   fn(draft)
 
-  // Absorb any cached plain values back into the Loro containers
+  // Finalize the transaction (e.g., clear caches to prevent stale refs)
   const draftInternals = (draft as any)[INTERNAL_SYMBOL]
-  draftInternals.absorbPlainValues()
+  draftInternals.finalizeTransaction?.()
 
   // Set commit message if provided
   const loroDoc = internals.getDoc()

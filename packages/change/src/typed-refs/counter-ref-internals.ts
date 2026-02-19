@@ -47,11 +47,6 @@ export class CounterRefInternals extends BaseRefInternals<CounterContainerShape>
     return containerValue
   }
 
-  /** No plain values in counter */
-  absorbPlainValues(): void {
-    // no plain values contained within
-  }
-
   /** Create the ext namespace for counter */
   protected override createExtNamespace(): ExtRefBase {
     const self = this

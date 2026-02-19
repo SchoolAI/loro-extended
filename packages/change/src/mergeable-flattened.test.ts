@@ -11,7 +11,7 @@ import { ext } from "./ext.js"
  */
 
 import { describe, expect, it } from "vitest"
-import { createTypedDoc, loro, Shape, unwrap } from "./index.js"
+import { change, createTypedDoc, loro, Shape, unwrap } from "./index.js"
 
 describe("Mergeable Flattened Containers", () => {
   describe("Basic functionality", () => {
@@ -27,7 +27,9 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: true })
 
       // Access nested struct
-      doc.data.nested.value = "hello"
+      change(doc, draft => {
+        draft.data.nested.value = "hello"
+      })
 
       expect(unwrap(doc.data.nested.value)).toBe("hello")
     })
@@ -44,7 +46,9 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: true })
 
       // Access nested struct to trigger container creation
-      doc.data.nested.value = "hello"
+      change(doc, draft => {
+        draft.data.nested.value = "hello"
+      })
 
       // Check that root containers exist with path-based names
       const loroDoc = loro(doc)
@@ -255,7 +259,9 @@ describe("Mergeable Flattened Containers", () => {
       })
 
       const doc = createTypedDoc(schema, { mergeable: true })
-      doc.data.nested.value = "hello"
+      change(doc, draft => {
+        draft.data.nested.value = "hello"
+      })
 
       const json = doc.toJSON()
       expect(json).toEqual({
@@ -277,8 +283,10 @@ describe("Mergeable Flattened Containers", () => {
       })
 
       const doc = createTypedDoc(schema, { mergeable: true })
-      doc.players.alice = { score: 100 }
-      doc.players.bob = { score: 200 }
+      change(doc, draft => {
+        draft.players.alice = { score: 100 }
+        draft.players.bob = { score: 200 }
+      })
 
       const json = doc.toJSON()
       expect(json).toEqual({
@@ -302,7 +310,9 @@ describe("Mergeable Flattened Containers", () => {
 
       // Explicitly non-mergeable doc
       const doc = createTypedDoc(schema, { mergeable: false })
-      doc.data.nested.value = "hello"
+      change(doc, draft => {
+        draft.data.nested.value = "hello"
+      })
 
       // Check that nested containers are used (not root containers)
       const loroDoc = loro(doc)
@@ -344,16 +354,22 @@ describe("Mergeable Flattened Containers", () => {
       })
 
       const doc = createTypedDoc(schema, { mergeable: true })
-      doc.data.value = "v1"
+      change(doc, draft => {
+        draft.data.value = "v1"
+      })
 
       const frontiers = loro(doc).frontiers()
-      doc.data.value = "v2"
+      change(doc, draft => {
+        draft.data.value = "v2"
+      })
 
       const forked = ext(doc).forkAt(frontiers)
 
       // The forked doc should also be mergeable
       // We can verify by checking that it uses root containers
-      forked.data.value = "forked"
+      change(forked, draft => {
+        draft.data.value = "forked"
+      })
 
       const loroDoc = loro(forked)
       const dataMap = loroDoc.getMap("data")

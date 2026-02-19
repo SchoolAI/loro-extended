@@ -25,7 +25,7 @@ export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
  *
  * **Note:** TreeNodeRef is not a subclass of TypedRef, but it implements
  * `[INTERNAL_SYMBOL]: RefInternalsBase` for consistency with other refs.
- * This allows internal code to call `absorbPlainValues()` uniformly
+ * This allows internal code to call `finalizeTransaction()` uniformly
  * across all ref types during the `change()` commit phase.
  *
  * @example

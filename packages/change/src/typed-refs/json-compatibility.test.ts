@@ -4,7 +4,7 @@ import { change } from "../functional-helpers.js"
 import { unwrap } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
-import type { Mutable } from "../types.js"
+import type { Draft } from "../types.js"
 
 const MessageSchema = Shape.struct({
   id: Shape.plain.string(),
@@ -270,7 +270,7 @@ describe("JSON Compatibility", () => {
 
     // This test verifies that TypeScript sees toJSON() on Mutable types
     // If this compiles, the type fix is working correctly
-    change(doc, (root: Mutable<typeof ChatSchema>) => {
+    change(doc, (root: Draft<typeof ChatSchema>) => {
       root.meta.title = "Type Test"
       root.messages.push({ id: "1", content: "Hello", timestamp: 123 })
 

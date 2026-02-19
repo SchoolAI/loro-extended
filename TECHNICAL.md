@@ -105,7 +105,7 @@ TypedRef (public facade)
 |--------|---------|
 | `getTypedRefParams()` | Returns params to recreate the ref (used by `change()` for draft creation) |
 | `getChildTypedRefParams(key/index, shape)` | Returns params for creating child refs (lists, structs, records) |
-| `absorbPlainValues()` | Commits cached plain value mutations back to Loro containers |
+| `finalizeTransaction?()` | Optional cleanup after `change()` completes (e.g., clear list caches) |
 | `commitIfAuto()` | Commits if `autoCommit` mode is enabled (respects suppression flag) |
 | `setSuppressAutoCommit(boolean)` | Temporarily suppress auto-commit during batch operations |
 
@@ -116,10 +116,12 @@ The `change()` function creates draft refs by:
 1. Getting params via `internals.getTypedRefParams()`
 2. Creating a new ref with `autoCommit: false`, `batchedMutation: true`
 3. Executing the user function with the draft
-4. Calling `absorbPlainValues()` to persist cached mutations
+4. Calling `finalizeTransaction?.()` for cleanup (e.g., clear list caches)
 5. Calling `doc.commit()` to finalize
 
 This works for all ref types because `createContainerTypedRef()` handles the polymorphic creation.
+
+**Note:** Plain values are written eagerly via `writeValue()` and `writeListValue()` during the user function execution. The `finalizeTransaction()` method only handles post-change cleanup like clearing caches to prevent stale refs.
 
 ### Value Shape Handling
 

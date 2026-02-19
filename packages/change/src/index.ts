@@ -95,6 +95,8 @@ export type {
   NumberValueShape,
   RecordContainerShape,
   RecordValueShape,
+  // Mode for accessing typed refs - "mutable" (outside change) or "draft" (inside change)
+  RefMode,
   StringValueShape,
   StructContainerShape,
   StructValueShape,
@@ -130,8 +132,12 @@ export type {
   TreeRef,
 } from "./typed-refs/index.js"
 export type {
+  // Draft type for use inside change() callbacks - value shapes return plain T
+  Draft,
   // Type inference - Infer<T> is the recommended unified helper
   Infer,
+  // Infer draft type from a shape - for value shapes returns plain T
+  InferDraftType,
   InferMutableType,
   InferPlaceholderType,
   // InferRaw<T> preserves type alias names (like TreeNodeJSON) in hover displays

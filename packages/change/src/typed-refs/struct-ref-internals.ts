@@ -20,7 +20,6 @@ import {
   unwrapPlainValueRef,
 } from "./plain-value-access.js"
 import {
-  absorbCachedPlainValues,
   assignPlainValueToTypedRef,
   containerConstructor,
   createContainerTypedRef,
@@ -189,14 +188,11 @@ export class StructRefInternals<
     this.commitIfAuto()
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
-    // Value shapes now use PlainValueRef with eager write-back, so we only need
-    // to recurse into container children (which may have their own cached values)
-    absorbCachedPlainValues(
-      this.propertyCache,
-      () => this.getContainer() as LoroMap,
-    )
+  /** Recursively finalize nested container refs */
+  override finalizeTransaction(): void {
+    for (const ref of this.propertyCache.values()) {
+      ref[INTERNAL_SYMBOL].finalizeTransaction?.()
+    }
   }
 
   /** Force materialization of the container and its nested containers */

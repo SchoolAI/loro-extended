@@ -103,11 +103,6 @@ export class TextRefInternals extends BaseRefInternals<TextContainerShape> {
     return container.length
   }
 
-  /** No plain values in text */
-  absorbPlainValues(): void {
-    // no plain values contained within
-  }
-
   /** Create the ext namespace for text */
   protected override createExtNamespace(): ExtRefBase {
     const self = this

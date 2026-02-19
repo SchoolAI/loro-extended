@@ -16,10 +16,10 @@ import {
   type ChangeOptions,
   createTypedDoc,
   type DocShape,
+  type Draft,
   EXT_SYMBOL,
   ext,
   loro,
-  type Mutable,
   serializeCommitMessage,
   type TypedDoc,
 } from "@loro-extended/change"
@@ -134,7 +134,7 @@ export function createLens<D extends DocShape>(
 
   // Queue for re-entrant change calls
   const changeQueue: Array<{
-    fn: (draft: Mutable<D>) => void
+    fn: (draft: Draft<D>) => void
     options?: ChangeOptions
   }> = []
 
@@ -292,7 +292,7 @@ export function createLens<D extends DocShape>(
    * This eliminates stale frontier bugs in re-entrant scenarios.
    */
   function applyAndPropagate(
-    fn: (draft: Mutable<D>) => void,
+    fn: (draft: Draft<D>) => void,
     options?: ChangeOptions,
   ): void {
     debug?.(`applyAndPropagate: starting`)
@@ -418,7 +418,7 @@ export function createLens<D extends DocShape>(
    * @param options - Optional configuration including commit message
    */
   function processLocalChange(
-    fn: (draft: Mutable<D>) => void,
+    fn: (draft: Draft<D>) => void,
     options?: ChangeOptions,
   ): void {
     if (isDisposed) {

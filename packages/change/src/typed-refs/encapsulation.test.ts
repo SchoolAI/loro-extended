@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { unwrap } from "../index.js"
+import { change, unwrap } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 import { INTERNAL_SYMBOL } from "./base.js"
@@ -89,7 +89,9 @@ describe("Internal State Encapsulation", () => {
       expect(keys.sort()).toEqual(["darkMode", "fontSize"])
 
       // Verify the ref still works — outside change(), value shapes return PlainValueRef
-      structRef.darkMode = true
+      change(doc, draft => {
+        draft.settings.darkMode = true
+      })
       expect(unwrap(structRef.darkMode)).toBe(true)
     })
 
@@ -153,9 +155,7 @@ describe("Internal State Encapsulation", () => {
 
       // INTERNAL_SYMBOL should be accessible
       expect(counterRef[INTERNAL_SYMBOL]).toBeDefined()
-      expect(typeof counterRef[INTERNAL_SYMBOL].absorbPlainValues).toBe(
-        "function",
-      )
+      expect(typeof counterRef[INTERNAL_SYMBOL].materialize).toBe("function")
       expect(typeof counterRef[INTERNAL_SYMBOL].commitIfAuto).toBe("function")
     })
 
@@ -216,7 +216,9 @@ describe("Internal State Encapsulation", () => {
         }),
       })
       const doc = createTypedDoc(schema)
-      doc.settings.darkMode = true
+      change(doc, draft => {
+        draft.settings.darkMode = true
+      })
 
       const json = JSON.parse(JSON.stringify(doc.settings))
       expect(Object.keys(json).sort()).toEqual(["darkMode", "fontSize"])

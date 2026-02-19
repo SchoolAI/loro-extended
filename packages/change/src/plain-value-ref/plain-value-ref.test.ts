@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { change } from "../functional-helpers.js"
 import { loro } from "../loro.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
@@ -111,8 +112,9 @@ describe("PlainValueRef", () => {
     describe("getContainerValue", () => {
       it("reads value from container", () => {
         const doc = createTypedDoc(schema)
-        doc.meta.title = "Hello"
-        loro(doc).commit()
+        change(doc, draft => {
+          draft.meta.title = "Hello"
+        })
 
         const internals = (doc.meta as any)[INTERNAL_SYMBOL]
         expect(getContainerValue(internals, ["title"])).toBe("Hello")
@@ -144,8 +146,9 @@ describe("PlainValueRef", () => {
     describe("resolveValue", () => {
       it("returns container value when present", () => {
         const doc = createTypedDoc(schema)
-        doc.meta.title = "FromContainer"
-        loro(doc).commit()
+        change(doc, draft => {
+          draft.meta.title = "FromContainer"
+        })
 
         const internals = (doc.meta as any)[INTERNAL_SYMBOL]
         expect(resolveValue(internals, ["title"])).toBe("FromContainer")
@@ -196,8 +199,9 @@ describe("PlainValueRef", () => {
     it("valueOf() returns current value", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "Test"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "Test"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,
@@ -211,8 +215,9 @@ describe("PlainValueRef", () => {
     it("toString() returns string representation", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.count = 42
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.count = 42
+      })
 
       const ref = createPlainValueRef<number>(
         internals,
@@ -226,8 +231,9 @@ describe("PlainValueRef", () => {
     it("toJSON() returns current value", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "JsonTest"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "JsonTest"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,
@@ -241,8 +247,9 @@ describe("PlainValueRef", () => {
     it("works in template literals via valueOf()", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "World"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "World"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,
@@ -257,8 +264,9 @@ describe("PlainValueRef", () => {
     it("works with string concatenation", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "Value"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "Value"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,
@@ -273,8 +281,9 @@ describe("PlainValueRef", () => {
     it("works with number coercion", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.count = 10
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.count = 10
+      })
 
       const ref = createPlainValueRef<number>(
         internals,
@@ -291,8 +300,9 @@ describe("PlainValueRef", () => {
     it("unwraps PlainValueRef to current value", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "Unwrapped"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "Unwrapped"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,
@@ -305,8 +315,9 @@ describe("PlainValueRef", () => {
 
     it("unwraps TypedRef via toJSON()", () => {
       const doc = createTypedDoc(schema)
-      doc.meta.title = "Test"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "Test"
+      })
 
       // Use toJSON() directly since value() overload for StructRef requires TypedDoc
       const metaValue = doc.meta.toJSON()
@@ -315,8 +326,9 @@ describe("PlainValueRef", () => {
 
     it("unwraps TypedDoc via toJSON()", () => {
       const doc = createTypedDoc(schema)
-      doc.meta.title = "DocTest"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "DocTest"
+      })
 
       const docValue = value(doc)
       expect(docValue.meta.title).toBe("DocTest")
@@ -460,8 +472,9 @@ describe("PlainValueRef", () => {
     it("handles number values correctly", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.count = 42
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.count = 42
+      })
 
       const ref = createPlainValueRef<number>(
         internals,
@@ -479,8 +492,9 @@ describe("PlainValueRef", () => {
     it("handles boolean values correctly", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.active = true
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.active = true
+      })
 
       const ref = createPlainValueRef<boolean>(
         internals,
@@ -510,8 +524,9 @@ describe("PlainValueRef", () => {
     it("works with JSON.stringify", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
-      doc.meta.title = "JSONTest"
-      loro(doc).commit()
+      change(doc, draft => {
+        draft.meta.title = "JSONTest"
+      })
 
       const ref = createPlainValueRef<string>(
         internals,

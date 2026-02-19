@@ -7,7 +7,7 @@ import type { Infer } from "../types.js"
 
 /**
  * Symbol for internal methods that should not be enumerable or accessible to users.
- * Used to hide implementation details like absorbPlainValues(), getTypedRefParams(), etc.
+ * Used to hide implementation details like getTypedRefParams(), finalizeTransaction(), etc.
  *
  * This achieves Success Criteria #7 from loro-api-refactor.md:
  * "Internal methods hidden - Via Symbol, not enumerable"
@@ -15,18 +15,18 @@ import type { Infer } from "../types.js"
 export const INTERNAL_SYMBOL = Symbol.for("loro-extended:internal")
 
 // ============================================================================
-// Minimal Interface for absorbPlainValues contract
+// Minimal Interface for ref internals contract
 // ============================================================================
 
 /**
- * Minimal interface for refs that only need absorbPlainValues.
+ * Minimal interface for ref internals.
  * Used by TreeNodeRef which doesn't extend TypedRef.
  */
 export interface RefInternalsBase {
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void
   /** Force materialization of the container and its nested containers */
   materialize(): void
+  /** Optional cleanup after change() completes (e.g., clear caches) */
+  finalizeTransaction?(): void
 }
 
 // ============================================================================
@@ -184,8 +184,8 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this.extNamespace
   }
 
-  /** Absorb mutated plain values back into Loro containers - subclasses override */
-  abstract absorbPlainValues(): void
+  /** Optional cleanup after change() completes - subclasses override if needed */
+  finalizeTransaction?(): void
 
   /** Force materialization of the container and its nested containers */
   materialize(): void {

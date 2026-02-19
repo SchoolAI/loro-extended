@@ -3,7 +3,10 @@
  * =============================================================================
  */
 
-import type { ContainerShape, DocShape, Shape } from "./shape.js"
+import type { ContainerShape, DocShape, RefMode, Shape } from "./shape.js"
+
+// Re-export RefMode for external use
+export type { RefMode }
 
 // Helper type for depth counting in ExpandDeep
 type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -60,7 +63,7 @@ type ExpandDeep<T, Depth extends number = 4> = Depth extends 0
  * // Result: { name: string; cursor: { x: number; y: number } }
  * ```
  */
-export type Infer<T> = T extends Shape<infer P, any, any>
+export type Infer<T> = T extends Shape<infer P, any, any, any>
   ? ExpandDeep<P>
   : never
 
@@ -69,18 +72,25 @@ export type Infer<T> = T extends Shape<infer P, any, any>
  * Use this if you prefer to see type alias names (like TreeNodeJSON) in hover displays,
  * or if you need slightly faster type checking on very large schemas.
  */
-export type InferRaw<T> = T extends Shape<infer P, any, any> ? P : never
+export type InferRaw<T> = T extends Shape<infer P, any, any, any> ? P : never
 
 /**
  * Infers the mutable type from any Shape.
- * This is the type used within change() callbacks for mutation.
+ * This is the type used for direct access outside change() callbacks.
+ * For value shapes, returns PlainValueRef<T> for reactive subscriptions.
  */
-export type InferMutableType<T> = T extends Shape<any, infer M, any> ? M : never
+export type InferMutableType<T> = T extends Shape<any, infer M, any, any>
+  ? M
+  : never
 
 /**
- * @deprecated Use InferMutableType<T> instead
+ * Infers the draft type from any Shape.
+ * This is the type used inside change() callbacks for mutation.
+ * For value shapes, returns plain T for ergonomic mutation patterns.
  */
-export type InferDraftType<T> = InferMutableType<T>
+export type InferDraftType<T> = T extends Shape<any, any, infer D, any>
+  ? D
+  : never
 
 /**
  * Extracts the valid placeholder type from a shape.
@@ -88,22 +98,25 @@ export type InferDraftType<T> = InferMutableType<T>
  * For dynamic containers (list, record, etc.), this will be constrained to
  * empty values ([] or {}) to prevent users from expecting per-entry merging.
  */
-export type InferPlaceholderType<T> = T extends Shape<any, any, infer P>
+export type InferPlaceholderType<T> = T extends Shape<any, any, any, infer P>
   ? P
   : never
 
 /**
- * Mutable type for use within change() callbacks and direct mutations on doc.value.
- * This is the type-safe wrapper around CRDT containers that allows mutation.
+ * Mutable type for direct access outside change() callbacks.
+ * For value shapes, properties return PlainValueRef<T> for reactive subscriptions.
+ * This is the type-safe wrapper around CRDT containers.
  */
 export type Mutable<T extends DocShape<Record<string, ContainerShape>>> =
   InferMutableType<T>
 
 /**
- * @deprecated Use Mutable<T> instead. Draft is an alias kept for backwards compatibility.
+ * Draft type for use inside change() callbacks.
+ * For value shapes, properties return plain T for ergonomic mutation patterns
+ * like `if (draft.active)` without needing to unwrap PlainValueRef.
  */
 export type Draft<T extends DocShape<Record<string, ContainerShape>>> =
-  Mutable<T>
+  InferDraftType<T>
 
 /**
  * Interface for objects that have a toJSON method.

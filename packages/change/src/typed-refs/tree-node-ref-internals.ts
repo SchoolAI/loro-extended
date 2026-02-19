@@ -90,6 +90,7 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
           shapes: dataShape.shapes,
           _plain: {} as any,
           _mutable: {} as any,
+          _draft: {} as any,
           _placeholder: {} as any,
         },
         placeholder: placeholder as any,
@@ -104,10 +105,10 @@ export class TreeNodeRefInternals<DataShape extends StructContainerShape>
     return this.dataRef
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
+  /** Recursively finalize nested data ref */
+  finalizeTransaction(): void {
     if (this.dataRef) {
-      this.dataRef[INTERNAL_SYMBOL].absorbPlainValues()
+      this.dataRef[INTERNAL_SYMBOL].finalizeTransaction?.()
     }
   }
 

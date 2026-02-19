@@ -79,10 +79,10 @@ export class TreeRefInternals<
     this.commitIfAuto()
   }
 
-  /** Absorb mutated plain values back into Loro containers */
-  absorbPlainValues(): void {
+  /** Recursively finalize nested node refs */
+  override finalizeTransaction(): void {
     for (const nodeRef of this.nodeCache.values()) {
-      nodeRef[INTERNAL_SYMBOL].absorbPlainValues()
+      nodeRef[INTERNAL_SYMBOL].finalizeTransaction?.()
     }
   }
 

@@ -1,7 +1,11 @@
 import type { Container, LoroMap, Value } from "loro-crdt"
 import { EXT_SYMBOL } from "../ext.js"
 import { LORO_SYMBOL } from "../loro.js"
-import type { ContainerOrValueShape, StructContainerShape } from "../shape.js"
+import type {
+  ContainerOrValueShape,
+  RefMode,
+  StructContainerShape,
+} from "../shape.js"
 import type { Infer } from "../types.js"
 import {
   INTERNAL_SYMBOL,
@@ -205,6 +209,10 @@ export function createStructRef<
  * Typed ref for struct containers (objects with fixed keys).
  * Uses LoroMap as the underlying container.
  *
+ * The `Mode` parameter controls property types:
+ * - `"mutable"` (default): Properties return `PlainValueRef<T>` for reactive access outside `change()`
+ * - `"draft"`: Properties return plain `T` for ergonomic mutation inside `change()` callbacks
+ *
  * Supports JavaScript-native object behavior:
  * - Property access: obj.key
  * - Property assignment: obj.key = value
@@ -244,8 +252,11 @@ export function createStructRef<
  */
 export type StructRef<
   NestedShapes extends Record<string, ContainerOrValueShape>,
+  Mode extends RefMode = "mutable",
 > = {
-  [K in keyof NestedShapes]: NestedShapes[K]["_mutable"]
+  [K in keyof NestedShapes]: Mode extends "mutable"
+    ? NestedShapes[K]["_mutable"]
+    : NestedShapes[K]["_draft"]
 } & {
   /**
    * Serializes the struct to a plain JSON-compatible object.
