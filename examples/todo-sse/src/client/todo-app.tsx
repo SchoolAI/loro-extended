@@ -1,11 +1,16 @@
-import { change, Shape, useDocument, useValue } from "@loro-extended/react"
+import {
+  change,
+  Shape,
+  useDocIdFromHash,
+  useDocument,
+  useValue,
+} from "@loro-extended/react"
 import { type DocId, generateUUID } from "@loro-extended/repo"
 import { useEffect } from "react"
 import { type Todo, TodoSchema } from "../shared/types"
 import { TodoInput } from "./components/todo-input"
 import { TodoList } from "./components/todo-list"
 import { useConnectionState } from "./use-connection-state"
-import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // Define the schema for our document
 const schema = Shape.doc({
@@ -17,7 +22,7 @@ const DEFAULT_TODO_DOC_ID: DocId = "todos-example-document"
 
 function TodoApp() {
   // Get document ID from URL hash if present, otherwise use default
-  const docId = useDocIdFromHash(DEFAULT_TODO_DOC_ID)
+  const docId = useDocIdFromHash(() => DEFAULT_TODO_DOC_ID)
 
   // Get doc for mutations and reading
   const doc = useDocument(docId, schema)
