@@ -1,5 +1,6 @@
 import {
   change,
+  useDocIdFromHash,
   useDocument,
   useEphemeral,
   useRepo,
@@ -13,14 +14,12 @@ import {
 } from "@loro-extended/repo"
 import { useEffect, useRef, useState } from "react"
 import {
-  type ChatDoc,
   ChatEphemeralDeclarations,
   ChatSchema,
   type Message,
   type Presence,
 } from "../shared/types"
 import { useAutoScroll } from "./use-auto-scroll"
-import { useDocIdFromHash } from "./use-doc-id-from-hash"
 
 // localStorage keys for name persistence
 const NAME_STORAGE_KEY = "loro-chat-user-name"
@@ -89,19 +88,12 @@ function ChatApp() {
   }, [])
 
   // Get document ID from URL hash, or create new conversation
-  const docId = useDocIdFromHash(generateConversationId())
-
-  // Ensure hash is set if it was empty (first load)
-  useEffect(() => {
-    if (!window.location.hash.slice(1)) {
-      window.location.hash = docId
-    }
-  }, [docId])
+  // Hook fully encapsulates hash ↔ docId sync (FC/IS principle)
+  const docId = useDocIdFromHash(generateConversationId)
 
   // Get document with both doc and ephemeral schemas
   const doc = useDocument(docId, ChatSchema, ChatEphemeralDeclarations)
-  // Cast snapshot to ChatDoc to help TypeScript infer the schema type
-  const snapshot = useValue(doc) as ChatDoc
+
   const { self, peers } = useEphemeral(sync(doc).presence)
 
   // Set self presence with name
@@ -110,8 +102,7 @@ function ChatApp() {
   }, [doc, userName])
 
   // Check if the current user has sent any messages in this conversation
-  // snapshot.messages is already a plain array (useValue returns JSON)
-  const messages = snapshot.messages
+  const messages = useValue(doc.messages)
   const hasUserSentMessages = messages.some(
     msg => msg.role === "user" && msg.author === repo.identity.peerId,
   )
@@ -188,8 +179,10 @@ function ChatApp() {
 
   const myPeerId = repo.identity.peerId
 
+  const preferences = useValue(doc.preferences)
+
   const tip: "share" | "at-ai" | "none" =
-    snapshot.preferences[myPeerId]?.showTip !== false
+    preferences[myPeerId]?.showTip !== false
       ? memberCount >= 2
         ? "at-ai"
         : "share"
