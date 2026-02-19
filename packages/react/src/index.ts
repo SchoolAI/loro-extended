@@ -24,6 +24,9 @@ export type {
   UseUndoManagerReturn,
 } from "@loro-extended/hooks-core"
 
+// Re-export URL hash utilities from @loro-extended/hooks-core
+export { getDocIdFromHash, parseHash } from "@loro-extended/hooks-core"
+
 // Re-export types from @loro-extended/repo
 export type {
   Doc,
@@ -43,6 +46,7 @@ export {
   RepoContext,
   useCollaborativeText,
   useCursorRegistry,
+  useDocIdFromHash,
   useDocument,
   useEphemeral,
   useLens,

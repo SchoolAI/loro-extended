@@ -24,7 +24,7 @@
 // Types
 export type { ChangeOptions, Lens, LensOptions } from "@loro-extended/lens"
 // Core hooks factory
-export { createHooks } from "./create-hooks"
+export { createHooks, getDocIdFromHash, parseHash } from "./create-hooks"
 export type { AnyTypedRef } from "./create-ref-hooks"
 // Ref hooks factory and types
 export { createRefHooks } from "./create-ref-hooks"

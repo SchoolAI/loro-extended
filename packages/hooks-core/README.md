@@ -11,6 +11,7 @@ This package implements a "Doc-first" pattern for working with Loro documents:
 3. **`usePlaceholder`** - Get placeholder values from schema definitions
 4. **`useLens`** - Create a Lens and subscribe to worldview snapshots
 5. **`useEphemeral`** - Subscribe to ephemeral store changes (presence, cursors, etc.)
+6. **`useDocIdFromHash`** - Sync document ID with URL hash for shareable links
 
 ## Installation
 
@@ -39,10 +40,9 @@ export const {
   RepoContext,
   useRepo,
   useDocument,
-  useValue,
-  usePlaceholder,
   useLens,
   useEphemeral,
+  useDocIdFromHash,
 } = createHooks(React)
 ```
 
@@ -185,6 +185,51 @@ const { self, peers } = useEphemeral(sync(doc).cursors)
 - `ephemeral: TypedEphemeral<T>` - A typed ephemeral store
 
 **Returns:** `{ self: T | undefined, peers: Map<string, T> }`
+
+#### `useDocIdFromHash(generateDefaultDocId)`
+
+Syncs document ID with the URL hash, enabling shareable links (e.g., `https://app.example.com/#doc-abc123`).
+
+```typescript
+import { useDocIdFromHash, useDocument } from "@loro-extended/react"
+import { generateUUID } from "@loro-extended/repo"
+
+function App() {
+  // If URL has no hash, generates a new ID and writes it to the hash
+  // If URL has a hash, uses that as the document ID
+  const docId = useDocIdFromHash(() => `doc-${generateUUID()}`)
+  const doc = useDocument(docId, MySchema)
+  // ...
+}
+```
+
+**Parameters:**
+- `generateDefaultDocId: () => DocId` - A function that generates a default document ID when the URL hash is empty
+
+**Returns:** `DocId` - The current document ID from the URL hash
+
+**Features:**
+- Uses `useSyncExternalStore` for React 18+ concurrent mode safety
+- SSR-safe with server snapshot support
+- Automatically writes hash on mount if empty
+- Caches generated default ID across renders (generator is only called once)
+- Reacts to `hashchange` events for browser navigation
+
+**Utility Functions:**
+
+The package also exports pure utility functions for custom implementations:
+
+```typescript
+import { parseHash, getDocIdFromHash } from "@loro-extended/hooks-core"
+
+// Remove '#' prefix from hash string
+parseHash("#my-doc") // => "my-doc"
+parseHash("my-doc")  // => "my-doc"
+
+// Get docId from hash with fallback
+getDocIdFromHash("#my-doc", defaultId) // => "my-doc"
+getDocIdFromHash("", defaultId)        // => defaultId
+```
 
 ### `createTextHooks(framework)`
 

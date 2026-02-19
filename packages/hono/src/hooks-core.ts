@@ -11,8 +11,14 @@ import * as Hono from "hono/jsx"
 const coreHooks = createHooks(Hono)
 const refHooks = createRefHooks(Hono)
 
-export const { RepoContext, useRepo, useDocument, useEphemeral, useLens } =
-  coreHooks
+export const {
+  RepoContext,
+  useRepo,
+  useDocument,
+  useEphemeral,
+  useLens,
+  useDocIdFromHash,
+} = coreHooks
 
 // ============================================================================
 // useValue - Explicit overloads to preserve type inference across packages

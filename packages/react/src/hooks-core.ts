@@ -26,7 +26,13 @@ export { CursorRegistry, CursorRegistryContext, useCursorRegistry }
 // Create core hooks
 const coreHooks = createHooks(React)
 
-export const { RepoContext, useRepo, useDocument, useEphemeral } = coreHooks
+export const {
+  RepoContext,
+  useRepo,
+  useDocument,
+  useEphemeral,
+  useDocIdFromHash,
+} = coreHooks
 
 export function useLens<D extends DocShape>(
   world: TypedDoc<D>,

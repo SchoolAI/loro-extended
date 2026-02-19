@@ -17,16 +17,57 @@ import type { LoroDoc } from "loro-crdt"
 import type { FrameworkHooks } from "./types"
 import { createSyncStore } from "./utils/create-sync-store"
 
+// ============================================================================
+// Pure Functions for URL Hash Handling
+// ============================================================================
+
+/** Parse the '#' prefix from a hash string, returning empty string if no value */
+export function parseHash(hash: string): string {
+  return hash.startsWith("#") ? hash.slice(1) : hash
+}
+
+/** Get docId from hash, or fallback to default */
+export function getDocIdFromHash(hash: string, defaultDocId: DocId): DocId {
+  const parsed = parseHash(hash)
+  return parsed ? (parsed as DocId) : defaultDocId
+}
+
+// ============================================================================
+// Hash Subscription Helpers (for useSyncExternalStore)
+// ============================================================================
+
+/** Subscribe to hash changes */
+function subscribeToHash(onStoreChange: () => void): () => void {
+  window.addEventListener("hashchange", onStoreChange)
+  return () => window.removeEventListener("hashchange", onStoreChange)
+}
+
+/** Get current hash snapshot */
+function getHashSnapshot(): string {
+  return window.location.hash
+}
+
+/** Server-side snapshot (no hash available) */
+function getServerHashSnapshot(): string {
+  return ""
+}
+
 /**
  * Creates the core hooks for Loro collaborative editing.
  * These hooks provide repository context, document access, and ephemeral state.
  *
  * @param framework - Framework-specific hook implementations
- * @returns Object containing RepoContext, useRepo, useDocument, useLens, and useEphemeral
+ * @returns Object containing RepoContext, useRepo, useDocument, useLens, useEphemeral, and useDocIdFromHash
  */
 export function createHooks(framework: FrameworkHooks) {
-  const { useMemo, useRef, useSyncExternalStore, useContext, createContext } =
-    framework
+  const {
+    useEffect,
+    useMemo,
+    useRef,
+    useSyncExternalStore,
+    useContext,
+    createContext,
+  } = framework
 
   // ============================================
   // RepoContext & useRepo
@@ -241,6 +282,67 @@ export function createHooks(framework: FrameworkHooks) {
   }
 
   // ============================================
+  // useDocIdFromHash - Sync document ID with URL hash
+  // ============================================
+
+  /**
+   * A hook that syncs document ID with the URL hash.
+   *
+   * This enables shareable URLs where the hash contains the document ID
+   * (e.g., `https://app.example.com/#doc-abc123`).
+   *
+   * Architecture:
+   * - URL hash is the source of truth (external store)
+   * - useSyncExternalStore subscribes to changes
+   * - Single effect handles initialization (writing hash if empty)
+   * - Pure functions handle all transformations
+   *
+   * @param generateDefaultDocId Function that generates a default document ID
+   * @returns The current document ID from URL hash
+   *
+   * @example
+   * ```tsx
+   * import { useDocIdFromHash, useDocument } from "@loro-extended/react"
+   * import { generateUUID } from "@loro-extended/repo"
+   *
+   * function App() {
+   *   const docId = useDocIdFromHash(() => generateUUID() as DocId)
+   *   const doc = useDocument(docId, MySchema)
+   *   // ...
+   * }
+   * ```
+   */
+  function useDocIdFromHash(generateDefaultDocId: () => DocId): DocId {
+    // Generate default once and cache it
+    const defaultDocIdRef = useRef<DocId | null>(null)
+    if (defaultDocIdRef.current === null) {
+      defaultDocIdRef.current = generateDefaultDocId()
+    }
+    // Safe: we just set it above if it was null
+    const defaultDocId = defaultDocIdRef.current as DocId
+
+    // Subscribe to URL hash as external store
+    const hash = useSyncExternalStore(
+      subscribeToHash,
+      getHashSnapshot,
+      getServerHashSnapshot,
+    )
+
+    // Derive docId from hash (pure transformation)
+    const docId = getDocIdFromHash(hash, defaultDocId)
+
+    // Initialize: write hash if empty (one-time effect)
+    useEffect(() => {
+      if (!parseHash(window.location.hash)) {
+        window.location.hash = defaultDocId
+      }
+      return undefined
+    }, [defaultDocId])
+
+    return docId
+  }
+
+  // ============================================
   // Exports
   // ============================================
 
@@ -250,5 +352,6 @@ export function createHooks(framework: FrameworkHooks) {
     useDocument,
     useLens,
     useEphemeral,
+    useDocIdFromHash,
   }
 }
