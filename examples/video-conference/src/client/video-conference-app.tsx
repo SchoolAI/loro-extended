@@ -3,6 +3,7 @@ import {
   change,
   type Infer,
   Shape,
+  useDocIdFromHash,
   useDocument,
   useEphemeral,
   useRepo,
@@ -35,7 +36,6 @@ import {
   useParticipantCleanup,
 } from "./hooks"
 import { useLocalMedia } from "./use-local-media"
-import { useRoomIdFromHash } from "./use-room-id-from-hash"
 import { useWebRtcMesh } from "./use-webrtc-mesh"
 
 // Generate a new room ID
@@ -61,7 +61,7 @@ export default function VideoConferenceApp({
   const [hasJoined, setHasJoined] = useState(false)
 
   // Get room ID from URL hash, or create new room
-  const roomId = useRoomIdFromHash(generateRoomId())
+  const roomId = useDocIdFromHash(generateRoomId)
 
   // Track previous room ID to detect changes
   const prevRoomIdRef = useRef<DocId>(roomId)
@@ -71,13 +71,6 @@ export default function VideoConferenceApp({
     if (prevRoomIdRef.current !== roomId) {
       setHasJoined(false)
       prevRoomIdRef.current = roomId
-    }
-  }, [roomId])
-
-  // Ensure hash is set if it was empty (first load)
-  useEffect(() => {
-    if (!window.location.hash.slice(1)) {
-      window.location.hash = roomId
     }
   }, [roomId])
 
