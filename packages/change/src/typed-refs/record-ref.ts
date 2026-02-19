@@ -7,12 +7,14 @@ import { serializeRefToJSON } from "./utils.js"
 
 /**
  * Record typed ref - thin facade that delegates to RecordRefInternals.
+ *
+ * Note: This class does NOT have an index signature to avoid conflicts with methods.
+ * Use `IndexedRecordRef<NestedShape>` for the user-facing type that supports bracket access.
+ * The Proxy wrapper handles runtime bracket access via `recordProxyHandler`.
  */
 export class RecordRef<
   NestedShape extends ContainerOrValueShape,
 > extends TypedRef<any> {
-  [key: string]: InferMutableType<NestedShape> | undefined | any
-
   [INTERNAL_SYMBOL]: RecordRefInternals<NestedShape>
 
   constructor(params: TypedRefParams<any>) {
@@ -21,7 +23,7 @@ export class RecordRef<
   }
 
   /** Set a value at a key */
-  set(key: string, value: any): void {
+  set(key: string, value: Infer<NestedShape>): void {
     this[INTERNAL_SYMBOL].set(key, value)
   }
 
@@ -147,3 +149,30 @@ export class RecordRef<
     >
   }
 }
+
+/**
+ * User-facing type for RecordRef that includes bracket access support.
+ *
+ * This type adds an index signature to RecordRef, allowing patterns like:
+ * - Reading: `doc.players['alice']?.score`
+ * - Writing: `draft.players['alice'] = { score: 100 }`
+ *
+ * The index signature is defined as a mapped type intersection to avoid
+ * conflicting with the class methods (set, get, delete, etc.).
+ *
+ * At runtime, the Proxy wrapper (`recordProxyHandler`) handles bracket access
+ * by delegating to the appropriate RecordRef methods.
+ */
+export type IndexedRecordRef<NestedShape extends ContainerOrValueShape> =
+  RecordRef<NestedShape> & {
+    /**
+     * Access record entries by key using bracket notation.
+     *
+     * Reading returns the mutable ref type (e.g., StructRef) or undefined.
+     * Writing accepts the plain value type (e.g., { score: number }).
+     */
+    [key: string]:
+      | InferMutableType<NestedShape>
+      | Infer<NestedShape>
+      | undefined
+  }

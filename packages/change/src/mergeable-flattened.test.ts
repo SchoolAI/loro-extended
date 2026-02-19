@@ -171,10 +171,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).import(exportA)
 
       // Both docs should have both players
-      expect(unwrap(docA.players.alice.score)).toBe(100)
-      expect(unwrap(docA.players.bob.score)).toBe(200)
-      expect(unwrap(docB.players.alice.score)).toBe(100)
-      expect(unwrap(docB.players.bob.score)).toBe(200)
+      expect(unwrap(docA.players.alice?.score)).toBe(100)
+      expect(unwrap(docA.players.bob?.score)).toBe(200)
+      expect(unwrap(docB.players.alice?.score)).toBe(100)
+      expect(unwrap(docB.players.bob?.score)).toBe(200)
     })
   })
 
@@ -237,10 +237,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).applyDiff(diffA)
 
       // Both docs should have both players
-      expect(unwrap(docA.players.alice.score)).toBe(100)
-      expect(unwrap(docA.players.bob.score)).toBe(200)
-      expect(unwrap(docB.players.alice.score)).toBe(100)
-      expect(unwrap(docB.players.bob.score)).toBe(200)
+      expect(unwrap(docA.players.alice?.score)).toBe(100)
+      expect(unwrap(docA.players.bob?.score)).toBe(200)
+      expect(unwrap(docB.players.alice?.score)).toBe(100)
+      expect(unwrap(docB.players.bob?.score)).toBe(200)
     })
   })
 

@@ -16,7 +16,7 @@ import type { PlainValueRef } from "./plain-value-ref/types.js"
 import type { CounterRef } from "./typed-refs/counter-ref.js"
 import type { ListRef } from "./typed-refs/list-ref.js"
 import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
-import type { RecordRef } from "./typed-refs/record-ref.js"
+import type { IndexedRecordRef } from "./typed-refs/record-ref.js"
 import type { StructRef } from "./typed-refs/struct-ref.js"
 import type { TextRef } from "./typed-refs/text-ref.js"
 import type { TreeNodeRef } from "./typed-refs/tree-node-ref.js"
@@ -218,7 +218,7 @@ export interface RecordContainerShape<
   NestedShape extends ContainerOrValueShape = ContainerOrValueShape,
 > extends Shape<
     Record<string, NestedShape["_plain"]>,
-    RecordRef<NestedShape>,
+    IndexedRecordRef<NestedShape>,
     Record<string, never>
   > {
   readonly _type: "record"
