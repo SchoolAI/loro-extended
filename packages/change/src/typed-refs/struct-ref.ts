@@ -4,6 +4,7 @@ import { LORO_SYMBOL } from "../loro.js"
 import type {
   ContainerOrValueShape,
   RefMode,
+  SelectByMode,
   StructContainerShape,
 } from "../shape.js"
 import type { Infer } from "../types.js"
@@ -254,9 +255,7 @@ export type StructRef<
   NestedShapes extends Record<string, ContainerOrValueShape>,
   Mode extends RefMode = "mutable",
 > = {
-  [K in keyof NestedShapes]: Mode extends "mutable"
-    ? NestedShapes[K]["_mutable"]
-    : NestedShapes[K]["_draft"]
+  [K in keyof NestedShapes]: SelectByMode<NestedShapes[K], Mode>
 } & {
   /**
    * Serializes the struct to a plain JSON-compatible object.

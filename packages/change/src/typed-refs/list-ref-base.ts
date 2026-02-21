@@ -14,6 +14,7 @@ import type {
   ContainerOrValueShape,
   ContainerShape,
   RefMode,
+  SelectByMode,
   ValueShape,
 } from "../shape.js"
 import {
@@ -328,9 +329,7 @@ export abstract class ListRefBase<
   NestedShape extends ContainerOrValueShape,
   Mode extends RefMode = "mutable",
   Item = NestedShape["_plain"],
-  MutableItem = Mode extends "mutable"
-    ? NestedShape["_mutable"]
-    : NestedShape["_draft"],
+  MutableItem = SelectByMode<NestedShape, Mode>,
 > extends TypedRef<any> {
   [INTERNAL_SYMBOL]: ListRefBaseInternals<
     NestedShape,

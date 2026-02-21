@@ -32,13 +32,22 @@ export type RefMode = "mutable" | "draft"
 
 /**
  * Helper to select type based on RefMode.
- * Used by container refs to switch between `_mutable` and `_draft` property types.
+ * Extracts `_mutable` or `_draft` from a shape based on the mode.
+ * Used by container refs to switch between mutable and draft property types.
+ *
+ * @example
+ * ```typescript
+ * // Returns PlainValueRef<string> for mutable mode
+ * type MutableTitle = SelectByMode<StringValueShape<string>, "mutable">
+ *
+ * // Returns string for draft mode
+ * type DraftTitle = SelectByMode<StringValueShape<string>, "draft">
+ * ```
  */
 export type SelectByMode<
-  Mutable,
-  Draft,
+  S extends Shape<any, any, any, any>,
   Mode extends RefMode,
-> = Mode extends "mutable" ? Mutable : Draft
+> = Mode extends "mutable" ? S["_mutable"] : S["_draft"]
 
 export interface Shape<Plain, Mutable, Draft = Mutable, Placeholder = Plain> {
   readonly _type: string

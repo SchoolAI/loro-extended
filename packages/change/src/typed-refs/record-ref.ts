@@ -1,6 +1,6 @@
 import type { Container, LoroMap } from "loro-crdt"
-import type { ContainerOrValueShape, RefMode } from "../shape.js"
-import type { Infer, InferMutableType } from "../types.js"
+import type { ContainerOrValueShape, RefMode, SelectByMode } from "../shape.js"
+import type { Infer } from "../types.js"
 import { INTERNAL_SYMBOL, TypedRef, type TypedRefParams } from "./base.js"
 import { RecordRefInternals } from "./record-ref-internals.js"
 import { serializeRefToJSON } from "./utils.js"
@@ -14,6 +14,7 @@ import { serializeRefToJSON } from "./utils.js"
  */
 export class RecordRef<
   NestedShape extends ContainerOrValueShape,
+  Mode extends RefMode = "mutable",
 > extends TypedRef<any> {
   [INTERNAL_SYMBOL]: RecordRefInternals<NestedShape>
 
@@ -32,17 +33,17 @@ export class RecordRef<
     this[INTERNAL_SYMBOL].delete(key)
   }
 
-  get(key: string): InferMutableType<NestedShape> | undefined {
+  get(key: string): SelectByMode<NestedShape, Mode> | undefined {
     // In batched mutation mode (inside change()), use getOrCreateRef to create containers
     // This allows patterns like: draft.scores.get("alice")!.increment(10)
     if (this[INTERNAL_SYMBOL].getBatchedMutation()) {
       return this[INTERNAL_SYMBOL].getOrCreateRef(key) as
-        | InferMutableType<NestedShape>
+        | SelectByMode<NestedShape, Mode>
         | undefined
     }
     // In readonly mode, use getRef which returns undefined for non-existent keys
     return this[INTERNAL_SYMBOL].getRef(key) as
-      | InferMutableType<NestedShape>
+      | SelectByMode<NestedShape, Mode>
       | undefined
   }
 
@@ -67,10 +68,10 @@ export class RecordRef<
    * Returns an array of all values in the record.
    * For container-valued records, returns properly typed refs.
    */
-  values(): InferMutableType<NestedShape>[] {
+  values(): SelectByMode<NestedShape, Mode>[] {
     // We know keys() only returns keys that exist, so get() will not return undefined
     return this.keys().map(
-      key => this.get(key) as InferMutableType<NestedShape>,
+      key => this.get(key) as SelectByMode<NestedShape, Mode>,
     )
   }
 
@@ -78,11 +79,11 @@ export class RecordRef<
    * Returns an array of [key, value] pairs.
    * For container-valued records, values are properly typed refs.
    */
-  entries(): [string, InferMutableType<NestedShape>][] {
+  entries(): [string, SelectByMode<NestedShape, Mode>][] {
     // We know keys() only returns keys that exist, so get() will not return undefined
     return this.keys().map(key => [
       key,
-      this.get(key) as InferMutableType<NestedShape>,
+      this.get(key) as SelectByMode<NestedShape, Mode>,
     ])
   }
 
@@ -170,7 +171,7 @@ export class RecordRef<
 export type IndexedRecordRef<
   NestedShape extends ContainerOrValueShape,
   Mode extends RefMode = "mutable",
-> = RecordRef<NestedShape> & {
+> = RecordRef<NestedShape, Mode> & {
   /**
    * Access record entries by key using bracket notation.
    *
@@ -178,7 +179,7 @@ export type IndexedRecordRef<
    * Writing accepts the plain value type (e.g., { score: number }).
    */
   [key: string]:
-    | (Mode extends "mutable" ? NestedShape["_mutable"] : NestedShape["_draft"])
+    | SelectByMode<NestedShape, Mode>
     | Infer<NestedShape>
     | undefined
 }
