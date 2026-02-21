@@ -6,15 +6,22 @@
  */
 
 import {
-  EXT_SYMBOL,
+  change,
+  type Draft,
   loro,
-  type Mutable,
   type TypedDoc,
+  unwrap,
 } from "@loro-extended/change"
 import { useDocument, useLens } from "@loro-extended/react"
 import { useEffect } from "react"
 import { createIdentityMessage } from "../shared/identity.js"
-import { type Choice, type GameDocShape, GameSchema } from "../shared/schema.js"
+import {
+  type Choice,
+  type GameDocShape,
+  GameSchema,
+  type Phase,
+  type Result,
+} from "../shared/schema.js"
 import { createClientLensFilter } from "./filters.js"
 
 /**
@@ -39,38 +46,30 @@ export function useRpsGame(playerId: string) {
     })
   }, [lens])
 
-  // Get current player state (players is a plain object in JSON, not a Map)
+  // Get current player state — unwrap PlainValueRef for clean consumer types
   const myPlayer = worldview.game.players[playerId]
-  const myChoice = myPlayer?.choice ?? null
-  const myLocked = myPlayer?.locked ?? false
+  const myChoice = (unwrap(myPlayer?.choice) ?? null) as Choice | null
+  const myLocked = unwrap(myPlayer?.locked) ?? false
 
   // Get opponent state
   const opponentId = playerId === "alice" ? "bob" : "alice"
   const opponent = worldview.game.players[opponentId]
-  const opponentLocked = opponent?.locked ?? false
+  const opponentLocked = unwrap(opponent?.locked) ?? false
 
   // Game phase and result
-  const phase = worldview.game.phase
-  const result = worldview.game.result
+  const phase = unwrap(worldview.game.phase) as Phase
+  const result = (unwrap(worldview.game.result) ?? null) as Result | null
 
   /**
    * Make a choice (rock, paper, or scissors).
    * Uses commitMessage option for identity-based server filtering.
    */
   const makeChoice = (choice: Choice) => {
-    if (myLocked || phase !== "choosing")
-      return // Use lens[EXT_SYMBOL].change directly with explicit type annotation
-    ;(
-      lens as {
-        [EXT_SYMBOL]: {
-          change: (
-            fn: (d: Mutable<GameDocShape>) => void,
-            opts?: { commitMessage?: unknown },
-          ) => void
-        }
-      }
-    )[EXT_SYMBOL].change(
-      (d: Mutable<GameDocShape>) => {
+    if (myLocked || phase !== "choosing") return
+
+    change(
+      lens,
+      (d: Draft<GameDocShape>) => {
         const player = d.game.players.get(playerId)
         if (player) {
           player.choice = choice
@@ -87,19 +86,11 @@ export function useRpsGame(playerId: string) {
    * Once locked, the choice cannot be changed.
    */
   const lockIn = () => {
-    if (!myChoice || myLocked || phase !== "choosing")
-      return // Use lens[EXT_SYMBOL].change directly with explicit type annotation
-    ;(
-      lens as {
-        [EXT_SYMBOL]: {
-          change: (
-            fn: (d: Mutable<GameDocShape>) => void,
-            opts?: { commitMessage?: unknown },
-          ) => void
-        }
-      }
-    )[EXT_SYMBOL].change(
-      (d: Mutable<GameDocShape>) => {
+    if (!myChoice || myLocked || phase !== "choosing") return
+
+    change(
+      lens,
+      (d: Draft<GameDocShape>) => {
         const player = d.game.players.get(playerId)
         if (player) {
           player.locked = true
@@ -117,7 +108,10 @@ export function useRpsGame(playerId: string) {
     myLocked,
     opponentId,
     opponentLocked,
-    opponentChoice: phase === "resolved" ? (opponent?.choice ?? null) : null,
+    opponentChoice:
+      phase === "resolved"
+        ? ((unwrap(opponent?.choice) ?? null) as Choice | null)
+        : null,
     isReady: !!doc && !!lens,
 
     // Actions

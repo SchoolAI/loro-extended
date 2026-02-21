@@ -4,7 +4,7 @@
  * This schema defines the structure of the Rock-Paper-Scissors game document.
  */
 
-import type { Mutable, TypedDoc } from "@loro-extended/change"
+import type { Infer, TypedDoc } from "@loro-extended/change"
 import { Shape } from "@loro-extended/change"
 
 /** Game phases */
@@ -16,8 +16,17 @@ export type Result = "alice" | "bob" | "draw"
 /** Player choice */
 export type Choice = "rock" | "paper" | "scissors"
 
-/** Player state */
-export type PlayerState = {
+/** Player state schema */
+export const PlayerSchema = Shape.struct({
+  choice: Shape.plain.string<Choice>().nullable(),
+  locked: Shape.plain.boolean().placeholder(false),
+})
+
+/** Player state (plain JSON type) */
+export type PlayerState = Infer<typeof PlayerSchema>
+
+/** Player draft (for use inside change() callbacks) */
+export type PlayerDraft = {
   choice: Choice | null
   locked: boolean
 }
@@ -49,5 +58,3 @@ export const GameSchema = Shape.doc(
 export type GameDocShape = typeof GameSchema
 
 export type GameDoc = TypedDoc<GameDocShape>
-
-export type GameChangeFn = (draft: Mutable<GameDocShape>) => void

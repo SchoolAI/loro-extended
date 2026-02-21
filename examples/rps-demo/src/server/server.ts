@@ -15,18 +15,14 @@ import {
   WsServerNetworkAdapter,
   wrapWsSocket,
 } from "@loro-extended/adapter-websocket/server"
-import { change, getTransition, loro } from "@loro-extended/change"
+import { change, type Draft, getTransition, loro } from "@loro-extended/change"
 import { createLens } from "@loro-extended/lens"
 import { Repo } from "@loro-extended/repo"
 import { createServer as createViteServer } from "vite"
 import type { WebSocket } from "ws"
 import { WebSocketServer } from "ws"
 import { createIdentityMessage, SERVER_PLAYER_ID } from "../shared/identity.js"
-import {
-  type GameChangeFn,
-  type GameDocShape,
-  GameSchema,
-} from "../shared/schema.js"
+import { type GameDocShape, GameSchema } from "../shared/schema.js"
 import { makeGameFilter } from "./filters.js"
 import { allLockedReactor, resolveGameReactor } from "./reactors.js"
 
@@ -58,7 +54,7 @@ loro(doc).subscribe(event => {
 const gameFilter = makeGameFilter()
 const lens = createLens<GameDocShape>(doc, { filter: gameFilter })
 
-function changeAsServer(fn: GameChangeFn) {
+function changeAsServer(fn: (draft: Draft<GameDocShape>) => void) {
   change(lens, fn, { commitMessage: createIdentityMessage(SERVER_PLAYER_ID) })
 }
 
