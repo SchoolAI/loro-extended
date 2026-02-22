@@ -5,6 +5,7 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
+import { FragmentReassembler } from "@loro-extended/wire-format"
 
 /**
  * Represents an active SSE connection to a peer.
@@ -15,10 +16,29 @@ export class SseConnection {
   private _sendFn: ((msg: ChannelMsg) => void) | null = null
   private _onDisconnect: (() => void) | null = null
 
+  /**
+   * Fragment reassembler for handling large binary POST payloads.
+   * Each connection has its own reassembler to track in-flight fragment batches.
+   */
+  readonly reassembler: FragmentReassembler
+
   constructor(
     public readonly peerId: PeerID,
     public readonly channelId: number,
-  ) {}
+  ) {
+    this.reassembler = new FragmentReassembler({
+      timeoutMs: 10000,
+      onTimeout: (batchId: Uint8Array) => {
+        console.warn(
+          `[SseConnection] Fragment batch timed out for peer ${peerId}: ${Array.from(
+            batchId,
+          )
+            .map((b: number) => b.toString(16).padStart(2, "0"))
+            .join("")}`,
+        )
+      },
+    })
+  }
 
   /**
    * Set the function to call when sending messages to this peer.
@@ -71,6 +91,14 @@ export class SseConnection {
    */
   disconnect(): void {
     this._onDisconnect?.()
+  }
+
+  /**
+   * Dispose of resources held by this connection.
+   * Must be called when the connection is closed to prevent timer leaks.
+   */
+  dispose(): void {
+    this.reassembler.dispose()
   }
 }
 
@@ -160,6 +188,7 @@ export class SseServerNetworkAdapter extends Adapter<PeerID> {
   unregisterConnection(peerId: PeerID): void {
     const connection = this.connections.get(peerId)
     if (connection) {
+      connection.dispose()
       this.removeChannel(connection.channelId)
       this.connections.delete(peerId)
 

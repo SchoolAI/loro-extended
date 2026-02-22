@@ -433,24 +433,24 @@ Update WebRTC adapter to use binary CBOR encoding with fragmentation.
 - ✅ Write unit test for binary encoding (in adapter.test.ts)
 - ✅ Write unit test for fragmentation (in adapter.test.ts)
 
-### Phase 5: Migrate SSE Adapter (POST to Binary) 🔴
+### Phase 5: Migrate SSE Adapter (POST to Binary) ✅
 
 Update SSE adapter: POST uses binary CBOR with fragmentation, EventSource stays JSON.
 
 **Tasks:**
 
-- 🔴 Add `@loro-extended/wire-format` dependency to `adapter-sse`
-- 🔴 Client: Replace `JSON.stringify(serializeChannelMsg(msg))` with binary CBOR
-- 🔴 Client: Set `Content-Type: application/octet-stream` for POST
-- 🔴 Client: Add fragmentation for payloads >80KB (safety margin below 100KB)
-- 🔴 Client: Add `FragmentReassembler` (not needed for POST, but for symmetry if server responds with fragments)
-- 🔴 Server (express-router): Add `express.raw()` middleware for binary POST body
-- 🔴 Server (express-router): Detect content-type, decode binary or JSON accordingly
-- 🔴 Server (express-router): Add `FragmentReassembler` per connection for large POST payloads
-- 🔴 Server (express-router): Keep JSON for EventSource responses (unchanged)
-- 🔴 Update README.md to document binary POST transport
-- 🔴 Write integration test for >100KB ephemeral payload via SSE POST
-- 🔴 Test video-conference example with large WebRTC signal payloads
+- ✅ Add `@loro-extended/wire-format` dependency to `adapter-sse`
+- ✅ Client: Replace `JSON.stringify(serializeChannelMsg(msg))` with binary CBOR
+- ✅ Client: Set `Content-Type: application/octet-stream` for POST
+- ✅ Client: Add fragmentation for payloads >80KB (safety margin below 100KB)
+- ✅ Server (express-router): Add `express.raw()` middleware for binary POST body
+- ✅ Server (express-router): Add `FragmentReassembler` per connection (in SseConnection)
+- ✅ Server (express-router): Keep JSON for EventSource responses (unchanged)
+- ✅ Create framework-agnostic `parsePostBody` handler (Functional Core)
+- ✅ Update README.md to document binary POST transport
+- ✅ Update client tests for binary encoding
+- ✅ Add unit tests for parsePostBody handler (sse-handler.test.ts)
+- ✅ Add unit tests for reassembler lifecycle (server-adapter.test.ts)
 
 ### Phase 6: Update HTTP-Polling Adapter (Binary POST) 🔴
 

@@ -258,15 +258,16 @@ describe("SseClientNetworkAdapter", () => {
       // Send a message
       await channel.send(createSyncRequest())
 
-      // Fetch should have been called
+      // Fetch should have been called with binary CBOR content
       expect(mockFetch).toHaveBeenCalledWith(
         "/loro/sync",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
-            "Content-Type": "application/json",
+            "Content-Type": "application/octet-stream",
             "X-Peer-Id": "123456789",
           }),
+          body: expect.any(Blob),
         }),
       )
     })

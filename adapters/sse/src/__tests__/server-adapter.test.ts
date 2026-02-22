@@ -76,4 +76,50 @@ describe("SseServerNetworkAdapter", () => {
       )
     })
   })
+
+  describe("Reassembler Lifecycle", () => {
+    it("creates reassembler for each connection", () => {
+      const conn = adapter.registerConnection(peerId)
+
+      expect(conn.reassembler).toBeDefined()
+      expect(conn.reassembler.pendingBatchCount).toBe(0)
+    })
+
+    it("disposes reassembler when connection is unregistered", () => {
+      const conn = adapter.registerConnection(peerId)
+      const reassembler = conn.reassembler
+
+      // Spy on dispose
+      const disposeSpy = vi.spyOn(reassembler, "dispose")
+
+      adapter.unregisterConnection(peerId)
+
+      expect(disposeSpy).toHaveBeenCalled()
+    })
+
+    it("disposes old reassembler when peer reconnects", () => {
+      const conn1 = adapter.registerConnection(peerId)
+      const reassembler1 = conn1.reassembler
+      const disposeSpy = vi.spyOn(reassembler1, "dispose")
+
+      // Reconnect same peer
+      const conn2 = adapter.registerConnection(peerId)
+
+      // Old reassembler should be disposed
+      expect(disposeSpy).toHaveBeenCalled()
+
+      // New connection has fresh reassembler
+      expect(conn2.reassembler).not.toBe(reassembler1)
+    })
+
+    it("each connection has independent reassembler", () => {
+      const peer1 = "peer-1" as PeerID
+      const peer2 = "peer-2" as PeerID
+
+      const conn1 = adapter.registerConnection(peer1)
+      const conn2 = adapter.registerConnection(peer2)
+
+      expect(conn1.reassembler).not.toBe(conn2.reassembler)
+    })
+  })
 })

@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@loro-extended/repo": "workspace:^",
+    "@loro-extended/wire-format": "workspace:^",
     "reconnecting-eventsource": "^1.6.4"
   },
   "peerDependencies": {
