@@ -3,7 +3,7 @@ import {
   createTypedDoc,
   loro,
   Shape,
-  unwrap,
+  value,
 } from "@loro-extended/change"
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
@@ -42,7 +42,7 @@ describe("createLens", () => {
 
       expect(lens.worldview.counter.value).toBe(5)
       expect(lens.worldview.text.toString()).toBe("Hello")
-      expect(unwrap(lens.worldview.data.get("key"))).toBe("value")
+      expect(value(lens.worldview.data.get("key"))).toBe("value")
 
       lens.dispose()
     })
