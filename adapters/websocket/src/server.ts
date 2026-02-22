@@ -4,6 +4,17 @@
  * @packageDocumentation
  */
 
+// Wire format (for advanced use cases)
+export {
+  decodeFrame,
+  encodeBatchFrame,
+  encodeFrame,
+  fromWireFormat,
+  MessageType,
+  toWireFormat,
+  WIRE_VERSION,
+  WireFlags,
+} from "@loro-extended/wire-format"
 // Connection
 export { WsConnection } from "./connection.js"
 // Handler types
@@ -18,14 +29,3 @@ export type {
 export { wrapStandardWebSocket } from "./handler/types.js"
 // Server adapter
 export { WsServerNetworkAdapter, wrapWsSocket } from "./server-adapter.js"
-// Wire format (for advanced use cases)
-export {
-  decodeFrame,
-  encodeBatchFrame,
-  encodeFrame,
-  fromWireFormat,
-  MessageType,
-  toWireFormat,
-  WIRE_VERSION,
-  WireFlags,
-} from "./wire-format.js"

@@ -6,8 +6,8 @@
  */
 
 import type { Channel, ChannelMsg, PeerID } from "@loro-extended/repo"
+import { decodeFrame, encodeFrame } from "@loro-extended/wire-format"
 import type { WsSocket } from "./handler/types.js"
-import { decodeFrame, encodeFrame } from "./wire-format.js"
 
 /**
  * Represents a WebSocket connection to a peer.

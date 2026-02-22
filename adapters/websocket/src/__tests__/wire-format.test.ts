@@ -12,8 +12,6 @@ import type {
   ChannelMsgSyncResponse,
   ChannelMsgUpdate,
 } from "@loro-extended/repo"
-import { LoroDoc, type PeerID, type VersionVector } from "loro-crdt"
-import { describe, expect, it } from "vitest"
 import {
   decodeFrame,
   encodeBatchFrame,
@@ -23,7 +21,9 @@ import {
   toWireFormat,
   WIRE_VERSION,
   WireFlags,
-} from "../wire-format.js"
+} from "@loro-extended/wire-format"
+import { LoroDoc, type PeerID, type VersionVector } from "loro-crdt"
+import { describe, expect, it } from "vitest"
 
 /**
  * Helper to create a VersionVector from a LoroDoc.
@@ -459,12 +459,14 @@ describe("Wire Format", () => {
     })
 
     it("should throw on unsupported wire version", () => {
-      const frame = new Uint8Array([99, 0, 0, 1, 0]) // version 99
+      // v2 format: 6-byte header [version, flags, length(4 bytes big-endian)]
+      const frame = new Uint8Array([99, 0, 0, 0, 0, 1, 0]) // version 99, 1 byte payload
       expect(() => decodeFrame(frame)).toThrow("Unsupported wire version: 99")
     })
 
     it("should throw on truncated frame", () => {
-      const frame = new Uint8Array([1, 0, 0, 100]) // claims 100 bytes but only has header
+      // v2 format: 6-byte header claiming 100 bytes payload but only has header
+      const frame = new Uint8Array([WIRE_VERSION, 0, 0, 0, 0, 100]) // claims 100 bytes but only has header
       expect(() => decodeFrame(frame)).toThrow("Frame truncated")
     })
 

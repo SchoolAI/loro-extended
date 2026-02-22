@@ -30,8 +30,8 @@
     "verify": "verify"
   },
   "dependencies": {
-    "@levischuck/tiny-cbor": "^0.3.2",
-    "@loro-extended/repo": "workspace:^"
+    "@loro-extended/repo": "workspace:^",
+    "@loro-extended/wire-format": "workspace:^"
   },
   "devDependencies": {
     "@logtape/logtape": "^1.1.1",

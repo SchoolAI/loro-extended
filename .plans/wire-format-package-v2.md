@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🟡 In Progress (Phase 2 Complete)
+## Status: 🟡 In Progress (Phase 3 Partial - Fragmentation Pending)
 
 ## Background
 
@@ -354,21 +354,67 @@ export class FragmentReassembler {
 }
 ```
 
-### Phase 3: Migrate WebSocket Adapter 🔴
+### Phase 3: Migrate WebSocket Adapter 🟡
 
-Update WebSocket adapter to use wire-format package with v2 framing.
+Update WebSocket adapter to use wire-format package with v2 framing and transport-layer fragmentation.
+
+**Rationale for fragmentation:** While WebSocket protocol has no hard message size limit, cloud infrastructure commonly imposes limits:
+- AWS API Gateway: 128KB
+- Memory-constrained deployments (permessage-deflate): ~256KB
+- Various serverless/proxy environments: 256KB
+
+Default fragment threshold: **100KB** (safe for AWS API Gateway's 128KB limit).
 
 **Tasks:**
 
-- 🔴 Add `@loro-extended/wire-format` dependency to `adapter-websocket`
-- 🔴 Replace inline `wire-format.ts` with imports from package
-- 🔴 Update `encodeFrame` calls to use 6-byte header (WIRE_VERSION=2)
-- 🔴 Update `decodeFrame` calls (same try/catch pattern, new import)
-- 🔴 Optionally add `FragmentReassembler` for future large payload support
-- 🔴 Remove `adapters/websocket/src/wire-format.ts` (now in package)
-- 🔴 Update `PROTOCOL.md` to document v2 wire format
-- 🔴 Run existing tests, update assertions for new header size
-- 🔴 Add regression test for >64KB payload
+- ✅ Add `@loro-extended/wire-format` dependency to `adapter-websocket`
+- ✅ Replace inline `wire-format.ts` with imports from package
+- ✅ Update `encodeFrame` calls to use 6-byte header (WIRE_VERSION=2)
+- ✅ Update `decodeFrame` calls (same try/catch pattern, new import)
+- ✅ Remove `adapters/websocket/src/wire-format.ts` (now in package)
+- ✅ Run existing tests, update assertions for new header size
+- ✅ Add regression test for >64KB payload (already in wire-format package tests)
+- 🔴 Add `fragmentThreshold` option to `WsClientNetworkAdapter` (default: 100KB)
+- 🔴 Add `fragmentThreshold` option to `WsServerNetworkAdapter` (default: 100KB)
+- 🔴 Add `FragmentReassembler` instance to `WsClientNetworkAdapter`
+- 🔴 Add `FragmentReassembler` instance per `WsConnection` (server-side)
+- 🔴 Update client send path: use `wrapCompleteMessage()` or `fragmentPayload()`
+- 🔴 Update client receive path: use `reassembler.receiveRaw()` → `decodeFrame()`
+- 🔴 Update server send path in `WsConnection.send()`
+- 🔴 Update server receive path in `WsConnection.handleMessage()`
+- 🔴 Dispose reassemblers on connection close (prevent timer leaks)
+- 🔴 Add unit tests for fragmentation round-trip
+- 🔴 Add integration test for >100KB payload fragmentation
+- 🔴 Verify e2e tests still pass
+- 🔴 Update `PROTOCOL.md` to document v2 wire format with transport layer
+
+**Wire format on the wire (after this phase):**
+
+```
+// Complete message (payload ≤ threshold):
+[0x00][version:1][flags:1][length:4][CBOR payload...]
+
+// Fragmented message (payload > threshold):
+[0x01][batchId:8][count:4][totalSize:4]    // Fragment header
+[0x02][batchId:8][index:4][chunk...]       // Fragment 0
+[0x02][batchId:8][index:4][chunk...]       // Fragment 1
+...
+```
+
+**API additions:**
+
+```typescript
+// Client
+const wsAdapter = new WsClientNetworkAdapter({
+  url: "wss://api.example.com/ws",
+  fragmentThreshold: 100 * 1024,  // Default: 100KB, set to 0 to disable
+})
+
+// Server
+const wsAdapter = new WsServerNetworkAdapter({
+  fragmentThreshold: 100 * 1024,  // Default: 100KB, applies to all connections
+})
+```
 
 ### Phase 4: Migrate WebRTC Adapter 🔴
 
@@ -580,14 +626,16 @@ For transports with size limits, payloads are fragmented using byte-prefix discr
 
 ### Transport-Specific Limits
 
-| Transport | Direction | Encoding | Fragment Threshold |
-|-----------|-----------|----------|-------------------|
-| WebSocket | Both | Binary CBOR | Optional (no hard limit) |
-| WebRTC | Both | Binary CBOR | 200KB (SCTP 256KB limit) |
-| SSE | POST (client→server) | Binary CBOR | 80KB (body-parser 100KB default) |
-| SSE | EventSource (server→client) | JSON | N/A (no fragmentation) |
-| HTTP-Polling | POST | Binary CBOR | 80KB |
-| HTTP-Polling | GET response | JSON | N/A |
+| Transport | Direction | Encoding | Fragment Threshold | Rationale |
+|-----------|-----------|----------|-------------------|-----------|
+| WebSocket | Both | Binary CBOR | 100KB (default) | AWS API Gateway 128KB limit |
+| WebRTC | Both | Binary CBOR | 200KB | SCTP 256KB limit |
+| SSE | POST (client→server) | Binary CBOR | 80KB | body-parser 100KB default |
+| SSE | EventSource (server→client) | JSON | N/A | Text-only protocol |
+| HTTP-Polling | POST | Binary CBOR | 80KB | body-parser 100KB default |
+| HTTP-Polling | GET response | JSON | N/A | No size limits on response |
+
+**Note:** WebSocket fragmentation is required for cloud deployments (AWS API Gateway, Cloudflare Workers, etc.) but can be disabled (`fragmentThreshold: 0`) for self-hosted deployments without proxy limits.
 
 ### SSE Asymmetric Encoding
 

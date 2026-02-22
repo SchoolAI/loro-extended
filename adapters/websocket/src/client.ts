@@ -12,13 +12,13 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
+import { decodeFrame, encodeFrame } from "@loro-extended/wire-format"
 import {
   type DisconnectReason,
   type WsClientState,
   WsClientStateMachine,
   type WsClientStateTransition,
 } from "./client-state-machine.js"
-import { decodeFrame, encodeFrame } from "./wire-format.js"
 
 // Re-export types from state machine for convenience
 export type { DisconnectReason, WsClientState, WsClientStateTransition }

@@ -189,12 +189,12 @@ importers:
 
   adapters/websocket:
     dependencies:
-      '@levischuck/tiny-cbor':
-        specifier: ^0.3.2
-        version: 0.3.2
       '@loro-extended/repo':
         specifier: workspace:^
         version: link:../../packages/repo
+      '@loro-extended/wire-format':
+        specifier: workspace:^
+        version: link:../../packages/wire-format
     devDependencies:
       '@logtape/logtape':
         specifier: ^1.1.1
