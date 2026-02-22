@@ -158,7 +158,7 @@ The shared logic covers: `hasContainerConstructor` guard → mergeable path (nul
 
 ---
 
-## Phase 6: Fix TECHNICAL.md mergeable documentation 🔴
+## Phase 6: Fix TECHNICAL.md mergeable documentation ✅
 
 ### Tasks
 
@@ -166,9 +166,11 @@ The shared logic covers: `hasContainerConstructor` guard → mergeable path (nul
    - **New documents** (no metadata): `options.mergeable` > `schema.mergeable` > `true` (default)
    - **Existing documents** (has metadata): metadata.mergeable takes precedence; schema/options ignored
    - **Legacy documents** (no metadata, pre-loro-extended): treated as `mergeable: false` only if `skipInitialize: true` is used; otherwise auto-initialized with the new-document default
-   🔴
+   ✅
 
-2. **Add a warning note** about passing `{ doc: existingLoroDoc }` without `skipInitialize: true` — the doc will be auto-initialized with `mergeable: true` if it lacks metadata. Recommend always passing `skipInitialize: true` when wrapping an existing LoroDoc. 🔴
+2. **Add a warning note** about passing `{ doc: existingLoroDoc }` without `skipInitialize: true` — the doc will be auto-initialized with `mergeable: true` if it lacks metadata. Recommend always passing `skipInitialize: true` when wrapping an existing LoroDoc. ✅
+
+   > Also updated TECHNICAL.md to document `withBatchedCommit`, `buildChildTypedRefParams`, and the `containerGetter` shared constant in the "Key Internal Methods" table and "Batch Assignment and Subscription Timing" section.
 
 **Resources**: `TECHNICAL.md`, `packages/change/src/typed-doc.ts` (constructor logic for reference)
 

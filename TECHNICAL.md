@@ -105,9 +105,10 @@ TypedRef (public facade)
 |--------|---------|
 | `getTypedRefParams()` | Returns params to recreate the ref (used by `change()` for draft creation) |
 | `getChildTypedRefParams(key/index, shape)` | Returns params for creating child refs (lists, structs, records) |
+| `buildChildTypedRefParams(internals, key, shape, placeholder)` | Shared helper in `utils.ts` for map-backed child ref creation (struct + record) |
 | `finalizeTransaction?()` | Optional cleanup after `change()` completes (e.g., clear list caches) |
 | `commitIfAuto()` | Commits if `autoCommit` mode is enabled (respects suppression flag) |
-| `setSuppressAutoCommit(boolean)` | Temporarily suppress auto-commit during batch operations |
+| `withBatchedCommit(fn)` | Suppress auto-commit, run `fn`, restore, then `commitIfAuto()` — reentrant-safe |
 
 ### Draft Creation for `change()`
 
@@ -230,7 +231,7 @@ strict so callers must handle checkout events explicitly if they want them.
 
 ### Batch Assignment and Subscription Timing
 
-When assigning a plain object to a struct/record via `ref.set(key, value)` or property assignment, `assignPlainValueToTypedRef()` handles the assignment atomically:
+When assigning a plain object to a struct/record via `ref.set(key, value)` or property assignment, `assignPlainValueToTypedRef()` handles the assignment atomically via `withBatchedCommit()`:
 
 1. **Suppresses auto-commit** before iterating over properties
 2. **Assigns all properties** in a loop
@@ -241,7 +242,14 @@ This ensures subscribers see **complete data** on the first notification, not pa
 
 **Why this matters**: Without batching, each property assignment would trigger a separate `commit()` and subscription notification. Subscribers would see incomplete objects (e.g., `{ a: "value", b: "", c: "" }` on first notification).
 
-The `setSuppressAutoCommit()` mechanism is reentrant-safe - it tracks whether suppression was already active to avoid double-restoring.
+**`withBatchedCommit(fn)`**: This method on `BaseRefInternals` encapsulates the suppress/restore/commitIfAuto pattern. It is reentrant-safe — if auto-commit is already suppressed by an outer call, the inner call runs without double-restoring. Used by `assignPlainValueToTypedRef()`, `RecordRefInternals.replace()`, `.merge()`, and `.clear()`.
+
+### Shared Child Ref Params for Map-Backed Refs
+
+`StructRefInternals` and `RecordRefInternals` both create child typed refs via `getChildTypedRefParams()`. The shared logic (hasContainerConstructor guard, mergeable vs non-mergeable branching, null markers, root container lookup) is extracted into `buildChildTypedRefParams(internals, key, shape, placeholder)` in `typed-refs/utils.ts`. Each caller computes `placeholder` differently:
+
+- **Structs**: `(this.getPlaceholder() as any)?.[key]` — direct lookup from parent placeholder
+- **Records**: Same lookup, but falls back to `deriveShapePlaceholder(shape)` when undefined (records have `{}` as placeholder, so nested containers need derived defaults)
 
 ### Nested Container Materialization
 
@@ -360,9 +368,33 @@ Use `skipInitialize: true` when:
 
 **Peer Agreement**: When a peer receives a document, it reads the metadata and uses it (metadata takes precedence over schema). This ensures all peers use consistent settings.
 
-**Priority Order**: `options.mergeable` > `schema.mergeable` > existing metadata > `false`
+**Mergeable Resolution** (depends on whether the document already has metadata):
 
-**Backward Compatibility**: Documents without metadata are assumed to have `mergeable: false`.
+| Scenario | How `mergeable` is determined |
+|----------|-------------------------------|
+| **Existing document** (has `_loro_extended_meta_`) | `metadata.mergeable` takes precedence; `options.mergeable` and `schema.mergeable` are ignored |
+| **New document** (no metadata) | `options.mergeable` > `schema.mergeable` > `true` (default). Metadata is auto-written immediately unless `skipInitialize: true`. |
+| **Legacy document** (no metadata, pre-loro-extended) with `skipInitialize: true` | Uses `options.mergeable` > `schema.mergeable` > `true`, but does NOT write metadata. Call `ext(doc).initialize()` later when ready. |
+
+**⚠️ Important: Wrapping an existing `LoroDoc`**
+
+When passing `{ doc: existingLoroDoc }` to `createTypedDoc`, if the document lacks metadata it will be treated as a **new** document and auto-initialized with `mergeable: true` (the default). This can silently corrupt a legacy non-mergeable document by writing mergeable metadata to it.
+
+**Always pass `skipInitialize: true` when wrapping an existing `LoroDoc`** unless you are certain the document was created by loro-extended and already has metadata:
+
+```typescript
+// ✅ Safe: skip initialization for existing documents
+const doc = createTypedDoc(schema, { doc: existingLoroDoc, skipInitialize: true })
+
+// ❌ Dangerous: may auto-initialize a legacy doc as mergeable: true
+const doc = createTypedDoc(schema, { doc: existingLoroDoc })
+```
+
+**Backward Compatibility**: Documents without metadata that are wrapped with `skipInitialize: true` will use the computed `options.mergeable` > `schema.mergeable` > `true` default without writing metadata. For true legacy documents, pass `mergeable: false` explicitly:
+
+```typescript
+const doc = createTypedDoc(schema, { doc: legacyDoc, skipInitialize: true, mergeable: false })
+```
 
 **Reserved Prefix**: Do not use `_loro_extended` as a prefix for your own root container keys.
 
