@@ -1,11 +1,8 @@
-import {
-  type ChannelMsg,
-  deserializeChannelMsg,
-  type PeerID,
-  serializeChannelMsg,
-} from "@loro-extended/repo"
+import type { PeerID } from "@loro-extended/repo"
+import { serializeChannelMsg } from "@loro-extended/repo"
 import type { Request, Response, Router } from "express"
 import express from "express"
+import { parsePostBody } from "./polling-handler.js"
 import type { HttpPollingServerNetworkAdapter } from "./server-adapter.js"
 
 export interface HttpPollingExpressRouterOptions {
@@ -46,9 +43,17 @@ export interface HttpPollingExpressRouterOptions {
  * This factory function creates Express routes that integrate with the
  * HttpPollingServerNetworkAdapter. It handles:
  * - GET endpoint for clients to poll for messages (with long-polling support)
- * - POST endpoint for clients to send messages to the server
+ * - POST endpoint for clients to send binary CBOR messages to the server
  * - DELETE endpoint for clients to explicitly disconnect
  * - Message serialization/deserialization
+ *
+ * ## Wire Format
+ *
+ * The POST endpoint accepts binary CBOR with transport-layer prefixes:
+ * - `Content-Type: application/octet-stream`
+ * - Body contains MESSAGE_COMPLETE (0x00) or FRAGMENT_HEADER/DATA (0x01/0x02) prefixed data
+ *
+ * The GET endpoint returns JSON messages (simpler client handling, no size limits on response).
  *
  * @param adapter The HttpPollingServerNetworkAdapter instance
  * @param options Configuration options for the router
@@ -81,7 +86,7 @@ export function createHttpPollingExpressRouter(
 
   const router = express.Router()
 
-  // GET endpoint for clients to poll for messages
+  // GET endpoint for clients to poll for messages (JSON response)
   router.get(pollPath, async (req: Request, res: Response) => {
     const peerId = getPeerIdFromPollRequest(req)
 
@@ -109,7 +114,7 @@ export function createHttpPollingExpressRouter(
       // Wait for messages (or return immediately if waitMs is 0 or messages are queued)
       const messages = await connection.waitForMessages(waitMs)
 
-      // Serialize messages for transport
+      // Serialize messages for transport (JSON for GET responses)
       const serializedMessages = messages.map(msg => serializeChannelMsg(msg))
 
       res.json({
@@ -122,35 +127,54 @@ export function createHttpPollingExpressRouter(
     }
   })
 
-  // POST endpoint for clients to send messages TO the server
-  router.post(syncPath, (req: Request, res: Response) => {
-    const peerId = getPeerIdFromSyncRequest(req)
+  // Binary POST endpoint for clients to send messages TO the server
+  // Uses express.raw() to receive binary CBOR with transport-layer prefixes
+  router.post(
+    syncPath,
+    express.raw({ type: "application/octet-stream", limit: "1mb" }),
+    (req: Request, res: Response) => {
+      const peerId = getPeerIdFromSyncRequest(req)
 
-    if (!peerId) {
-      res.status(400).json({ error: "x-peer-id header is required" })
-      return
-    }
+      if (!peerId) {
+        res.status(400).json({ error: "x-peer-id header is required" })
+        return
+      }
 
-    // Get connection
-    const connection = adapter.getConnection(peerId)
+      // Get connection
+      const connection = adapter.getConnection(peerId)
 
-    if (!connection) {
-      res.status(404).json({
-        error: "Connection not found. Poll first to establish connection.",
-      })
-      return
-    }
+      if (!connection) {
+        res.status(404).json({
+          error: "Connection not found. Poll first to establish connection.",
+        })
+        return
+      }
 
-    try {
-      const serialized = req.body
-      const message = deserializeChannelMsg(serialized) as ChannelMsg
-      connection.receive(message)
-      res.json({ ok: true })
-    } catch (error) {
-      adapter.logger.error("Error processing sync message", { peerId, error })
-      res.status(400).json({ error: "Invalid message format" })
-    }
-  })
+      // Ensure we have binary data
+      if (!Buffer.isBuffer(req.body)) {
+        res.status(400).json({ error: "Expected binary body" })
+        return
+      }
+
+      // Functional core: parse body through reassembler
+      const result = parsePostBody(connection.reassembler, req.body)
+
+      // Imperative shell: execute side effects based on result
+      if (result.type === "messages") {
+        for (const msg of result.messages) {
+          connection.receive(msg)
+        }
+      } else if (result.type === "error") {
+        adapter.logger.warn(
+          "Failed to parse message from peer {peerId}: {error}",
+          { peerId, error: result.response.body },
+        )
+      }
+      // "pending" type means fragment received, waiting for more - no action needed
+
+      res.status(result.response.status).json(result.response.body)
+    },
+  )
 
   // DELETE endpoint for clients to explicitly disconnect
   router.delete(pollPath, (req: Request, res: Response) => {

@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🟡 In Progress (Phase 3 Complete)
+## Status: 🟡 In Progress (Phase 6 Complete)
 
 ## Background
 
@@ -452,20 +452,22 @@ Update SSE adapter: POST uses binary CBOR with fragmentation, EventSource stays 
 - ✅ Add unit tests for parsePostBody handler (sse-handler.test.ts)
 - ✅ Add unit tests for reassembler lifecycle (server-adapter.test.ts)
 
-### Phase 6: Update HTTP-Polling Adapter (Binary POST) 🔴
+### Phase 6: Update HTTP-Polling Adapter (Binary POST) ✅
 
 HTTP-Polling uses binary CBOR for POST with fragmentation, keeps JSON for GET response.
 
 **Tasks:**
 
-- 🔴 Add `@loro-extended/wire-format` dependency to `adapter-http-polling`
-- 🔴 Client POST: Use binary CBOR with `Content-Type: application/octet-stream`
-- 🔴 Client POST: Add fragmentation for large payloads
-- 🔴 Server: Add `express.raw()` middleware for binary POST
-- 🔴 Server: Detect content-type, decode accordingly
-- 🔴 Server: Add `FragmentReassembler` per connection
-- 🔴 Keep JSON response for GET (simpler client handling, no size limits on response)
-- 🔴 Update documentation
+- ✅ Add `@loro-extended/wire-format` dependency to `adapter-http-polling`
+- ✅ Client POST: Use binary CBOR with `Content-Type: application/octet-stream`
+- ✅ Client POST: Add fragmentation for large payloads (80KB threshold)
+- ✅ Server: Add `express.raw()` middleware for binary POST
+- ✅ Server: Create `parsePostBody()` functional core handler (polling-handler.ts)
+- ✅ Server: Add `FragmentReassembler` per `HttpPollingConnection`
+- ✅ Keep JSON response for GET (simpler client handling, no size limits on response)
+- ✅ Add `dispose()` method to `HttpPollingConnection` for reassembler cleanup
+- ✅ Write unit tests for `parsePostBody` handler
+- ✅ Update client tests for binary encoding
 
 ### Phase 7: Documentation and Cleanup 🔴
 

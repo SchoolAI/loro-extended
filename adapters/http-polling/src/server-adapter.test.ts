@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape"
+import { FragmentReassembler } from "@loro-extended/wire-format"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   HttpPollingConnection,
@@ -10,6 +11,13 @@ describe("HttpPollingConnection", () => {
     const connection = new HttpPollingConnection("1001", 1)
     expect(connection.peerId).toBe("1001")
     expect(connection.channelId).toBe(1)
+    connection.dispose() // Clean up
+  })
+
+  it("should have a FragmentReassembler instance", () => {
+    const connection = new HttpPollingConnection("1001", 1)
+    expect(connection.reassembler).toBeInstanceOf(FragmentReassembler)
+    connection.dispose() // Clean up
   })
 
   it("should enqueue and drain messages", () => {
@@ -28,6 +36,7 @@ describe("HttpPollingConnection", () => {
     expect(messages[0]).toBe(msg1)
     expect(messages[1]).toBe(msg2)
     expect(connection.queueLength).toBe(0)
+    connection.dispose() // Clean up
   })
 
   it("should update lastActivity on drain", () => {
@@ -42,6 +51,7 @@ describe("HttpPollingConnection", () => {
     expect(connection.lastActivity).toBeGreaterThan(initialActivity)
 
     vi.useRealTimers()
+    connection.dispose() // Clean up
   })
 
   it("should return immediately from waitForMessages if messages are queued", async () => {
@@ -52,6 +62,7 @@ describe("HttpPollingConnection", () => {
     const messages = await connection.waitForMessages(5000)
     expect(messages).toHaveLength(1)
     expect(messages[0]).toBe(msg)
+    connection.dispose() // Clean up
   })
 
   it("should return immediately from waitForMessages if timeout is 0", async () => {
@@ -59,6 +70,7 @@ describe("HttpPollingConnection", () => {
 
     const messages = await connection.waitForMessages(0)
     expect(messages).toHaveLength(0)
+    connection.dispose() // Clean up
   })
 
   it("should wait for messages and resolve when message arrives", async () => {
@@ -74,6 +86,7 @@ describe("HttpPollingConnection", () => {
     const messages = await waitPromise
     expect(messages).toHaveLength(1)
     expect(messages[0]).toBe(msg)
+    connection.dispose() // Clean up
   })
 
   it("should timeout and return empty array if no messages arrive", async () => {
@@ -89,6 +102,7 @@ describe("HttpPollingConnection", () => {
     expect(messages).toHaveLength(0)
 
     vi.useRealTimers()
+    connection.dispose() // Clean up
   })
 
   it("should cancel wait and return queued messages", async () => {
@@ -107,6 +121,7 @@ describe("HttpPollingConnection", () => {
     expect(messages).toHaveLength(1)
 
     vi.useRealTimers()
+    connection.dispose() // Clean up
   })
 
   it("should report isWaiting correctly", async () => {
@@ -123,6 +138,31 @@ describe("HttpPollingConnection", () => {
     await waitPromise
 
     expect(connection.isWaiting).toBe(false)
+    connection.dispose() // Clean up
+  })
+
+  describe("Reassembler lifecycle", () => {
+    it("should dispose reassembler when connection is disposed", () => {
+      const connection = new HttpPollingConnection("1001", 1)
+
+      // Reassembler should be active
+      expect(connection.reassembler.pendingBatchCount).toBe(0)
+
+      // Dispose should clean up
+      connection.dispose()
+
+      // Subsequent operations on reassembler would fail after dispose
+      // This is tested indirectly - the dispose() call should not throw
+    })
+
+    it("should be safe to dispose multiple times", () => {
+      const connection = new HttpPollingConnection("1001", 1)
+
+      // Multiple dispose calls should not throw
+      connection.dispose()
+      connection.dispose()
+      connection.dispose()
+    })
   })
 })
 

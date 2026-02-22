@@ -5,6 +5,7 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
+import { FragmentReassembler } from "@loro-extended/wire-format"
 
 /**
  * Represents an active HTTP polling connection to a peer.
@@ -18,10 +19,29 @@ export class HttpPollingConnection {
   private _waitingResolver: ((messages: ChannelMsg[]) => void) | null = null
   private _waitingTimeout: ReturnType<typeof setTimeout> | null = null
 
+  /**
+   * Fragment reassembler for handling large binary POST payloads.
+   * Each connection has its own reassembler to track in-flight fragment batches.
+   */
+  readonly reassembler: FragmentReassembler
+
   constructor(
     public readonly peerId: PeerID,
     public readonly channelId: number,
-  ) {}
+  ) {
+    this.reassembler = new FragmentReassembler({
+      timeoutMs: 10000,
+      onTimeout: (batchId: Uint8Array) => {
+        console.warn(
+          `[HttpPollingConnection] Fragment batch timed out for peer ${peerId}: ${Array.from(
+            batchId,
+          )
+            .map((b: number) => b.toString(16).padStart(2, "0"))
+            .join("")}`,
+        )
+      },
+    })
+  }
 
   /**
    * Internal: Set the channel reference (called by adapter).
@@ -148,6 +168,14 @@ export class HttpPollingConnection {
   get queueLength(): number {
     return this._messageQueue.length
   }
+
+  /**
+   * Dispose of resources held by this connection.
+   * Must be called when the connection is closed to prevent timer leaks.
+   */
+  dispose(): void {
+    this.reassembler.dispose()
+  }
 }
 
 /**
@@ -155,6 +183,14 @@ export class HttpPollingConnection {
  * This adapter is framework-agnostic and does not depend on Express or any HTTP framework.
  *
  * Use a router factory (like createHttpPollingExpressRouter) to integrate with your HTTP framework.
+ *
+ * ## Wire Format
+ *
+ * POST requests accept binary CBOR with transport-layer prefixes:
+ * - `Content-Type: application/octet-stream`
+ * - Body contains MESSAGE_COMPLETE (0x00) or FRAGMENT_HEADER/DATA (0x01/0x02) prefixed data
+ *
+ * Poll responses (GET) use JSON for simplicity and broad compatibility.
  */
 export class HttpPollingServerNetworkAdapter extends Adapter<PeerID> {
   private connections = new Map<PeerID, HttpPollingConnection>()
@@ -203,6 +239,7 @@ export class HttpPollingServerNetworkAdapter extends Adapter<PeerID> {
     // Cancel all waiting requests and clear connections
     for (const connection of this.connections.values()) {
       connection.cancelWait()
+      connection.dispose()
     }
     this.connections.clear()
 
@@ -253,6 +290,7 @@ export class HttpPollingServerNetworkAdapter extends Adapter<PeerID> {
     const connection = this.connections.get(peerId)
     if (connection) {
       connection.cancelWait()
+      connection.dispose()
       this.removeChannel(connection.channelId)
       this.connections.delete(peerId)
 

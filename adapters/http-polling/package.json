@@ -26,7 +26,8 @@
     "verify": "verify"
   },
   "dependencies": {
-    "@loro-extended/repo": "workspace:^"
+    "@loro-extended/repo": "workspace:^",
+    "@loro-extended/wire-format": "workspace:^"
   },
   "peerDependencies": {
     "express": "^4.21.0 || ^5.0.0"

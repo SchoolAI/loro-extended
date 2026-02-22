@@ -1,13 +1,48 @@
+/**
+ * HTTP Polling client network adapter for loro-extended.
+ *
+ * This adapter uses:
+ * - HTTP POST with binary CBOR encoding for client→server messages
+ * - HTTP GET with JSON for server→client messages (poll responses)
+ *
+ * The asymmetry is because poll responses aggregate queued messages and
+ * benefit from simple JSON serialization, while POST requests can use
+ * binary encoding for ~33% bandwidth savings on binary-heavy payloads.
+ *
+ * ## Wire Format
+ *
+ * POST requests use binary CBOR with transport-layer prefixes:
+ * - `Content-Type: application/octet-stream`
+ * - Messages are wrapped with MESSAGE_COMPLETE (0x00) prefix
+ * - Large messages (>80KB) are fragmented into multiple POST requests
+ *
+ * ## Fragmentation
+ *
+ * The default fragment threshold is 80KB, providing a safety margin below
+ * the typical 100KB body-parser limit. Each fragment is sent as a separate
+ * POST request.
+ */
+
 import {
   Adapter,
   type Channel,
   type ChannelMsg,
-  type ChannelMsgJSON,
   deserializeChannelMsg,
   type GeneratedChannel,
   type PeerID,
-  serializeChannelMsg,
 } from "@loro-extended/repo"
+import {
+  encodeFrame,
+  fragmentPayload,
+  wrapCompleteMessage,
+} from "@loro-extended/wire-format"
+
+/**
+ * Default fragment threshold in bytes.
+ * Messages larger than this are fragmented into multiple POST requests.
+ * 80KB provides a safety margin below the typical 100KB body-parser limit.
+ */
+export const DEFAULT_FRAGMENT_THRESHOLD = 80 * 1024
 
 export type ConnectionState =
   | "disconnected"
@@ -71,6 +106,14 @@ export interface HttpPollingClientOptions {
   pollDelay?: number
 
   /**
+   * Fragment threshold in bytes. Messages larger than this are fragmented
+   * into multiple POST requests.
+   * Set to 0 to disable fragmentation (not recommended).
+   * Default: 80KB (safe for typical 100KB body-parser limits)
+   */
+  fragmentThreshold?: number
+
+  /**
    * Optional fetch options (headers, credentials, etc.).
    * These will be merged with the default options for each request.
    */
@@ -113,6 +156,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
     baseDelay: 1000,
     maxDelay: 10000,
   }
+  private readonly fragmentThreshold: number
 
   private serverChannel?: Channel
   private isPolling = false
@@ -129,6 +173,8 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
     this.minPollInterval = options.minPollInterval ?? 100
     this.pollDelay = options.pollDelay ?? 0
     this.fetchOptions = options.fetchOptions
+    this.fragmentThreshold =
+      options.fragmentThreshold ?? DEFAULT_FRAGMENT_THRESHOLD
     if (options.postRetry) {
       this.postRetryOptions = { ...this.postRetryOptions, ...options.postRetry }
     }
@@ -172,9 +218,26 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
             ? this.postUrl(this.peerId)
             : this.postUrl
 
-        // Serialize and send via HTTP POST
-        const serialized = serializeChannelMsg(msg)
-        await this.sendWithRetry(resolvedPostUrl, serialized)
+        // Encode to binary CBOR wire format
+        const frame = encodeFrame(msg)
+
+        // Fragment large payloads for body-parser compatibility
+        if (
+          this.fragmentThreshold > 0 &&
+          frame.length > this.fragmentThreshold
+        ) {
+          // Send fragments as separate POST requests
+          const fragments = fragmentPayload(frame, this.fragmentThreshold)
+          for (const fragment of fragments) {
+            await this.sendBinaryWithRetry(resolvedPostUrl, fragment)
+          }
+        } else {
+          // Wrap with MESSAGE_COMPLETE prefix for transport layer consistency
+          await this.sendBinaryWithRetry(
+            resolvedPostUrl,
+            wrapCompleteMessage(frame),
+          )
+        }
       },
       stop: () => {
         this.stopPolling()
@@ -332,7 +395,7 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
     if (this.serverChannel && messages && messages.length > 0) {
       for (const serialized of messages) {
         try {
-          const message = deserializeChannelMsg(serialized as ChannelMsgJSON)
+          const message = deserializeChannelMsg(serialized as any)
           this.serverChannel.onReceive(message)
         } catch (error) {
           this.logger.warn("Failed to deserialize message", { error })
@@ -348,7 +411,13 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
 
-  private async sendWithRetry(url: string, data: any): Promise<void> {
+  /**
+   * Send binary data via POST with retry logic.
+   */
+  private async sendBinaryWithRetry(
+    url: string,
+    data: Uint8Array,
+  ): Promise<void> {
     let attempt = 0
     const { maxAttempts, baseDelay, maxDelay } = this.postRetryOptions
 
@@ -361,24 +430,37 @@ export class HttpPollingClientNetworkAdapter extends Adapter<void> {
         const response = await fetch(url, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/octet-stream",
             "X-Peer-Id": this.peerId,
             ...this.fetchOptions?.headers,
           },
-          body: JSON.stringify(data),
+          // Use Blob for consistent fetch body handling across environments
+          body: new Blob([data as BlobPart], {
+            type: "application/octet-stream",
+          }),
           ...this.fetchOptions,
         })
 
         if (!response.ok) {
-          // Don't retry on client errors (4xx), except maybe 429 (Too Many Requests)
+          // Don't retry on client errors (4xx) - they won't succeed on retry
           if (response.status >= 400 && response.status < 500) {
             throw new Error(`Failed to send message: ${response.statusText}`)
           }
+          // Server errors (5xx) will be caught and retried below
           throw new Error(`Server error: ${response.statusText}`)
         }
 
+        // Success
         return
-      } catch (error: any) {
+      } catch (error: unknown) {
+        // Check if this is a client error (4xx) - don't retry those
+        if (
+          error instanceof Error &&
+          error.message.startsWith("Failed to send message:")
+        ) {
+          throw error
+        }
+
         attempt++
 
         // If max attempts reached, throw the last error
