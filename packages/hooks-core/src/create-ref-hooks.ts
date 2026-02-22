@@ -126,7 +126,23 @@ export function createRefHooks(framework: FrameworkHooks) {
    *   return <pre>{JSON.stringify(snapshot, null, 2)}</pre>
    * }
    * ```
+   *
+   * @example Handle optional refs (nullish support)
+   * ```tsx
+   * function PlayerChoice({ doc }: { doc: Doc<GameSchema> }) {
+   *   // record.get() returns PlainValueRef<T> | undefined
+   *   const player = doc.players.get("alice")
+   *   const playerData = useValue(player)  // T | undefined
+   *   return <div>{playerData?.choice ?? "No choice"}</div>
+   * }
+   * ```
    */
+
+  // ============================================================================
+  // Non-nullish overloads (most specific - must come FIRST)
+  // TypeScript picks the first matching overload, so specific types must precede unions
+  // ============================================================================
+
   // Overload: for PlainValueRef (must come FIRST for proper overload resolution)
   function useValue<T>(ref: PlainValueRef<T>): T
 
@@ -136,18 +152,77 @@ export function createRefHooks(framework: FrameworkHooks) {
   // Overload: for TypedDoc/Doc
   function useValue<D extends DocShape>(doc: TypedDoc<D>): Infer<D>
 
+  // ============================================================================
+  // Nullish overloads (less specific - must come AFTER non-nullish)
+  // These handle optional chaining patterns like `useValue(record.get("key"))`
+  // ============================================================================
+
+  /**
+   * Handle undefined input - returns undefined.
+   * Enables patterns like `useValue(record.get("key"))` where get() may return undefined.
+   */
+  function useValue(ref: undefined): undefined
+
+  /**
+   * Handle null input - returns null.
+   */
+  function useValue(ref: null): null
+
+  /**
+   * Subscribe to a PlainValueRef that may be undefined.
+   * Enables patterns like `useValue(record.get("key"))`.
+   */
+  function useValue<T>(ref: PlainValueRef<T> | undefined): T | undefined
+
+  /**
+   * Subscribe to a PlainValueRef that may be null.
+   */
+  function useValue<T>(ref: PlainValueRef<T> | null): T | null
+
+  /**
+   * Subscribe to a TypedRef that may be undefined.
+   */
+  function useValue<R extends AnyTypedRef>(
+    ref: R | undefined,
+  ): ReturnType<R["toJSON"]> | undefined
+
+  /**
+   * Subscribe to a TypedRef that may be null.
+   */
+  function useValue<R extends AnyTypedRef>(
+    ref: R | null,
+  ): ReturnType<R["toJSON"]> | null
+
+  /**
+   * Subscribe to a TypedDoc that may be undefined.
+   */
+  function useValue<D extends DocShape>(
+    doc: TypedDoc<D> | undefined,
+  ): Infer<D> | undefined
+
+  /**
+   * Subscribe to a TypedDoc that may be null.
+   */
+  function useValue<D extends DocShape>(
+    doc: TypedDoc<D> | null,
+  ): Infer<D> | null
+
   // Implementation
   function useValue<T, R extends AnyTypedRef, D extends DocShape>(
-    refOrDoc: PlainValueRef<T> | R | TypedDoc<D>,
-  ): T | ReturnType<R["toJSON"]> | Infer<D> {
-    // Check if it's a PlainValueRef
-    const isPlainRef = isPlainValueRef(refOrDoc)
+    refOrDoc: PlainValueRef<T> | R | TypedDoc<D> | null | undefined,
+  ): T | ReturnType<R["toJSON"]> | Infer<D> | null | undefined {
+    // Handle nullish inputs - preserve the nullishness
+    const isNullish = refOrDoc === null || refOrDoc === undefined
 
-    // Check if it's a TypedDoc
-    const isDoc = !isPlainRef && isTypedDoc(refOrDoc)
+    // Check if it's a PlainValueRef (only if not nullish)
+    const isPlainRef = !isNullish && isPlainValueRef(refOrDoc)
+
+    // Check if it's a TypedDoc (only if not nullish)
+    const isDoc = !isNullish && !isPlainRef && isTypedDoc(refOrDoc)
 
     // Get the loro container/doc for subscription
     const loroTarget = useMemo(() => {
+      if (isNullish) return null // No container to subscribe to
       if (isPlainRef) {
         // For PlainValueRef, get the parent container for subscription
         return getPlainValueRefValue(refOrDoc as PlainValueRef<T>).container
@@ -156,12 +231,32 @@ export function createRefHooks(framework: FrameworkHooks) {
         return getLoroDoc(refOrDoc as TypedDoc<D>)
       }
       return loro(refOrDoc as Parameters<typeof loro>[0]) as Container
-    }, [refOrDoc, isPlainRef, isDoc])
+    }, [refOrDoc, isPlainRef, isDoc, isNullish])
 
     // Cache ref for the sync store
     const cacheRef = useRef<{ version?: string; value: unknown } | null>(null)
 
+    // Cached value for nullish inputs - must be stable to avoid infinite loops
+    const nullishCacheRef = useRef<{ value: unknown } | null>(null)
+
     const store = useMemo(() => {
+      // No-op store for nullish inputs
+      if (isNullish) {
+        // Cache the nullish value to avoid creating new objects on each getSnapshot call
+        // This prevents React's useSyncExternalStore from detecting false changes
+        if (
+          nullishCacheRef.current === null ||
+          nullishCacheRef.current.value !== refOrDoc
+        ) {
+          nullishCacheRef.current = { value: refOrDoc }
+        }
+        const cachedNullish = nullishCacheRef.current
+        return {
+          subscribe: (_onChange: () => void) => () => {}, // No-op unsubscribe
+          getSnapshot: () => cachedNullish, // Return stable cached reference
+        }
+      }
+
       const computeValue = (): { version?: string; value: unknown } => {
         if (isPlainRef) {
           // For PlainValueRef, extract the current value
@@ -214,10 +309,15 @@ export function createRefHooks(framework: FrameworkHooks) {
       }
 
       return createSyncStore(computeValue, subscribeToSource, cacheRef)
-    }, [refOrDoc, loroTarget, isPlainRef, isDoc])
+    }, [refOrDoc, loroTarget, isPlainRef, isDoc, isNullish])
 
     const result = useSyncExternalStore(store.subscribe, store.getSnapshot)
-    return result.value as ReturnType<R["toJSON"]> | Infer<D>
+    return result.value as
+      | T
+      | ReturnType<R["toJSON"]>
+      | Infer<D>
+      | null
+      | undefined
   }
 
   // ============================================
