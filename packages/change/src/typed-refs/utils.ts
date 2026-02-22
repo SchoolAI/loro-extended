@@ -17,7 +17,12 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
-import { INTERNAL_SYMBOL, type TypedRef, type TypedRefParams } from "./base.js"
+import {
+  type BaseRefInternals,
+  INTERNAL_SYMBOL,
+  type TypedRef,
+  type TypedRefParams,
+} from "./base.js"
 import { CounterRef } from "./counter-ref.js"
 import { ListRef } from "./list-ref.js"
 import { MovableListRef } from "./movable-list-ref.js"
@@ -73,6 +78,78 @@ export function hasContainerConstructor(
   type: string,
 ): type is keyof typeof containerConstructor {
   return type in containerConstructor
+}
+
+/**
+ * Builds TypedRefParams for a child container of a map-backed ref (struct or record).
+ *
+ * This is the shared logic for StructRefInternals.getChildTypedRefParams and
+ * RecordRefInternals.getChildTypedRefParams. The only varying input is `placeholder`,
+ * which callers compute differently:
+ * - Structs: `(this.getPlaceholder() as any)?.[key]`
+ * - Records: `(this.getPlaceholder() as any)?.[key] ?? deriveShapePlaceholder(shape)`
+ *
+ * Handles both mergeable (flattened root storage with null markers) and
+ * non-mergeable (nested getOrCreateContainer) paths.
+ */
+export function buildChildTypedRefParams(
+  internals: BaseRefInternals<any>,
+  key: string,
+  shape: ContainerShape,
+  placeholder: unknown,
+): TypedRefParams<ContainerShape> {
+  // AnyContainerShape is an escape hatch - it doesn't have a constructor
+  if (!hasContainerConstructor(shape._type)) {
+    throw new Error(
+      `Cannot create typed ref for shape type "${shape._type}". ` +
+        `Use Shape.any() only at the document root level.`,
+    )
+  }
+
+  // For mergeable documents, use flattened root containers
+  if (internals.isMergeable()) {
+    const doc = internals.getDoc()
+    const rootName = internals.computeChildRootContainerName(key)
+    const pathPrefix = internals.getPathPrefix() || []
+    const newPathPrefix = [...pathPrefix, key]
+
+    // Set null marker in parent map to indicate child container reference
+    const container = internals.getContainer() as LoroMap
+    if (container.get(key) !== null) {
+      container.set(key, null)
+    }
+
+    const getterName =
+      containerGetter[shape._type as keyof typeof containerGetter]
+    const getter = (doc as any)[getterName].bind(doc)
+
+    return {
+      shape,
+      placeholder,
+      getContainer: () => getter(rootName),
+      autoCommit: internals.getAutoCommit(),
+      batchedMutation: internals.getBatchedMutation(),
+      getDoc: () => doc,
+      overlay: internals.getOverlay(),
+      pathPrefix: newPathPrefix,
+      mergeable: true,
+    }
+  }
+
+  // Non-mergeable: use standard nested container storage
+  const LoroContainer = containerConstructor[shape._type]
+  const container = internals.getContainer() as LoroMap
+
+  return {
+    shape,
+    placeholder,
+    getContainer: () =>
+      container.getOrCreateContainer(key, new (LoroContainer as any)()),
+    autoCommit: internals.getAutoCommit(),
+    batchedMutation: internals.getBatchedMutation(),
+    getDoc: () => internals.getDoc(),
+    overlay: internals.getOverlay(),
+  }
 }
 
 /**

@@ -120,19 +120,19 @@ After recent major changes to `packages/change`, a deep-dive audit revealed seve
 
 ---
 
-## Phase 4: Extract shared `getChildTypedRefParams` for map-backed refs 🔴
+## Phase 4: Extract shared `getChildTypedRefParams` for map-backed refs ✅
 
 The shared logic covers: `hasContainerConstructor` guard → mergeable path (null marker + root container getter) → non-mergeable path (`getOrCreateContainer`). The only varying input is how `placeholder` is resolved.
 
 ### Tasks
 
-1. **Create a helper function** `buildChildTypedRefParams` in `typed-refs/utils.ts` that accepts `{ internals: BaseRefInternals<any>, key: string, shape: ContainerShape, placeholder: unknown }` and returns `TypedRefParams<ContainerShape>`. This contains the shared body (hasContainerConstructor check, mergeable branch with null marker + containerGetter, non-mergeable branch with containerConstructor + getOrCreateContainer). 🔴
+1. **Create a helper function** `buildChildTypedRefParams` in `typed-refs/utils.ts` that accepts `{ internals: BaseRefInternals<any>, key: string, shape: ContainerShape, placeholder: unknown }` and returns `TypedRefParams<ContainerShape>`. This contains the shared body (hasContainerConstructor check, mergeable branch with null marker + containerGetter, non-mergeable branch with containerConstructor + getOrCreateContainer). ✅
 
-2. **Refactor `StructRefInternals.getChildTypedRefParams`** to compute placeholder as `(this.getPlaceholder() as any)?.[key]` then delegate to `buildChildTypedRefParams`. 🔴
+2. **Refactor `StructRefInternals.getChildTypedRefParams`** to compute placeholder as `(this.getPlaceholder() as any)?.[key]` then delegate to `buildChildTypedRefParams`. ✅
 
-3. **Refactor `RecordRefInternals.getChildTypedRefParams`** to compute placeholder with the existing derive-fallback logic, then delegate to `buildChildTypedRefParams`. 🔴
+3. **Refactor `RecordRefInternals.getChildTypedRefParams`** to compute placeholder with the existing derive-fallback logic, then delegate to `buildChildTypedRefParams`. ✅
 
-4. **Run `verify`** — all mergeable and non-mergeable tests must pass. 🔴
+4. **Run `verify`** — all mergeable and non-mergeable tests must pass. ✅ (format 112 files, types passed, 909/909 tests passed)
 
 **Resources**: `packages/change/src/typed-refs/struct-ref-internals.ts`, `packages/change/src/typed-refs/record-ref-internals.ts`, `packages/change/src/typed-refs/utils.ts`
 

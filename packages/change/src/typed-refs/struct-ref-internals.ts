@@ -21,10 +21,8 @@ import {
 } from "./plain-value-access.js"
 import {
   assignPlainValueToTypedRef,
-  containerConstructor,
-  containerGetter,
+  buildChildTypedRefParams,
   createContainerTypedRef,
-  hasContainerConstructor,
 } from "./utils.js"
 
 /**
@@ -43,59 +41,7 @@ export class StructRefInternals<
     shape: ContainerShape,
   ): TypedRefParams<ContainerShape> {
     const placeholder = (this.getPlaceholder() as any)?.[key]
-
-    // AnyContainerShape is an escape hatch - it doesn't have a constructor
-    if (!hasContainerConstructor(shape._type)) {
-      throw new Error(
-        `Cannot create typed ref for shape type "${shape._type}". ` +
-          `Use Shape.any() only at the document root level.`,
-      )
-    }
-
-    // For mergeable documents, use flattened root containers
-    if (this.isMergeable()) {
-      const doc = this.getDoc()
-      const rootName = this.computeChildRootContainerName(key)
-      const pathPrefix = this.getPathPrefix() || []
-      const newPathPrefix = [...pathPrefix, key]
-
-      // Set null marker in parent map to indicate child container reference
-      const container = this.getContainer() as LoroMap
-      if (container.get(key) !== null) {
-        container.set(key, null)
-      }
-
-      const getterName =
-        containerGetter[shape._type as keyof typeof containerGetter]
-      const getter = (doc as any)[getterName].bind(doc)
-
-      return {
-        shape,
-        placeholder,
-        getContainer: () => getter(rootName),
-        autoCommit: this.getAutoCommit(),
-        batchedMutation: this.getBatchedMutation(),
-        getDoc: () => doc,
-        overlay: this.getOverlay(),
-        pathPrefix: newPathPrefix,
-        mergeable: true,
-      }
-    }
-
-    // Non-mergeable: use standard nested container storage
-    const LoroContainer = containerConstructor[shape._type]
-    const container = this.getContainer() as LoroMap
-
-    return {
-      shape,
-      placeholder,
-      getContainer: () =>
-        container.getOrCreateContainer(key, new (LoroContainer as any)()),
-      autoCommit: this.getAutoCommit(),
-      batchedMutation: this.getBatchedMutation(),
-      getDoc: () => this.getDoc(),
-      overlay: this.getOverlay(),
-    }
+    return buildChildTypedRefParams(this, key, shape, placeholder)
   }
 
   /** Get or create a ref for a key */
