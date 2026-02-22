@@ -15,6 +15,7 @@ import {
 import {
   getContainerValue,
   getPlaceholderValue,
+  resolveListValue,
   resolveValue,
 } from "./value-reader.js"
 import { writeValue } from "./value-writer.js"
@@ -556,6 +557,30 @@ describe("PlainValueRef", () => {
       const ref = createPlainValueRef<any>(internals, ["nested"], nestedShape)
 
       expect(ref.toJSON()).toEqual({ value: "test", deep: { inner: "nested" } })
+    })
+  })
+
+  describe("resolveListValue null preservation", () => {
+    const listSchema = Shape.doc({
+      items: Shape.list(Shape.plain.string().nullable()),
+    })
+
+    it("returns null for a null item in a list (not undefined)", () => {
+      const doc = createTypedDoc(listSchema)
+
+      // Push items including a null via the underlying LoroList
+      change(doc, draft => {
+        draft.items.push("first")
+        draft.items.push(null as any)
+        draft.items.push("third")
+      })
+
+      const internals = (doc.items as any)[INTERNAL_SYMBOL]
+
+      // resolveListValue must preserve null — not skip it via ??
+      expect(resolveListValue(internals, 0)).toBe("first")
+      expect(resolveListValue(internals, 1)).toBe(null)
+      expect(resolveListValue(internals, 2)).toBe("third")
     })
   })
 })

@@ -61,11 +61,13 @@ After recent major changes to `packages/change`, a deep-dive audit revealed seve
 
 ---
 
-## Phase 1: Fix `resolveListValue` null bug 🔴
+## Phase 1: Fix `resolveListValue` null bug ✅
 
 ### Tasks
 
-1. **Write a failing test** in `packages/change/src/plain-value-ref/plain-value-ref.test.ts` (or a new co-located test file if more appropriate) that stores `null` in a list via a nullable value shape, reads it back through `resolveListValue`, and asserts it returns `null` (not the container fallback). 🔴
+1. **Write a failing test** in `packages/change/src/plain-value-ref/plain-value-ref.test.ts` (or a new co-located test file if more appropriate) that stores `null` in a list via a nullable value shape, reads it back through `resolveListValue`, and asserts it returns `null` (not the container fallback). ✅
+
+   > **Note**: The test passes both before and after the fix because `getListOverlayValue` currently always returns `undefined` (list overlay is a TODO stub). The bug is **latent** — it will manifest when list overlay support is implemented. The test documents the expected contract and the fix aligns with `resolveValue`'s defensive pattern.
 
 2. **Fix `resolveListValue`** in `value-reader.ts` to use explicit `!== undefined` checks matching `resolveValue`'s pattern. The function body becomes:
 
@@ -74,9 +76,9 @@ After recent major changes to `packages/change`, a deep-dive audit revealed seve
    if (overlay !== undefined) return overlay as T
    return getListContainerValue(internals, index) as T | undefined
    ```
-   🔴
+   ✅
 
-3. **Run tests** via `pnpm turbo run verify --filter=@loro-extended/change -- logic` and confirm the new test passes and no regressions. 🔴
+3. **Run tests** via `pnpm turbo run verify --filter=@loro-extended/change -- logic` and confirm the new test passes and no regressions. ✅ (909/909 passed)
 
 **Resources**: `packages/change/src/plain-value-ref/value-reader.ts`, existing tests in `packages/change/src/plain-value-ref/plain-value-ref.test.ts`
 

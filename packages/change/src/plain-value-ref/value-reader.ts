@@ -162,6 +162,10 @@ export function resolveListValue<T>(
   internals: BaseRefInternals<any>,
   index: number,
 ): T | undefined {
-  return (getListOverlayValue(internals, index) ??
-    getListContainerValue(internals, index)) as T | undefined
+  // Use explicit undefined checks instead of ?? to correctly handle null values.
+  // The ?? operator treats null as nullish, which would skip a deliberately-stored
+  // null in the overlay and fall through to the container value.
+  const overlay = getListOverlayValue(internals, index)
+  if (overlay !== undefined) return overlay as T
+  return getListContainerValue(internals, index) as T | undefined
 }
