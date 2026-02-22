@@ -84,19 +84,21 @@ After recent major changes to `packages/change`, a deep-dive audit revealed seve
 
 ---
 
-## Phase 2: Consolidate `DiffOverlay` to single source 🔴
+## Phase 2: Consolidate `DiffOverlay` to single source ✅
 
 ### Tasks
 
-1. **Remove** the `DiffOverlay` type from `typed-refs/base.ts`. 🔴
+1. **Remove** the `DiffOverlay` type from `typed-refs/base.ts`. ✅
 
-2. **Add import** of `DiffOverlay` from `../diff-overlay.js` in `typed-refs/base.ts` and re-export it so that `typed-refs/index.ts` still exports `DiffOverlay`. 🔴
+2. **Add import** of `DiffOverlay` from `../diff-overlay.js` in `typed-refs/base.ts` and re-export it so that `typed-refs/index.ts` still exports `DiffOverlay`. ✅
 
-3. **Update** `typed-doc.ts` to import `DiffOverlay` from `./diff-overlay.js` instead of `./typed-refs/base.js`. 🔴
+3. **Update** `typed-doc.ts` to import `DiffOverlay` from `./diff-overlay.js` instead of `./typed-refs/base.js`. ✅
 
-4. **Verify** `index.ts` still exports `DiffOverlay` from both `./diff-overlay.js` (direct) and `./typed-refs/index.js` (re-export) — confirm these resolve to the same type. If both paths are exported, remove one to avoid confusion — prefer exporting only from `./diff-overlay.js` in the main `index.ts`, and keep `typed-refs/index.ts` re-export for internal use only. 🔴
+4. **Verify** `index.ts` still exports `DiffOverlay` from both `./diff-overlay.js` (direct) and `./typed-refs/index.js` (re-export) — confirm these resolve to the same type. If both paths are exported, remove one to avoid confusion — prefer exporting only from `./diff-overlay.js` in the main `index.ts`, and keep `typed-refs/index.ts` re-export for internal use only. ✅
 
-5. **Run `verify`** — types and logic. 🔴
+   > `index.ts` exports `DiffOverlay` only from `./typed-refs/index.js` (which re-exports from `base.js`, which re-exports from `diff-overlay.js`). `createDiffOverlay` is exported directly from `./diff-overlay.js`. No duplicate type export in the public API — clean.
+
+5. **Run `verify`** — types and logic. ✅ (types passed, 909/909 tests passed, format passed 112 files)
 
 **Resources**: `packages/change/src/diff-overlay.ts`, `packages/change/src/typed-refs/base.ts`, `packages/change/src/typed-refs/index.ts`, `packages/change/src/typed-doc.ts`, `packages/change/src/index.ts`
 

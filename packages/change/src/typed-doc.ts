@@ -3,6 +3,7 @@
 import { LoroDoc, type PeerID, type Value } from "loro-crdt"
 import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { derivePlaceholder } from "./derive-placeholder.js"
+import type { DiffOverlay } from "./diff-overlay.js"
 import { EXT_SYMBOL, type ExtDocRef } from "./ext.js"
 import {
   type JsonPatch,
@@ -26,7 +27,7 @@ import type {
   RecordContainerShape,
   StructContainerShape,
 } from "./shape.js"
-import { type DiffOverlay, INTERNAL_SYMBOL } from "./typed-refs/base.js"
+import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import { DocRef } from "./typed-refs/doc-ref.js"
 import { serializeRefToJSON } from "./typed-refs/utils.js"
 import type { Draft, Infer, InferPlaceholderType, Mutable } from "./types.js"

@@ -1,4 +1,4 @@
-import type { ContainerID, Diff, LoroDoc } from "loro-crdt"
+import type { LoroDoc } from "loro-crdt"
 import { EXT_SYMBOL, type ExtRefBase } from "../ext.js"
 import { LORO_SYMBOL } from "../loro.js"
 import { buildRootContainerName } from "../path-encoding.js"
@@ -33,7 +33,10 @@ export interface RefInternalsBase {
 // TypedRefParams and TypedRef Base Class
 // ============================================================================
 
-export type DiffOverlay = ReadonlyMap<ContainerID, Diff>
+export type { DiffOverlay } from "../diff-overlay.js"
+
+// Re-export so typed-refs/index.ts and other internal consumers can import from here
+import type { DiffOverlay } from "../diff-overlay.js"
 
 export type TypedRefParams<Shape extends DocShape | ContainerShape> = {
   shape: Shape
