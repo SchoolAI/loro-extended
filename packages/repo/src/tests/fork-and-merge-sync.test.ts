@@ -8,7 +8,7 @@ import {
   replayDiff,
   Shape,
   type TypedDoc,
-  unwrap,
+  value,
 } from "@loro-extended/change"
 import { UndoManager } from "loro-crdt"
 import { afterEach, describe, expect, it } from "vitest"
@@ -113,7 +113,7 @@ describe("fork-and-merge synchronization", () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Verify peer2 received the changes
-    expect(unwrap(doc2.data.value)).toBe("hello from peer1")
+    expect(value(doc2.data.value)).toBe("hello from peer1")
     expect(doc2.counter.value).toBe(1)
   })
 
@@ -138,14 +138,14 @@ describe("fork-and-merge synchronization", () => {
     frontier = update(doc, frontier, { value: "first" })
 
     // Verify the change was applied
-    expect(unwrap(doc.data.value)).toBe("first")
+    expect(value(doc.data.value)).toBe("first")
     expect(doc.counter.value).toBe(1)
 
     // Apply second update
     frontier = update(doc, frontier, { value: "second" })
 
     // Verify the second change
-    expect(unwrap(doc.data.value)).toBe("second")
+    expect(value(doc.data.value)).toBe("second")
     expect(doc.counter.value).toBe(2)
 
     // Undo should work
@@ -153,21 +153,21 @@ describe("fork-and-merge synchronization", () => {
     undoManager.undo()
 
     // After undo, should be back to first state
-    expect(unwrap(doc.data.value)).toBe("first")
+    expect(value(doc.data.value)).toBe("first")
     expect(doc.counter.value).toBe(1)
 
     // Undo again
     undoManager.undo()
 
     // After second undo, should be back to initial state
-    expect(unwrap(doc.data.value)).toBe("")
+    expect(value(doc.data.value)).toBe("")
     expect(doc.counter.value).toBe(0)
 
     // Redo should work
     expect(undoManager.canRedo()).toBe(true)
     undoManager.redo()
 
-    expect(unwrap(doc.data.value)).toBe("first")
+    expect(value(doc.data.value)).toBe("first")
     expect(doc.counter.value).toBe(1)
   })
 
@@ -197,7 +197,7 @@ describe("fork-and-merge synchronization", () => {
     expect(localUpdates.length).toBeGreaterThan(0)
 
     // Verify the change was applied
-    expect(unwrap(doc.data.value)).toBe("test")
+    expect(value(doc.data.value)).toBe("test")
   })
 
   it("should sync multiple fork-and-merge updates between peers", async () => {
@@ -239,7 +239,7 @@ describe("fork-and-merge synchronization", () => {
     await new Promise(resolve => setTimeout(resolve, 300))
 
     // Verify peer2 received all changes
-    expect(unwrap(doc2.data.value)).toBe("update3")
+    expect(value(doc2.data.value)).toBe("update3")
     expect(doc2.counter.value).toBe(3)
   })
 
