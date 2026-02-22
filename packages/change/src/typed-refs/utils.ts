@@ -1,3 +1,4 @@
+import type { LoroDoc } from "loro-crdt"
 import {
   LoroCounter,
   LoroList,
@@ -46,6 +47,23 @@ export const containerConstructor = {
   text: LoroText,
   tree: LoroTree,
 } as const
+
+/**
+ * Mapping from container shape types to their LoroDoc getter method names.
+ * Used when resolving root containers (both hierarchical and flattened/mergeable storage).
+ *
+ * Note: "any" is not included because AnyContainerShape is an escape hatch
+ * that doesn't create typed refs - it returns raw Loro containers.
+ */
+export const containerGetter = {
+  counter: "getCounter",
+  list: "getList",
+  movableList: "getMovableList",
+  record: "getMap",
+  struct: "getMap", // Structs use LoroMap as their underlying container
+  text: "getText",
+  tree: "getTree",
+} as const satisfies Record<string, keyof LoroDoc>
 
 /**
  * Type guard to check if a container shape type has a constructor.

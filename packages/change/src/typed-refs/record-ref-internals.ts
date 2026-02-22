@@ -22,6 +22,7 @@ import {
 import {
   assignPlainValueToTypedRef,
   containerConstructor,
+  containerGetter,
   createContainerTypedRef,
   hasContainerConstructor,
 } from "./utils.js"
@@ -72,17 +73,6 @@ export class RecordRefInternals<
       if (container.get(key) !== null) {
         container.set(key, null)
       }
-
-      // Use the appropriate root container getter based on shape type
-      const containerGetter = {
-        counter: "getCounter",
-        list: "getList",
-        movableList: "getMovableList",
-        record: "getMap",
-        struct: "getMap",
-        text: "getText",
-        tree: "getTree",
-      } as const
 
       const getterName =
         containerGetter[shape._type as keyof typeof containerGetter]

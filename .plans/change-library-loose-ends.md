@@ -104,17 +104,17 @@ After recent major changes to `packages/change`, a deep-dive audit revealed seve
 
 ---
 
-## Phase 3: Extract shared `containerGetter` mapping 🔴
+## Phase 3: Extract shared `containerGetter` mapping ✅
 
 ### Tasks
 
-1. **Add** `containerGetter` as an exported const in `typed-refs/utils.ts`, alongside the existing `containerConstructor`. Use the `satisfies Record<string, keyof LoroDoc>` constraint from `doc-ref-internals.ts`. 🔴
+1. **Add** `containerGetter` as an exported const in `typed-refs/utils.ts`, alongside the existing `containerConstructor`. Use the `satisfies Record<string, keyof LoroDoc>` constraint from `doc-ref-internals.ts`. ✅
 
-2. **Replace** the inline `containerGetter` objects in `struct-ref-internals.ts` and `record-ref-internals.ts` with imports from `./utils.js`. 🔴
+2. **Replace** the inline `containerGetter` objects in `struct-ref-internals.ts` and `record-ref-internals.ts` with imports from `./utils.js`. ✅
 
-3. **Replace** the module-level `containerGetter` in `doc-ref-internals.ts` with an import from `./utils.js`. Remove the local `ContainerGetterKey` type and use `keyof typeof containerGetter` from utils. 🔴
+3. **Replace** the module-level `containerGetter` in `doc-ref-internals.ts` with an import from `./utils.js`. Remove the local `ContainerGetterKey` type and use `keyof typeof containerGetter` from utils. ✅
 
-4. **Run `verify`**. 🔴
+4. **Run `verify`**. ✅ (format 112 files, types passed, 909/909 tests passed)
 
 **Resources**: `packages/change/src/typed-refs/utils.ts`, `packages/change/src/typed-refs/doc-ref-internals.ts`, `packages/change/src/typed-refs/struct-ref-internals.ts`, `packages/change/src/typed-refs/record-ref-internals.ts`
 

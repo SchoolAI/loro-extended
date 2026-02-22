@@ -7,19 +7,7 @@ import {
   type TypedRef,
   type TypedRefParams,
 } from "./base.js"
-import { createContainerTypedRef } from "./utils.js"
-
-const containerGetter = {
-  counter: "getCounter",
-  list: "getList",
-  movableList: "getMovableList",
-  record: "getMap",
-  struct: "getMap", // Structs use LoroMap as their underlying container
-  text: "getText",
-  tree: "getTree",
-} as const satisfies Record<string, keyof LoroDoc>
-
-type ContainerGetterKey = keyof typeof containerGetter
+import { containerGetter, createContainerTypedRef } from "./utils.js"
 
 /**
  * Internal implementation for DocRef.
@@ -68,7 +56,8 @@ export class DocRefInternals<
       )
     }
 
-    const getterName = containerGetter[shape._type as ContainerGetterKey]
+    const getterName =
+      containerGetter[shape._type as keyof typeof containerGetter]
     const getter = this.doc[getterName].bind(this.doc)
 
     // For mergeable documents, use root containers with path-based names
