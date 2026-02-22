@@ -159,5 +159,22 @@ export function handleEstablishResponse(
     })
   }
 
+  // Broadcast all local ephemeral data to the newly established channel.
+  // This ensures that any ephemeral state set before the channel was established
+  // (e.g., presence set during React component initialization) reaches the peer.
+  // The sync-request above includes ephemeral for docs being synced, but this
+  // covers ALL documents with ephemeral stores, including:
+  // - Docs not needing sync (reconnection where doc is up-to-date)
+  // - Ephemeral-only docs (like signaling channels with no persistent data)
+  const allDocIds = Array.from(model.documents.keys())
+  if (allDocIds.length > 0) {
+    commands.push({
+      type: "cmd/broadcast-ephemeral-batch",
+      docIds: allDocIds,
+      hopsRemaining: 1, // Allow server to relay to other clients
+      toChannelId: channel.channelId,
+    })
+  }
+
   return batchAsNeeded(...commands)
 }

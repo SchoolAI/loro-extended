@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { isEstablished } from "../../channel.js"
 import { createPermissions } from "../../permissions.js"
 import {
+  type Command,
   createSynchronizerUpdate,
   type SynchronizerMessage,
 } from "../../synchronizer-program.js"
@@ -15,6 +16,39 @@ import {
   expectCommand,
   sendEstablishResponse,
 } from "../test-utils.js"
+
+/**
+ * Extract a specific command type from a batch or single command.
+ * Returns the first matching command, or undefined if not found.
+ */
+function extractCommand<T extends Command["type"]>(
+  command: Command | undefined,
+  type: T,
+): Extract<Command, { type: T }> | undefined {
+  if (!command) return undefined
+  if (command.type === type) return command as Extract<Command, { type: T }>
+  if (command.type === "cmd/batch") {
+    return command.commands.find(c => c.type === type) as
+      | Extract<Command, { type: T }>
+      | undefined
+  }
+  return undefined
+}
+
+/**
+ * Check that a command (or batch) contains an ephemeral broadcast.
+ */
+function expectEphemeralBroadcast(
+  command: Command | undefined,
+  channelId: number,
+  docIds: string[],
+): void {
+  const broadcast = extractCommand(command, "cmd/broadcast-ephemeral-batch")
+  expect(broadcast).toBeDefined()
+  expect(broadcast?.toChannelId).toBe(channelId)
+  expect(broadcast?.docIds.sort()).toEqual(docIds.sort())
+  expect(broadcast?.hopsRemaining).toBe(1)
+}
 
 describe("handle-establish-response", () => {
   let update: ReturnType<typeof createSynchronizerUpdate>
@@ -60,8 +94,11 @@ describe("handle-establish-response", () => {
       expect(peerState?.identity.name).toBe("test")
     }
 
-    // Should return sync-request command
-    expectCommand(command, "cmd/send-sync-request")
+    // Should return batch with sync-request and ephemeral broadcast
+    expectCommand(command, "cmd/batch")
+    const syncRequest = extractCommand(command, "cmd/send-sync-request")
+    expect(syncRequest).toBeDefined()
+    expectEphemeralBroadcast(command, channel.channelId, ["doc-1"])
   })
 
   describe("reconnection detection", () => {
@@ -81,11 +118,14 @@ describe("handle-establish-response", () => {
       // Creates peer state
       expect(newModel.peers.has("1")).toBe(true)
 
-      // Sends sync-request command
-      expectCommand(command, "cmd/send-sync-request")
-      expect(command.docs).toHaveLength(2)
-      expect(command.bidirectional).toBe(true)
-      expect(command.includeEphemeral).toBe(true)
+      // Returns batch with sync-request and ephemeral broadcast
+      expectCommand(command, "cmd/batch")
+      const syncRequest = extractCommand(command, "cmd/send-sync-request")
+      expect(syncRequest).toBeDefined()
+      expect(syncRequest?.docs).toHaveLength(2)
+      expect(syncRequest?.bidirectional).toBe(true)
+      expect(syncRequest?.includeEphemeral).toBe(true)
+      expectEphemeralBroadcast(command, channel.channelId, ["doc-1", "doc-2"])
     })
 
     it("skips directory-request for known peer", () => {
@@ -107,12 +147,15 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      // Only syncs new doc-2 (no directory-request)
-      expectCommand(command, "cmd/send-sync-request")
-      expect(command.docs).toHaveLength(1)
-      expect(command.docs[0].docId).toBe("doc-2")
-      expect(command.bidirectional).toBe(true)
-      expect(command.includeEphemeral).toBe(true)
+      // Returns batch with sync-request for new doc and ephemeral broadcast
+      expectCommand(command, "cmd/batch")
+      const syncRequest = extractCommand(command, "cmd/send-sync-request")
+      expect(syncRequest).toBeDefined()
+      expect(syncRequest?.docs).toHaveLength(1)
+      expect(syncRequest?.docs[0].docId).toBe("doc-2")
+      expect(syncRequest?.bidirectional).toBe(true)
+      expect(syncRequest?.includeEphemeral).toBe(true)
+      expectEphemeralBroadcast(command, channel.channelId, ["doc-1", "doc-2"])
     })
 
     it("syncs only changed documents on reconnection", () => {
@@ -135,12 +178,15 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      // Now returns sync-request command
-      expectCommand(command, "cmd/send-sync-request")
-      expect(command.docs).toHaveLength(1)
-      expect(command.docs[0].docId).toBe("doc-1")
-      expect(command.docs[0].requesterDocVersion).toEqual(oldVersion) // Incremental sync
-      expect(command.includeEphemeral).toBe(true)
+      // Returns batch with sync-request and ephemeral broadcast
+      expectCommand(command, "cmd/batch")
+      const syncRequest = extractCommand(command, "cmd/send-sync-request")
+      expect(syncRequest).toBeDefined()
+      expect(syncRequest?.docs).toHaveLength(1)
+      expect(syncRequest?.docs[0].docId).toBe("doc-1")
+      expect(syncRequest?.docs[0].requesterDocVersion).toEqual(oldVersion) // Incremental sync
+      expect(syncRequest?.includeEphemeral).toBe(true)
+      expectEphemeralBroadcast(command, channel.channelId, ["doc-1"])
     })
 
     it("skips unchanged documents on reconnection", () => {
@@ -163,8 +209,9 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      // No sync needed
-      expect(command).toBeUndefined()
+      // No sync needed, but still broadcasts ephemeral
+      expectCommand(command, "cmd/broadcast-ephemeral-batch")
+      expectEphemeralBroadcast(command, channel.channelId, ["doc-1"])
     })
 
     it("skips documents peer doesn't have", () => {
@@ -183,8 +230,9 @@ describe("handle-establish-response", () => {
         update,
       )
 
-      // Don't sync docs they don't have
-      expect(command).toBeUndefined()
+      // Don't sync docs they don't have, but still broadcast ephemeral
+      expectCommand(command, "cmd/broadcast-ephemeral-batch")
+      expectEphemeralBroadcast(command, channel.channelId, ["doc-1"])
     })
 
     it("handles mixed new, changed, and unchanged docs", () => {
@@ -223,11 +271,21 @@ describe("handle-establish-response", () => {
       )
 
       // Should sync doc-2 (changed) and doc-3 (new), skip doc-1 (unchanged)
-      expectCommand(command, "cmd/send-sync-request")
-      expect(command.docs).toHaveLength(2)
-      const docIds = command.docs.map((d: { docId: string }) => d.docId).sort()
+      expectCommand(command, "cmd/batch")
+      const syncRequest = extractCommand(command, "cmd/send-sync-request")
+      expect(syncRequest).toBeDefined()
+      expect(syncRequest?.docs).toHaveLength(2)
+      const docIds = syncRequest?.docs
+        .map((d: { docId: string }) => d.docId)
+        .sort()
       expect(docIds).toEqual(["doc-2", "doc-3"])
-      expect(command.includeEphemeral).toBe(true)
+      expect(syncRequest?.includeEphemeral).toBe(true)
+      // Ephemeral broadcast includes all docs
+      expectEphemeralBroadcast(command, channel.channelId, [
+        "doc-1",
+        "doc-2",
+        "doc-3",
+      ])
     })
   })
 })

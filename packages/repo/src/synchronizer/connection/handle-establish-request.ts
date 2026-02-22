@@ -122,5 +122,18 @@ export function handleEstablishRequest(
     })
   }
 
+  // Broadcast all local ephemeral data to the newly established channel.
+  // This ensures that any ephemeral state set before the channel was established
+  // reaches the peer immediately after connection.
+  const allDocIds = Array.from(model.documents.keys())
+  if (allDocIds.length > 0) {
+    commands.push({
+      type: "cmd/broadcast-ephemeral-batch",
+      docIds: allDocIds,
+      hopsRemaining: 1, // Allow relay to other clients
+      toChannelId: fromChannelId,
+    })
+  }
+
   return batchAsNeeded(...commands)
 }
