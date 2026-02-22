@@ -39,8 +39,8 @@ describe("Signaling Presence", () => {
         signals: {
           "peer-1": [
             { type: "offer", sdp: "..." },
-            { type: "candidate", candidate: "..." },
-            { type: "candidate", candidate: "..." },
+            { type: "candidate", candidate: { candidate: "ice1" } },
+            { type: "candidate", candidate: { candidate: "ice2" } },
           ],
         },
       }
@@ -69,7 +69,7 @@ describe("SignalsMap", () => {
     // Append a new signal
     signals["peer-1"] = [
       ...signals["peer-1"],
-      { type: "candidate", candidate: "..." },
+      { type: "candidate", candidate: { candidate: "ice1" } },
     ]
 
     expect(signals["peer-1"]).toHaveLength(2)

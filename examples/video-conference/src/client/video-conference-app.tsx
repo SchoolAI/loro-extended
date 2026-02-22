@@ -1,28 +1,7 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
-import {
-  change,
-  type Infer,
-  Shape,
-  useDocIdFromHash,
-  useDocument,
-  useEphemeral,
-  useRepo,
-  useValue,
-} from "@loro-extended/react"
-import {
-  type DocId,
-  generateUUID,
-  type PeerID,
-  sync,
-} from "@loro-extended/repo"
-import { useCallback, useEffect, useRef, useState } from "react"
-import {
-  RoomSchema,
-  SignalingEphemeralDeclarations,
-  type SignalingPresence,
-  UserEphemeralDeclarations,
-  type UserPresence,
-} from "../shared/types"
+import { useDocIdFromHash } from "@loro-extended/react"
+import { type DocId, generateUUID } from "@loro-extended/repo"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   DebugPanel,
   Header,
@@ -34,6 +13,7 @@ import {
   useConnectionStatus,
   useDebugInfo,
   useParticipantCleanup,
+  useRoom,
 } from "./hooks"
 import { useLocalMedia } from "./use-local-media"
 import { useWebRtcMesh } from "./use-webrtc-mesh"
@@ -42,9 +22,6 @@ import { useWebRtcMesh } from "./use-webrtc-mesh"
 function generateRoomId(): DocId {
   return `room-${generateUUID()}`
 }
-
-// Empty doc schema for signaling channel (we only use presence)
-const SignalingDocSchema = Shape.doc({})
 
 type VideoConferenceAppProps = {
   displayName: string
@@ -55,80 +32,29 @@ export default function VideoConferenceApp({
   displayName,
   webrtcAdapter,
 }: VideoConferenceAppProps) {
-  const repo = useRepo()
-  const myPeerId = repo.identity.peerId
   const [isCopied, setIsCopied] = useState(false)
-  const [hasJoined, setHasJoined] = useState(false)
 
   // Get room ID from URL hash, or create new room
   const roomId = useDocIdFromHash(generateRoomId)
 
-  // Track previous room ID to detect changes
-  const prevRoomIdRef = useRef<DocId>(roomId)
+  // Room state, presence, and actions (consolidated hook)
+  const {
+    myPeerId,
+    participants,
+    participantPeerIds,
+    userPresence,
+    signalingPresence,
+    setSignalingPresence,
+    setUserPresence,
+    joinRoom: joinRoomAction,
+    leaveRoom,
+    removeParticipant,
+  } = useRoom(roomId)
 
-  // Handle room changes - reset state when switching rooms
-  useEffect(() => {
-    if (prevRoomIdRef.current !== roomId) {
-      setHasJoined(false)
-      prevRoomIdRef.current = roomId
-    }
-  }, [roomId])
-
-  // Get document with doc and ephemeral schemas
-  const doc = useDocument(roomId, RoomSchema, UserEphemeralDeclarations)
-  const snapshot = useValue(doc) as Infer<typeof RoomSchema>
-  const { self: userSelf, peers: userPeers } = useEphemeral(sync(doc).presence)
-
-  // Convert to the old format for backward compatibility with existing code
-  const userPresence: Record<string, UserPresence> = {}
-  if (userSelf) {
-    userPresence[myPeerId] = userSelf
-  }
-  for (const [peerId, presence] of userPeers.entries()) {
-    userPresence[peerId] = presence
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: debug logging
-  useEffect(() => {
-    console.log({ userPresence })
-  }, [userPresence])
-
-  // ============================================================================
-  // Signaling Presence Channel (separate from user presence)
-  // ============================================================================
-
-  // Signaling presence - high-frequency WebRTC signals
-  // Uses a separate channel to avoid mixing with user metadata
-  const signalingChannelId = `${roomId}:signaling` as DocId
-  const signalingDoc = useDocument(
-    signalingChannelId,
-    SignalingDocSchema,
-    SignalingEphemeralDeclarations,
-  )
-  const { self: signalingSelf, peers: signalingPeers } = useEphemeral(
-    sync(signalingDoc).presence,
-  )
-
-  // Convert to the old format for backward compatibility
-  const signalingPresence: Record<string, SignalingPresence> = {}
-  if (signalingSelf) {
-    signalingPresence[myPeerId] = signalingSelf
-  }
-  for (const [peerId, presence] of signalingPeers.entries()) {
-    signalingPresence[peerId] = presence
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: debug logging
-  useEffect(() => {
-    console.log({ signalingPresence })
-  }, [signalingPresence])
-
-  // Wrapper for setSignalingPresence to match old API
-  const setSignalingPresence = useCallback(
-    (value: Partial<SignalingPresence>) => {
-      sync(signalingDoc).presence.setSelf(value as SignalingPresence)
-    },
-    [signalingDoc],
+  // Derive hasJoined from document state (single source of truth)
+  const hasJoined = useMemo(
+    () => participants.some(p => p.peerId === myPeerId),
+    [participants, myPeerId],
   )
 
   // Local media (camera/microphone)
@@ -148,13 +74,7 @@ export default function VideoConferenceApp({
     audioLevel,
   } = useLocalMedia(true, true)
 
-  // Get participant peer IDs from the document
-  // snapshot.participants is already a plain array (useValue returns JSON)
-  const participants = snapshot.participants
-  const participantPeerIds = participants.map(p => p.peerId as PeerID)
-
-  // WebRTC mesh for video connections - only needs signaling presence
-  // Also connects Loro sync via data channels
+  // WebRTC mesh for video connections
   const { remoteStreams, connectionStates, outgoingSignals, instanceId } =
     useWebRtcMesh(
       myPeerId,
@@ -175,53 +95,18 @@ export default function VideoConferenceApp({
   })
 
   // Update user presence with media preferences
-  // Use wantsAudio/wantsVideo (user preferences) not hasAudio/hasVideo (actual track state)
   useEffect(() => {
-    sync(doc).presence.setSelf({
+    setUserPresence({
       name: displayName,
       wantsAudio: wantsAudio,
       wantsVideo: wantsVideo,
     })
-  }, [displayName, wantsAudio, wantsVideo, doc])
+  }, [displayName, wantsAudio, wantsVideo, setUserPresence])
 
   // Join room
   const joinRoom = useCallback(() => {
-    const alreadyJoined = participants.some(p => p.peerId === myPeerId)
-    if (!alreadyJoined) {
-      change(doc, draft => {
-        draft.participants.push({
-          peerId: myPeerId,
-          name: displayName,
-          joinedAt: Date.now(),
-        })
-      })
-    }
-    setHasJoined(true)
-  }, [participants, myPeerId, displayName, doc])
-
-  // Leave room
-  const leaveRoom = useCallback(() => {
-    change(doc, draft => {
-      const index = draft.participants.findIndex(p => p.peerId === myPeerId)
-      if (index !== -1) {
-        draft.participants.delete(index, 1)
-      }
-    })
-    setHasJoined(false)
-  }, [myPeerId, doc])
-
-  // Remove a participant from the document (used by cleanup hook)
-  const removeParticipant = useCallback(
-    (peerId: string) => {
-      change(doc, draft => {
-        const index = draft.participants.findIndex(p => p.peerId === peerId)
-        if (index !== -1) {
-          draft.participants.delete(index, 1)
-        }
-      })
-    },
-    [doc],
-  )
+    joinRoomAction(displayName)
+  }, [joinRoomAction, displayName])
 
   // Connection status monitoring
   const { isOnline, getPeerStatus } = useConnectionStatus(
@@ -253,9 +138,6 @@ export default function VideoConferenceApp({
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (hasJoined) {
-        // Use synchronous approach for beforeunload
-        // The changeDoc will be queued but may not complete
-        // The presence-based cleanup will handle it if this fails
         removeParticipant(myPeerId)
       }
     }
@@ -269,7 +151,8 @@ export default function VideoConferenceApp({
   const startNewRoom = useCallback(() => {
     const newId = generateRoomId()
     window.location.hash = newId
-    setHasJoined(false)
+    // hasJoined is derived from document state, so it will naturally
+    // become false when the room changes (new room has no participants)
   }, [])
 
   const copyLink = useCallback(() => {

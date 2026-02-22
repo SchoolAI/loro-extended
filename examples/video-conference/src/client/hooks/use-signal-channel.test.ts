@@ -38,11 +38,11 @@ describe("useSignalChannel", () => {
         })
         result.current.queueOutgoingSignal(peerA, {
           type: "candidate",
-          candidate: "ice1",
+          candidate: { candidate: "ice1" },
         })
         result.current.queueOutgoingSignal(peerA, {
           type: "candidate",
-          candidate: "ice2",
+          candidate: { candidate: "ice2" },
         })
       })
 
@@ -65,8 +65,10 @@ describe("useSignalChannel", () => {
 
       expect(result.current.outgoingSignals[peerA]).toHaveLength(1)
       expect(result.current.outgoingSignals[peerB]).toHaveLength(1)
-      expect(result.current.outgoingSignals[peerA][0].sdp).toBe("offerA")
-      expect(result.current.outgoingSignals[peerB][0].sdp).toBe("offerB")
+      const signalA = result.current.outgoingSignals[peerA][0]
+      const signalB = result.current.outgoingSignals[peerB][0]
+      expect(signalA.type === "offer" && signalA.sdp).toBe("offerA")
+      expect(signalB.type === "offer" && signalB.sdp).toBe("offerB")
     })
   })
 
@@ -75,8 +77,8 @@ describe("useSignalChannel", () => {
       const { result } = renderHook(() => useSignalChannel(testInstanceId))
 
       act(() => {
-        result.current.queueOutgoingSignal(peerA, { type: "offer" })
-        result.current.queueOutgoingSignal(peerB, { type: "offer" })
+        result.current.queueOutgoingSignal(peerA, { type: "offer", sdp: "a" })
+        result.current.queueOutgoingSignal(peerB, { type: "offer", sdp: "b" })
       })
 
       expect(result.current.outgoingSignals[peerA]).toBeDefined()
@@ -107,7 +109,7 @@ describe("useSignalChannel", () => {
 
       const signals: SignalData[] = [
         { type: "offer", sdp: "test" },
-        { type: "candidate", candidate: "ice1" },
+        { type: "candidate", candidate: { candidate: "ice1" } },
       ]
 
       let newSignals: SignalData[]
@@ -123,7 +125,7 @@ describe("useSignalChannel", () => {
 
       const signals: SignalData[] = [
         { type: "offer", sdp: "test" },
-        { type: "candidate", candidate: "ice1" },
+        { type: "candidate", candidate: { candidate: "ice1" } },
       ]
 
       // First call - all signals are new
@@ -146,7 +148,7 @@ describe("useSignalChannel", () => {
       const initialSignals: SignalData[] = [{ type: "offer", sdp: "test" }]
       const mixedSignals: SignalData[] = [
         { type: "offer", sdp: "test" }, // Already processed
-        { type: "candidate", candidate: "ice1" }, // New
+        { type: "candidate", candidate: { candidate: "ice1" } }, // New
       ]
 
       act(() => {
@@ -159,7 +161,10 @@ describe("useSignalChannel", () => {
       })
 
       expect(newSignals!).toHaveLength(1)
-      expect(newSignals![0]).toEqual({ type: "candidate", candidate: "ice1" })
+      expect(newSignals![0]).toEqual({
+        type: "candidate",
+        candidate: { candidate: "ice1" },
+      })
     })
 
     it("tracks signals separately per peer", () => {

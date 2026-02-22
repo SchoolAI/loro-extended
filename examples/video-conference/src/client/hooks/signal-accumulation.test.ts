@@ -344,9 +344,8 @@ a=rtcp-fb:96 nack pli`,
 
       // New signals are queued correctly
       expect(result.current.outgoingSignals[peerA]).toHaveLength(1)
-      expect(result.current.outgoingSignals[peerA][0].sdp).toBe(
-        "renegotiation-offer",
-      )
+      const signal = result.current.outgoingSignals[peerA][0]
+      expect(signal.type === "offer" && signal.sdp).toBe("renegotiation-offer")
     })
   })
 })

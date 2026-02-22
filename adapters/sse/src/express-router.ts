@@ -101,7 +101,18 @@ export function createSseExpressRouter(
       connection.receive(message)
       res.status(200).send({ ok: true })
     } else {
-      adapter.logger.warn("Received message from unknown peer", { peerId })
+      // Debug: Log all currently connected peers to understand the mismatch
+      const allConnections = adapter.getAllConnections()
+      const connectedPeerIds = allConnections.map(c => c.peerId)
+      adapter.logger.warn(
+        "Received message from unknown peer {peerId}, message type: {messageType}. Connected peers: {connectedPeerIds} (count: {count})",
+        {
+          peerId,
+          messageType: message.type,
+          connectedPeerIds: connectedPeerIds.join(", ") || "(none)",
+          count: connectedPeerIds.length,
+        },
+      )
       res.status(404).send({ error: "Peer not connected" })
     }
   })
@@ -113,6 +124,8 @@ export function createSseExpressRouter(
       res.status(400).end("peerId is required")
       return
     }
+
+    adapter.logger.info("SSE connection request from peer {peerId}", { peerId })
 
     // Set headers for SSE
     res.writeHead(200, {
@@ -126,6 +139,13 @@ export function createSseExpressRouter(
 
     // Register connection with adapter
     const connection = adapter.registerConnection(peerId)
+    adapter.logger.info(
+      "SSE connection established for peer {peerId}, channelId: {channelId}",
+      {
+        peerId,
+        channelId: connection.channelId,
+      },
+    )
 
     // Set up send function to write to SSE stream
     connection.setSendFunction((msg: ChannelMsg) => {
@@ -168,6 +188,10 @@ export function createSseExpressRouter(
 
     // Handle client disconnect
     req.on("close", () => {
+      adapter.logger.info(
+        "SSE connection closed for peer {peerId} (client disconnect)",
+        { peerId },
+      )
       adapter.unregisterConnection(peerId)
       const heartbeat = heartbeats.get(peerId)
       if (heartbeat) {

@@ -27,12 +27,20 @@ const repo = new Repo({
   identity: { name: "video-conference-server", type: "service" },
   adapters: [sseAdapter, storageAdapter],
   permissions: {
+    // Visibility controls DISCOVERY (can this peer learn a document exists?),
+    // not DATA TRANSFER. Once a peer subscribes via sync-request, they receive
+    // all updates regardless of visibility (the "visibility bypass").
+    //
+    // Returning `true` here means the server will:
+    // - Include documents in the initial sync list when a client connects
+    // - Announce new documents to clients who haven't subscribed yet
+    //
+    // Returning `false` would NOT block sync-requests or subscribed updates,
+    // but would prevent the server from proactively telling clients about
+    // documents they don't already know about.
     visibility(_doc, peer) {
-      // Storage adapters can always see documents
       if (peer.channelKind === "storage") return true
-
-      // Network peers can only see room documents that they themselves reveal
-      return false
+      return true
     },
   },
 })

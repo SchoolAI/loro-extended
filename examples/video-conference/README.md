@@ -96,20 +96,35 @@ This starts:
 
 ```
 src/
-├── main.tsx                      # Entry point with RepoProvider
-├── index.css                     # Tailwind styles
 ├── client/
-│   ├── video-conference-app.tsx  # Main app component
-│   ├── video-bubble.tsx          # Video display component
-│   ├── use-room-id-from-hash.ts  # URL hash management
-│   ├── use-local-media.ts        # getUserMedia hook
-│   └── use-webrtc-mesh.ts        # simple-peer mesh management
+│   ├── main.tsx                    # Entry point with RepoProvider
+│   ├── index.css                   # Tailwind styles
+│   ├── video-conference-app.tsx    # Main app component (orchestrates hooks)
+│   ├── use-local-media.ts          # getUserMedia hook
+│   ├── use-webrtc-mesh.ts          # WebRTC mesh orchestration
+│   ├── adapters/
+│   │   └── simple-peer-data-channel.ts  # RTCDataChannel wrapper for simple-peer
+│   ├── components/
+│   │   ├── video-bubble.tsx        # Individual video display
+│   │   ├── video-grid.tsx          # Video layout grid
+│   │   ├── pre-join-screen.tsx     # Pre-call setup screen
+│   │   ├── in-call-screen.tsx      # Active call screen
+│   │   └── ...                     # Other UI components
+│   ├── domain/
+│   │   └── peer-actions.ts         # Pure function for peer lifecycle decisions
+│   └── hooks/
+│       ├── use-room.ts             # Room document + presence (consolidated)
+│       ├── use-peer-manager.ts     # WebRTC peer connection management
+│       ├── use-signal-channel.ts   # Signal routing and deduplication
+│       ├── use-connection-status.ts # Online/offline status tracking
+│       └── use-participant-cleanup.ts # Stale participant removal
 ├── server/
-│   ├── server.ts                 # Express + loro-extended server
-│   ├── config.ts                 # Server configuration
-│   └── logger.ts                 # Logging setup
+│   ├── server.ts                   # Express + loro-extended server
+│   ├── config.ts                   # Server configuration
+│   └── logger.ts                   # Logging setup
 └── shared/
-    └── types.ts                  # Shared schemas and types
+    ├── types.ts                    # Shared schemas and types
+    └── webrtc-protocol.ts          # WebRTC helpers (shouldInitiate, etc.)
 ```
 
 ## Key Files
@@ -120,23 +135,43 @@ Defines the data model:
 
 - `RoomSchema` - CRDT document for persistent room state
 - `SignalingPresenceSchema` - Ephemeral presence for WebRTC signals
+- `SignalData` - Discriminated union for all WebRTC signal types
+- `isSignalData` - Type guard for validating incoming signals
+
+### `client/hooks/use-room.ts`
+
+Consolidated room state management:
+
+- Room document with participant list
+- User presence (name, audio/video preferences)
+- Signaling presence (WebRTC signals)
+- Join/leave/remove participant actions
 
 ### `client/use-webrtc-mesh.ts`
 
-The core WebRTC logic:
+WebRTC mesh orchestration:
 
-- Creates `simple-peer` instances for each participant
+- Orchestrates `usePeerManager` and `useSignalChannel`
+- Uses `computePeerActions` pure function for peer lifecycle decisions
+- Reads signals from presence, validates with type guard
 - Publishes signals via presence
-- Processes incoming signals from other peers' presence
-- Manages peer lifecycle (create/destroy on join/leave)
+
+### `client/domain/peer-actions.ts`
+
+Pure function for peer lifecycle decisions (FC/IS pattern):
+
+- Computes which peers to create/destroy based on participant list
+- Handles initiator determination (smaller peerId initiates)
+- Protects signal-created peers from premature destruction
 
 ### `client/video-conference-app.tsx`
 
 The main React component:
 
-- Uses `useDocument` for room state
-- Uses `usePresence` for signaling
-- Renders video bubbles for local and remote streams
+- Uses `useRoom` for room state and presence
+- Uses `useWebRtcMesh` for WebRTC connections
+- Derives `hasJoined` from document state (single source of truth)
+- Renders pre-join and in-call screens
 
 ## Limitations
 

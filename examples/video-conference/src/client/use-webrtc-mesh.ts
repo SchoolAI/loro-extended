@@ -1,8 +1,12 @@
 import type { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc"
 import { generateUUID, type PeerID } from "@loro-extended/repo"
 import { useCallback, useEffect, useMemo, useRef } from "react"
-import type { SignalData, SignalingPresence } from "../shared/types"
-import { shouldInitiate } from "../shared/webrtc-protocol"
+import {
+  isSignalData,
+  type SignalData,
+  type SignalingPresence,
+} from "../shared/types"
+import { computePeerActions } from "./domain/peer-actions"
 import { usePeerManager } from "./hooks/use-peer-manager"
 import { useSignalChannel } from "./hooks/use-signal-channel"
 
@@ -119,47 +123,40 @@ export function useWebRtcMesh(
   // Track current peer IDs for cleanup logic
   const currentPeerIdsRef = useRef<Set<PeerID>>(new Set())
 
-  // Manage peer lifecycle based on participant list
-  // Only create peers for participants where WE are the initiator
-  // Don't destroy peers that were created from incoming signals
-  // IMPORTANT: Only create initiator peers when we have our local stream ready
+  // Manage peer lifecycle based on participant list using pure function
   useEffect(() => {
     const targetPeerIds = new Set(
       participantPeerIds.filter(id => id !== myPeerId),
     )
 
-    // Create peers for new participants (only if we're the initiator AND we have our stream)
-    for (const peerId of targetPeerIds) {
-      if (!currentPeerIdsRef.current.has(peerId) && !hasPeer(peerId)) {
-        // Only create if we're the initiator (numerically smaller peerId)
-        const weAreInitiator = shouldInitiate(myPeerId, peerId)
-        if (weAreInitiator && localStream) {
-          // Wait until we have our local stream before creating initiator peers
-          // This ensures our offer includes media tracks
-          createPeer(peerId)
-          currentPeerIdsRef.current.add(peerId)
-        }
-      }
+    // Merge tracked peers with signal-created peers for accurate decision-making
+    // Signal-created peers exist in the peer manager but aren't in currentPeerIdsRef
+    const allTrackedPeers = new Set([
+      ...currentPeerIdsRef.current,
+      ...signalCreatedPeersRef.current,
+    ])
+
+    // Compute actions using pure function (FC/IS pattern)
+    const { toCreate, toDestroy } = computePeerActions(
+      allTrackedPeers,
+      targetPeerIds,
+      signalCreatedPeersRef.current,
+      myPeerId,
+      !!localStream,
+    )
+
+    // Apply create actions
+    for (const peerId of toCreate) {
+      createPeer(peerId)
+      currentPeerIdsRef.current.add(peerId)
     }
 
-    // Destroy peers for removed participants
-    // BUT don't destroy signal-created peers - they manage their own lifecycle
-    for (const peerId of currentPeerIdsRef.current) {
-      if (!targetPeerIds.has(peerId)) {
-        if (!signalCreatedPeersRef.current.has(peerId)) {
-          destroyPeer(peerId)
-          currentPeerIdsRef.current.delete(peerId)
-        }
-      }
+    // Apply destroy actions
+    for (const peerId of toDestroy) {
+      destroyPeer(peerId)
+      currentPeerIdsRef.current.delete(peerId)
     }
-  }, [
-    participantPeerIds,
-    myPeerId,
-    localStream,
-    hasPeer,
-    createPeer,
-    destroyPeer,
-  ])
+  }, [participantPeerIds, myPeerId, localStream, createPeer, destroyPeer])
 
   // Process incoming signals from other peers' signaling presence
   useEffect(() => {
@@ -176,10 +173,20 @@ export function useWebRtcMesh(
       }
 
       // Check if this peer has signals addressed to us
-      const signalsForMe = presence.signals?.[myPeerIdStr]
+      const rawSignals = presence.signals?.[myPeerIdStr]
 
-      if (signalsForMe && signalsForMe.length > 0) {
-        processIncomingSignals(peerId as PeerID, signalsForMe as any)
+      if (rawSignals && rawSignals.length > 0) {
+        // Validate and filter signals using type guard
+        const validSignals = rawSignals.filter(isSignalData)
+        const invalidCount = rawSignals.length - validSignals.length
+        if (invalidCount > 0) {
+          console.warn(
+            `[useWebRtcMesh] Filtered ${invalidCount} invalid signal(s) from peer ${peerId}`,
+          )
+        }
+        if (validSignals.length > 0) {
+          processIncomingSignals(peerId as PeerID, validSignals)
+        }
       }
     }
   }, [signalingPresence, myPeerId, processIncomingSignals])

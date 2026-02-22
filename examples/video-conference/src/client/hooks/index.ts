@@ -26,5 +26,7 @@ export type {
   UsePeerManagerReturn,
 } from "./use-peer-manager"
 export { usePeerManager } from "./use-peer-manager"
+export type { UseRoomReturn } from "./use-room"
+export { useRoom } from "./use-room"
 export type { UseSignalChannelReturn } from "./use-signal-channel"
 export { useSignalChannel } from "./use-signal-channel"
