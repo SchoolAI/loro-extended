@@ -114,7 +114,7 @@ describe("PlainValueRef", () => {
       it("reads value from container", () => {
         const doc = createTypedDoc(schema)
         change(doc, draft => {
-          draft.meta.title = "Hello"
+          draft.meta.title.set("Hello")
         })
 
         const internals = (doc.meta as any)[INTERNAL_SYMBOL]
@@ -148,7 +148,7 @@ describe("PlainValueRef", () => {
       it("returns container value when present", () => {
         const doc = createTypedDoc(schema)
         change(doc, draft => {
-          draft.meta.title = "FromContainer"
+          draft.meta.title.set("FromContainer")
         })
 
         const internals = (doc.meta as any)[INTERNAL_SYMBOL]
@@ -201,7 +201,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "Test"
+        draft.meta.title.set("Test")
       })
 
       const ref = createPlainValueRef<string>(
@@ -217,7 +217,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.count = 42
+        draft.meta.count.set(42)
       })
 
       const ref = createPlainValueRef<number>(
@@ -233,7 +233,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "JsonTest"
+        draft.meta.title.set("JsonTest")
       })
 
       const ref = createPlainValueRef<string>(
@@ -249,7 +249,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "World"
+        draft.meta.title.set("World")
       })
 
       const ref = createPlainValueRef<string>(
@@ -266,7 +266,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "Value"
+        draft.meta.title.set("Value")
       })
 
       const ref = createPlainValueRef<string>(
@@ -283,7 +283,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.count = 10
+        draft.meta.count.set(10)
       })
 
       const ref = createPlainValueRef<number>(
@@ -302,7 +302,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "Unwrapped"
+        draft.meta.title.set("Unwrapped")
       })
 
       const ref = createPlainValueRef<string>(
@@ -317,7 +317,7 @@ describe("PlainValueRef", () => {
     it("unwraps TypedRef via toJSON()", () => {
       const doc = createTypedDoc(schema)
       change(doc, draft => {
-        draft.meta.title = "Test"
+        draft.meta.title.set("Test")
       })
 
       // Use toJSON() directly since value() overload for StructRef requires TypedDoc
@@ -328,7 +328,7 @@ describe("PlainValueRef", () => {
     it("unwraps TypedDoc via toJSON()", () => {
       const doc = createTypedDoc(schema)
       change(doc, draft => {
-        draft.meta.title = "DocTest"
+        draft.meta.title.set("DocTest")
       })
 
       const docValue = value(doc)
@@ -428,8 +428,9 @@ describe("PlainValueRef", () => {
 
       const ref = createPlainValueRef<any>(internals, ["nested"], nestedShape)
 
-      // SET should write through via Proxy
-      ;(ref as any).value = "updated"
+      // .set() should write through via PlainValueRef method
+      // The struct proxy provides .value at runtime, but TypeScript doesn't see it on PlainValueRef<any>
+      ;(ref as any).value.set("updated")
 
       // Verify the write
       const result = container.get("nested") as any
@@ -474,7 +475,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.count = 42
+        draft.meta.count.set(42)
       })
 
       const ref = createPlainValueRef<number>(
@@ -494,7 +495,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.active = true
+        draft.meta.active.set(true)
       })
 
       const ref = createPlainValueRef<boolean>(
@@ -526,7 +527,7 @@ describe("PlainValueRef", () => {
       const doc = createTypedDoc(schema)
       const internals = (doc.meta as any)[INTERNAL_SYMBOL]
       change(doc, draft => {
-        draft.meta.title = "JSONTest"
+        draft.meta.title.set("JSONTest")
       })
 
       const ref = createPlainValueRef<string>(

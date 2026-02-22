@@ -29,7 +29,7 @@ describe("JSON Compatibility", () => {
     const doc = createTypedDoc(ChatSchema)
 
     change(doc, (root: any) => {
-      root.meta.title = "My Chat"
+      root.meta.title.set("My Chat")
       root.meta.count.increment(5)
 
       root.messages.push({
@@ -72,7 +72,7 @@ describe("JSON Compatibility", () => {
   it("should support Object.keys and Object.entries", () => {
     const doc = createTypedDoc(ChatSchema)
     change(doc, (root: any) => {
-      root.meta.title = "Test"
+      root.meta.title.set("Test")
     })
 
     // With the new proxy API, Object.keys works directly on doc
@@ -129,7 +129,7 @@ describe("JSON Compatibility", () => {
     let mutableJson = ""
 
     change(doc, (root: any) => {
-      root.meta.title = "Draft"
+      root.meta.title.set("Draft")
       mutableJson = JSON.stringify(root)
     })
 
@@ -195,7 +195,7 @@ describe("JSON Compatibility", () => {
 
     change(doc, (root: any) => {
       root.messages.push({ id: "1", content: "A", timestamp: 1 })
-      root.meta.title = "Test"
+      root.meta.title.set("Test")
     })
 
     // Spy on LoroDoc methods
@@ -220,7 +220,7 @@ describe("JSON Compatibility", () => {
   it("should allow calling toJSON() directly on refs", () => {
     const doc = createTypedDoc(ChatSchema)
     change(doc, (root: any) => {
-      root.meta.title = "Direct"
+      root.meta.title.set("Direct")
       root.meta.count.increment(10)
       root.messages.push({ id: "1", content: "A", timestamp: 1 })
       root.settings.set("opt", true)
@@ -271,7 +271,7 @@ describe("JSON Compatibility", () => {
     // This test verifies that TypeScript sees toJSON() on Mutable types
     // If this compiles, the type fix is working correctly
     change(doc, (root: Draft<typeof ChatSchema>) => {
-      root.meta.title = "Type Test"
+      root.meta.title.set("Type Test")
       root.messages.push({ id: "1", content: "Hello", timestamp: 123 })
 
       // These should all compile without errors - toJSON() is visible on the type

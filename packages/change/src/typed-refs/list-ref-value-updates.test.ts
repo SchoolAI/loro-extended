@@ -134,8 +134,8 @@ describe("List value updates across change() calls", () => {
       change(doc, draft => {
         const user = draft.users.get(0)
         if (user) {
-          user.name = "Bob"
-          user.age = 25
+          user.name.set("Bob")
+          user.age.set(25)
         }
       })
 
@@ -165,7 +165,7 @@ describe("List value updates across change() calls", () => {
         change(doc, draft => {
           const item = draft.items.get(0)
           if (item) {
-            item.count = i
+            item.count.set(i)
           }
         })
         expect(value(doc.items.get(0)?.count)).toBe(i) // May fail on i > 1

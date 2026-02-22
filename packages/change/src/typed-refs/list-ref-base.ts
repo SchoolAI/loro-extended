@@ -32,7 +32,7 @@ import {
   createPlainValueRefForListItem,
   resolveListValueForBatchedMutation,
 } from "./plain-value-access.js"
-import { createContainerTypedRef } from "./utils.js"
+import { assignPlainValueToTypedRef, createContainerTypedRef } from "./utils.js"
 
 // ============================================================================
 // ListRefBaseInternals - Internal implementation class
@@ -331,11 +331,7 @@ export abstract class ListRefBase<
   Item = NestedShape["_plain"],
   MutableItem = SelectByMode<NestedShape, Mode>,
 > extends TypedRef<any> {
-  [INTERNAL_SYMBOL]: ListRefBaseInternals<
-    NestedShape,
-    Item,
-    NestedShape["_mutable"]
-  >
+  [INTERNAL_SYMBOL]: ListRefBaseInternals<NestedShape>
 
   constructor(params: TypedRefParams<any>) {
     super()
@@ -345,7 +341,7 @@ export abstract class ListRefBase<
   /** Subclasses override to create their specific internals */
   protected abstract createInternals(
     params: TypedRefParams<any>,
-  ): ListRefBaseInternals<NestedShape, Item, MutableItem>
+  ): ListRefBaseInternals<NestedShape>
 
   // Array-like methods for better developer experience
   // DUAL INTERFACE: Predicates get Item (plain data), return values are MutableItem (mutable)
@@ -469,6 +465,51 @@ export abstract class ListRefBase<
     this[INTERNAL_SYMBOL].commitIfAuto()
   }
 
+  /**
+   * Set an item at a specific index, replacing the existing item.
+   * This is the canonical method for replacing list items.
+   *
+   * @param index - The index to set
+   * @param item - The new item value
+   */
+  set(index: number, item: Item): void {
+    const internals = this[INTERNAL_SYMBOL]
+    const shape = internals.getShape()
+    const container = internals.getContainer() as LoroList | LoroMovableList
+
+    // For container shapes (struct, record, etc.), UPDATE the existing container
+    // instead of trying to replace it. This preserves container identity and
+    // uses assignPlainValueToTypedRef to properly update nested properties.
+    if (isContainerShape(shape.shape)) {
+      const existingRef = internals.getMutableItem(index)
+      if (existingRef && assignPlainValueToTypedRef(existingRef as any, item)) {
+        internals.commitIfAuto()
+        return
+      }
+      // If assignPlainValueToTypedRef returns false, fall through to replacement
+    }
+
+    // For value shapes or if container update failed, replace the item
+    // Check if container has native .set() method (LoroMovableList has it, LoroList doesn't)
+    if (
+      "set" in container &&
+      typeof (container as LoroMovableList).set === "function"
+    ) {
+      // LoroMovableList: use .set() directly
+      // Convert the item first to handle nested structures
+      const convertedItem = convertInputToRef(item as any, shape.shape)
+      ;(container as LoroMovableList).set(
+        index,
+        convertedItem as Exclude<Item, Container>,
+      )
+    } else {
+      // LoroList: use delete+insert since it doesn't have .set()
+      ;(container as LoroList).delete(index, 1)
+      internals.insertWithConversion(index, item)
+    }
+    internals.commitIfAuto()
+  }
+
   pushContainer(container: Container): Container {
     const loroContainer = this[INTERNAL_SYMBOL].getContainer() as
       | LoroList
@@ -496,7 +537,7 @@ export abstract class ListRefBase<
   toArray(): Item[] {
     const overlayList = this[INTERNAL_SYMBOL].getOverlayList()
     if (overlayList) {
-      return [...overlayList]
+      return [...overlayList] as Item[]
     }
     const result: Item[] = []
     for (let i = 0; i < this.length; i++) {

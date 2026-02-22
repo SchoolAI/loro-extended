@@ -26,7 +26,7 @@ describe("Internal State Encapsulation", () => {
 
       // Verify the ref still works
       counterRef.increment(5)
-      expect(counterRef.value).toBe(5)
+      expect(counterRef.get()).toBe(5)
     })
 
     it("TextRef has no enumerable internal state", () => {
@@ -90,7 +90,7 @@ describe("Internal State Encapsulation", () => {
 
       // Verify the ref still works — outside change(), value shapes return PlainValueRef
       change(doc, draft => {
-        draft.settings.darkMode = true
+        draft.settings.darkMode.set(true)
       })
       expect(value(structRef.darkMode)).toBe(true)
     })
@@ -217,7 +217,7 @@ describe("Internal State Encapsulation", () => {
       })
       const doc = createTypedDoc(schema)
       change(doc, draft => {
-        draft.settings.darkMode = true
+        draft.settings.darkMode.set(true)
       })
 
       const json = JSON.parse(JSON.stringify(doc.settings))

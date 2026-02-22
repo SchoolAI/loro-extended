@@ -406,7 +406,7 @@ describe("functional helpers", () => {
       loro(doc2).import(snapshot)
 
       expect(callback).toHaveBeenCalled()
-      expect(doc2.count.value).toBe(42)
+      expect(doc2.count.get()).toBe(42)
 
       unsubscribe()
     })
@@ -498,8 +498,8 @@ describe("functional helpers", () => {
       const unsubscribe = loro(doc).subscribe(event => {
         const { before, after } = getTransition(doc, event)
         transitions.push({
-          beforeCount: before.count.value,
-          afterCount: after.count.value,
+          beforeCount: before.count.get(),
+          afterCount: after.count.get(),
         })
       })
 
@@ -545,11 +545,9 @@ describe("functional helpers", () => {
       })
 
       change(doc, draft => {
-        const bob = draft.game.players.get("bob") as
-          | { locked: boolean }
-          | undefined
+        const bob = draft.game.players.get("bob")
         if (bob) {
-          bob.locked = true
+          bob.locked.set(true)
         }
       })
 
@@ -738,7 +736,7 @@ describe("functional helpers", () => {
         change(doc.items, draft => {
           const item = draft.find(i => i.id === "b")
           if (item) {
-            item.count = 10
+            item.count.set(10)
           }
         })
 
@@ -809,7 +807,7 @@ describe("functional helpers", () => {
           draft.increment(2)
         })
 
-        expect(doc.count.value).toBe(10)
+        expect(doc.count.get()).toBe(10)
       })
 
       it("should batch increment and decrement operations", () => {
@@ -822,7 +820,7 @@ describe("functional helpers", () => {
           draft.decrement(3)
         })
 
-        expect(doc.count.value).toBe(12)
+        expect(doc.count.get()).toBe(12)
       })
 
       it("should return the original ref for chaining", () => {
@@ -834,7 +832,7 @@ describe("functional helpers", () => {
 
         expect(result).toBe(doc.count)
         result.increment(3)
-        expect(doc.count.value).toBe(8)
+        expect(doc.count.get()).toBe(8)
       })
     })
 
@@ -848,7 +846,7 @@ describe("functional helpers", () => {
         })
 
         expect(doc.profile.bio.toString()).toBe("Hello")
-        expect(doc.profile.age.value).toBe(25)
+        expect(doc.profile.age.get()).toBe(25)
       })
 
       it("should return the original ref for chaining", () => {
@@ -984,7 +982,7 @@ describe("functional helpers", () => {
         })
 
         expect(doc.items.toJSON()).toEqual(["outer1", "outer2"])
-        expect(doc.count.value).toBe(10)
+        expect(doc.count.get()).toBe(10)
       })
 
       it("should handle deeply nested change() calls", () => {
@@ -1007,7 +1005,7 @@ describe("functional helpers", () => {
         })
 
         expect(doc.items.toJSON()).toEqual(["L1", "L1-end"])
-        expect(doc.count.value).toBe(3)
+        expect(doc.count.get()).toBe(3)
         expect(doc.title.toString()).toBe("Deep")
       })
     })
@@ -1063,7 +1061,7 @@ describe("functional helpers", () => {
         })
 
         expect(doc.title.toString()).toBe("World")
-        expect(doc.count.value).toBe(10)
+        expect(doc.count.get()).toBe(10)
       })
     })
 
@@ -1280,7 +1278,7 @@ describe("functional helpers", () => {
         )
 
         change(doc, d => {
-          d.config.theme = "dark"
+          d.config.theme.set("dark")
         })
 
         expect(receivedValue).toBe("dark")
@@ -1324,7 +1322,7 @@ describe("functional helpers", () => {
         const listener = vi.fn()
 
         change(doc, d => {
-          d.config.theme = "light"
+          d.config.theme.set("light")
         })
 
         subscribe(doc, p => p.config.theme, listener)

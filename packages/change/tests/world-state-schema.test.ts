@@ -135,7 +135,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.playerLocationName = "Starting Village"
+        draft.meta.playerLocationName.set("Starting Village")
       }).toJSON()
 
       expect(result.meta.playerLocationName).toBe("Starting Village")
@@ -145,11 +145,11 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       change(typedDoc, draft => {
-        draft.meta.playerLocationName = "Starting Village"
+        draft.meta.playerLocationName.set("Starting Village")
       })
 
       const result = change(typedDoc, draft => {
-        draft.meta.playerLocationName = null
+        draft.meta.playerLocationName.set(null)
       }).toJSON()
 
       expect(result.meta.playerLocationName).toBeNull()
@@ -159,7 +159,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.worldMood = "rising-tensions"
+        draft.meta.worldMood.set("rising-tensions")
       }).toJSON()
 
       expect(result.meta.worldMood).toBe("rising-tensions")
@@ -169,7 +169,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.currentAct = "confrontation"
+        draft.meta.currentAct.set("confrontation")
       }).toJSON()
 
       expect(result.meta.currentAct).toBe("confrontation")
@@ -179,7 +179,7 @@ describe("WorldStateSchema", () => {
       const typedDoc = createTypedDoc(WorldStateSchema)
 
       const result = change(typedDoc, draft => {
-        draft.meta.flourish = "brief"
+        draft.meta.flourish.set("brief")
       }).toJSON()
 
       expect(result.meta.flourish).toBe("brief")
@@ -246,8 +246,8 @@ describe("WorldStateSchema", () => {
       const result = change(typedDoc, draft => {
         const hero = draft.characters.find(c => c.name === "Hero")
         if (hero) {
-          hero.locationName = "Forest"
-          hero.isInParty = false
+          hero.locationName.set("Forest")
+          hero.isInParty.set(false)
         }
       }).toJSON()
 
@@ -509,7 +509,7 @@ describe("WorldStateSchema", () => {
       const result = change(typedDoc, draft => {
         const village = draft.map.locations.find(loc => loc.name === "Village")
         if (village) {
-          village.description = "A bustling village with a market"
+          village.description.set("A bustling village with a market")
         }
       }).toJSON()
 
@@ -610,7 +610,7 @@ describe("WorldStateSchema", () => {
           inv => inv.item.name === "Health Potion",
         )
         if (potion) {
-          potion.item.quantity.measure = 4 // Used one potion
+          potion.item.quantity.measure.set(4) // Used one potion
         }
       }).toJSON()
 
@@ -700,7 +700,7 @@ describe("WorldStateSchema", () => {
         })
 
         // Update meta
-        draft.meta.playerLocationName = "Tavern"
+        draft.meta.playerLocationName.set("Tavern")
       }).toJSON()
 
       expect(result.map.locations).toHaveLength(1)
@@ -721,7 +721,7 @@ describe("WorldStateSchema", () => {
           creationContext: "Init",
           items: [],
         })
-        draft.meta.playerLocationName = "Village"
+        draft.meta.playerLocationName.set("Village")
       })
 
       // Second change: add character
@@ -786,7 +786,7 @@ describe("WorldStateSchema", () => {
             // Unlock the chest
             const lockedState = chest.state.find(s => s.name === "locked")
             if (lockedState) {
-              lockedState.status = false
+              lockedState.status.set(false)
             }
           }
         }

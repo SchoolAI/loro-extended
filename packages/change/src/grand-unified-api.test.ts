@@ -225,7 +225,7 @@ describe("Grand Unified API v3", () => {
 
       // Read via doc directly
       expect(doc.title.toString()).toBe("Test Title")
-      expect(doc.count.value).toBe(42)
+      expect(doc.count.get()).toBe(42)
       expect(doc.users.has("alice")).toBe(true)
       expect(doc.items.length).toBe(1)
     })
@@ -249,7 +249,7 @@ describe("Grand Unified API v3", () => {
       change(doc, draft => {
         draft.article.title.insert(0, "My Article")
         draft.article.metadata.views.increment(100)
-        draft.article.metadata.author = "John Doe"
+        draft.article.metadata.author.set("John Doe")
       })
 
       const result = doc.toJSON()
@@ -319,7 +319,7 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schemaWithPlaceholder)
 
       // Before any mutations, should return placeholder
-      expect(doc.count.value).toBe(0)
+      expect(doc.count.get()).toBe(0)
       expect(doc.toJSON().count).toBe(0)
     })
 
@@ -360,7 +360,7 @@ describe("Grand Unified API v3", () => {
       doc.count.increment(10)
       doc.title.update("Custom Title")
 
-      expect(doc.count.value).toBe(10)
+      expect(doc.count.get()).toBe(10)
       expect(doc.title.toString()).toBe("Custom Title")
     })
   })
@@ -381,13 +381,13 @@ describe("Grand Unified API v3", () => {
       const doc = createTypedDoc(schema)
 
       doc.count.increment(5)
-      expect(doc.count.value).toBe(5)
+      expect(doc.count.get()).toBe(5)
 
       doc.count.increment(3)
-      expect(doc.count.value).toBe(8)
+      expect(doc.count.get()).toBe(8)
 
       doc.count.decrement(2)
-      expect(doc.count.value).toBe(6)
+      expect(doc.count.get()).toBe(6)
     })
   })
 

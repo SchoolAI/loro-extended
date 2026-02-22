@@ -255,7 +255,7 @@ describe("Nested Container Materialization", () => {
     loro(doc2).import(loro(doc1).export({ mode: "snapshot" }))
 
     // Peer 2 writes to the nested metadata
-    const item = doc2.items[0]
+    const item = doc2.items.get(0)
     expect(item).toBeDefined()
     item?.metadata.set("key", "value")
 
@@ -265,7 +265,7 @@ describe("Nested Container Materialization", () => {
     )
 
     // Verify the nested value is visible in doc1
-    expect(value(doc1.items[0]?.metadata.get("key"))).toBe("value")
+    expect(value(doc1.items.get(0)?.metadata.get("key"))).toBe("value")
   })
 
   // Task 1.5: Test conversion API with nested empty container

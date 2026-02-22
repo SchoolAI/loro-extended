@@ -18,8 +18,8 @@ describe("MovableListRef", () => {
       change(doc, draft => {
         draft.users.push({ name: "Alice" })
 
-        // Update via index
-        ;(draft.users as any)[0] = { name: "Bob" }
+        // Update via .set() method
+        draft.users.set(0, { name: "Bob" })
       })
 
       expect(doc.toJSON().users[0]).toEqual({ name: "Bob" })

@@ -13,21 +13,11 @@ export const recordProxyHandler: ProxyHandler<RecordRef<any>> = {
     return Reflect.get(target, prop)
   },
 
-  set: (target, prop, value) => {
-    if (typeof prop === "string" && !(prop in target)) {
-      target.set(prop, value)
-      return true
-    }
-    return Reflect.set(target, prop, value)
-  },
+  // Note: SET trap removed for consistency with method-based API.
+  // Use record.set(key, value) instead of record.key = value
 
-  deleteProperty: (target, prop) => {
-    if (typeof prop === "string" && !(prop in target)) {
-      target.delete(prop)
-      return true
-    }
-    return Reflect.deleteProperty(target, prop)
-  },
+  // Note: deleteProperty trap removed for consistency.
+  // Use record.delete(key) instead of delete record.key
 
   // Support `in` operator for checking key existence
   has: (target, prop) => {
@@ -69,18 +59,8 @@ export const listProxyHandler: ProxyHandler<ListRef<any>> = {
     return Reflect.get(target, prop)
   },
 
-  set: (target, prop, value) => {
-    if (typeof prop === "string") {
-      const index = Number(prop)
-      if (!Number.isNaN(index)) {
-        // For lists, assignment to index implies replacement
-        target.delete(index, 1)
-        target.insert(index, value)
-        return true
-      }
-    }
-    return Reflect.set(target, prop, value)
-  },
+  // Note: SET trap removed for consistency with method-based API.
+  // Use list.set(index, value) instead of list[index] = value
 }
 
 export const movableListProxyHandler: ProxyHandler<MovableListRef<any>> = {
@@ -94,15 +74,6 @@ export const movableListProxyHandler: ProxyHandler<MovableListRef<any>> = {
     return Reflect.get(target, prop)
   },
 
-  set: (target, prop, value) => {
-    if (typeof prop === "string") {
-      const index = Number(prop)
-      if (!Number.isNaN(index)) {
-        // MovableList supports set directly
-        target.set(index, value)
-        return true
-      }
-    }
-    return Reflect.set(target, prop, value)
-  },
+  // Note: SET trap removed for consistency with method-based API.
+  // Use list.set(index, value) instead of list[index] = value
 }

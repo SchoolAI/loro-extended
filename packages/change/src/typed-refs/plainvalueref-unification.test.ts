@@ -48,7 +48,7 @@ describe("writeListValue LoroList compatibility", () => {
 })
 
 describe("runtime primitive check", () => {
-  it("union of primitives returns raw value inside change()", () => {
+  it("union of primitives returns PlainValueRef inside change()", () => {
     const schema = Shape.doc({
       data: Shape.struct({
         nullable: Shape.plain.union([Shape.plain.null(), Shape.plain.string()]),
@@ -57,11 +57,11 @@ describe("runtime primitive check", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      // Raw null, not PlainValueRef
-      expect(draft.data.nullable).toBeNull()
-      draft.data.nullable = "hello"
-      // Raw string
-      expect(draft.data.nullable).toBe("hello")
+      // PlainValueRef wrapping null - use .get() to unwrap
+      expect(draft.data.nullable.get()).toBeNull()
+      draft.data.nullable.set("hello")
+      // PlainValueRef wrapping string - use .get() to unwrap
+      expect(draft.data.nullable.get()).toBe("hello")
     })
   })
 
@@ -79,7 +79,7 @@ describe("runtime primitive check", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.metadata = { type: "a", value: 1 }
+      draft.data.metadata.set({ type: "a", value: 1 })
     })
 
     change(doc, draft => {
@@ -87,7 +87,7 @@ describe("runtime primitive check", () => {
       const metadata = draft.data.metadata
       expect(isPlainValueRef(metadata)).toBe(true)
       // Nested mutation must persist
-      ;(metadata as any).value = 42
+      ;(metadata as any).value.set(42)
     })
 
     expect(doc.toJSON().data.metadata.value).toBe(42)
@@ -102,7 +102,7 @@ describe("runtime primitive check", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.config.options = { nested: { deep: true } }
+      draft.config.options.set({ nested: { deep: true } })
     })
 
     change(doc, draft => {
@@ -110,14 +110,14 @@ describe("runtime primitive check", () => {
       const options = draft.config.options
       expect(isPlainValueRef(options)).toBe(true)
       // Nested mutation must persist
-      ;(options as any).nested.deep = false
+      ;(options as any).nested.deep.set(false)
     })
 
     const result = doc.toJSON().config.options as { nested: { deep: boolean } }
     expect(result.nested.deep).toBe(false)
   })
 
-  it("any shape with primitive value returns raw value", () => {
+  it("any shape with primitive value returns PlainValueRef", () => {
     const schema = Shape.doc({
       config: Shape.struct({
         value: Shape.plain.any(),
@@ -126,13 +126,13 @@ describe("runtime primitive check", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.config.value = 42
+      draft.config.value.set(42)
     })
 
     change(doc, draft => {
-      // Primitive should be raw value for ergonomic boolean logic
-      expect(draft.config.value).toBe(42)
-      expect(isPlainValueRef(draft.config.value)).toBe(false)
+      // PlainValueRef for consistent API - use .get() to unwrap
+      expect(draft.config.value.get()).toBe(42)
+      expect(isPlainValueRef(draft.config.value)).toBe(true)
     })
   })
 })
@@ -158,7 +158,7 @@ describe("ListRef PlainValueRef unification", () => {
       // Should be PlainValueRef for struct value shape
       expect(isPlainValueRef(item)).toBe(true)
       // Mutation must persist
-      if (item) item.active = true
+      if (item) item.active.set(true)
     })
 
     expect(doc.toJSON().items[0].active).toBe(true)
@@ -183,7 +183,7 @@ describe("ListRef PlainValueRef unification", () => {
     change(doc, draft => {
       const user = draft.users.find(u => u.id === "a")
       if (user) {
-        user.score = 100 // Must persist
+        user.score.set(100) // Must persist
       }
     })
 
@@ -208,7 +208,7 @@ describe("ListRef PlainValueRef unification", () => {
     change(doc, draft => {
       // Mutate via getMutableItem (PlainValueRef writes immediately)
       const item = draft.items.get(0)
-      if (item) item.value = 999
+      if (item) item.value.set(999)
 
       // Predicate should see the mutation (reads fresh from container)
       const found = draft.items.find(i => i.value === 999)
@@ -254,7 +254,7 @@ describe("ListRef PlainValueRef unification", () => {
       if (todo) {
         // This pattern must work: !todo.completed where todo is PlainValueRef
         // but completed is a raw boolean (runtime primitive check)
-        todo.completed = !todo.completed
+        todo.completed.set(!todo.completed.get())
       }
     })
 
@@ -286,8 +286,8 @@ describe("ListRef PlainValueRef unification", () => {
       const article = draft.articles.get(0)
       // Nested mutation via PlainValueRef
       if (article) {
-        article.metadata.published = true
-        article.metadata.author = "Bob"
+        article.metadata.published.set(true)
+        article.metadata.author.set("Bob")
       }
     })
 
@@ -307,7 +307,7 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.items = [1, 2, 3]
+      draft.data.items.set([1, 2, 3])
     })
 
     // Outside change(), array is wrapped in PlainValueRef (since typeof [] === 'object')
@@ -325,7 +325,7 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.items = ["a", "b", "c"]
+      draft.data.items.set(["a", "b", "c"])
     })
 
     change(doc, draft => {
@@ -344,7 +344,7 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.arr = [10, 20, 30]
+      draft.data.arr.set([10, 20, 30])
     })
 
     const arr = doc.data.arr
@@ -363,7 +363,7 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.arr = [1, 2, 3, 4, 5]
+      draft.data.arr.set([1, 2, 3, 4, 5])
     })
 
     // The .length property should be accessible since it exists on the value
@@ -380,19 +380,19 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.arr = [1, 2, 3]
+      draft.data.arr.set([1, 2, 3])
     })
 
     // To modify arrays in any/union shapes, replace the whole array
     change(doc, draft => {
       const current = value(draft.data.arr) as number[]
-      draft.data.arr = [...current, 4]
+      draft.data.arr.set([...current, 4])
     })
 
     expect(doc.toJSON().data.arr).toEqual([1, 2, 3, 4])
   })
 
-  it("numeric index access on array PlainValueRef returns the element", () => {
+  it("numeric index access on array PlainValueRef returns PlainValueRef", () => {
     const schema = Shape.doc({
       data: Shape.struct({
         arr: Shape.plain.any(),
@@ -401,15 +401,15 @@ describe("array-in-any edge case", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.arr = ["first", "second", "third"]
+      draft.data.arr.set(["first", "second", "third"])
     })
 
-    // Numeric property access (as string) should work via the generic object proxy
+    // Numeric property access returns PlainValueRef - use .get() to unwrap
     const arr = doc.data.arr as any
     // The proxy handles string property access, so "0", "1", "2" work
-    expect(arr["0"]).toBe("first")
-    expect(arr["1"]).toBe("second")
-    expect(arr["2"]).toBe("third")
+    expect(arr["0"].get()).toBe("first")
+    expect(arr["1"].get()).toBe("second")
+    expect(arr["2"].get()).toBe("third")
   })
 })
 
@@ -492,7 +492,7 @@ describe("value() nullish handling", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.title = "Hello"
+      draft.data.title.set("Hello")
     })
 
     // value() unwraps PlainValueRef to raw value
@@ -509,7 +509,7 @@ describe("value() nullish handling", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.name = "Test"
+      draft.data.name.set("Test")
     })
 
     // value() on StructRef (a TypedRef) calls toJSON()
@@ -562,7 +562,7 @@ describe("value() export", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, draft => {
-      draft.data.title = "Hello"
+      draft.data.title.set("Hello")
     })
 
     // Outside change(), properties return PlainValueRef

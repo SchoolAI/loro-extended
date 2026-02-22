@@ -41,8 +41,8 @@ describe("JSON Patch Integration", () => {
 
       // First set some values
       change(typedDoc, draft => {
-        draft.config.theme = "dark"
-        draft.config.debug = false
+        draft.config.theme.set("dark")
+        draft.config.debug.set(false)
       })
 
       const patch: JsonPatch = [{ op: "remove", path: "/config/debug" }]
@@ -66,8 +66,8 @@ describe("JSON Patch Integration", () => {
 
       // Set initial values
       change(typedDoc, draft => {
-        draft.settings.language = "fr"
-        draft.settings.volume = 75
+        draft.settings.language.set("fr")
+        draft.settings.volume.set(75)
       })
 
       const patch: JsonPatch = [
@@ -187,8 +187,8 @@ describe("JSON Patch Integration", () => {
       // should use increment/decrement methods
 
       // doc.value returns CounterRef objects with methods
-      expect(typedDoc.views.value).toBe(0)
-      expect(typedDoc.likes.value).toBe(0)
+      expect(typedDoc.views.get()).toBe(0)
+      expect(typedDoc.likes.get()).toBe(0)
 
       // toJSON returns plain numbers
       expect(typedDoc.toJSON().views).toBe(0)
@@ -383,7 +383,7 @@ describe("JSON Patch Integration", () => {
       const typedDoc = createTypedDoc(schema)
 
       change(typedDoc, draft => {
-        draft.config.version = "2.0.0"
+        draft.config.version.set("2.0.0")
       })
 
       const patch: JsonPatch = [

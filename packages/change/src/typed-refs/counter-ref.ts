@@ -24,22 +24,22 @@ export class CounterRef extends TypedRef<CounterContainerShape> {
   }
 
   /** Get the current counter value */
-  get value(): number {
+  get(): number {
     return this[INTERNAL_SYMBOL].getValue()
   }
 
   valueOf(): number {
-    return this.value
+    return this.get()
   }
 
   toJSON(): number {
-    return this.value
+    return this.get()
   }
 
   [Symbol.toPrimitive](hint: string): number | string {
     if (hint === "string") {
-      return String(this.value)
+      return String(this.get())
     }
-    return this.value
+    return this.get()
   }
 }

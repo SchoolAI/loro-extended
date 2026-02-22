@@ -328,7 +328,7 @@ describe("Path Selector DSL", () => {
 
       // Add some data
       change(doc, draft => {
-        draft.config.theme = "light"
+        draft.config.theme.set("light")
       })
 
       const builder = createPathBuilder(docShape)

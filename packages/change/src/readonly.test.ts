@@ -17,8 +17,8 @@ describe("TypedDoc Mutable Mode", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, d => {
-      d.meta.count = 1
-      d.meta.title = "updated"
+      d.meta.count.set(1)
+      d.meta.title.set("updated")
       d.list.push("item1")
     })
 
@@ -36,7 +36,7 @@ describe("TypedDoc Mutable Mode", () => {
     expect(value(liveMeta.count)).toBe(0)
 
     change(doc, d => {
-      d.meta.count = 5
+      d.meta.count.set(5)
     })
 
     // Should see the update without re-fetching doc.value
@@ -48,7 +48,7 @@ describe("TypedDoc Mutable Mode", () => {
 
     // Direct mutations via change()
     change(doc, draft => {
-      draft.meta.count = 10
+      draft.meta.count.set(10)
     })
     expect(doc.toJSON().meta.count).toBe(10)
 
@@ -67,8 +67,8 @@ describe("TypedDoc Mutable Mode", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, d => {
-      d.meta.count = 1
-      d.meta.title = "batched"
+      d.meta.count.set(1)
+      d.meta.title.set("batched")
       d.list.push("a")
       d.list.push("b")
     })
@@ -83,8 +83,8 @@ describe("TypedDoc Mutable Mode", () => {
     const doc = createTypedDoc(schema)
 
     change(doc, d => {
-      d.meta.count = 1
-      d.meta.title = "json"
+      d.meta.count.set(1)
+      d.meta.title.set("json")
       d.list.push("a")
       d.list.push("b")
     })

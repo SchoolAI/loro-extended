@@ -12,7 +12,7 @@ import type {
   ValueShape,
 } from "../shape.js"
 import type { BaseRefInternals } from "../typed-refs/base.js"
-import { setAtPath, transformAtPath } from "../utils/path-ops.js"
+
 import {
   PARENT_INTERNALS_SYMBOL,
   PATH_SYMBOL,
@@ -21,7 +21,11 @@ import {
 } from "./symbols.js"
 import type { PlainValueRef } from "./types.js"
 import { resolveListValue, resolveValue } from "./value-reader.js"
-import { writeListValue, writeValue } from "./value-writer.js"
+import {
+  writeListValue,
+  writeListValueAtPath,
+  writeValue,
+} from "./value-writer.js"
 
 /**
  * Symbol to store the list index for list item PlainValueRefs.
@@ -75,17 +79,6 @@ function proxyGetPreamble(
 }
 
 /**
- * Unwrap a value for SET operations.
- * If the value is a PlainValueRef, returns its raw value via valueOf().
- *
- * @param value - The value being assigned
- * @returns The unwrapped value
- */
-function unwrapForSet(value: unknown): unknown {
-  return isPlainValueRefLike(value) ? value.valueOf() : value
-}
-
-/**
  * Runtime primitive check for nested values.
  * Returns true if the value is a primitive (should be returned raw, not wrapped).
  * This enables boolean logic like `!draft.completed` and `if (item.active)`.
@@ -95,18 +88,6 @@ function unwrapForSet(value: unknown): unknown {
  */
 function runtimePrimitiveCheck(value: unknown): boolean {
   return value === null || typeof value !== "object"
-}
-
-/**
- * Check if a value looks like a PlainValueRef (duck typing for assignment unwrapping).
- * This avoids circular dependency with the type guard in index.ts.
- */
-function isPlainValueRefLike(value: unknown): value is { valueOf(): unknown } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    PLAIN_VALUE_REF_SYMBOL in value
-  )
 }
 
 /**
@@ -126,8 +107,11 @@ function buildBasePlainValueRef<T>(
   path: string[],
   shape: ValueShape,
   listIndex?: number,
+  listNestedPath?: string[],
 ): PlainValueRef<T> {
-  const base: PlainValueRef<T> = {
+  // Cast needed because nested properties (for object types) are provided
+  // by the Proxy at runtime, not by this base object literal.
+  const base = {
     [PLAIN_VALUE_REF_SYMBOL]: true as const,
     [PARENT_INTERNALS_SYMBOL]: internals,
     [PATH_SYMBOL]: path,
@@ -141,7 +125,22 @@ function buildBasePlainValueRef<T>(
       if (hint === "number") return Number(v)
       return v
     },
-  }
+    get: getValue,
+    set(value: T): void {
+      if (listIndex !== undefined) {
+        if (listNestedPath && listNestedPath.length > 0) {
+          // Nested list item property: read-modify-write
+          writeListValueAtPath(internals, listIndex, listNestedPath, value)
+        } else {
+          // Top-level list item: replace the whole value
+          writeListValue(internals, listIndex, value)
+        }
+      } else {
+        // Struct/record property: write through the path
+        writeValue(internals, path, value)
+      }
+    },
+  } as PlainValueRef<T>
 
   // Store the numeric index for list-specific operations
   if (listIndex !== undefined) {
@@ -197,7 +196,8 @@ export function createPlainValueRef<T>(
  *
  * The Proxy intercepts:
  * - GET: Returns PlainValueRef for nested properties defined in the shape
- * - SET: Writes the value through the parent container
+ *
+ * Note: SET is not supported. Use .set() on the nested PlainValueRef instead.
  *
  * @param base - The base PlainValueRef object
  * @param internals - The parent ref's internals
@@ -225,14 +225,6 @@ function createStructProxy<T>(
       }
       return undefined
     },
-
-    set(_target, prop, value) {
-      if (typeof prop === "string" && prop in shape.shape) {
-        writeValue(internals, [...path, prop], unwrapForSet(value))
-        return true
-      }
-      return false
-    },
   }) as PlainValueRef<T>
 }
 
@@ -240,6 +232,8 @@ function createStructProxy<T>(
  * Create a Proxy wrapper for union/any value shapes containing objects.
  * Unlike struct proxies (which have a defined shape), this proxy allows
  * dynamic property access based on the actual runtime value structure.
+ *
+ * Note: SET is not supported. Use .set() on the PlainValueRef instead.
  *
  * @param base - The base PlainValueRef object
  * @param internals - The parent ref's internals
@@ -262,8 +256,14 @@ function createGenericObjectProxy<T>(
         typeof currentValue === "object" &&
         preamble.prop in currentValue
       ) {
+        // Special case: array .length returns raw number for ergonomics
+        // This is a known property of arrays and shouldn't require .get()
+        if (Array.isArray(currentValue) && preamble.prop === "length") {
+          return currentValue.length
+        }
+
         const propValue = currentValue[preamble.prop]
-        if (runtimePrimitiveCheck(propValue)) return propValue
+        if (propValue === undefined) return undefined
         return createNestedGenericObjectProxy(
           internals,
           path,
@@ -272,28 +272,6 @@ function createGenericObjectProxy<T>(
         )
       }
       return undefined
-    },
-
-    set(target, prop, value) {
-      if (typeof prop === "string") {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        const updated = { ...currentValue, [prop]: unwrapForSet(value) }
-        writeValue(internals, path, updated)
-        return true
-      }
-      return false
-    },
-
-    deleteProperty(target, prop) {
-      if (typeof prop === "string") {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        if (prop in currentValue) {
-          const { [prop]: _, ...rest } = currentValue
-          writeValue(internals, path, rest)
-        }
-        return true
-      }
-      return false
     },
   }) as PlainValueRef<T>
 }
@@ -339,8 +317,14 @@ function createNestedGenericObjectProxy<T>(
 
         const val = target.valueOf() as Record<string, unknown>
         if (val && typeof val === "object" && preamble.prop in val) {
+          // Special case: array .length returns raw number for ergonomics
+          // This is a known property of arrays and shouldn't require .get()
+          if (Array.isArray(val) && preamble.prop === "length") {
+            return val.length
+          }
+
           const propValue = val[preamble.prop]
-          if (runtimePrimitiveCheck(propValue)) return propValue
+          if (propValue === undefined) return undefined
           return createNestedGenericObjectProxy(
             internals,
             rootPath,
@@ -349,24 +333,6 @@ function createNestedGenericObjectProxy<T>(
           )
         }
         return undefined
-      },
-
-      set(_target, prop, value) {
-        if (typeof prop === "string") {
-          const rootValue =
-            (resolveValue<Record<string, unknown>>(
-              internals,
-              rootPath,
-            ) as Record<string, unknown>) ?? {}
-          const updated = setAtPath(
-            rootValue,
-            [...nestedPath, prop],
-            unwrapForSet(value),
-          )
-          writeValue(internals, rootPath, updated)
-          return true
-        }
-        return false
       },
     }) as PlainValueRef<T>
   }
@@ -380,8 +346,8 @@ function createNestedGenericObjectProxy<T>(
  * Unlike struct value shapes with fixed keys, record value shapes have dynamic keys.
  * The Proxy intercepts:
  * - GET: Returns the value at that key from the current record value
- * - SET: Does a read-modify-write on the whole record
- * - DELETE: Removes the key via read-modify-write
+ *
+ * Note: SET is not supported. Use .set() on the PlainValueRef instead.
  *
  * @param base - The base PlainValueRef object
  * @param internals - The parent ref's internals
@@ -400,39 +366,22 @@ function createRecordProxy<T>(
       const preamble = proxyGetPreamble(target, prop, receiver)
       if (preamble.handled) return preamble.value
 
+      // Always create a PlainValueRef for any key access when shape.shape is defined.
+      // This enables .set() on both existing and new keys via read-modify-write.
+      if (shape.shape) {
+        return createPlainValueRef(
+          internals,
+          [...path, preamble.prop],
+          shape.shape,
+        )
+      }
+
+      // Fallback for untyped records: return the raw value
       const currentValue = target.valueOf() as Record<string, unknown>
       if (currentValue && typeof currentValue === "object") {
-        const propValue = currentValue[preamble.prop]
-        if (propValue !== undefined && shape.shape) {
-          return createPlainValueRef(
-            internals,
-            [...path, preamble.prop],
-            shape.shape,
-          )
-        }
-        return propValue
+        return currentValue[preamble.prop]
       }
       return undefined
-    },
-
-    set(_target, prop, value) {
-      if (typeof prop === "string") {
-        writeValue(internals, [...path, prop], unwrapForSet(value))
-        return true
-      }
-      return false
-    },
-
-    deleteProperty(target, prop) {
-      if (typeof prop === "string") {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        if (prop in currentValue) {
-          const { [prop]: _, ...rest } = currentValue
-          writeValue(internals, path, rest)
-        }
-        return true
-      }
-      return false
     },
   }) as PlainValueRef<T>
 }
@@ -512,13 +461,9 @@ function createListItemStructProxy<T>(
 
       if (preamble.prop in shape.shape) {
         const nestedShape = shape.shape[preamble.prop]
-        const currentValue = target.valueOf() as Record<string, unknown>
-        const nestedValue = currentValue?.[preamble.prop]
 
-        // Runtime primitive check: return raw value for primitives
-        if (runtimePrimitiveCheck(nestedValue)) return nestedValue
-
-        // For objects/arrays, return sub-PlainValueRef for nested mutation tracking
+        // Always return PlainValueRef for nested properties (consistent with createStructProxy).
+        // This ensures .set() is available on all nested properties, including primitives.
         return createListItemNestedPlainValueRef(
           internals,
           index,
@@ -527,16 +472,6 @@ function createListItemStructProxy<T>(
         )
       }
       return undefined
-    },
-
-    set(target, prop, value) {
-      if (typeof prop === "string" && prop in shape.shape) {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        const updated = { ...currentValue, [prop]: unwrapForSet(value) }
-        writeListValue(internals, index, updated)
-        return true
-      }
-      return false
     },
   }) as PlainValueRef<T>
 }
@@ -566,7 +501,7 @@ function createListItemRecordProxy<T>(
       if (currentValue && typeof currentValue === "object") {
         const propValue = currentValue[preamble.prop]
         if (propValue === undefined) return undefined
-        if (runtimePrimitiveCheck(propValue)) return propValue
+        // Always return PlainValueRef for record values so .set() is available
         if (shape.shape) {
           return createListItemNestedPlainValueRef(
             internals,
@@ -575,31 +510,10 @@ function createListItemRecordProxy<T>(
             shape.shape,
           )
         }
+        if (runtimePrimitiveCheck(propValue)) return propValue
         return propValue
       }
       return undefined
-    },
-
-    set(target, prop, value) {
-      if (typeof prop === "string") {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        const updated = { ...currentValue, [prop]: unwrapForSet(value) }
-        writeListValue(internals, index, updated)
-        return true
-      }
-      return false
-    },
-
-    deleteProperty(target, prop) {
-      if (typeof prop === "string") {
-        const currentValue = (target.valueOf() as Record<string, unknown>) ?? {}
-        if (prop in currentValue) {
-          const { [prop]: _, ...rest } = currentValue
-          writeListValue(internals, index, rest)
-        }
-        return true
-      }
-      return false
     },
   }) as PlainValueRef<T>
 }
@@ -645,6 +559,7 @@ function createListItemNestedPlainValueRef<T>(
     [String(index), ...nestedPath],
     shape,
     index, // Pass list index
+    nestedPath, // Pass nested path for read-modify-write in .set()
   )
 
   // For nested struct value shapes, wrap in Proxy to enable deeper property access
@@ -688,11 +603,7 @@ function createListItemNestedStructProxy<T>(
       if (preamble.handled) return preamble.value
 
       if (preamble.prop in shape.shape) {
-        const currentValue = target.valueOf() as Record<string, unknown>
-        const nestedValue = currentValue?.[preamble.prop]
-
-        if (runtimePrimitiveCheck(nestedValue)) return nestedValue
-
+        // Always return PlainValueRef for nested properties (consistent with createStructProxy).
         return createListItemNestedPlainValueRef(
           internals,
           index,
@@ -701,19 +612,6 @@ function createListItemNestedStructProxy<T>(
         )
       }
       return undefined
-    },
-
-    set(_target, prop, value) {
-      if (typeof prop === "string" && prop in shape.shape) {
-        writeListItemNestedValue(
-          internals,
-          index,
-          [...nestedPath, prop],
-          unwrapForSet(value),
-        )
-        return true
-      }
-      return false
     },
   }) as PlainValueRef<T>
 }
@@ -737,7 +635,7 @@ function createListItemNestedRecordProxy<T>(
       if (currentValue && typeof currentValue === "object") {
         const propValue = currentValue[preamble.prop]
         if (propValue === undefined) return undefined
-        if (runtimePrimitiveCheck(propValue)) return propValue
+        // Always return PlainValueRef for record values so .set() is available
         if (shape.shape) {
           return createListItemNestedPlainValueRef(
             internals,
@@ -746,62 +644,10 @@ function createListItemNestedRecordProxy<T>(
             shape.shape,
           )
         }
+        if (runtimePrimitiveCheck(propValue)) return propValue
         return propValue
       }
       return undefined
     },
-
-    set(_target, prop, value) {
-      if (typeof prop === "string") {
-        writeListItemNestedValue(
-          internals,
-          index,
-          [...nestedPath, prop],
-          unwrapForSet(value),
-        )
-        return true
-      }
-      return false
-    },
-
-    deleteProperty(_target, prop) {
-      if (typeof prop === "string") {
-        const itemValue =
-          resolveListValue<Record<string, unknown>>(internals, index) ?? {}
-        const updated = transformAtPath(
-          itemValue,
-          nestedPath,
-          (parent: Record<string, unknown>) => {
-            const { [prop]: _, ...rest } = parent
-            return rest
-          },
-        )
-        writeListValue(internals, index, updated)
-        return true
-      }
-      return false
-    },
   }) as PlainValueRef<T>
-}
-
-/**
- * Write a nested value within a list item using read-modify-write.
- */
-function writeListItemNestedValue(
-  internals: BaseRefInternals<any>,
-  index: number,
-  path: string[],
-  value: unknown,
-): void {
-  const itemValue =
-    resolveListValue<Record<string, unknown>>(internals, index) ?? {}
-  const updated = transformAtPath(
-    itemValue,
-    path.slice(0, -1),
-    (parent: Record<string, unknown>) => ({
-      ...parent,
-      [path[path.length - 1]]: value,
-    }),
-  )
-  writeListValue(internals, index, updated)
 }

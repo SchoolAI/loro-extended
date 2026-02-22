@@ -21,8 +21,8 @@ describe("diff overlay", () => {
 
     change(doc, draft => {
       draft.counter.increment(10)
-      draft.info.name = "Alice"
-      draft.info.count = 1
+      draft.info.name.set("Alice")
+      draft.info.count.set(1)
       draft.list.push(1)
       draft.text.insert(0, "hello")
     })
@@ -54,14 +54,14 @@ describe("diff overlay", () => {
 
       transitions.push({
         before: {
-          counter: beforeDoc.counter.value,
+          counter: beforeDoc.counter.get(),
           name: value(beforeDoc.info.name),
           count: value(beforeDoc.info.count),
           list: beforeDoc.list.toArray(),
           text: beforeDoc.text.toString(),
         },
         after: {
-          counter: afterDoc.counter.value,
+          counter: afterDoc.counter.get(),
           name: value(afterDoc.info.name),
           count: value(afterDoc.info.count),
           list: afterDoc.list.toArray(),
@@ -72,8 +72,8 @@ describe("diff overlay", () => {
 
     change(doc, draft => {
       draft.counter.increment(5)
-      draft.info.name = "Bob"
-      draft.info.count = 2
+      draft.info.name.set("Bob")
+      draft.info.count.set(2)
       draft.list.push(2)
       draft.text.update("hello world")
     })

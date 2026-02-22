@@ -101,13 +101,15 @@ class StructRefImpl<
 /**
  * Creates a StructRef wrapped in a Proxy for JavaScript-native object behavior.
  * Supports:
- * - Property access: obj.key
- * - Property assignment: obj.key = value
+ * - Property access: obj.key (returns PlainValueRef or nested Ref)
  * - Object.keys(obj)
  * - 'key' in obj
- * - delete obj.key
  * - toJSON()
  * - loro(obj) for CRDT access
+ *
+ * Note: Property assignment is NOT supported. Use .set() on the PlainValueRef instead:
+ *   doc.meta.title.set("New Title")  // Correct
+ *   doc.meta.title = "New Title"     // NOT supported
  */
 export function createStructRef<
   NestedShapes extends Record<string, ContainerOrValueShape>,
@@ -153,14 +155,6 @@ export function createStructRef<
       return undefined
     },
 
-    set(target, prop, value) {
-      if (typeof prop === "string" && prop in target.structShape.shapes) {
-        target[INTERNAL_SYMBOL].setPropertyValue(prop, value)
-        return true
-      }
-      return false
-    },
-
     has(target, prop) {
       if (
         prop === LORO_SYMBOL ||
@@ -173,14 +167,6 @@ export function createStructRef<
       }
       if (typeof prop === "string") {
         return prop in target.structShape.shapes
-      }
-      return false
-    },
-
-    deleteProperty(target, prop) {
-      if (typeof prop === "string" && prop in target.structShape.shapes) {
-        target[INTERNAL_SYMBOL].deleteProperty(prop)
-        return true
       }
       return false
     },

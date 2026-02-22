@@ -157,13 +157,13 @@ describe("Path Subscription", () => {
         const listener = vi.fn()
 
         change(doc, d => {
-          d.config.theme = "light"
+          d.config.theme.set("light")
         })
 
         const unsubscribe = subscribeToPath(doc, p => p.config.theme, listener)
 
         change(doc, d => {
-          d.config.theme = "dark"
+          d.config.theme.set("dark")
         })
 
         expect(listener).toHaveBeenCalledWith("dark")
@@ -247,7 +247,7 @@ describe("Path Subscription", () => {
         const listener = vi.fn()
 
         change(doc, d => {
-          d.config.theme = "light"
+          d.config.theme.set("light")
         })
 
         const unsubscribe = subscribeToPath(doc, p => p.config.theme, listener)
@@ -270,7 +270,7 @@ describe("Path Subscription", () => {
         const unsubscribe = subscribeToPath(doc, p => p.config.theme, listener)
 
         change(doc, d => {
-          d.config.theme = "dark"
+          d.config.theme.set("dark")
         })
         expect(listener).toHaveBeenCalledTimes(1)
 
@@ -278,7 +278,7 @@ describe("Path Subscription", () => {
         listener.mockClear()
 
         change(doc, d => {
-          d.config.theme = "light"
+          d.config.theme.set("light")
         })
         expect(listener).not.toHaveBeenCalled()
       })
@@ -304,7 +304,7 @@ describe("Path Subscription", () => {
         )
 
         change(doc, d => {
-          d.config.theme = "dark"
+          d.config.theme.set("dark")
         })
 
         expect(theme).toBe("dark")

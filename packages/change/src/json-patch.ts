@@ -1,7 +1,21 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: JSON Patch values can be any type */
 
+import { isPlainValueRef } from "./plain-value-ref/index.js"
 import type { DocShape } from "./shape.js"
+import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
 import type { Draft } from "./types.js"
+
+/**
+ * Unwrap a value that may be a PlainValueRef to get the raw value.
+ * This is critical for move/copy operations where we need to capture
+ * the value BEFORE mutating the source location.
+ */
+function unwrapValue(value: any): any {
+  if (isPlainValueRef(value)) {
+    return value.get()
+  }
+  return value
+}
 
 // =============================================================================
 // JSON PATCH TYPES - Discriminated Union for Type Safety
@@ -179,11 +193,27 @@ function handleAdd<T extends DocShape>(
 
   if (typeof key === "string") {
     // Map-like operations - use natural assignment or set() method
-    if (parent.set && typeof parent.set === "function") {
+    // Check if parent is a PlainValueRef (has PLAIN_VALUE_REF_SYMBOL or specific shape)
+    // PlainValueRef.set() takes ONE argument, RecordRef.set() takes TWO arguments
+    if (isPlainValueRef(parent)) {
+      // Parent is a PlainValueRef (e.g., a struct value in a list) - access nested property
+      const ref = (parent as any)[key]
+      if (ref && typeof ref.set === "function") {
+        ref.set(operation.value)
+      } else {
+        throw new Error(`Cannot add property "${key}" on PlainValueRef parent`)
+      }
+    } else if (parent.set && typeof parent.set === "function") {
+      // RecordRef: parent.set(key, value)
       parent.set(key, operation.value)
     } else {
-      // Natural property assignment (follows existing test patterns)
-      parent[key] = operation.value
+      // StructRef: navigate to property PlainValueRef, then .set()
+      const ref = parent[key]
+      if (ref && typeof ref.set === "function") {
+        ref.set(operation.value)
+      } else {
+        throw new Error(`Cannot add property "${key}" on parent`)
+      }
     }
   } else if (typeof key === "number") {
     // List operations - use insert() method (follows existing patterns)
@@ -209,10 +239,18 @@ function handleRemove<T extends DocShape>(
 
   if (typeof key === "string") {
     // Map-like operations - use delete() method (follows existing patterns)
+    // This works for both RecordRef.delete(key) and StructRef internals
     if (parent.delete && typeof parent.delete === "function") {
       parent.delete(key)
     } else {
-      delete parent[key]
+      // StructRef proxy doesn't expose delete directly, but we can access
+      // the underlying LoroMap via the internals
+      const internals = (parent as any)[INTERNAL_SYMBOL]
+      if (internals && typeof internals.deleteProperty === "function") {
+        internals.deleteProperty(key)
+      } else {
+        throw new Error(`Cannot remove property "${key}" on parent`)
+      }
     }
   } else if (typeof key === "number") {
     // List operations - use delete() method with count (follows existing patterns)
@@ -238,10 +276,29 @@ function handleReplace<T extends DocShape>(
 
   if (typeof key === "string") {
     // Map-like operations - use set() method or natural assignment
-    if (parent.set && typeof parent.set === "function") {
+    // Check if parent is a PlainValueRef (has PLAIN_VALUE_REF_SYMBOL or specific shape)
+    // PlainValueRef.set() takes ONE argument, RecordRef.set() takes TWO arguments
+    if (isPlainValueRef(parent)) {
+      // Parent is a PlainValueRef (e.g., a struct value in a list) - access nested property
+      const ref = (parent as any)[key]
+      if (ref && typeof ref.set === "function") {
+        ref.set(operation.value)
+      } else {
+        throw new Error(
+          `Cannot replace property "${key}" on PlainValueRef parent`,
+        )
+      }
+    } else if (parent.set && typeof parent.set === "function") {
+      // RecordRef: parent.set(key, value)
       parent.set(key, operation.value)
     } else {
-      parent[key] = operation.value
+      // StructRef: navigate to property PlainValueRef, then .set()
+      const ref = parent[key]
+      if (ref && typeof ref.set === "function") {
+        ref.set(operation.value)
+      } else {
+        throw new Error(`Cannot replace property "${key}" on parent`)
+      }
     }
   } else if (typeof key === "number") {
     // List operations - delete then insert (follows existing patterns)
@@ -290,7 +347,10 @@ function handleMove<T extends DocShape>(
       }
 
       // Otherwise, get value, remove, then add at target index
-      const value = getValueAtPath(draft, fromPath)
+      // CRITICAL: Unwrap PlainValueRef BEFORE removal to capture the raw value.
+      // PlainValueRef is a LIVE reference - after removal, indices shift and
+      // the ref would read from the wrong position.
+      const value = unwrapValue(getValueAtPath(draft, fromPath))
       handleRemove(draft, { op: "remove", path: operation.from })
 
       // For JSON Patch move semantics, the target index refers to the position
@@ -302,7 +362,8 @@ function handleMove<T extends DocShape>(
   }
 
   // Different parents or non-numeric indices - standard move
-  const value = getValueAtPath(draft, fromPath)
+  // CRITICAL: Unwrap PlainValueRef BEFORE removal to capture the raw value.
+  const value = unwrapValue(getValueAtPath(draft, fromPath))
   handleRemove(draft, { op: "remove", path: operation.from })
   handleAdd(draft, { op: "add", path: operation.path, value })
 }
@@ -317,7 +378,8 @@ function handleCopy<T extends DocShape>(
   const fromPath = normalizePath(operation.from)
 
   // Get the value to copy
-  const value = getValueAtPath(draft, fromPath)
+  // Unwrap PlainValueRef to get the raw value for copying
+  const value = unwrapValue(getValueAtPath(draft, fromPath))
 
   // Add to destination (no removal)
   handleAdd(draft, { op: "add", path: operation.path, value })

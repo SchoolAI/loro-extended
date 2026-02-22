@@ -192,8 +192,8 @@ describe("shallow fork", () => {
       // Set initial state
       doc.counter.increment(5)
       change(doc, draft => {
-        draft.data.name = "test"
-        draft.data.value = 100
+        draft.data.name.set("test")
+        draft.data.value.set(100)
       })
 
       const frontier = loro(doc).frontiers()
@@ -211,15 +211,15 @@ describe("shallow fork", () => {
       const shallowDoc = createTypedDoc(TestSchema, { doc: shallowLoroDoc })
 
       // Verify state is correct
-      expect(shallowDoc.counter.value).toBe(5)
+      expect(shallowDoc.counter.get()).toBe(5)
       expect(value(shallowDoc.data.name)).toBe("test")
       expect(value(shallowDoc.data.value)).toBe(100)
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
       change(shallowDoc, draft => {
-        draft.data.name = "modified"
-        draft.data.value = 200
+        draft.data.name.set("modified")
+        draft.data.value.set(200)
       })
 
       // Export and merge back
@@ -230,7 +230,7 @@ describe("shallow fork", () => {
       loro(doc).import(update)
 
       // Verify merge worked
-      expect(doc.counter.value).toBe(15)
+      expect(doc.counter.get()).toBe(15)
       expect(value(doc.data.name)).toBe("modified")
       expect(value(doc.data.value)).toBe(200)
     })
@@ -241,8 +241,8 @@ describe("shallow fork", () => {
       // Set initial state
       doc.counter.increment(5)
       change(doc, draft => {
-        draft.data.name = "test"
-        draft.data.value = 100
+        draft.data.name.set("test")
+        draft.data.value.set(100)
       })
 
       const frontier = loro(doc).frontiers()
@@ -254,15 +254,15 @@ describe("shallow fork", () => {
       })
 
       // Verify state is correct
-      expect(shallowDoc.counter.value).toBe(5)
+      expect(shallowDoc.counter.get()).toBe(5)
       expect(value(shallowDoc.data.name)).toBe("test")
       expect(value(shallowDoc.data.value)).toBe(100)
 
       // Modify the shallow doc
       shallowDoc.counter.increment(10)
       change(shallowDoc, draft => {
-        draft.data.name = "modified"
-        draft.data.value = 200
+        draft.data.name.set("modified")
+        draft.data.value.set(200)
       })
 
       // Export and merge back
@@ -273,7 +273,7 @@ describe("shallow fork", () => {
       loro(doc).import(update)
 
       // Verify merge worked
-      expect(doc.counter.value).toBe(15)
+      expect(doc.counter.get()).toBe(15)
       expect(value(doc.data.name)).toBe("modified")
       expect(value(doc.data.value)).toBe(200)
     })

@@ -9,6 +9,7 @@ import {
   TreeNodeRefInternals,
   type TreeRefLike,
 } from "./tree-node-ref-internals.js"
+import { assignPlainValueToTypedRef } from "./utils.js"
 
 export interface TreeNodeRefParams<DataShape extends StructContainerShape> {
   node: LoroTreeNode
@@ -98,7 +99,15 @@ export class TreeNodeRef<DataShape extends StructContainerShape> {
     // Initialize data if provided
     if (initialData) {
       for (const [key, value] of Object.entries(initialData)) {
-        ;(nodeRef.data as any)[key] = value
+        const propRef = (nodeRef.data as any)[key]
+        // Use assignPlainValueToTypedRef for container refs (RecordRef, StructRef, etc.)
+        // This properly handles the different container types and their APIs
+        if (propRef && INTERNAL_SYMBOL in propRef) {
+          assignPlainValueToTypedRef(propRef, value)
+        } else if (propRef && typeof propRef.set === "function") {
+          // PlainValueRef for value shapes
+          propRef.set(value)
+        }
       }
     }
 

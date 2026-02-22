@@ -273,8 +273,8 @@ describe("Mutable type helper", () => {
     const doc = createTypedDoc(DocSchema)
 
     change(doc, (root: any) => {
-      root.meta.title = "Test"
-      root.meta.count = 42
+      root.meta.title.set("Test")
+      root.meta.count.set(42)
     })
 
     const meta = doc.meta
@@ -297,9 +297,9 @@ describe("RefMode type separation", () => {
       expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
     })
 
-    it("StringValueShape._draft is string", () => {
+    it("StringValueShape._draft is PlainValueRef<string> (same as _mutable)", () => {
       type Result = StringValueShape["_draft"]
-      expectTypeOf<Result>().toEqualTypeOf<string>()
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
     })
 
     it("NumberValueShape._mutable is PlainValueRef<number>", () => {
@@ -307,9 +307,9 @@ describe("RefMode type separation", () => {
       expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<number>>()
     })
 
-    it("NumberValueShape._draft is number", () => {
+    it("NumberValueShape._draft is PlainValueRef<number> (same as _mutable)", () => {
       type Result = NumberValueShape["_draft"]
-      expectTypeOf<Result>().toEqualTypeOf<number>()
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<number>>()
     })
   })
 
@@ -325,26 +325,28 @@ describe("RefMode type separation", () => {
       expectTypeOf<TitleType>().toEqualTypeOf<PlainValueRef<string>>()
     })
 
-    it("draft mode returns raw properties for primitives", () => {
+    it("draft mode returns PlainValueRef properties (same as mutable)", () => {
       type Ref = StructRef<TestShapes, "draft">
       type TitleType = Ref["title"]
-      expectTypeOf<TitleType>().toEqualTypeOf<string>()
+      expectTypeOf<TitleType>().toEqualTypeOf<PlainValueRef<string>>()
     })
   })
 
   describe("ListRef with mode", () => {
-    it("mutable mode returns PlainValueRef elements", () => {
+    it("mutable mode .get() returns PlainValueRef elements", () => {
       type Ref = ListRef<StringValueShape, "mutable">
-      type ElementType = Ref[0]
+      type ElementType = ReturnType<Ref["get"]>
       expectTypeOf<ElementType>().toEqualTypeOf<
         PlainValueRef<string> | undefined
       >()
     })
 
-    it("draft mode returns raw elements", () => {
+    it("draft mode .get() returns PlainValueRef elements (same as mutable)", () => {
       type Ref = ListRef<StringValueShape, "draft">
-      type ElementType = Ref[0]
-      expectTypeOf<ElementType>().toEqualTypeOf<string | undefined>()
+      type ElementType = ReturnType<Ref["get"]>
+      expectTypeOf<ElementType>().toEqualTypeOf<
+        PlainValueRef<string> | undefined
+      >()
     })
   })
 
@@ -354,9 +356,9 @@ describe("RefMode type separation", () => {
       expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
     })
 
-    it("InferDraftType extracts _draft", () => {
+    it("InferDraftType extracts _draft (now PlainValueRef, same as _mutable)", () => {
       type Result = InferDraftType<StringValueShape>
-      expectTypeOf<Result>().toEqualTypeOf<string>()
+      expectTypeOf<Result>().toEqualTypeOf<PlainValueRef<string>>()
     })
   })
 
@@ -372,9 +374,9 @@ describe("RefMode type separation", () => {
       type DraftType = Draft<typeof schema>
       type MetaType = DraftType["meta"]
 
-      // Inside change(), meta.title should be string, not PlainValueRef<string>
-      expectTypeOf<MetaType["title"]>().toEqualTypeOf<string>()
-      expectTypeOf<MetaType["count"]>().toEqualTypeOf<number>()
+      // Inside change(), meta.title is PlainValueRef<string> (draft = mutable)
+      expectTypeOf<MetaType["title"]>().toEqualTypeOf<PlainValueRef<string>>()
+      expectTypeOf<MetaType["count"]>().toEqualTypeOf<PlainValueRef<number>>()
     })
   })
 
@@ -390,14 +392,17 @@ describe("RefMode type separation", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        // Inside change(), these should be plain types (boolean, number)
-        // not PlainValueRef<boolean>, PlainValueRef<number>
-        expectTypeOf(draft.settings.darkMode).toEqualTypeOf<boolean>()
-        expectTypeOf(draft.settings.fontSize).toEqualTypeOf<number>()
+        // Inside change(), these are PlainValueRef (draft = mutable, unified API)
+        expectTypeOf(draft.settings.darkMode).toEqualTypeOf<
+          PlainValueRef<boolean>
+        >()
+        expectTypeOf(draft.settings.fontSize).toEqualTypeOf<
+          PlainValueRef<number>
+        >()
 
         // Direct assignment should be valid (no type error)
-        draft.settings.darkMode = true
-        draft.settings.fontSize = 16
+        draft.settings.darkMode.set(true)
+        draft.settings.fontSize.set(16)
       })
     })
 

@@ -84,3 +84,31 @@ export function writeListValue(
 
   internals.commitIfAuto()
 }
+
+/**
+ * Write a value to a nested path within a list item, using read-modify-write.
+ *
+ * This is needed when mutating a property inside a list item (e.g., `item.active.set(true)`
+ * where `item` is at list index 0 and `active` is a nested path within the item).
+ *
+ * The operation:
+ * 1. Reads the current item at the given index
+ * 2. Updates the value at the nested path within the item
+ * 3. Writes the entire modified item back to the list
+ *
+ * @param internals - The list ref's internals
+ * @param index - The list index of the item
+ * @param nestedPath - Path within the item to the value (e.g., ["active"] or ["metadata", "published"])
+ * @param value - The value to write at the nested path
+ */
+export function writeListValueAtPath(
+  internals: BaseRefInternals<any>,
+  index: number,
+  nestedPath: string[],
+  value: unknown,
+): void {
+  const container = internals.getContainer() as LoroList | LoroMovableList
+  const current = container.get(index) ?? {}
+  const updated = setAtPath(current, nestedPath, value)
+  writeListValue(internals, index, updated)
+}

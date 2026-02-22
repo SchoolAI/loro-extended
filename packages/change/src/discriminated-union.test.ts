@@ -225,11 +225,11 @@ describe("discriminatedUnion", () => {
 
         change(doc, draft => {
           // This should work now that MapDraftNode recognizes discriminatedUnion as a value shape
-          draft.state.presence = {
+          draft.state.presence.set({
             type: "server",
             cars: { p1: { x: 10, y: 20 } },
             tick: 100,
-          }
+          })
         })
 
         expect(doc.toJSON().state.presence).toEqual({

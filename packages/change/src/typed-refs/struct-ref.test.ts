@@ -24,16 +24,16 @@ describe("Struct value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.config.name = "initial"
-        draft.config.count = 1
+        draft.config.name.set("initial")
+        draft.config.count.set(1)
       })
       expect(value(doc.config.name)).toBe("initial")
       expect(value(doc.config.count)).toBe(1)
 
       // Second change - BUG: values stay at initial values
       change(doc, draft => {
-        draft.config.name = "updated"
-        draft.config.count = 2
+        draft.config.name.set("updated")
+        draft.config.count.set(2)
       })
       expect(value(doc.config.name)).toBe("updated") // FAILS: returns "initial"
       expect(value(doc.config.count)).toBe(2) // FAILS: returns 1
@@ -50,7 +50,7 @@ describe("Struct value updates across change() calls", () => {
 
       for (let i = 1; i <= 5; i++) {
         change(doc, draft => {
-          draft.settings.value = i
+          draft.settings.value.set(i)
         })
         expect(value(doc.settings.value)).toBe(i) // FAILS on i > 1
       }
@@ -66,12 +66,12 @@ describe("Struct value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.flags.enabled = true
+        draft.flags.enabled.set(true)
       })
       expect(value(doc.flags.enabled)).toBe(true)
 
       change(doc, draft => {
-        draft.flags.enabled = false
+        draft.flags.enabled.set(false)
       })
       expect(value(doc.flags.enabled)).toBe(false) // FAILS: returns true
     })
@@ -90,12 +90,12 @@ describe("Struct value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.outer.inner.value = 100
+        draft.outer.inner.value.set(100)
       })
       expect(value(doc.outer.inner.value)).toBe(100)
 
       change(doc, draft => {
-        draft.outer.inner.value = 200
+        draft.outer.inner.value.set(200)
       })
       expect(value(doc.outer.inner.value)).toBe(200) // FAILS: returns 100
     })
@@ -115,23 +115,21 @@ describe("Struct value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.users.user1 = { name: "Alice", age: 30 }
+        draft.users.set("user1", { name: "Alice", age: 30 })
       })
       expect(value(doc.users.user1?.name)).toBe("Alice")
       expect(value(doc.users.user1?.age)).toBe(30)
 
       // Update the struct's value properties
       change(doc, draft => {
-        const user = draft.users.get("user1") as
-          | { name: string; age: number }
-          | undefined
+        const user = draft.users.get("user1")
         if (user) {
-          user.name = "Bob"
-          user.age = 25
+          user.name.set("Bob")
+          user.age.set(25)
         }
       })
-      expect(value(doc.users.user1?.name)).toBe("Bob") // FAILS: returns "Alice"
-      expect(value(doc.users.user1?.age)).toBe(25) // FAILS: returns 30
+      expect(value(doc.users.user1?.name)).toBe("Bob")
+      expect(value(doc.users.user1?.age)).toBe(25)
     })
   })
 
@@ -146,12 +144,12 @@ describe("Struct value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.data.status = "pending"
+        draft.data.status.set("pending")
       })
       expect(doc.toJSON().data).toEqual({ status: "pending" })
 
       change(doc, draft => {
-        draft.data.status = "complete"
+        draft.data.status.set("complete")
       })
       expect(doc.toJSON().data).toEqual({ status: "complete" })
     })
@@ -172,13 +170,13 @@ describe("Struct value updates across change() calls", () => {
 
       // First set
       change(doc, draft => {
-        draft.config.value = 100
+        draft.config.value.set(100)
       })
       expect(value(doc.config.value)).toBe(100)
 
       // Second set - PlainValueRef reads fresh from the container
       change(doc, draft => {
-        draft.config.value = 200
+        draft.config.value.set(200)
       })
       expect(value(doc.config.value)).toBe(200)
     })

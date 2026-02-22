@@ -28,7 +28,7 @@ describe("Mergeable Flattened Containers", () => {
 
       // Access nested struct
       change(doc, draft => {
-        draft.data.nested.value = "hello"
+        draft.data.nested.value.set("hello")
       })
 
       expect(value(doc.data.nested.value)).toBe("hello")
@@ -47,7 +47,7 @@ describe("Mergeable Flattened Containers", () => {
 
       // Access nested struct to trigger container creation
       change(doc, draft => {
-        draft.data.nested.value = "hello"
+        draft.data.nested.value.set("hello")
       })
 
       // Check that root containers exist with path-based names
@@ -75,11 +75,13 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: true })
 
       // Create players
-      doc.players.alice = { score: 100, name: "Alice" }
-      doc.players.bob = { score: 200, name: "Bob" }
+      change(doc, draft => {
+        draft.players.set("alice", { score: 100, name: "Alice" })
+        draft.players.set("bob", { score: 200, name: "Bob" })
+      })
 
-      expect(value(doc.players.alice.score)).toBe(100)
-      expect(value(doc.players.bob.name)).toBe("Bob")
+      expect(value(doc.players.alice?.score)).toBe(100)
+      expect(value(doc.players.bob?.name)).toBe("Bob")
 
       // Check root containers
       const loroDoc = loro(doc)
@@ -105,9 +107,11 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: true })
 
       // Create entry with hyphenated key
-      doc.config["api-url"] = { value: "https://example.com" }
+      change(doc, draft => {
+        draft.config.set("api-url", { value: "https://example.com" })
+      })
 
-      expect(value(doc.config["api-url"].value)).toBe("https://example.com")
+      expect(value(doc.config["api-url"]?.value)).toBe("https://example.com")
 
       // Check that the root container name is properly escaped
       const loroDoc = loro(doc)
@@ -127,12 +131,16 @@ describe("Mergeable Flattened Containers", () => {
       // Peer A creates a doc and adds an item
       const docA = createTypedDoc(schema, { mergeable: true })
       loro(docA).setPeerId("1")
-      docA.data.items.a = "from A"
+      change(docA, draft => {
+        draft.data.items.set("a", "from A")
+      })
 
       // Peer B creates a doc and adds a different item
       const docB = createTypedDoc(schema, { mergeable: true })
       loro(docB).setPeerId("2")
-      docB.data.items.b = "from B"
+      change(docB, draft => {
+        draft.data.items.set("b", "from B")
+      })
 
       // Sync via import
       const exportA = loro(docA).export({ mode: "update" })
@@ -160,12 +168,16 @@ describe("Mergeable Flattened Containers", () => {
       // Peer A creates alice
       const docA = createTypedDoc(schema, { mergeable: true })
       loro(docA).setPeerId("1")
-      docA.players.alice = { score: 100 }
+      change(docA, draft => {
+        draft.players.set("alice", { score: 100 })
+      })
 
       // Peer B creates bob
       const docB = createTypedDoc(schema, { mergeable: true })
       loro(docB).setPeerId("2")
-      docB.players.bob = { score: 200 }
+      change(docB, draft => {
+        draft.players.set("bob", { score: 200 })
+      })
 
       // Sync via import
       const exportA = loro(docA).export({ mode: "update" })
@@ -193,12 +205,16 @@ describe("Mergeable Flattened Containers", () => {
       // Peer A creates a doc and adds an item
       const docA = createTypedDoc(schema, { mergeable: true })
       loro(docA).setPeerId("1")
-      docA.data.items.a = "from A"
+      change(docA, draft => {
+        draft.data.items.set("a", "from A")
+      })
 
       // Peer B creates a doc and adds a different item
       const docB = createTypedDoc(schema, { mergeable: true })
       loro(docB).setPeerId("2")
-      docB.data.items.b = "from B"
+      change(docB, draft => {
+        draft.data.items.set("b", "from B")
+      })
 
       // Sync via applyDiff (simulating lens propagation)
       const diffA = loro(docA).diff([], loro(docA).frontiers(), false)
@@ -226,12 +242,16 @@ describe("Mergeable Flattened Containers", () => {
       // Peer A creates alice
       const docA = createTypedDoc(schema, { mergeable: true })
       loro(docA).setPeerId("1")
-      docA.players.alice = { score: 100 }
+      change(docA, draft => {
+        draft.players.set("alice", { score: 100 })
+      })
 
       // Peer B creates bob
       const docB = createTypedDoc(schema, { mergeable: true })
       loro(docB).setPeerId("2")
-      docB.players.bob = { score: 200 }
+      change(docB, draft => {
+        draft.players.set("bob", { score: 200 })
+      })
 
       // Sync via applyDiff
       const diffA = loro(docA).diff([], loro(docA).frontiers(), false)
@@ -260,7 +280,7 @@ describe("Mergeable Flattened Containers", () => {
 
       const doc = createTypedDoc(schema, { mergeable: true })
       change(doc, draft => {
-        draft.data.nested.value = "hello"
+        draft.data.nested.value.set("hello")
       })
 
       const json = doc.toJSON()
@@ -284,8 +304,8 @@ describe("Mergeable Flattened Containers", () => {
 
       const doc = createTypedDoc(schema, { mergeable: true })
       change(doc, draft => {
-        draft.players.alice = { score: 100 }
-        draft.players.bob = { score: 200 }
+        draft.players.set("alice", { score: 100 })
+        draft.players.set("bob", { score: 200 })
       })
 
       const json = doc.toJSON()
@@ -311,7 +331,7 @@ describe("Mergeable Flattened Containers", () => {
       // Explicitly non-mergeable doc
       const doc = createTypedDoc(schema, { mergeable: false })
       change(doc, draft => {
-        draft.data.nested.value = "hello"
+        draft.data.nested.value.set("hello")
       })
 
       // Check that nested containers are used (not root containers)
@@ -334,9 +354,11 @@ describe("Mergeable Flattened Containers", () => {
       })
 
       const doc = createTypedDoc(schema, { mergeable: false })
-      doc.players.alice = { score: 100 }
+      change(doc, draft => {
+        draft.players.set("alice", { score: 100 })
+      })
 
-      expect(value(doc.players.alice.score)).toBe(100)
+      expect(value(doc.players.alice?.score)).toBe(100)
       expect(doc.toJSON()).toEqual({
         players: {
           alice: { score: 100 },
@@ -355,12 +377,12 @@ describe("Mergeable Flattened Containers", () => {
 
       const doc = createTypedDoc(schema, { mergeable: true })
       change(doc, draft => {
-        draft.data.value = "v1"
+        draft.data.value.set("v1")
       })
 
       const frontiers = loro(doc).frontiers()
       change(doc, draft => {
-        draft.data.value = "v2"
+        draft.data.value.set("v2")
       })
 
       const forked = ext(doc).forkAt(frontiers)
@@ -368,7 +390,7 @@ describe("Mergeable Flattened Containers", () => {
       // The forked doc should also be mergeable
       // We can verify by checking that it uses root containers
       change(forked, draft => {
-        draft.data.value = "forked"
+        draft.data.value.set("forked")
       })
 
       const loroDoc = loro(forked)

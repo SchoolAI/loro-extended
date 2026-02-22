@@ -44,14 +44,8 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       change(doc, draft => {
         const draftNode = draft.states.getNodeByID(capturedNodeId)
         if (draftNode) {
-          // Inside change(), use type assertion for node.data since TreeNodeRef.data
-          // doesn't yet support Mode parameter
-          const data = draftNode.data as unknown as {
-            name: string
-            value: number
-          }
-          data.name = "updated"
-          data.value = 999
+          draftNode.data.name.set("updated")
+          draftNode.data.value.set(999)
         }
       })
 
@@ -86,8 +80,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
         change(doc, draft => {
           const draftNode = draft.tree.getNodeByID(capturedNodeId)
           if (draftNode) {
-            const data = draftNode.data as unknown as { count: number }
-            data.count = i
+            draftNode.data.count.set(i)
           }
         })
         expect(value(node?.data.count)).toBe(i)
@@ -119,8 +112,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       change(doc, draft => {
         const draftNode = draft.nodes.getNodeByID(capturedNodeId)
         if (draftNode) {
-          const data = draftNode.data as unknown as { active: boolean }
-          data.active = false
+          draftNode.data.active.set(false)
         }
       })
 
@@ -158,11 +150,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       change(doc, draft => {
         const draftNode = draft.states.getNodeByID(capturedNodeId)
         if (draftNode) {
-          const data = draftNode.data as unknown as {
-            name: string
-            facts: { set(k: string, v: string): void }
-          }
-          data.name = "state2"
+          draftNode.data.name.set("state2")
           draftNode.data.facts.set("key1", "updated")
           draftNode.data.facts.set("key2", "new")
         }
@@ -210,12 +198,10 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
         const parent = draft.tree.getNodeByID(capturedParentId)
         const child = draft.tree.getNodeByID(capturedChildId)
         if (parent) {
-          const data = parent.data as unknown as { label: string }
-          data.label = "parent-updated"
+          parent.data.label.set("parent-updated")
         }
         if (child) {
-          const data = child.data as unknown as { label: string }
-          data.label = "child-updated"
+          child.data.label.set("child-updated")
         }
       })
 
@@ -247,8 +233,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       change(doc, draft => {
         const node = draft.tree.roots()[0]
         if (node) {
-          const data = node.data as unknown as { status: string }
-          data.status = "complete"
+          node.data.status.set("complete")
         }
       })
 

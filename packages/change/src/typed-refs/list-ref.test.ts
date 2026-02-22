@@ -18,8 +18,8 @@ describe("ListRef", () => {
       change(doc, draft => {
         draft.users.push({ name: "Alice" })
 
-        // Update via index
-        ;(draft.users as any)[0] = { name: "Bob" }
+        // Update via .set() method
+        draft.users.set(0, { name: "Bob" })
       })
 
       expect(doc.toJSON().users[0]).toEqual({ name: "Bob" })
@@ -35,7 +35,7 @@ describe("ListRef", () => {
       change(doc, draft => {
         draft.tags.push("a")
         draft.tags.push("b")
-        draft.tags[1] = "c"
+        draft.tags.set(1, "c")
       })
 
       expect(doc.toJSON().tags).toEqual(["a", "c"])

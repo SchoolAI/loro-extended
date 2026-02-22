@@ -27,11 +27,11 @@ describe("forkAt", () => {
 
       // Forked doc should have the earlier state
       expect(forkedDoc.title.toString()).toBe("Hello")
-      expect(forkedDoc.count.value).toBe(5)
+      expect(forkedDoc.count.get()).toBe(5)
 
       // Original doc should still have the latest state
       expect(doc.title.toString()).toBe("World")
-      expect(doc.count.value).toBe(15)
+      expect(doc.count.get()).toBe(15)
     })
 
     it("should preserve type safety on forked doc", () => {
@@ -55,7 +55,7 @@ describe("forkAt", () => {
 
       // Type safety: forkedDoc.items should have the same type
       expect(forkedDoc.items.length).toBe(1)
-      const firstItem = forkedDoc.items[0]
+      const firstItem = forkedDoc.items.get(0)
       if (firstItem) {
         expect(firstItem.name.toString()).toBe("Task 1")
         expect(value(firstItem.done)).toBe(false)
@@ -82,15 +82,15 @@ describe("forkAt", () => {
       forkedDoc.value.increment(100)
 
       // Original should be unchanged
-      expect(doc.value.value).toBe(10)
-      expect(forkedDoc.value.value).toBe(110)
+      expect(doc.value.get()).toBe(10)
+      expect(forkedDoc.value.get()).toBe(110)
 
       // Mutate original
       doc.value.increment(5)
 
       // Forked should be unchanged
-      expect(doc.value.value).toBe(15)
-      expect(forkedDoc.value.value).toBe(110)
+      expect(doc.value.get()).toBe(15)
+      expect(forkedDoc.value.get()).toBe(110)
     })
 
     it("should work with complex schemas (maps, trees)", () => {
@@ -220,7 +220,7 @@ describe("forkAt", () => {
       const forkedDoc = ext(doc).forkAt(emptyFrontiers)
 
       // Should be at initial state (placeholder value)
-      expect(forkedDoc.count.value).toBe(0)
+      expect(forkedDoc.count.get()).toBe(0)
     })
 
     it("should fork at current frontiers (same state)", () => {

@@ -181,7 +181,7 @@ describe("loro() function", () => {
     it("should allow calling LoroMap methods directly", () => {
       const doc = createTypedDoc(schema)
       change(doc, draft => {
-        draft.settings.darkMode = true
+        draft.settings.darkMode.set(true)
       })
 
       const loroMap = loro(doc.settings)
@@ -198,7 +198,7 @@ describe("loro() function", () => {
 
       // Use change() to ensure the subscription fires
       change(doc, draft => {
-        draft.settings.darkMode = true
+        draft.settings.darkMode.set(true)
       })
 
       expect(events.length).toBeGreaterThan(0)
@@ -310,7 +310,7 @@ describe("ext() function", () => {
         })
 
         expect(doc.title.toString()).toBe("Hello")
-        expect(doc.count.value).toBe(5)
+        expect(doc.count.get()).toBe(5)
         expect(doc.items.toJSON()).toEqual(["item1"])
       })
 
@@ -341,7 +341,7 @@ describe("ext() function", () => {
           },
         )
 
-        expect(doc.count.value).toBe(6)
+        expect(doc.count.get()).toBe(6)
       })
     })
 

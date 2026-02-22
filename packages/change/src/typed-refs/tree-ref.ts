@@ -8,6 +8,7 @@ import type { Infer } from "../types.js"
 import { INTERNAL_SYMBOL, TypedRef, type TypedRefParams } from "./base.js"
 import type { TreeNodeRef } from "./tree-node-ref.js"
 import { TreeRefInternals } from "./tree-ref-internals.js"
+import { assignPlainValueToTypedRef } from "./utils.js"
 
 /**
  * Typed ref for tree (forest) containers - thin facade that delegates to TreeRefInternals.
@@ -93,7 +94,15 @@ export class TreeRef<DataShape extends StructContainerShape> extends TypedRef<
     // Initialize data if provided
     if (initialData) {
       for (const [key, value] of Object.entries(initialData)) {
-        ;(nodeRef.data as any)[key] = value
+        const propRef = (nodeRef.data as any)[key]
+        // Use assignPlainValueToTypedRef for container refs (RecordRef, StructRef, etc.)
+        // This properly handles the different container types and their APIs
+        if (propRef && INTERNAL_SYMBOL in propRef) {
+          assignPlainValueToTypedRef(propRef, value)
+        } else if (propRef && typeof propRef.set === "function") {
+          // PlainValueRef for value shapes
+          propRef.set(value)
+        }
       }
     }
 

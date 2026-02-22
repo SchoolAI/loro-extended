@@ -10,7 +10,7 @@ describe("Equality Check", () => {
   it("should compare CounterRef.value to plain number", () => {
     const doc = createTypedDoc(schema)
     // doc.counter returns a CounterRef, use .value to get the number
-    expect(doc.counter.value).toEqual(1)
+    expect(doc.counter.get()).toEqual(1)
   })
 
   it("should compare equal using toJSON", () => {

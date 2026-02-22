@@ -85,8 +85,8 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         // Use type assertion for dynamic property access on plain record values
-        ;(draft.wrapper.config as any).theme = "dark"
-        ;(draft.wrapper.config as any).lang = "en"
+        ;(draft.wrapper.config as any).theme.set("dark")
+        ;(draft.wrapper.config as any).lang.set("en")
       })
 
       expect(doc.toJSON().wrapper.config).toEqual({
@@ -96,8 +96,7 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         // Use type assertion for dynamic property access on plain record values
-        delete (draft.wrapper.config as any).theme
-        ;(draft.wrapper.config as any).lang = "fr"
+        draft.wrapper.config.set({ lang: "fr" })
       })
 
       expect(doc.toJSON().wrapper.config).toEqual({
@@ -116,8 +115,8 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         // Use type assertion for dynamic property access on plain record values
-        ;(draft.wrapper.stats as any).visits = 100
-        ;(draft.wrapper.stats as any).clicks = 50
+        ;(draft.wrapper.stats as any).visits.set(100)
+        ;(draft.wrapper.stats as any).clicks.set(50)
       })
 
       expect(doc.toJSON().wrapper.stats).toEqual({
@@ -139,14 +138,14 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         // Use type assertion for dynamic property access on plain record values
-        ;(draft.wrapper.settings as any).ui = {
+        ;(draft.wrapper.settings as any).ui.set({
           darkMode: true,
           sidebar: false,
-        }
-        ;(draft.wrapper.settings as any).notifications = {
+        })
+        ;(draft.wrapper.settings as any).notifications.set({
           email: true,
           push: true,
-        }
+        })
       })
 
       expect(doc.toJSON().wrapper.settings).toEqual({
@@ -176,21 +175,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        const alice = draft.users.get("u1") as
-          | { name: string; age: number }
-          | undefined
-        if (alice) {
-          alice.name = "Alice"
-          alice.age = 30
-        }
-
-        const bob = draft.users.get("u2") as
-          | { name: string; age: number }
-          | undefined
-        if (bob) {
-          bob.name = "Bob"
-          bob.age = 25
-        }
+        draft.users.set("u1", { name: "Alice", age: 30 })
+        draft.users.set("u2", { name: "Bob", age: 25 })
       })
 
       expect(doc.toJSON().users).toEqual({
@@ -214,12 +200,12 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.participants["student-1"] = {
+        draft.participants.set("student-1", {
           id: "student-1",
           role: "student",
           name: "Alice",
           color: "indigo",
-        }
+        })
       })
 
       expect(doc.toJSON().participants["student-1"]).toEqual({
@@ -244,11 +230,11 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.data["item-1"] = {
+        draft.data.set("item-1", {
           info: {
             name: "Item 1",
           },
-        }
+        })
       })
 
       expect(doc.toJSON().data["item-1"]).toEqual({
@@ -266,14 +252,13 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.histories.user1 = ["a", "b"]
+        draft.histories.set("user1", ["a", "b"])
       })
 
       expect(doc.toJSON().histories.user1).toEqual(["a", "b"])
 
       change(doc, draft => {
-        // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
-        draft.histories["user1"] = ["c"]
+        draft.histories.set("user1", ["c"])
       })
 
       // biome-ignore lint/complexity/useLiteralKeys: tests indexed assignment
@@ -289,7 +274,7 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         draft.notes.set("note-1", "Hello World")
-        draft.notes["note-2"] = "Another note"
+        draft.notes.set("note-2", "Another note")
       })
 
       expect(doc.toJSON().notes).toEqual({
@@ -307,7 +292,7 @@ describe("Record Types", () => {
 
       change(doc, draft => {
         draft.scores.set("alice", 100)
-        draft.scores.bob = 50
+        draft.scores.set("bob", 50)
       })
 
       expect(doc.toJSON().scores).toEqual({
@@ -361,7 +346,7 @@ describe("Record Types", () => {
 
       // First, set a value for a specific peer
       change(doc, d => {
-        d.preferences.peer1 = { showTip: true }
+        d.preferences.set("peer1", { showTip: true })
       })
 
       // This should work - accessing an existing key
@@ -423,8 +408,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.scores.alice = 100
-        draft.scores.bob = 50
+        draft.scores.set("alice", 100)
+        draft.scores.set("bob", 50)
       })
 
       // Outside change(), value shapes return PlainValueRef
@@ -446,8 +431,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.scores.alice = 100
-        draft.scores.bob = 50
+        draft.scores.set("alice", 100)
+        draft.scores.set("bob", 50)
       })
 
       // Outside change(), value shapes return PlainValueRef
@@ -476,8 +461,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.players.alice = { name: "Alice", score: 100 }
-        draft.players.bob = { name: "Bob", score: 50 }
+        draft.players.set("alice", { name: "Alice", score: 100 })
+        draft.players.set("bob", { name: "Bob", score: 50 })
       })
 
       const values = doc.players.values()
@@ -502,8 +487,8 @@ describe("Record Types", () => {
       const doc = createTypedDoc(schema)
 
       change(doc, draft => {
-        draft.players.alice = { name: "Alice", score: 100 }
-        draft.players.bob = { name: "Bob", score: 50 }
+        draft.players.set("alice", { name: "Alice", score: 100 })
+        draft.players.set("bob", { name: "Bob", score: 50 })
       })
 
       const entries = doc.players.entries()
@@ -537,8 +522,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
         })
 
         expect(doc.toJSON().scores).toEqual({ alice: 100, bob: 50 })
@@ -597,9 +582,9 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
-          draft.scores.charlie = 25
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
+          draft.scores.set("charlie", 25)
         })
 
         change(doc, draft => {
@@ -645,8 +630,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
         })
 
         // Track subscription calls
@@ -694,8 +679,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
         })
 
         change(doc, draft => {
@@ -715,8 +700,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
         })
 
         change(doc, draft => {
@@ -745,7 +730,7 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.players.alice = { name: "Alice", score: 100 }
+          draft.players.set("alice", { name: "Alice", score: 100 })
         })
 
         change(doc, draft => {
@@ -796,9 +781,9 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
-          draft.scores.charlie = 25
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
+          draft.scores.set("charlie", 25)
         })
 
         expect(doc.toJSON().scores).toEqual({
@@ -839,9 +824,9 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.scores.alice = 100
-          draft.scores.bob = 50
-          draft.scores.charlie = 25
+          draft.scores.set("alice", 100)
+          draft.scores.set("bob", 50)
+          draft.scores.set("charlie", 25)
         })
 
         // Track subscription calls
@@ -874,8 +859,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.players.alice = { name: "Alice", score: 100 }
-          draft.players.bob = { name: "Bob", score: 50 }
+          draft.players.set("alice", { name: "Alice", score: 100 })
+          draft.players.set("bob", { name: "Bob", score: 50 })
         })
 
         change(doc, draft => {
@@ -902,7 +887,7 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.players.alice = { name: "Alice", score: 100 }
+          draft.players.set("alice", { name: "Alice", score: 100 })
         })
 
         change(doc, draft => {
@@ -930,8 +915,8 @@ describe("Record Types", () => {
         const doc = createTypedDoc(schema)
 
         change(doc, draft => {
-          draft.players.alice = { name: "Alice", score: 100 }
-          draft.players.bob = { name: "Bob", score: 50 }
+          draft.players.set("alice", { name: "Alice", score: 100 })
+          draft.players.set("bob", { name: "Bob", score: 50 })
         })
 
         change(doc, draft => {

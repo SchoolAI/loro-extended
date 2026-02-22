@@ -12,7 +12,10 @@ import type {
 } from "loro-crdt"
 
 import { LORO_SYMBOL } from "./loro.js"
-import type { PlainValueRef } from "./plain-value-ref/types.js"
+import type {
+  DeepPlainValueRef,
+  PlainValueRef,
+} from "./plain-value-ref/types.js"
 import type { CounterRef } from "./typed-refs/counter-ref.js"
 import type { ListRef } from "./typed-refs/list-ref.js"
 import type { MovableListRef } from "./typed-refs/movable-list-ref.js"
@@ -35,19 +38,23 @@ export type RefMode = "mutable" | "draft"
  * Extracts `_mutable` or `_draft` from a shape based on the mode.
  * Used by container refs to switch between mutable and draft property types.
  *
- * @example
- * ```typescript
- * // Returns PlainValueRef<string> for mutable mode
- * type MutableTitle = SelectByMode<StringValueShape<string>, "mutable">
- *
- * // Returns string for draft mode
- * type DraftTitle = SelectByMode<StringValueShape<string>, "draft">
- * ```
+ * The result is passed through `Deepen` to expand `PlainValueRef<T>` into
+ * `DeepPlainValueRef<T>` when T is a plain object, enabling nested property
+ * access like `ref.metadata.author.get()`.
  */
 export type SelectByMode<
   S extends Shape<any, any, any, any>,
   Mode extends RefMode,
-> = Mode extends "mutable" ? S["_mutable"] : S["_draft"]
+> = Deepen<Mode extends "mutable" ? S["_mutable"] : S["_draft"]>
+
+/**
+ * Expands PlainValueRef<T> into DeepPlainValueRef<T> so that object-typed
+ * PlainValueRefs expose nested properties.
+ *
+ * This is applied at the access point (SelectByMode) rather than in the
+ * shape definitions to avoid circular type references in the shape system.
+ */
+type Deepen<T> = T extends PlainValueRef<infer U> ? DeepPlainValueRef<U> : T
 
 export interface Shape<Plain, Mutable, Draft = Mutable, Placeholder = Plain> {
   readonly _type: string
@@ -320,36 +327,51 @@ export type ContainerShape =
 export type ContainerType = ContainerShape["_type"]
 
 // LoroValue shape types - a shape for each of Loro's Value types
-// NOTE: _mutable returns PlainValueRef<T> for reactive access outside change()
-// _draft returns plain T for ergonomic mutation inside change() callbacks
+// NOTE: Both _mutable and _draft return PlainValueRef<T>.
+// Use .get() to read and .set() to write uniformly inside and outside change().
 export interface StringValueShape<T extends string = string>
-  extends Shape<T, PlainValueRef<T>, T, T> {
+  extends Shape<T, PlainValueRef<T>, PlainValueRef<T>, T> {
   readonly _type: "value"
   readonly valueType: "string"
   readonly options?: T[]
 }
 export interface NumberValueShape
-  extends Shape<number, PlainValueRef<number>, number, number> {
+  extends Shape<number, PlainValueRef<number>, PlainValueRef<number>, number> {
   readonly _type: "value"
   readonly valueType: "number"
 }
 export interface BooleanValueShape
-  extends Shape<boolean, PlainValueRef<boolean>, boolean, boolean> {
+  extends Shape<
+    boolean,
+    PlainValueRef<boolean>,
+    PlainValueRef<boolean>,
+    boolean
+  > {
   readonly _type: "value"
   readonly valueType: "boolean"
 }
 export interface NullValueShape
-  extends Shape<null, PlainValueRef<null>, null, null> {
+  extends Shape<null, PlainValueRef<null>, PlainValueRef<null>, null> {
   readonly _type: "value"
   readonly valueType: "null"
 }
 export interface UndefinedValueShape
-  extends Shape<undefined, PlainValueRef<undefined>, undefined, undefined> {
+  extends Shape<
+    undefined,
+    PlainValueRef<undefined>,
+    PlainValueRef<undefined>,
+    undefined
+  > {
   readonly _type: "value"
   readonly valueType: "undefined"
 }
 export interface Uint8ArrayValueShape
-  extends Shape<Uint8Array, PlainValueRef<Uint8Array>, Uint8Array, Uint8Array> {
+  extends Shape<
+    Uint8Array,
+    PlainValueRef<Uint8Array>,
+    PlainValueRef<Uint8Array>,
+    Uint8Array
+  > {
   readonly _type: "value"
   readonly valueType: "uint8array"
 }
@@ -359,15 +381,15 @@ export interface Uint8ArrayValueShape
  * This is the preferred way to define fixed-key plain value objects.
  * Identical structure to ObjectValueShape but with valueType: "struct".
  *
- * - `_mutable`: Returns PlainValueRef with nested property access via Proxy (outside change())
- * - `_draft`: Returns plain nested object for ergonomic mutation (inside change())
+ * - `_mutable`: Returns PlainValueRef with nested property access via Proxy
+ * - `_draft`: Same as _mutable (PlainValueRef) for unified method-based API
  */
 export interface StructValueShape<
   T extends Record<string, ValueShape> = Record<string, ValueShape>,
 > extends Shape<
     { [K in keyof T]: T[K]["_plain"] },
     PlainValueRef<{ [K in keyof T]: T[K]["_plain"] }>,
-    { [K in keyof T]: T[K]["_draft"] },
+    PlainValueRef<{ [K in keyof T]: T[K]["_plain"] }>,
     { [K in keyof T]: T[K]["_placeholder"] }
   > {
   readonly _type: "value"
@@ -381,7 +403,7 @@ export interface RecordValueShape<T extends ValueShape = ValueShape>
   extends Shape<
     Record<string, T["_plain"]>,
     PlainValueRef<Record<string, T["_plain"]>>,
-    Record<string, T["_draft"]>,
+    PlainValueRef<Record<string, T["_plain"]>>,
     Record<string, never>
   > {
   readonly _type: "value"
@@ -393,7 +415,7 @@ export interface ArrayValueShape<T extends ValueShape = ValueShape>
   extends Shape<
     T["_plain"][],
     PlainValueRef<T["_plain"][]>,
-    T["_draft"][],
+    PlainValueRef<T["_plain"][]>,
     never[]
   > {
   readonly _type: "value"
@@ -405,7 +427,7 @@ export interface UnionValueShape<T extends ValueShape[] = ValueShape[]>
   extends Shape<
     T[number]["_plain"],
     PlainValueRef<T[number]["_plain"]>,
-    T[number]["_draft"],
+    PlainValueRef<T[number]["_plain"]>,
     T[number]["_placeholder"]
   > {
   readonly _type: "value"
@@ -431,7 +453,7 @@ export interface DiscriminatedUnionValueShape<
   T extends Record<string, StructValueShape> = Record<string, StructValueShape>,
   Plain = T[keyof T]["_plain"],
   Mutable = PlainValueRef<Plain>,
-  Draft = T[keyof T]["_draft"],
+  Draft = Mutable,
   Placeholder = T[keyof T]["_placeholder"],
 > extends Shape<Plain, Mutable, Draft, Placeholder> {
   readonly _type: "value"
@@ -452,7 +474,7 @@ export interface DiscriminatedUnionValueShape<
  * ```
  */
 export interface AnyValueShape
-  extends Shape<Value, PlainValueRef<Value>, Value, undefined> {
+  extends Shape<Value, PlainValueRef<Value>, PlainValueRef<Value>, undefined> {
   readonly _type: "value"
   readonly valueType: "any"
 }
@@ -486,7 +508,7 @@ function makeNullable<S extends ValueShape>(
     valueType: "null" as const,
     _plain: null,
     _mutable: null as any,
-    _draft: null,
+    _draft: null as any,
     _placeholder: null,
   }
 
@@ -709,7 +731,7 @@ export const Shape = {
         valueType: "string" as const,
         _plain: (options[0] ?? "") as T,
         _mutable: {} as any,
-        _draft: (options[0] ?? "") as T,
+        _draft: {} as any,
         _placeholder: (options[0] ?? "") as T,
         options: options.length > 0 ? options : undefined,
       }
@@ -732,7 +754,7 @@ export const Shape = {
         valueType: "number" as const,
         _plain: 0,
         _mutable: {} as any,
-        _draft: 0,
+        _draft: {} as any,
         _placeholder: 0,
       }
       return Object.assign(base, {
@@ -754,7 +776,7 @@ export const Shape = {
         valueType: "boolean" as const,
         _plain: false,
         _mutable: {} as any,
-        _draft: false,
+        _draft: {} as any,
         _placeholder: false,
       }
       return Object.assign(base, {
@@ -774,7 +796,7 @@ export const Shape = {
       valueType: "null" as const,
       _plain: null,
       _mutable: {} as any,
-      _draft: null,
+      _draft: null as any,
       _placeholder: null,
     }),
 
@@ -783,7 +805,7 @@ export const Shape = {
       valueType: "undefined" as const,
       _plain: undefined,
       _mutable: {} as any,
-      _draft: undefined,
+      _draft: undefined as any,
       _placeholder: undefined,
     }),
 
@@ -794,7 +816,7 @@ export const Shape = {
         valueType: "uint8array" as const,
         _plain: new Uint8Array(),
         _mutable: {} as any,
-        _draft: new Uint8Array(),
+        _draft: {} as any,
         _placeholder: new Uint8Array(),
       }
       return Object.assign(base, {
@@ -824,7 +846,7 @@ export const Shape = {
         valueType: "uint8array" as const,
         _plain: new Uint8Array(),
         _mutable: {} as any,
-        _draft: new Uint8Array(),
+        _draft: {} as any,
         _placeholder: new Uint8Array(),
       }
       return Object.assign(base, {
@@ -852,7 +874,7 @@ export const Shape = {
       valueType: "any" as const,
       _plain: undefined as unknown as Value,
       _mutable: {} as any,
-      _draft: undefined as unknown as Value,
+      _draft: {} as any,
       _placeholder: undefined,
     }),
 

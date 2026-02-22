@@ -119,10 +119,10 @@ describe("CRDT Operations", () => {
 
       change(typedDoc, draft => {
         draft.counter.increment(7)
-        expect(draft.counter.value).toBe(7)
+        expect(draft.counter.get()).toBe(7)
 
         draft.counter.decrement(3)
-        expect(draft.counter.value).toBe(4)
+        expect(draft.counter.get()).toBe(4)
       })
     })
 
@@ -205,8 +205,8 @@ describe("CRDT Operations", () => {
 
         expect(draft.testList.length).toBe(2)
         expect(draft.testList.toArray()).toEqual(["a", "b"])
-        expect(draft.testList.get(0)).toBe("a")
-        expect(draft.testList.get(1)).toBe("b")
+        expect(value(draft.testList.get(0))).toBe("a")
+        expect(value(draft.testList.get(1))).toBe("b")
       })
     })
 
@@ -243,8 +243,9 @@ describe("CRDT Operations", () => {
 
       // Test move operation: move first item to the end
       const result = change(typedDoc, draft => {
-        // Inside change(), list items are plain values (not PlainValueRef)
-        const valueToMove = draft.items.get(0)
+        // PlainValueRef is a LIVE reference — capture the raw value BEFORE
+        // mutating the list, since delete() shifts indices.
+        const valueToMove = draft.items.get(0)?.get()
         if (valueToMove !== undefined) {
           draft.items.delete(0, 1)
           draft.items.insert(2, valueToMove)
@@ -308,7 +309,7 @@ describe("CRDT Operations", () => {
         draft.movableItems.push(20)
 
         expect(draft.movableItems.length).toBe(2)
-        expect(draft.movableItems.get(0)).toBe(10)
+        expect(value(draft.movableItems.get(0))).toBe(10)
         expect(draft.movableItems.toArray()).toEqual([10, 20])
       })
     })
@@ -327,9 +328,9 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.metadata.title = "Test Title"
-        draft.metadata.count = 42
-        draft.metadata.enabled = true
+        draft.metadata.title.set("Test Title")
+        draft.metadata.count.set(42)
+        draft.metadata.enabled.set(true)
       }).toJSON()
 
       expect(result.metadata.title).toBe("Test Title")
@@ -348,8 +349,8 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.config.tags = ["tag1", "tag2", "tag3"]
-        draft.config.numbers = [1, 2, 3]
+        draft.config.tags.set(["tag1", "tag2", "tag3"])
+        draft.config.numbers.set([1, 2, 3])
       }).toJSON()
 
       expect(result.config.tags).toEqual(["tag1", "tag2", "tag3"])
@@ -367,16 +368,18 @@ describe("CRDT Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       change(typedDoc, draft => {
-        draft.testMap.key1 = "value1"
-        draft.testMap.key2 = 123
+        draft.testMap.key1.set("value1")
+        draft.testMap.key2.set(123)
 
-        expect(draft.testMap.key1).toBe("value1")
+        expect(value(draft.testMap.key1)).toBe("value1")
         expect("key1" in draft.testMap).toBe(true)
         // Use Object.keys() instead of .keys()
         expect(Object.keys(draft.testMap)).toContain("key1")
         expect(Object.keys(draft.testMap)).toContain("key2")
-        expect(Object.values(draft.testMap)).toContain("value1")
-        expect(Object.values(draft.testMap)).toContain(123)
+        expect(Object.values(draft.testMap).map(v => value(v))).toContain(
+          "value1",
+        )
+        expect(Object.values(draft.testMap).map(v => value(v))).toContain(123)
       })
     })
 
@@ -478,9 +481,9 @@ describe("Nested Operations", () => {
       const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "Nested Article")
         draft.article.metadata.views.increment(10)
-        if (draft.article.metadata.author.name === "anon")
-          draft.article.metadata.author.name = "John Doe"
-        draft.article.metadata.author.email = "john@example.com"
+        if (draft.article.metadata.author.name.get() === "anon")
+          draft.article.metadata.author.name.set("John Doe")
+        draft.article.metadata.author.email.set("john@example.com")
       }).toJSON()
 
       expect(result.article.title).toBe("Nested Article")
@@ -502,8 +505,8 @@ describe("Nested Operations", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.mixed.plainString = "Hello"
-        draft.mixed.plainArray = [1, 2, 3]
+        draft.mixed.plainString.set("Hello")
+        draft.mixed.plainArray.set([1, 2, 3])
         draft.mixed.loroText.insert(0, "Loro Text")
         draft.mixed.loroCounter.increment(5)
       }).toJSON()
@@ -575,7 +578,7 @@ describe("Nested Operations", () => {
 
       const result1 = change(typedDoc, draft => {
         // natural object access & assignment for Value nodes
-        draft.articles.metadata.views.page = 1
+        draft.articles.metadata.views.page.set(1)
       }).toJSON()
 
       expect(result1).toEqual({
@@ -584,7 +587,7 @@ describe("Nested Operations", () => {
 
       const result2 = change(typedDoc, draft => {
         // natural object access & assignment for Value nodes
-        draft.articles.metadata = { views: { page: 2 } }
+        draft.articles.metadata.set({ views: { page: 2 } })
       }).toJSON()
 
       expect(result2).toEqual({
@@ -710,7 +713,7 @@ describe("TypedLoroDoc", () => {
       const result = change(typedDoc, draft => {
         draft.article.title.insert(0, "New Title")
         draft.article.metadata.views.increment(10)
-        draft.article.metadata.author = "John Doe"
+        draft.article.metadata.author.set("John Doe")
       }).toJSON()
 
       expect(result.article.title).toBe("New Title")
@@ -735,8 +738,8 @@ describe("TypedLoroDoc", () => {
       const typedDoc = createTypedDoc(schema)
 
       const result = change(typedDoc, draft => {
-        draft.profile.name = "John Doe"
-        draft.profile.email = "john@example.com"
+        draft.profile.name.set("John Doe")
+        draft.profile.email.set("john@example.com")
       }).toJSON()
 
       expect(result.profile.name).toBe("John Doe")
@@ -760,14 +763,14 @@ describe("TypedLoroDoc", () => {
 
           // Should accept string value
           const result = change(typedDoc, draft => {
-            draft.profile.email = "test@example.com"
+            draft.profile.email.set("test@example.com")
           }).toJSON()
 
           expect(result.profile.email).toBe("test@example.com")
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.profile.email = null
+            draft.profile.email.set(null)
           }).toJSON()
 
           expect(result2.profile.email).toBeNull()
@@ -785,7 +788,7 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().stats.age).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.stats.age = 25
+            draft.stats.age.set(25)
           }).toJSON()
 
           expect(result.stats.age).toBe(25)
@@ -803,7 +806,7 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().settings.enabled).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.settings.enabled = true
+            draft.settings.enabled.set(true)
           }).toJSON()
 
           expect(result.settings.enabled).toBe(true)
@@ -821,14 +824,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.candidates).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.candidates = { a: "Alice", b: "Bob" }
+            draft.data.candidates.set({ a: "Alice", b: "Bob" })
           }).toJSON()
 
           expect(result.data.candidates).toEqual({ a: "Alice", b: "Bob" })
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.candidates = null
+            draft.data.candidates.set(null)
           }).toJSON()
 
           expect(result2.data.candidates).toBeNull()
@@ -846,14 +849,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.tags).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.tags = ["a", "b", "c"]
+            draft.data.tags.set(["a", "b", "c"])
           }).toJSON()
 
           expect(result.data.tags).toEqual(["a", "b", "c"])
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.tags = null
+            draft.data.tags.set(null)
           }).toJSON()
 
           expect(result2.data.tags).toBeNull()
@@ -876,14 +879,14 @@ describe("TypedLoroDoc", () => {
           expect(typedDoc.toJSON().data.point).toBeNull()
 
           const result = change(typedDoc, draft => {
-            draft.data.point = { x: 10, y: 20 }
+            draft.data.point.set({ x: 10, y: 20 })
           }).toJSON()
 
           expect(result.data.point).toEqual({ x: 10, y: 20 })
 
           // Should accept null value
           const result2 = change(typedDoc, draft => {
-            draft.data.point = null
+            draft.data.point.set(null)
           }).toJSON()
 
           expect(result2.data.point).toBeNull()
@@ -905,7 +908,7 @@ describe("TypedLoroDoc", () => {
 
           // Should still accept null
           const result = change(typedDoc, draft => {
-            draft.profile.name = null
+            draft.profile.name.set(null)
           }).toJSON()
 
           expect(result.profile.name).toBeNull()
@@ -938,12 +941,12 @@ describe("TypedLoroDoc", () => {
 
           // TypeScript should allow these assignments
           change(typedDoc, draft => {
-            draft.data.nullableString = "hello"
-            draft.data.nullableString = null
-            draft.data.nullableNumber = 42
-            draft.data.nullableNumber = null
-            draft.data.nullableBoolean = true
-            draft.data.nullableBoolean = null
+            draft.data.nullableString.set("hello")
+            draft.data.nullableString.set(null)
+            draft.data.nullableNumber.set(42)
+            draft.data.nullableNumber.set(null)
+            draft.data.nullableBoolean.set(true)
+            draft.data.nullableBoolean.set(null)
           })
 
           // Verify the types work correctly
@@ -984,10 +987,10 @@ describe("TypedLoroDoc", () => {
 
           // Both should accept same operations
           change(doc1, draft => {
-            draft.profile.email = "test@example.com"
+            draft.profile.email.set("test@example.com")
           })
           change(doc2, draft => {
-            draft.profile.email = "test@example.com"
+            draft.profile.email.set("test@example.com")
           })
 
           expect(doc1.toJSON()).toEqual(doc2.toJSON())
@@ -1065,10 +1068,10 @@ describe("TypedLoroDoc", () => {
         change(typedDoc, draft => {
           // Accessing the property triggers getOrCreateNode
           const current = draft.interjection.currentPrediction
-          expect(current).toBeNull()
+          expect(value(current)).toBeNull()
 
           // Verify we can update it
-          draft.interjection.currentPrediction = "new value"
+          draft.interjection.currentPrediction.set("new value")
         })
       }).not.toThrow()
 
@@ -1211,7 +1214,7 @@ describe("Edge Cases and Error Handling", () => {
       // Multiple changes
       change(typedDoc, draft => {
         draft.title.insert(0, "First Title")
-        draft.metadata.author = "John Doe"
+        draft.metadata.author.set("John Doe")
       })
 
       // Use toJSON() to get plain values for comparison
@@ -1223,7 +1226,7 @@ describe("Edge Cases and Error Handling", () => {
       // More changes
       change(typedDoc, draft => {
         draft.title.update("Updated Title")
-        draft.metadata.publishedAt = "2025-12-01"
+        draft.metadata.publishedAt.set("2025-12-01")
       })
 
       result = typedDoc.toJSON()
@@ -1338,7 +1341,7 @@ describe("Edge Cases and Error Handling", () => {
 
           // Test find method
           const found = draft.items.find(item => item.startsWith("b"))
-          expect(found).toBe("banana")
+          expect(value(found)).toBe("banana")
 
           const notFound = draft.items.find(item => item.startsWith("z"))
           expect(notFound).toBeUndefined()
@@ -1409,10 +1412,10 @@ describe("Edge Cases and Error Handling", () => {
 
           // Test filter method
           const evens = draft.numbers.filter(num => num % 2 === 0)
-          expect(evens).toEqual([2, 4])
+          expect(evens.map(v => value(v))).toEqual([2, 4])
 
           const withIndex = draft.numbers.filter((_num, index) => index > 2)
-          expect(withIndex).toEqual([4, 5])
+          expect(withIndex.map(v => value(v))).toEqual([4, 5])
         })
       })
 
@@ -1528,9 +1531,9 @@ describe("Edge Cases and Error Handling", () => {
           // Test filter with objects - returns PlainValueRef[] for struct value shapes
           const incompleteTodos = draft.todos.filter(todo => !todo.completed)
           expect(incompleteTodos).toHaveLength(2)
-          // Access properties through PlainValueRef (returns raw primitives)
-          expect(incompleteTodos[0].text).toBe("Buy milk")
-          expect(incompleteTodos[1].text).toBe("Write code")
+          // Access properties through PlainValueRef — unwrap with value()
+          expect(value(incompleteTodos[0].text)).toBe("Buy milk")
+          expect(value(incompleteTodos[1].text)).toBe("Write code")
 
           // Test map with objects
           const todoTexts = draft.todos.map(todo => todo.text)
@@ -1572,7 +1575,7 @@ describe("Edge Cases and Error Handling", () => {
           const publishedArticle = draft.articles.find(
             article => article.published,
           )
-          expect(publishedArticle?.published).toBe(true)
+          expect(value(publishedArticle?.published)).toBe(true)
 
           // Test map with nested containers
           const titles = draft.articles.map(article => article.title)
@@ -1607,7 +1610,7 @@ describe("Edge Cases and Error Handling", () => {
 
           // Test find
           const highPriorityTask = draft.tasks.find(task => task.priority === 3)
-          expect(highPriorityTask?.id).toBe("2")
+          expect(value(highPriorityTask?.id)).toBe("2")
 
           // Test findIndex
           const mediumPriorityIndex = draft.tasks.findIndex(
@@ -1672,10 +1675,12 @@ describe("Edge Cases and Error Handling", () => {
           draft.items.push(42)
 
           // Test all methods on single item list
-          expect(draft.items.find(item => item === 42)).toBe(42)
+          expect(value(draft.items.find(item => item === 42))).toBe(42)
           expect(draft.items.find(item => item === 99)).toBeUndefined()
           expect(draft.items.map(item => item * 2)).toEqual([84])
-          expect(draft.items.filter(item => item > 0)).toEqual([42])
+          expect(
+            draft.items.filter(item => item > 0).map(v => value(v)),
+          ).toEqual([42])
           expect(draft.items.filter(item => item < 0)).toEqual([])
           expect(draft.items.some(item => item === 42)).toBe(true)
           expect(draft.items.some(item => item === 99)).toBe(false)
@@ -1704,7 +1709,7 @@ describe("Edge Cases and Error Handling", () => {
 
           // Test that index parameter is correct in all methods
           const findResult = draft.items.find((_item, index) => index === 1)
-          expect(findResult).toBe("b")
+          expect(value(findResult)).toBe("b")
 
           const findIndexResult = draft.items.findIndex(
             (_item, index) => index === 2,
@@ -1717,7 +1722,7 @@ describe("Edge Cases and Error Handling", () => {
           const filterResult = draft.items.filter(
             (_item, index) => index % 2 === 0,
           )
-          expect(filterResult).toEqual(["a", "c"])
+          expect(filterResult.map(v => value(v))).toEqual(["a", "c"])
 
           const someResult = draft.items.some(
             (item, index) => index === 1 && item === "b",
@@ -1765,13 +1770,13 @@ describe("Edge Cases and Error Handling", () => {
             // Find a todo and toggle its completion status
             const todo = draft.todos.find(t => t.id === "2")
             if (todo) {
-              todo.completed = !todo.completed // This should work and persist!
+              todo.completed.set(!todo.completed.get()) // This should work and persist!
             }
 
             // Find another todo and change its text
             const codeTodo = draft.todos.find(t => t.text === "Write code")
             if (codeTodo) {
-              codeTodo.text = "Write better code"
+              codeTodo.text.set("Write better code")
             }
           }).toJSON()
 
@@ -1840,7 +1845,7 @@ describe("Edge Cases and Error Handling", () => {
               // Mutate counter container
               aliceArticle.viewCount.increment(10)
               // Mutate plain object property
-              aliceArticle.metadata.published = true
+              aliceArticle.metadata.published.set(true)
             }
 
             // Find article by publication status and modify it
@@ -1904,28 +1909,28 @@ describe("Edge Cases and Error Handling", () => {
             // Pattern 1: Find and toggle boolean
             const inactiveUser = draft.users.find(user => !user.active)
             if (inactiveUser) {
-              inactiveUser.active = true
+              inactiveUser.active.set(true)
             }
 
             // Pattern 2: Find by condition and update multiple properties
             const highScorer = draft.users.find(user => user.score > 110)
             if (highScorer) {
-              highScorer.name = `${highScorer.name} (VIP)`
+              highScorer.name.set(`${highScorer.name.get()} (VIP)`)
               // Use Number() to coerce PlainValueRef to number for arithmetic
-              highScorer.score = Number(highScorer.score) + 50
+              highScorer.score.set(Number(highScorer.score) + 50)
             }
 
             // Pattern 3: Filter and modify multiple items
             const activeUsers = draft.users.filter(user => user.active)
             activeUsers.forEach(user => {
               // Use Number() to coerce PlainValueRef to number for arithmetic
-              user.score = Number(user.score) + 10 // Bonus points for active users
+              user.score.set(Number(user.score) + 10) // Bonus points for active users
             })
 
             // Pattern 4: Find by index-based condition
             const firstUser = draft.users.find((_user, index) => index === 0)
             if (firstUser) {
-              firstUser.name = `👑 ${firstUser.name}`
+              firstUser.name.set(`👑 ${firstUser.name.get()}`)
             }
           }).toJSON()
 
@@ -1963,14 +1968,14 @@ describe("Edge Cases and Error Handling", () => {
             // Try to find non-existent item - should not crash
             const nonExistent = draft.items.find(item => item.id === "999")
             if (nonExistent) {
-              nonExistent.value = 999 // This shouldn't execute
+              nonExistent.value.set(999) // This shouldn't execute
             }
 
             // Find existing item and mutate
             const existing = draft.items.find(item => item.id === "1")
             if (existing) {
               // Use Number() to coerce PlainValueRef to number for arithmetic
-              existing.value = Number(existing.value) * 2
+              existing.value.set(Number(existing.value) * 2)
             }
 
             // Use findIndex to locate and mutate
@@ -1981,7 +1986,7 @@ describe("Edge Cases and Error Handling", () => {
               const item = draft.items.get(index)
               if (item) {
                 // Use Number() to coerce PlainValueRef to number for arithmetic
-                item.value = Number(item.value) + 5
+                item.value.set(Number(item.value) + 5)
               }
             }
           }).toJSON()
@@ -2013,7 +2018,7 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice(1, 3) returns items at indices 1 and 2
             const sliced = draft.items.slice(1, 3)
-            expect(sliced).toEqual(["b", "c"])
+            expect(sliced.map(v => value(v))).toEqual(["b", "c"])
           })
         })
 
@@ -2033,15 +2038,15 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice(-2) returns last 2 items
             const lastTwo = draft.items.slice(-2)
-            expect(lastTwo).toEqual(["d", "e"])
+            expect(lastTwo.map(v => value(v))).toEqual(["d", "e"])
 
             // slice(1, -1) returns items from index 1 to second-to-last
             const middle = draft.items.slice(1, -1)
-            expect(middle).toEqual(["b", "c", "d"])
+            expect(middle.map(v => value(v))).toEqual(["b", "c", "d"])
 
             // slice(-3, -1) returns items from third-to-last to second-to-last
             const negativeRange = draft.items.slice(-3, -1)
-            expect(negativeRange).toEqual(["c", "d"])
+            expect(negativeRange.map(v => value(v))).toEqual(["c", "d"])
           })
         })
 
@@ -2060,7 +2065,7 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice(2) returns items from index 2 to end
             const fromTwo = draft.items.slice(2)
-            expect(fromTwo).toEqual(["c", "d"])
+            expect(fromTwo.map(v => value(v))).toEqual(["c", "d"])
           })
         })
 
@@ -2078,7 +2083,7 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice() returns all items (shallow copy)
             const all = draft.items.slice()
-            expect(all).toEqual(["a", "b", "c"])
+            expect(all.map(v => value(v))).toEqual(["a", "b", "c"])
           })
         })
 
@@ -2096,7 +2101,7 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice(0, 100) on 3-item list returns all 3 items
             const overEnd = draft.items.slice(0, 100)
-            expect(overEnd).toEqual(["a", "b", "c"])
+            expect(overEnd.map(v => value(v))).toEqual(["a", "b", "c"])
 
             // slice(100) returns empty array
             const overStart = draft.items.slice(100)
@@ -2104,7 +2109,7 @@ describe("Edge Cases and Error Handling", () => {
 
             // slice(-100) returns all items (clamped to 0)
             const underStart = draft.items.slice(-100)
-            expect(underStart).toEqual(["a", "b", "c"])
+            expect(underStart.map(v => value(v))).toEqual(["a", "b", "c"])
           })
         })
 
@@ -2146,8 +2151,8 @@ describe("Edge Cases and Error Handling", () => {
           const result = change(typedDoc, draft => {
             const middleItems = draft.items.slice(1, 3)
             // Mutate the sliced items
-            middleItems[0].value = 200
-            middleItems[1].value = 300
+            middleItems[0].value.set(200)
+            middleItems[1].value.set(300)
           }).toJSON()
 
           // Verify mutations persisted to the original list
@@ -2172,10 +2177,10 @@ describe("Edge Cases and Error Handling", () => {
 
             // Test slice on movable list
             const sliced = draft.tasks.slice(1, 3)
-            expect(sliced).toEqual(["task2", "task3"])
+            expect(sliced.map(v => value(v))).toEqual(["task2", "task3"])
 
             const lastTwo = draft.tasks.slice(-2)
-            expect(lastTwo).toEqual(["task3", "task4"])
+            expect(lastTwo.map(v => value(v))).toEqual(["task3", "task4"])
           })
         })
 

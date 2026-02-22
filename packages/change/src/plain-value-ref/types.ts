@@ -18,10 +18,10 @@ import {
  * PlainValueRef is a read-write accessor for plain values stored in CRDT containers.
  *
  * It provides:
- * - Reactive reads via `valueOf()`, `toJSON()` (reads from overlay → container → placeholder)
- * - Eager writes via Proxy SET trap (immediately persists to Loro)
+ * - Reactive reads via `get()` (reads from overlay → container → placeholder)
+ * - Eager writes via `set()` (immediately persists to Loro)
  * - Coercion support via `valueOf()`, `toString()`, `[Symbol.toPrimitive]()`
- * - Nested struct access via Proxy GET trap
+ * - Nested struct access via Proxy GET trap (typed via DeepPlainValueRef)
  *
  * NOTE: PlainValueRef must NOT be added to AnyTypedRef.
  * AnyTypedRef uses ReturnType<R["toJSON"]> for inference;
@@ -89,4 +89,64 @@ export interface PlainValueRef<T> {
    * @param hint - The type hint ("string", "number", or "default")
    */
   [Symbol.toPrimitive](hint: string): T | string | number
+
+  /**
+   * Returns the current plain value.
+   * This is the canonical way to read from a PlainValueRef.
+   *
+   * @example
+   * ```typescript
+   * const title = doc.meta.title.get() // string
+   * const nested = doc.meta.config.get() // { theme: string, ... }
+   * ```
+   */
+  get(): T
+
+  /**
+   * Sets the value, immediately persisting to the CRDT container.
+   * This is the canonical way to write to a PlainValueRef.
+   *
+   * @param value - The new value to set
+   *
+   * @example
+   * ```typescript
+   * doc.meta.title.set("New Title")
+   * draft.config.theme.set("dark")
+   * ```
+   */
+  set(value: T): void
 }
+
+/**
+ * A PlainValueRef with nested property access for object types.
+ *
+ * When T is a plain object, this type exposes each key as a nested
+ * DeepPlainValueRef, matching the runtime Proxy behavior where
+ * accessing a property on a struct-valued PlainValueRef returns
+ * a nested PlainValueRef for that property.
+ *
+ * For primitives, arrays, and non-plain-object types, this is identical
+ * to PlainValueRef<T>.
+ *
+ * This type is used in StructValueShape, RecordValueShape, etc. to
+ * provide type-safe nested access. It is NOT used in PlainValueRef itself
+ * to avoid circular type references in the shape system.
+ *
+ * @example
+ * ```typescript
+ * // Given a struct value shape:
+ * const metadata: DeepPlainValueRef<{ author: string; published: boolean }>
+ *
+ * // Nested access is typed:
+ * metadata.author        // DeepPlainValueRef<string> (which is PlainValueRef<string>)
+ * metadata.author.get()  // string
+ * metadata.author.set("Alice")
+ * metadata.get()         // { author: string; published: boolean }
+ * ```
+ */
+export type DeepPlainValueRef<T> = PlainValueRef<T> &
+  (T extends any[] | Uint8Array | string | number | boolean | null | undefined
+    ? {}
+    : T extends Record<string, any>
+      ? { readonly [K in keyof T]: DeepPlainValueRef<T[K]> }
+      : {})

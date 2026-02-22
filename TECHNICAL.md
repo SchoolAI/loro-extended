@@ -2,6 +2,173 @@
 
 This document captures architectural decisions, technical insights, and implementation details for the loro-extended project.
 
+## API Consistency Principle: Dot for Traversal, Methods for Read/Write
+
+### The Principle
+
+All data access in loro-extended follows two rules:
+
+1. **Traversal** — Use dot notation for schema-defined paths, `.get()` for dynamic/indexed access
+2. **Read/Write** — Use method notation (`.get()`, `.set()`, etc.) — never assignment or property getters
+
+This applies **uniformly** both inside and outside `change()` blocks. There is no "draft mode" with different ergonomics.
+
+### Canonical API
+
+```typescript
+// Traversal — dot for schema, method for dynamic
+doc.meta                        // StructRef
+doc.meta.title                  // PlainValueRef<string> (via Proxy)
+doc.items.get(0)                // PlainValueRef or nested Ref
+doc.settings.get("key")         // PlainValueRef or nested Ref
+
+// Read — always .get() at leaves
+doc.meta.title.get()            // string
+doc.items.get(0)?.get()         // T | undefined
+doc.score.get()                 // number (CounterRef)
+
+// Write — always methods
+doc.meta.title.set("New")       // PlainValueRef.set()
+doc.items.push(item)            // ListRef.push()
+doc.items.set(0, newItem)       // ListRef.set()
+doc.settings.set("key", v)      // RecordRef.set()
+doc.score.increment(1)          // CounterRef.increment()
+doc.content.update("text")      // TextRef.update()
+
+// Inside change() — SAME API, not assignment
+change(doc, draft => {
+  draft.meta.title.set("New")
+  draft.items.get(0)?.name.set("Updated")
+  draft.items.set(0, { name: "Replaced" })
+  const score = draft.meta.score.get()
+  draft.meta.score.set(score + 10)
+})
+```
+
+### What Changed (and Why)
+
+| Component | Before | After | Rationale |
+|-----------|--------|-------|-----------|
+| **PlainValueRef** | No `.get()`/`.set()` methods; relied on `value()` function and assignment | Added `.get()` and `.set()` methods | Canonical read/write at leaf nodes |
+| **CounterRef** | `.value` property getter | `.get()` method | Consistent with PlainValueRef |
+| **ListRef** | `list[0]` bracket access; no `.set()` method | `list.get(0)` for traversal; `list.set(0, value)` for replacement | Consistent method-based API |
+| **StructRef Proxy** | SET trap allowed `draft.title = "x"` | SET trap removed | Writes go through PlainValueRef.set() |
+| **RecordRef Proxy** | SET trap allowed `record.key = value` | SET trap removed | Use `record.set("key", value)` |
+| **PlainValueRef Proxies** | SET traps on struct/record/generic/list-item proxies | All SET traps removed | Writes go through `.set()` |
+| **`_draft` types** | Returned raw `T` (e.g., `string`) for ergonomic assignment inside `change()` | Returns `PlainValueRef<T>`, same as `_mutable` | Unified type — no dual mode |
+| **`resolveValueForBatchedMutation`** | Returned raw primitives inside `change()`, PlainValueRef for objects | Always returns PlainValueRef | Consistent behavior in both contexts |
+
+### Key Type System Details
+
+#### DeepPlainValueRef
+
+`PlainValueRef<T>` is a simple interface with `.get()`, `.set()`, `.valueOf()`, etc. It does **not** expose nested properties for object types.
+
+`DeepPlainValueRef<T>` is a type alias that adds nested property access when `T` is a plain object:
+
+```typescript
+// For PlainValueRef<{ author: string; published: boolean }>:
+// - .get() returns { author: string; published: boolean }
+// - .set({ author: "Alice", published: true }) writes the whole value
+// - .author is DeepPlainValueRef<string>  (via the intersection type)
+// - .author.get() returns string
+// - .author.set("Alice") writes just the author
+```
+
+This is defined in `packages/change/src/plain-value-ref/types.ts`.
+
+**Why two types?** Using a conditional type directly in `PlainValueRef<T>` causes circular type references in the shape system. The expansion is applied at the access point via the `Deepen` helper in `SelectByMode`, not in the shape definitions.
+
+#### SelectByMode and Deepen
+
+```typescript
+// In shape.ts:
+type SelectByMode<S, Mode> = Deepen<Mode extends "mutable" ? S["_mutable"] : S["_draft"]>
+type Deepen<T> = T extends PlainValueRef<infer U> ? DeepPlainValueRef<U> : T
+```
+
+This ensures that any `PlainValueRef<T>` returned by a shape is automatically expanded to `DeepPlainValueRef<T>` at the point of use, without requiring the shape definitions to use conditional types (which would cause circularity).
+
+#### _draft Collapsed Into _mutable
+
+Since both modes now return `PlainValueRef<T>`, the `_draft` type parameter on all ValueShapes is set to match `_mutable`. The `_draft` type parameter is kept for now (not yet removed from the `Shape` interface) but is always equal to `_mutable` for value shapes. A future cleanup could remove the `_draft` parameter entirely.
+
+### Container Structs vs Value Structs
+
+A common confusion: there are two ways to define struct-like data:
+
+```typescript
+// Container struct — each property is a separate CRDT handle (LoroMap)
+metadata: Shape.struct({ author: Shape.plain.string() })
+// → StructRef, dot access returns PlainValueRef<string> per property
+// → Each property is independently mergeable
+
+// Value struct — the entire object is ONE value in a parent LoroMap
+metadata: Shape.plain.struct({ author: Shape.plain.string() })
+// → PlainValueRef<{ author: string }>, dot access via DeepPlainValueRef
+// → Writes replace the whole object (last-writer-wins)
+```
+
+Both support dot traversal at the type level now (via StructRef properties and DeepPlainValueRef respectively), but the CRDT semantics are very different.
+
+### Implementation Status (as of this writing)
+
+**Source code: Complete** — All core changes implemented, zero source-level type errors.
+
+**Tests: ~60 type errors remaining** — All in test files that still use the old assignment patterns. The fixes are mechanical:
+
+| Old Pattern | New Pattern |
+|-------------|-------------|
+| `draft.meta.title = "New"` | `draft.meta.title.set("New")` |
+| `draft.items[0] = value` | `draft.items.set(0, value)` |
+| `record.alice = { ... }` | `record.set("alice", { ... })` |
+| `doc.counter.value` | `doc.counter.get()` |
+| `item.completed = !item.completed` | `item.completed.set(!item.completed.get())` |
+
+Files with remaining test errors (by count): `change.test.ts` (18), `types.test.ts` (10), `plainvalueref-unification.test.ts` (10), `world-state-schema.test.ts` (5), `readonly.test.ts` (4), `discriminated-union.test.ts` (4), plus a handful of 1-error files.
+
+### Gotchas for Developers Continuing This Work
+
+1. **The `value()` function still works** — It's kept for backwards compatibility but is no longer "the way". Prefer `.get()`. Don't add new `value()` usage.
+
+2. **Predicate functions in `.find()`, `.filter()` etc. receive plain values** — The `getPredicateItem()` method returns raw values for predicates (so `t.id === "foo"` works naturally). Only the *return value* of `.find()` is a PlainValueRef/TypedRef.
+
+3. **`writeValue`, `writeListValue`, and `writeListValueAtPath` are all used** — They're used by the PlainValueRef `.set()` implementation in `buildBasePlainValueRef`. The factory.ts proxies no longer call them directly (SET traps removed), but the base `.set()` method does. `writeListValueAtPath` handles read-modify-write for nested list item properties (e.g., `item.active.set(true)` reads the whole item, updates `active`, writes it back).
+
+4. **`unwrapPlainValueRef` in `plain-value-access.ts` may be dead code** — It was used by the old `setPropertyValue` path. Verify before removing.
+
+5. **RecordRef bracket GET still works** — The `recordProxyHandler` GET trap is retained so `doc.players.alice` returns the ref for key `"alice"`. Only the SET and deleteProperty traps were removed.
+
+6. **ListRef bracket GET still works at runtime** — The `listProxyHandler` GET trap is retained so `list[0]` returns the same as `list.get(0)` at runtime. But the TypeScript index signature was removed, so `list[0]` is a type error. This is intentional — use `.get(0)`.
+
+7. **The `_draft` shape parameter still exists** — It's set equal to `_mutable` for all value shapes (including `AnyValueShape`, which was fixed). A future PR could simplify the `Shape` interface to remove `_draft` entirely and collapse `RefMode` to a single mode.
+
+8. **`AnyValueShape._draft` is now `PlainValueRef<Value>` (FIXED)** — Previously it was `Value`, inconsistent with all other value shapes. Now corrected. `AnyContainerShape._draft` remains `unknown` (container shapes are unaffected by this work).
+
+9. **`tests/world-state-schema.test.ts`** — This is a large integration test file outside `src/`. It has been fully updated.
+
+10. **Phantom type assignments in `shape.ts` use `as any`** — The `_draft` fields in shape factory functions (e.g., `Shape.plain.string()`) are assigned `{} as any` because they're phantom types never instantiated at runtime. This is intentional and correct.
+
+11. **PlainValueRef is a LIVE reference, not a snapshot** — When you call `list.get(0)`, the returned PlainValueRef reads from the container at call time. If you delete from the list, indices shift, and `.get()` on the old PlainValueRef returns the WRONG value. Always capture raw values (via `.get()`) before mutating the container:
+    ```
+    // WRONG: ref reads stale index after delete
+    const ref = draft.items.get(0)
+    draft.items.delete(0, 1)
+    draft.items.insert(2, ref.get())  // reads shifted value!
+
+    // RIGHT: snapshot before mutating
+    const rawValue = draft.items.get(0)?.get()
+    draft.items.delete(0, 1)
+    draft.items.insert(2, rawValue)
+    ```
+
+12. **`assignPlainValueToTypedRef` in `utils.ts` splits struct/record paths** — For structs, it iterates keys and calls `propRef.set(value[k])` on each PlainValueRef. For records, it calls `ref.set(k, value[k])` on the RecordRef. This function is called when setting a plain value on a container-valued record entry (e.g., `record.set("alice", { name: "Alice" })`).
+
+13. **List item proxies no longer have `runtimePrimitiveCheck`** — `createListItemStructProxy`, `createListItemNestedStructProxy`, and the generic object proxies now always return PlainValueRef for nested properties. This matches `createStructProxy` (which never had the check) and ensures `.set()` is always available. The predicate pathway (`getPredicateItem`) still returns raw values for ergonomic comparisons.
+
+14. **`createRecordProxy` creates PlainValueRef for ALL keys** — Even non-existent keys get a PlainValueRef. This enables `.set()` on new keys via read-modify-write. The trade-off: `if (record.someKey)` is always truthy (PlainValueRef is an object). Use `value(record.someKey)` to check for existence.
+
+
 ## Loro CRDT Behavior
 
 ### Commit Idempotency

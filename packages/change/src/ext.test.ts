@@ -111,8 +111,8 @@ describe("ext() function", () => {
     it("applyPatch() applies JSON patch operations", () => {
       const doc = createTypedDoc(TestSchema)
       change(doc, draft => {
-        draft.data.name = "initial"
-        draft.data.value = 0
+        draft.data.name.set("initial")
+        draft.data.value.set(0)
       })
 
       ext(doc).applyPatch([

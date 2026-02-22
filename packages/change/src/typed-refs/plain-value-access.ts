@@ -5,7 +5,6 @@
  * @module typed-refs/plain-value-access
  */
 
-import type { LoroMap } from "loro-crdt"
 import { createListItemPlainValueRef } from "../plain-value-ref/factory.js"
 import {
   createPlainValueRef,
@@ -67,67 +66,42 @@ export function unwrapPlainValueRef<T>(value: T | PlainValueRef<T>): T {
 }
 
 /**
- * Resolve a value for batched mutation, applying a runtime check for primitives.
+ * Resolve a value for batched mutation.
  *
- * Inside `change()` blocks, we want:
- * - **Primitive values** (string, number, boolean, null) returned as raw values
- *   for ergonomic boolean logic (`if (draft.active)`, `!draft.published`)
- * - **Object/array values** wrapped in PlainValueRef for nested mutation tracking
- *   (`item.metadata.author = "Alice"`)
- *
- * This function replaces the old schema-based `valueType` heuristic which was
- * semantically wrong for `union` and `any` shapes that can contain either
- * primitives or objects at runtime.
+ * Always returns PlainValueRef for consistent method-based read/write
+ * both inside and outside `change()` blocks:
+ * - Read: `draft.meta.title.get()`
+ * - Write: `draft.meta.title.set("new value")`
  *
  * @param internals - The parent ref's internals (provides access to container, placeholder)
  * @param key - The property key to read
  * @param shape - The value shape for this property
- * @returns Raw value for primitives, PlainValueRef for objects/arrays
+ * @returns PlainValueRef for method-based access
  */
 export function resolveValueForBatchedMutation<T>(
   internals: BaseRefInternals<any>,
   key: string,
   shape: ValueShape,
-): T | PlainValueRef<T> {
-  const container = internals.getContainer() as LoroMap
-  const rawValue = container.get(key)
-  const resolved =
-    rawValue !== undefined
-      ? rawValue
-      : (internals.getPlaceholder() as any)?.[key]
-
-  // Return raw value only for actual primitives (not objects/arrays).
-  // This handles union and any correctly regardless of what they contain at runtime.
-  if (resolved === null || typeof resolved !== "object") {
-    return resolved as T
-  }
-
-  // For objects/arrays, return PlainValueRef for nested mutation tracking
+): PlainValueRef<T> {
   return createPlainValueRefForProperty<T>(internals, key, shape)
 }
 
 /**
- * Resolve a list item value for batched mutation, applying a runtime check for primitives.
+ * Resolve a list item value for batched mutation.
  *
- * Same logic as `resolveValueForBatchedMutation` but for list items by index.
+ * Always returns PlainValueRef for consistent method-based read/write.
  *
  * @param internals - The list ref's internals
  * @param index - The list index
  * @param shape - The value shape for list items
- * @param rawValue - The raw value already read from the list
- * @returns Raw value for primitives, PlainValueRef for objects/arrays
+ * @param _rawValue - Unused (kept for call-site compatibility)
+ * @returns PlainValueRef for method-based access
  */
 export function resolveListValueForBatchedMutation<T>(
   internals: BaseRefInternals<any>,
   index: number,
   shape: ValueShape,
-  rawValue: unknown,
-): T | PlainValueRef<T> {
-  // Return raw value only for actual primitives (not objects/arrays).
-  if (rawValue === null || typeof rawValue !== "object") {
-    return rawValue as T
-  }
-
-  // For objects/arrays, return PlainValueRef for nested mutation tracking
+  _rawValue: unknown,
+): PlainValueRef<T> {
   return createPlainValueRefForListItem<T>(internals, index, shape)
 }

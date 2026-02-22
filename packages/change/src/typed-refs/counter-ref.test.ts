@@ -29,7 +29,7 @@ describe("Counter Ref", () => {
     const counterRef = doc.counter
     expect(typeof counterRef.increment).toBe("function")
     expect(typeof counterRef.decrement).toBe("function")
-    expect(typeof counterRef.value).toBe("number")
+    expect(typeof counterRef.get()).toBe("number")
   })
 
   it("should materialize the container after modification via doc.value", () => {
@@ -46,7 +46,7 @@ describe("Counter Ref", () => {
     // When we modify the counter, we are modifying the underlying CRDT counter which starts at 0.
     // So 0 + 5 = 5. The placeholder (10) is lost once the container exists.
     expect(doc.toJSON().counter).toBe(5)
-    expect(doc.counter.value).toBe(5)
+    expect(doc.counter.get()).toBe(5)
 
     // Verify it IS materialized in the underlying doc
     const shallow = loro(doc).getShallowValue()

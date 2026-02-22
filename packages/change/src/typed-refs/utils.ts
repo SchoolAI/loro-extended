@@ -163,7 +163,7 @@ export function unwrapReadonlyPrimitive(
   shape: ContainerShape,
 ): any {
   if (shape._type === "counter") {
-    return (ref as any).value
+    return (ref as any).get()
   }
   if (shape._type === "text") {
     return (ref as any).toString()
@@ -269,10 +269,61 @@ export function assignPlainValueToTypedRef(
   const shape = internals?.getShape?.() ?? (ref as any).shape
   const shapeType = shape?._type
 
-  if (shapeType === "struct" || shapeType === "record") {
+  if (shapeType === "struct") {
+    const structShapes = shape.shapes as Record<string, { _type: string }>
+
     internals.withBatchedCommit(() => {
       for (const k in value) {
-        ;(ref as any)[k] = value[k]
+        const propRef = (ref as any)[k]
+        const propShape = structShapes?.[k]
+
+        // Handle CounterRef specially - it has increment/decrement, not set
+        if (propShape?._type === "counter") {
+          if (typeof value[k] === "number") {
+            const currentValue = propRef.get()
+            const diff = value[k] - currentValue
+            if (diff > 0) {
+              propRef.increment(diff)
+            } else if (diff < 0) {
+              propRef.decrement(-diff)
+            }
+          }
+        } else if (
+          propShape?._type === "struct" ||
+          propShape?._type === "record"
+        ) {
+          // Nested container refs - recursively assign
+          if (propRef && INTERNAL_SYMBOL in propRef) {
+            assignPlainValueToTypedRef(propRef, value[k])
+          }
+        } else if (
+          propShape?._type === "list" ||
+          propShape?._type === "movableList"
+        ) {
+          // ListRef - recursively assign to update the list contents
+          if (propRef && INTERNAL_SYMBOL in propRef) {
+            assignPlainValueToTypedRef(propRef, value[k])
+          }
+        } else if (propShape?._type === "text") {
+          // TextRef uses .update() method
+          if (propRef && typeof propRef.update === "function") {
+            propRef.update(value[k])
+          }
+        } else if (propRef && typeof propRef.set === "function") {
+          // Use .set() on PlainValueRef or other refs with set method
+          propRef.set(value[k])
+        }
+      }
+    })
+
+    return true
+  }
+
+  if (shapeType === "record") {
+    internals.withBatchedCommit(() => {
+      for (const k in value) {
+        // Use RecordRef.set(key, value) method
+        ;(ref as any).set(k, value[k])
       }
     })
 
@@ -306,7 +357,7 @@ export function assignPlainValueToTypedRef(
 
   if (shapeType === "counter") {
     if (typeof value === "number") {
-      const currentValue = (ref as any).value
+      const currentValue = (ref as any).get()
       const diff = value - currentValue
       if (diff > 0) {
         ;(ref as any).increment(diff)

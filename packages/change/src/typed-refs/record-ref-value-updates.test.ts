@@ -39,12 +39,12 @@ describe("Record value updates across change() calls", () => {
       const doc = createTypedDoc(Schema)
 
       change(doc, draft => {
-        draft.input.key1 = 100
+        draft.input.set("key1", 100)
       })
       expect(value(doc.input.key1)).toBe(100)
 
       change(doc, draft => {
-        draft.input.key1 = 200
+        draft.input.set("key1", 200)
       })
       expect(value(doc.input.key1)).toBe(200)
     })
