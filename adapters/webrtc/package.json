@@ -22,9 +22,11 @@
     "verify": "verify"
   },
   "dependencies": {
-    "@loro-extended/repo": "workspace:^"
+    "@loro-extended/repo": "workspace:^",
+    "@loro-extended/wire-format": "workspace:^"
   },
   "devDependencies": {
+    "@loro-extended/wire-format": "workspace:^",
     "@logtape/logtape": "^1.1.1",
     "@typescript/native-preview": "7.0.0-dev.20260103.1",
     "tsup": "^8.5.0",

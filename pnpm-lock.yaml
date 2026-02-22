@@ -170,6 +170,9 @@ importers:
       '@loro-extended/repo':
         specifier: workspace:^
         version: link:../../packages/repo
+      '@loro-extended/wire-format':
+        specifier: workspace:^
+        version: link:../../packages/wire-format
     devDependencies:
       '@logtape/logtape':
         specifier: ^1.1.1

@@ -104,8 +104,14 @@ peer._pc.ondatachannel = (event) => {
 #### Constructor
 
 ```typescript
-const adapter = new WebRtcDataChannelAdapter();
+const adapter = new WebRtcDataChannelAdapter(options?: WebRtcAdapterOptions);
 ```
+
+##### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `fragmentThreshold` | `number` | `204800` (200KB) | Messages larger than this are fragmented. Set to 0 to disable. |
 
 #### Methods
 
@@ -129,21 +135,56 @@ Check if a data channel is attached for a peer.
 
 Get all peer IDs with attached data channels.
 
+## Wire Format
+
+This adapter uses **binary CBOR encoding** (v2 wire format) with transport-layer fragmentation. This provides approximately **33% bandwidth savings** compared to JSON+base64 encoding.
+
+### Transport Layer
+
+All messages are prefixed with a transport layer byte:
+
+| Prefix | Name | Description |
+|--------|------|-------------|
+| `0x00` | MESSAGE_COMPLETE | Complete message (not fragmented) |
+| `0x01` | FRAGMENT_HEADER | Start of a fragmented batch |
+| `0x02` | FRAGMENT_DATA | Fragment data chunk |
+
+### Fragmentation
+
+SCTP (the underlying transport for WebRTC data channels) has a message size limit of approximately 256KB. The adapter automatically fragments messages larger than the threshold (default: 200KB).
+
+```typescript
+// Custom threshold for constrained environments
+const adapter = new WebRtcDataChannelAdapter({
+  fragmentThreshold: 100 * 1024, // 100KB
+});
+
+// Disable fragmentation (not recommended)
+const adapter = new WebRtcDataChannelAdapter({
+  fragmentThreshold: 0,
+});
+```
+
+### Version Compatibility
+
+**Important**: All peers must use the same wire format version. The v2 binary format is **not compatible** with the legacy JSON format. Mixing versions will cause decode failures.
+
 ## How It Works
 
 1. **Adapter Registration**: The adapter is registered with the Loro repo alongside other adapters (e.g., SSE for server communication)
 
-2. **Data Channel Attachment**: When a WebRTC connection is established, you attach the data channel to the adapter
+2. **Data Channel Attachment**: When a WebRTC connection is established, you attach the data channel to the adapter. The adapter sets `binaryType = 'arraybuffer'` automatically.
 
 3. **Channel Lifecycle**: The adapter handles data channel events:
-
    - `open`: Creates a Loro channel and starts the establishment handshake
-   - `message`: Deserializes and routes messages to the Loro synchronizer
-   - `close`/`error`: Removes the Loro channel
+   - `message`: Decodes binary CBOR and routes messages to the Loro synchronizer
+   - `close`/`error`: Removes the Loro channel and cleans up the reassembler
 
-4. **Message Serialization**: Messages are serialized as JSON (same format as the SSE adapter)
+4. **Message Encoding**: Messages are encoded as binary CBOR with transport-layer prefixes
 
-5. **Peer Deduplication**: If the same peer is connected via multiple adapters (e.g., SSE + WebRTC), the Loro repo handles deduplication automatically
+5. **Fragmentation**: Large messages are automatically fragmented and reassembled
+
+6. **Peer Deduplication**: If the same peer is connected via multiple adapters (e.g., SSE + WebRTC), the Loro repo handles deduplication automatically
 
 ## Multi-Adapter Architecture
 

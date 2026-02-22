@@ -416,22 +416,22 @@ const wsAdapter = new WsServerNetworkAdapter({
 })
 ```
 
-### Phase 4: Migrate WebRTC Adapter 🔴
+### Phase 4: Migrate WebRTC Adapter ✅
 
 Update WebRTC adapter to use binary CBOR encoding with fragmentation.
 
 **Tasks:**
 
-- 🔴 Add `@loro-extended/wire-format` dependency to `adapter-webrtc`
-- 🔴 Set `dataChannel.binaryType = 'arraybuffer'`
-- 🔴 Replace `JSON.stringify(serializeChannelMsg(msg))` with `encodeFrame(msg)`
-- 🔴 Add `FragmentReassembler` instance per data channel
-- 🔴 Fragment payloads >200KB (safety margin below SCTP 256KB limit)
-- 🔴 Handle `MESSAGE_COMPLETE` vs fragment payloads in receive path
-- 🔴 Document peer version requirements (all peers must use v2)
-- 🔴 Update README.md to document binary transport
-- 🔴 Write integration test for binary encoding
-- 🔴 Write integration test for >256KB payload fragmentation
+- ✅ Add `@loro-extended/wire-format` dependency to `adapter-webrtc`
+- ✅ Set `dataChannel.binaryType = 'arraybuffer'`
+- ✅ Replace `JSON.stringify(serializeChannelMsg(msg))` with `encodeFrame(msg)`
+- ✅ Add `FragmentReassembler` instance per data channel
+- ✅ Fragment payloads >200KB (safety margin below SCTP 256KB limit)
+- ✅ Handle `MESSAGE_COMPLETE` vs fragment payloads in receive path
+- ✅ Document peer version requirements (all peers must use v2)
+- ✅ Update README.md to document binary transport
+- ✅ Write unit test for binary encoding (in adapter.test.ts)
+- ✅ Write unit test for fragmentation (in adapter.test.ts)
 
 ### Phase 5: Migrate SSE Adapter (POST to Binary) 🔴
 
@@ -850,3 +850,68 @@ while (!adapter.isReady) { ... }
 ```
 
 The `isConnected` state means the WebSocket is open. The `isReady` state means the full handshake (including the "ready" text signal from server) is complete.
+
+#### 5. RTCDataChannel has stricter DOM types than WebSocket
+
+The DOM types for `RTCDataChannel.send()` are stricter than WebSocket's `ws` library or Bun types. While the runtime accepts `Uint8Array`, TypeScript requires type assertions:
+
+```typescript
+// WebSocket (ws library, Bun) - works directly
+this.socket.send(fragment)
+
+// RTCDataChannel (DOM types) - needs assertion
+dataChannel.send(fragment as unknown as ArrayBuffer)
+```
+
+This is TypeScript-only; runtime behavior is identical.
+
+#### 6. ChannelDirectory is iterable, not a Map
+
+```typescript
+// ❌ Wrong - ChannelDirectory doesn't have .values()
+const channel = adapter.channels.values().next().value
+
+// ✅ Correct - use spread or for...of
+const channel = [...adapter.channels][0]
+```
+
+#### 7. Set binaryType before messages arrive
+
+```typescript
+dataChannel.binaryType = "arraybuffer"
+```
+
+If not set, browsers may deliver messages as `Blob` instead of `ArrayBuffer`, requiring async `.arrayBuffer()` calls.
+
+#### 8. Use reduced thresholds in integration tests
+
+Testing with production thresholds (100KB+) makes tests slow. Use a reduced threshold to exercise fragmentation without large payloads:
+
+```typescript
+const TEST_FRAGMENT_THRESHOLD = 10 * 1024  // 10KB for fast tests
+```
+
+This exercises the same code paths without waiting for 100KB+ transfers.
+
+#### 9. WebRTC needs per-data-channel reassemblers
+
+Unlike WebSocket (one reassembler per connection), WebRTC adapters need one reassembler per data channel since each peer has its own channel:
+
+```typescript
+const attached: AttachedChannel = {
+  remotePeerId,
+  dataChannel,
+  channelId: null,
+  cleanup,
+  reassembler: new FragmentReassembler({ timeoutMs: 10000 }),
+}
+```
+
+#### 10. Fragment threshold recommendations by transport
+
+| Transport | Threshold | Hard Limit | Rationale |
+|-----------|-----------|------------|-----------|
+| WebSocket (AWS) | 100KB | 128KB | API Gateway limit |
+| WebSocket (CF) | 500KB | 1MB | Cloudflare Workers |
+| WebRTC (SCTP) | 200KB | ~256KB | SCTP message limit |
+| SSE POST | 80KB | 100KB | Express body-parser default |

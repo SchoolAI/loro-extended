@@ -2,11 +2,35 @@ import {
   Adapter,
   type ChannelId,
   type ChannelMsg,
-  deserializeChannelMsg,
   type GeneratedChannel,
   type PeerID,
-  serializeChannelMsg,
 } from "@loro-extended/repo"
+import {
+  decodeFrame,
+  encodeFrame,
+  FragmentReassembler,
+  fragmentPayload,
+  wrapCompleteMessage,
+} from "@loro-extended/wire-format"
+
+/**
+ * Default fragment threshold in bytes.
+ * Messages larger than this are fragmented for SCTP compatibility.
+ * SCTP has a ~256KB message size limit, so 200KB provides a safe margin.
+ */
+export const DEFAULT_FRAGMENT_THRESHOLD = 200 * 1024
+
+/**
+ * Configuration options for the WebRTC adapter.
+ */
+export interface WebRtcAdapterOptions {
+  /**
+   * Fragment threshold in bytes. Messages larger than this are fragmented.
+   * Set to 0 to disable fragmentation (not recommended).
+   * Default: 200KB (safe for SCTP's 256KB limit)
+   */
+  fragmentThreshold?: number
+}
 
 /**
  * Context for each data channel - stores the remote peer ID
@@ -24,6 +48,7 @@ type AttachedChannel = {
   dataChannel: RTCDataChannel
   channelId: ChannelId | null
   cleanup: () => void
+  reassembler: FragmentReassembler
 }
 
 /**
@@ -33,6 +58,15 @@ type AttachedChannel = {
  * It follows a "Bring Your Own Data Channel" approach - developers create and manage
  * their own WebRTC connections (e.g., using simple-peer), then attach the data channels
  * to this adapter for Loro sync.
+ *
+ * ## Wire Format
+ *
+ * This adapter uses binary CBOR encoding (v2 wire format) with transport-layer
+ * fragmentation for large payloads. This provides ~33% bandwidth savings compared
+ * to the previous JSON+base64 encoding.
+ *
+ * **Important**: All peers must use the same wire format version. Mixing v1 (JSON)
+ * and v2 (binary CBOR) peers will cause decode failures.
  *
  * ## Usage
  *
@@ -64,7 +98,8 @@ type AttachedChannel = {
  * - **Non-intrusive**: Doesn't manage WebRTC connections - works with any WebRTC setup
  * - **Multi-peer**: Supports multiple simultaneous peer connections
  * - **Automatic lifecycle**: Handles data channel open/close events
- * - **JSON serialization**: Compatible with other loro-extended adapters
+ * - **Binary encoding**: CBOR binary encoding for bandwidth efficiency
+ * - **Fragmentation**: Large payloads are automatically fragmented for SCTP compatibility
  */
 export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
   /**
@@ -72,8 +107,15 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
    */
   private attachedChannels = new Map<PeerID, AttachedChannel>()
 
-  constructor() {
+  /**
+   * Fragment threshold in bytes
+   */
+  private readonly fragmentThreshold: number
+
+  constructor(options?: WebRtcAdapterOptions) {
     super({ adapterType: "webrtc-datachannel" })
+    this.fragmentThreshold =
+      options?.fragmentThreshold ?? DEFAULT_FRAGMENT_THRESHOLD
   }
 
   /**
@@ -95,8 +137,25 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
           return
         }
 
-        const serialized = serializeChannelMsg(msg)
-        dataChannel.send(JSON.stringify(serialized))
+        // Encode to binary CBOR wire format
+        const frame = encodeFrame(msg)
+
+        // Fragment large payloads for SCTP compatibility
+        if (
+          this.fragmentThreshold > 0 &&
+          frame.length > this.fragmentThreshold
+        ) {
+          const fragments = fragmentPayload(frame, this.fragmentThreshold)
+          for (const fragment of fragments) {
+            // RTCDataChannel.send accepts ArrayBufferView which includes Uint8Array
+            // Use type assertion to satisfy strict DOM types
+            dataChannel.send(fragment as unknown as ArrayBuffer)
+          }
+        } else {
+          // Wrap with MESSAGE_COMPLETE prefix for transport layer consistency
+          const wrapped = wrapCompleteMessage(frame)
+          dataChannel.send(wrapped as unknown as ArrayBuffer)
+        }
       },
       stop: () => {
         // Clean up is handled by detachDataChannel
@@ -155,6 +214,25 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
       { remotePeerId, readyState: dataChannel.readyState },
     )
 
+    // Set binary type to arraybuffer for binary CBOR messages
+    dataChannel.binaryType = "arraybuffer"
+
+    // Create reassembler for this data channel
+    const reassembler = new FragmentReassembler({
+      timeoutMs: 10000,
+      onTimeout: (batchId: Uint8Array) => {
+        this.logger.warn(
+          "Fragment batch timed out for peer {remotePeerId}: {batchId}",
+          {
+            remotePeerId,
+            batchId: Array.from(batchId)
+              .map((b: number) => b.toString(16).padStart(2, "0"))
+              .join(""),
+          },
+        )
+      },
+    })
+
     // Event handlers
     const onOpen = () => {
       this.logger.debug("Data channel opened for peer {remotePeerId}", {
@@ -202,6 +280,7 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
       dataChannel,
       channelId: null,
       cleanup,
+      reassembler,
     }
     this.attachedChannels.set(remotePeerId, attached)
 
@@ -236,6 +315,9 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
 
     // Remove the Loro channel if it exists
     this.removeLoroChannel(remotePeerId)
+
+    // Dispose the reassembler to clean up timers
+    attached.reassembler.dispose()
 
     // Clean up event listeners
     attached.cleanup()
@@ -340,22 +422,39 @@ export class WebRtcDataChannelAdapter extends Adapter<DataChannelContext> {
     }
 
     try {
-      const data =
-        typeof event.data === "string"
-          ? event.data
-          : new TextDecoder().decode(event.data)
-      const serialized = JSON.parse(data)
-      const message = deserializeChannelMsg(serialized)
+      // Handle binary messages through reassembler
+      if (event.data instanceof ArrayBuffer) {
+        const result = attached.reassembler.receiveRaw(
+          new Uint8Array(event.data),
+        )
 
-      this.logger.trace(
-        "Received message from peer {remotePeerId}: {messageType}",
-        { remotePeerId, messageType: message.type },
-      )
-
-      channel.onReceive(message)
+        if (result.status === "complete") {
+          // Decode the reassembled frame
+          const messages = decodeFrame(result.data)
+          for (const msg of messages) {
+            this.logger.trace(
+              "Received message from peer {remotePeerId}: {messageType}",
+              { remotePeerId, messageType: msg.type },
+            )
+            channel.onReceive(msg)
+          }
+        } else if (result.status === "error") {
+          this.logger.error(
+            "Fragment reassembly error for peer {remotePeerId}: {error}",
+            { remotePeerId, error: result.error },
+          )
+        }
+        // "pending" status means we're waiting for more fragments - nothing to do
+      } else {
+        // Unexpected string message - log warning
+        this.logger.warn(
+          "Received unexpected string message from peer {remotePeerId}",
+          { remotePeerId },
+        )
+      }
     } catch (error) {
       this.logger.warn(
-        "Failed to parse message from peer {remotePeerId}: {error}",
+        "Failed to decode message from peer {remotePeerId}: {error}",
         { remotePeerId, error },
       )
     }

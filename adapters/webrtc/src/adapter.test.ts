@@ -1,5 +1,11 @@
 import { getLogger } from "@logtape/logtape"
 import type { PeerID, PeerIdentityDetails } from "@loro-extended/repo"
+import {
+  decodeFrame,
+  encodeFrame,
+  parseTransportPayload,
+  wrapCompleteMessage,
+} from "@loro-extended/wire-format"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { WebRtcDataChannelAdapter } from "./adapter.js"
 
@@ -31,6 +37,7 @@ function createMockDataChannel(
 
   const channel = {
     readyState,
+    binaryType: "blob" as BinaryType,
     send: vi.fn(),
     close: vi.fn(),
     addEventListener: vi.fn((type: string, listener: EventListener) => {
@@ -95,6 +102,13 @@ describe("WebRtcDataChannelAdapter", () => {
       expect(adapter).toBeInstanceOf(WebRtcDataChannelAdapter)
       expect(adapter.adapterType).toBe("webrtc-datachannel")
     })
+
+    it("should accept custom fragment threshold", () => {
+      const customAdapter = new WebRtcDataChannelAdapter({
+        fragmentThreshold: 50 * 1024,
+      })
+      expect(customAdapter).toBeInstanceOf(WebRtcDataChannelAdapter)
+    })
   })
 
   describe("attachDataChannel", () => {
@@ -106,6 +120,16 @@ describe("WebRtcDataChannelAdapter", () => {
       adapter.attachDataChannel(peerId, dataChannel)
 
       expect(adapter.hasDataChannel(peerId)).toBe(true)
+    })
+
+    it("should set binaryType to arraybuffer", async () => {
+      await initializeAdapter(adapter)
+      const peerId = "12345" as PeerID
+      const dataChannel = createMockDataChannel("open")
+
+      adapter.attachDataChannel(peerId, dataChannel)
+
+      expect(dataChannel.binaryType).toBe("arraybuffer")
     })
 
     it("should return a cleanup function", async () => {
@@ -337,26 +361,167 @@ describe("WebRtcDataChannelAdapter", () => {
     })
   })
 
-  describe("message handling", () => {
-    it("should deserialize and forward messages to Loro channel", async () => {
+  describe("binary message handling", () => {
+    it("should decode binary CBOR messages and forward to Loro channel", async () => {
       const hooks = await initializeAdapter(adapter)
       const peerId = "12345" as PeerID
       const dataChannel = createMockDataChannel("open")
 
       adapter.attachDataChannel(peerId, dataChannel)
 
-      // Create a mock message event with a serialized channel message
-      const serializedMsg = JSON.stringify({
-        type: "channel/establish-request",
-        identity: { peerId: "67890", name: "remote-peer", type: "user" },
-      })
-      const messageEvent = new MessageEvent("message", { data: serializedMsg })
+      // Create a binary CBOR message with transport layer prefix
+      const msg = {
+        type: "channel/establish-request" as const,
+        identity: {
+          peerId: "67890" as PeerID,
+          name: "remote-peer",
+          type: "user" as const,
+        },
+      }
+      const frame = encodeFrame(msg)
+      const wrapped = wrapCompleteMessage(frame)
 
-      // Simulate message event
+      // Simulate binary message event
+      const messageEvent = new MessageEvent("message", {
+        data: wrapped.buffer,
+      })
       ;(dataChannel as any)._emit("message", messageEvent)
 
       // onChannelReceive should have been called
       expect(hooks.onChannelReceive).toHaveBeenCalled()
+    })
+
+    it("should send binary CBOR messages with transport prefix", async () => {
+      await initializeAdapter(adapter)
+      const peerId = "12345" as PeerID
+      const dataChannel = createMockDataChannel("open")
+
+      adapter.attachDataChannel(peerId, dataChannel)
+
+      // Get the channel and send a message
+      const channel = [...adapter.channels][0]
+      expect(channel).toBeDefined()
+
+      const msg = {
+        type: "channel/establish-request" as const,
+        identity: {
+          peerId: "0" as PeerID,
+          name: "test-peer",
+          type: "user" as const,
+        },
+      }
+
+      channel.send(msg)
+
+      // Should have called send with binary data
+      expect(dataChannel.send).toHaveBeenCalled()
+      const sentData = (dataChannel.send as any).mock.calls[0][0]
+      expect(sentData).toBeInstanceOf(Uint8Array)
+
+      // Verify the data has transport layer prefix
+      const parsed = parseTransportPayload(sentData)
+      expect(parsed.kind).toBe("message")
+
+      // Verify we can decode the frame
+      if (parsed.kind === "message") {
+        const decoded = decodeFrame(parsed.data)
+        expect(decoded).toHaveLength(1)
+        expect(decoded[0].type).toBe("channel/establish-request")
+      }
+    })
+
+    it("should ignore unexpected string messages", async () => {
+      const hooks = await initializeAdapter(adapter)
+      const peerId = "12345" as PeerID
+      const dataChannel = createMockDataChannel("open")
+
+      adapter.attachDataChannel(peerId, dataChannel)
+
+      // Simulate string message event (legacy format - should be ignored)
+      const messageEvent = new MessageEvent("message", {
+        data: JSON.stringify({ type: "channel/establish-request" }),
+      })
+      ;(dataChannel as any)._emit("message", messageEvent)
+
+      // onChannelReceive should NOT have been called
+      expect(hooks.onChannelReceive).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("fragmentation", () => {
+    it("should fragment large payloads", async () => {
+      // Use a small threshold for testing
+      const smallThresholdAdapter = new WebRtcDataChannelAdapter({
+        fragmentThreshold: 100,
+      })
+      await initializeAdapter(smallThresholdAdapter)
+
+      const peerId = "12345" as PeerID
+      const dataChannel = createMockDataChannel("open")
+
+      smallThresholdAdapter.attachDataChannel(peerId, dataChannel)
+
+      // Get the channel
+      const channel = [...smallThresholdAdapter.channels][0]
+      expect(channel).toBeDefined()
+
+      // Create a message that will result in a large frame
+      // We'll use a sync-response with a large payload
+      const largeData = new Uint8Array(500)
+      for (let i = 0; i < largeData.length; i++) {
+        largeData[i] = i % 256
+      }
+
+      const msg = {
+        type: "channel/sync-response" as const,
+        docId: "test-doc",
+        transmission: {
+          type: "snapshot" as const,
+          data: largeData,
+          version: { encode: () => new Uint8Array([1, 2, 3]) } as any,
+        },
+      }
+
+      channel.send(msg)
+
+      // Should have called send multiple times (fragments)
+      expect((dataChannel.send as any).mock.calls.length).toBeGreaterThan(1)
+
+      // First call should be fragment header (0x01 prefix)
+      const firstSent = (dataChannel.send as any).mock.calls[0][0]
+      expect(firstSent[0]).toBe(0x01) // FRAGMENT_HEADER
+
+      // Subsequent calls should be fragment data (0x02 prefix)
+      const secondSent = (dataChannel.send as any).mock.calls[1][0]
+      expect(secondSent[0]).toBe(0x02) // FRAGMENT_DATA
+
+      await smallThresholdAdapter._stop()
+    })
+
+    it("should not fragment small payloads", async () => {
+      await initializeAdapter(adapter)
+      const peerId = "12345" as PeerID
+      const dataChannel = createMockDataChannel("open")
+
+      adapter.attachDataChannel(peerId, dataChannel)
+
+      const channel = [...adapter.channels][0]
+      expect(channel).toBeDefined()
+
+      // Small message that won't need fragmentation
+      const msg = {
+        type: "channel/directory-request" as const,
+        docIds: undefined,
+      }
+
+      channel.send(msg)
+
+      // Should have called send exactly once
+      expect(dataChannel.send).toHaveBeenCalledTimes(1)
+
+      // Should have MESSAGE_COMPLETE prefix (0x00)
+      const sentData = (dataChannel.send as any).mock.calls[0][0]
+      expect(sentData[0]).toBe(0x00) // MESSAGE_COMPLETE
     })
   })
 
