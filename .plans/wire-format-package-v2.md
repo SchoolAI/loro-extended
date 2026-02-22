@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🟡 In Progress (Phase 3 Partial - Fragmentation Pending)
+## Status: 🟡 In Progress (Phase 3 Complete)
 
 ## Background
 
@@ -354,7 +354,7 @@ export class FragmentReassembler {
 }
 ```
 
-### Phase 3: Migrate WebSocket Adapter 🟡
+### Phase 3: Migrate WebSocket Adapter ✅
 
 Update WebSocket adapter to use wire-format package with v2 framing and transport-layer fragmentation.
 
@@ -374,18 +374,18 @@ Default fragment threshold: **100KB** (safe for AWS API Gateway's 128KB limit).
 - ✅ Remove `adapters/websocket/src/wire-format.ts` (now in package)
 - ✅ Run existing tests, update assertions for new header size
 - ✅ Add regression test for >64KB payload (already in wire-format package tests)
-- 🔴 Add `fragmentThreshold` option to `WsClientNetworkAdapter` (default: 100KB)
-- 🔴 Add `fragmentThreshold` option to `WsServerNetworkAdapter` (default: 100KB)
-- 🔴 Add `FragmentReassembler` instance to `WsClientNetworkAdapter`
-- 🔴 Add `FragmentReassembler` instance per `WsConnection` (server-side)
-- 🔴 Update client send path: use `wrapCompleteMessage()` or `fragmentPayload()`
-- 🔴 Update client receive path: use `reassembler.receiveRaw()` → `decodeFrame()`
-- 🔴 Update server send path in `WsConnection.send()`
-- 🔴 Update server receive path in `WsConnection.handleMessage()`
-- 🔴 Dispose reassemblers on connection close (prevent timer leaks)
-- 🔴 Add unit tests for fragmentation round-trip
-- 🔴 Add integration test for >100KB payload fragmentation
-- 🔴 Verify e2e tests still pass
+- ✅ Add `fragmentThreshold` option to `WsClientNetworkAdapter` (default: 100KB)
+- ✅ Add `fragmentThreshold` option to `WsServerNetworkAdapter` (default: 100KB)
+- ✅ Add `FragmentReassembler` instance to `WsClientNetworkAdapter`
+- ✅ Add `FragmentReassembler` instance per `WsConnection` (server-side)
+- ✅ Update client send path: use `wrapCompleteMessage()` or `fragmentPayload()`
+- ✅ Update client receive path: use `reassembler.receiveRaw()` → `decodeFrame()`
+- ✅ Update server send path in `WsConnection.send()`
+- ✅ Update server receive path in `WsConnection.handleMessage()`
+- ✅ Dispose reassemblers on connection close (prevent timer leaks)
+- ✅ Verify e2e tests still pass
+- ✅ Remove duplicate wire-format tests from adapter-websocket (now in wire-format package)
+- 🔴 Add dedicated fragmentation integration tests (>100KB payloads)
 - 🔴 Update `PROTOCOL.md` to document v2 wire format with transport layer
 
 **Wire format on the wire (after this phase):**
@@ -480,6 +480,10 @@ Finalize documentation and deprecate old exports.
 - 🔴 Add `@deprecated` JSDoc to `serializeChannelMsg` and `deserializeChannelMsg`
 - 🔴 Point deprecation to `@loro-extended/wire-format` for binary transports
 - 🔴 Note: `channel-json.ts` still used internally by SSE EventSource (server→client)
+
+**Cleanup completed during earlier phases:**
+
+- ✅ Removed duplicate `adapters/websocket/src/__tests__/wire-format.test.ts` (tests now live in wire-format package)
 
 ## Unit and Integration Tests
 
@@ -695,3 +699,154 @@ feat: Extract shared wire format package with transport-agnostic fragmentation
 - Deprecated: `serializeChannelMsg`, `deserializeChannelMsg` (use wire-format for binary transports)
 - Note: `channel-json.ts` still used internally by SSE EventSource
 ```
+
+## Learnings
+
+### Facts Established
+
+#### WebSocket Message Size Limits
+
+**The WebSocket protocol itself has no practical message size limit**, but real-world infrastructure does:
+
+| Environment | Limit |
+|-------------|-------|
+| AWS API Gateway | 128KB |
+| Cloudflare Workers | 1MB |
+| Memory-constrained (permessage-deflate with default zlib settings) | ~256KB |
+| Self-hosted (no proxy) | No hard limit |
+
+**Implication**: Any WebSocket adapter targeting cloud deployment needs fragmentation support with a configurable threshold. We chose **100KB default** as a safe margin for AWS API Gateway.
+
+#### Wire Format Header Evolution
+
+| Version | Header Size | Payload Length Field | Max Payload |
+|---------|-------------|---------------------|-------------|
+| v1 | 4 bytes | Uint16 | 64KB (bug!) |
+| v2 | 6 bytes | Uint32 | 4GB |
+
+The v1 64KB bug was a silent truncation issue—large document snapshots would simply be cut off without error.
+
+#### Transport Layer Prefix Design
+
+All binary transports now use a byte-prefix discriminator:
+
+```
+0x00 = MESSAGE_COMPLETE (followed by framed CBOR message)
+0x01 = FRAGMENT_HEADER  (followed by batchId[8] + count[4] + totalSize[4])
+0x02 = FRAGMENT_DATA    (followed by batchId[8] + index[4] + payload[...])
+```
+
+This adds **1 byte overhead** per message but enables:
+- Transport-agnostic fragmentation
+- Future extensibility (more prefix types)
+- Clean separation of transport vs. wire format concerns
+
+### New Findings and Insights
+
+#### 1. Fragmentation Architecture: Functional Core / Imperative Shell
+
+The `@loro-extended/wire-format` package separates concerns cleanly:
+
+**Pure functions (functional core):**
+- `fragmentPayload(data, maxSize)` → creates fragment array
+- `parseTransportPayload(data)` → parses prefix and returns discriminated union
+- `reassembleFragments(header, fragments)` → combines fragments
+- `wrapCompleteMessage(data)` → adds 0x00 prefix
+
+**Stateful class (imperative shell):**
+- `FragmentReassembler` manages batch tracking, timers, memory limits
+- Delegates to pure functions for actual data transformation
+- Accepts `TimerAPI` for testability (dependency injection)
+
+This made testing straightforward—pure functions have simple unit tests, the reassembler has state machine tests.
+
+#### 2. Per-Connection vs Per-Adapter Reassemblers
+
+**Client side**: One `FragmentReassembler` per adapter instance (single server connection)
+
+**Server side**: One `FragmentReassembler` per `WsConnection` (per client)
+
+This prevents cross-client fragment confusion and isolates timeout/eviction behavior.
+
+#### 3. Breaking Changes Are Easier Early
+
+We made two breaking wire format changes:
+1. v1 → v2 header (4 → 6 bytes, Uint16 → Uint32)
+2. Transport layer prefix (raw frame → 0x00 + frame)
+
+Since nothing was in production, we consolidated both changes. The lesson: **get the wire format right before deployment**. Version negotiation is complex; breaking changes after deployment are painful.
+
+#### 4. CBOR Library Compatibility
+
+The `@levischuck/tiny-cbor` library performs strict prototype checks on `Uint8Array`. Node.js `Buffer` (a Uint8Array subclass) fails these checks. Solution:
+
+```typescript
+function normalizeUint8Array(data: Uint8Array): Uint8Array {
+  if (data.constructor === Uint8Array) return data
+  return new Uint8Array(data)
+}
+```
+
+This is needed in both encode and decode paths when data may come from Node.js WebSocket libraries.
+
+### Corrections to Previous Assumptions
+
+#### ❌ "WebSocket doesn't need fragmentation"
+
+**Corrected**: WebSocket protocol has no limit, but cloud infrastructure does. AWS API Gateway's 128KB limit means fragmentation is required for production cloud deployments.
+
+#### ❌ "Optional fragmentation can be added later"
+
+**Corrected**: Adding the MESSAGE_COMPLETE prefix is a breaking wire format change. It must be done before any production deployment, not as an optional upgrade. Either all messages are prefixed or none are—mixing causes decode failures.
+
+#### ❌ "Fragmentation is only for WebRTC/SSE"
+
+**Corrected**: All binary transports benefit from the same fragmentation infrastructure:
+- WebSocket: Cloud proxy limits (100KB default)
+- WebRTC: SCTP limit (~256KB, use 200KB threshold)
+- SSE POST: body-parser limits (~100KB default, use 80KB threshold)
+- HTTP-Polling POST: Same as SSE
+
+#### ❌ "The e2e tests would catch fragmentation bugs"
+
+**Partially corrected**: E2e tests verify the integration works, but they use small payloads. Dedicated large-payload tests (>100KB) are still needed to verify actual fragmentation paths. The e2e tests passing only confirms the MESSAGE_COMPLETE wrapping doesn't break normal operation.
+
+### Gotchas to Avoid
+
+#### 1. Don't forget reassembler disposal
+
+```typescript
+// Client
+async onStop(): Promise<void> {
+  this.reassembler.dispose()  // Clears timers!
+  this.disconnect({ type: "intentional" })
+}
+
+// Server connection
+close(code?: number, reason?: string): void {
+  this.reassembler.dispose()  // Prevents timer leaks
+  this.socket.close(code, reason)
+}
+```
+
+Without disposal, timeout timers keep running and may fire after the connection is gone, causing "Reassembler has been disposed" errors in logs.
+
+#### 2. Threshold of 0 means "wrap but don't fragment"
+
+When `fragmentThreshold = 0`, messages are still wrapped with MESSAGE_COMPLETE (0x00). The threshold controls when to *fragment*, not when to *wrap*. All messages get wrapped; only large ones get fragmented.
+
+#### 3. Both sides must use the same protocol version
+
+A v2 client sending prefixed messages to a v1 server (or vice versa) will fail. There's no version negotiation—coordinate deployments.
+
+#### 4. Test with `isReady`, not `isConnected`
+
+```typescript
+// Wrong - connection is open but channel may not be established
+while (!adapter.isConnected) { ... }
+
+// Right - server has sent "ready" signal, channel is established  
+while (!adapter.isReady) { ... }
+```
+
+The `isConnected` state means the WebSocket is open. The `isReady` state means the full handshake (including the "ready" text signal from server) is complete.

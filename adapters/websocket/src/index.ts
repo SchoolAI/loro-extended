@@ -23,6 +23,7 @@ export {
   type ConnectionState,
   createServiceWsClient,
   createWsClient,
+  DEFAULT_FRAGMENT_THRESHOLD,
   type DisconnectReason,
   type ServiceWsClientOptions,
   type WsClientLifecycleEvents,
@@ -34,7 +35,7 @@ export {
 // State machine (for advanced use cases)
 export { WsClientStateMachine } from "./client-state-machine.js"
 // Connection
-export { WsConnection } from "./connection.js"
+export { WsConnection, type WsConnectionConfig } from "./connection.js"
 // Handler types
 export type {
   WsConnectionHandle,
@@ -46,4 +47,8 @@ export type {
 } from "./handler/types.js"
 export { wrapStandardWebSocket } from "./handler/types.js"
 // Server adapter
-export { WsServerNetworkAdapter, wrapWsSocket } from "./server-adapter.js"
+export {
+  type WsServerAdapterOptions,
+  WsServerNetworkAdapter,
+  wrapWsSocket,
+} from "./server-adapter.js"

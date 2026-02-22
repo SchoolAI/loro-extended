@@ -12,7 +12,13 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
-import { decodeFrame, encodeFrame } from "@loro-extended/wire-format"
+import {
+  decodeFrame,
+  encodeFrame,
+  FragmentReassembler,
+  fragmentPayload,
+  wrapCompleteMessage,
+} from "@loro-extended/wire-format"
 import {
   type DisconnectReason,
   type WsClientState,
@@ -32,6 +38,13 @@ export type ConnectionState =
   | "connecting"
   | "connected"
   | "reconnecting"
+
+/**
+ * Default fragment threshold in bytes.
+ * Messages larger than this are fragmented for cloud infrastructure compatibility.
+ * AWS API Gateway has a 128KB limit, so 100KB provides a safe margin.
+ */
+export const DEFAULT_FRAGMENT_THRESHOLD = 100 * 1024
 
 /**
  * Base options for the WebSocket client adapter.
@@ -54,6 +67,13 @@ export interface WsClientOptions {
 
   /** Keepalive interval in ms (default: 30000) */
   keepaliveInterval?: number
+
+  /**
+   * Fragment threshold in bytes. Messages larger than this are fragmented.
+   * Set to 0 to disable fragmentation (not recommended for cloud deployments).
+   * Default: 100KB (safe for AWS API Gateway's 128KB limit)
+   */
+  fragmentThreshold?: number
 
   /**
    * Lifecycle event callbacks.
@@ -174,10 +194,26 @@ export class WsClientNetworkAdapter extends Adapter<void> {
   // Unified state machine
   private readonly stateMachine = new WsClientStateMachine()
 
+  // Fragmentation support
+  private readonly fragmentThreshold: number
+  private readonly reassembler: FragmentReassembler
+
   constructor(options: ServiceWsClientOptions) {
     super({ adapterType: "websocket-client" })
     this.options = options
     this.WebSocketImpl = options.WebSocket ?? globalThis.WebSocket
+    this.fragmentThreshold =
+      options.fragmentThreshold ?? DEFAULT_FRAGMENT_THRESHOLD
+    this.reassembler = new FragmentReassembler({
+      timeoutMs: 10000,
+      onTimeout: batchId => {
+        this.logger.warn("Fragment batch timed out", {
+          batchId: Array.from(batchId)
+            .map(b => b.toString(16).padStart(2, "0"))
+            .join(""),
+        })
+      },
+    })
 
     // Set up lifecycle event forwarding
     this.setupLifecycleEvents()
@@ -332,7 +368,20 @@ export class WsClientNetworkAdapter extends Adapter<void> {
         }
 
         const frame = encodeFrame(msg)
-        this.socket.send(frame)
+
+        // Fragment large payloads for cloud infrastructure compatibility
+        if (
+          this.fragmentThreshold > 0 &&
+          frame.length > this.fragmentThreshold
+        ) {
+          const fragments = fragmentPayload(frame, this.fragmentThreshold)
+          for (const fragment of fragments) {
+            this.socket.send(fragment)
+          }
+        } else {
+          // Wrap with MESSAGE_COMPLETE prefix for transport layer consistency
+          this.socket.send(wrapCompleteMessage(frame))
+        }
       },
       stop: () => {
         // Note: We don't call disconnect() here because the channel's stop()
@@ -358,6 +407,7 @@ export class WsClientNetworkAdapter extends Adapter<void> {
 
   async onStop(): Promise<void> {
     this.shouldReconnect = false
+    this.reassembler.dispose()
     this.disconnect({ type: "intentional" })
   }
 
@@ -533,16 +583,23 @@ export class WsClientNetworkAdapter extends Adapter<void> {
       return
     }
 
-    // Handle binary messages
+    // Handle binary messages through reassembler (handles both complete and fragmented)
     if (data instanceof ArrayBuffer) {
-      try {
-        const messages = decodeFrame(new Uint8Array(data))
-        for (const msg of messages) {
-          this.handleChannelMessage(msg)
+      const result = this.reassembler.receiveRaw(new Uint8Array(data))
+
+      if (result.status === "complete") {
+        try {
+          const messages = decodeFrame(result.data)
+          for (const msg of messages) {
+            this.handleChannelMessage(msg)
+          }
+        } catch (error) {
+          this.logger.error("Failed to decode message", { error })
         }
-      } catch (error) {
-        this.logger.error("Failed to decode message", { error })
+      } else if (result.status === "error") {
+        this.logger.error("Fragment reassembly error", { error: result.error })
       }
+      // "pending" status means we're waiting for more fragments - nothing to do
     }
   }
 

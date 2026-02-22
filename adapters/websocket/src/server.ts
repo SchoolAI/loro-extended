@@ -16,7 +16,11 @@ export {
   WireFlags,
 } from "@loro-extended/wire-format"
 // Connection
-export { WsConnection } from "./connection.js"
+export {
+  DEFAULT_FRAGMENT_THRESHOLD,
+  WsConnection,
+  type WsConnectionConfig,
+} from "./connection.js"
 // Handler types
 export type {
   WsConnectionHandle,
@@ -28,4 +32,8 @@ export type {
 } from "./handler/types.js"
 export { wrapStandardWebSocket } from "./handler/types.js"
 // Server adapter
-export { WsServerNetworkAdapter, wrapWsSocket } from "./server-adapter.js"
+export {
+  type WsServerAdapterOptions,
+  WsServerNetworkAdapter,
+  wrapWsSocket,
+} from "./server-adapter.js"

@@ -11,12 +11,24 @@ import {
   type GeneratedChannel,
   type PeerID,
 } from "@loro-extended/repo"
-import { WsConnection } from "./connection.js"
+import { DEFAULT_FRAGMENT_THRESHOLD, WsConnection } from "./connection.js"
 import type {
   WsConnectionOptions,
   WsConnectionResult,
   WsSocket,
 } from "./handler/types.js"
+
+/**
+ * Options for the WebSocket server adapter.
+ */
+export interface WsServerAdapterOptions {
+  /**
+   * Fragment threshold in bytes. Messages larger than this are fragmented.
+   * Set to 0 to disable fragmentation (not recommended for cloud deployments).
+   * Default: 100KB (safe for AWS API Gateway's 128KB limit)
+   */
+  fragmentThreshold?: number
+}
 
 /**
  * Generate a random peer ID for connections that don't provide one.
@@ -56,9 +68,12 @@ function generatePeerId(): PeerID {
  */
 export class WsServerNetworkAdapter extends Adapter<PeerID> {
   private connections = new Map<PeerID, WsConnection>()
+  private readonly fragmentThreshold: number
 
-  constructor() {
+  constructor(options?: WsServerAdapterOptions) {
     super({ adapterType: "websocket-server" })
+    this.fragmentThreshold =
+      options?.fragmentThreshold ?? DEFAULT_FRAGMENT_THRESHOLD
   }
 
   protected generate(peerId: PeerID): GeneratedChannel {
@@ -116,8 +131,10 @@ export class WsServerNetworkAdapter extends Adapter<PeerID> {
     // Create channel for this peer
     const channel = this.addChannel(peerId)
 
-    // Create connection object
-    const connection = new WsConnection(peerId, channel.channelId, socket)
+    // Create connection object with fragmentation config
+    const connection = new WsConnection(peerId, channel.channelId, socket, {
+      fragmentThreshold: this.fragmentThreshold,
+    })
     connection._setChannel(channel)
 
     // Store connection

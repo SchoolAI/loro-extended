@@ -6,8 +6,33 @@
  */
 
 import type { Channel, ChannelMsg, PeerID } from "@loro-extended/repo"
-import { decodeFrame, encodeFrame } from "@loro-extended/wire-format"
+import {
+  decodeFrame,
+  encodeFrame,
+  FragmentReassembler,
+  fragmentPayload,
+  wrapCompleteMessage,
+} from "@loro-extended/wire-format"
 import type { WsSocket } from "./handler/types.js"
+
+/**
+ * Default fragment threshold in bytes.
+ * Messages larger than this are fragmented for cloud infrastructure compatibility.
+ * AWS API Gateway has a 128KB limit, so 100KB provides a safe margin.
+ */
+export const DEFAULT_FRAGMENT_THRESHOLD = 100 * 1024
+
+/**
+ * Configuration for creating a WsConnection.
+ */
+export interface WsConnectionConfig {
+  /**
+   * Fragment threshold in bytes. Messages larger than this are fragmented.
+   * Set to 0 to disable fragmentation (not recommended for cloud deployments).
+   * Default: 100KB (safe for AWS API Gateway's 128KB limit)
+   */
+  fragmentThreshold?: number
+}
 
 /**
  * Represents a WebSocket connection to a peer.
@@ -20,10 +45,31 @@ export class WsConnection {
   private channel: Channel | null = null
   private started = false
 
-  constructor(peerId: PeerID, channelId: number, socket: WsSocket) {
+  // Fragmentation support
+  private readonly fragmentThreshold: number
+  private readonly reassembler: FragmentReassembler
+
+  constructor(
+    peerId: PeerID,
+    channelId: number,
+    socket: WsSocket,
+    config?: WsConnectionConfig,
+  ) {
     this.peerId = peerId
     this.channelId = channelId
     this.socket = socket
+    this.fragmentThreshold =
+      config?.fragmentThreshold ?? DEFAULT_FRAGMENT_THRESHOLD
+    this.reassembler = new FragmentReassembler({
+      timeoutMs: 10000,
+      onTimeout: batchId => {
+        console.warn(
+          `[WsConnection] Fragment batch timed out: ${Array.from(batchId)
+            .map(b => b.toString(16).padStart(2, "0"))
+            .join("")}`,
+        )
+      },
+    })
   }
 
   /**
@@ -59,7 +105,17 @@ export class WsConnection {
     }
 
     const frame = encodeFrame(msg)
-    this.socket.send(frame)
+
+    // Fragment large payloads for cloud infrastructure compatibility
+    if (this.fragmentThreshold > 0 && frame.length > this.fragmentThreshold) {
+      const fragments = fragmentPayload(frame, this.fragmentThreshold)
+      for (const fragment of fragments) {
+        this.socket.send(fragment)
+      }
+    } else {
+      // Wrap with MESSAGE_COMPLETE prefix for transport layer consistency
+      this.socket.send(wrapCompleteMessage(frame))
+    }
   }
 
   /**
@@ -72,15 +128,22 @@ export class WsConnection {
       return
     }
 
-    // Handle binary protocol messages
-    try {
-      const messages = decodeFrame(data)
-      for (const msg of messages) {
-        this.handleChannelMessage(msg)
+    // Handle binary protocol messages through reassembler
+    const result = this.reassembler.receiveRaw(data)
+
+    if (result.status === "complete") {
+      try {
+        const messages = decodeFrame(result.data)
+        for (const msg of messages) {
+          this.handleChannelMessage(msg)
+        }
+      } catch (error) {
+        console.error("Failed to decode wire message:", error)
       }
-    } catch (error) {
-      console.error("Failed to decode wire message:", error)
+    } else if (result.status === "error") {
+      console.error("Fragment reassembly error:", result.error)
     }
+    // "pending" status means we're waiting for more fragments - nothing to do
   }
 
   /**
@@ -121,9 +184,10 @@ export class WsConnection {
   }
 
   /**
-   * Close the connection.
+   * Close the connection and clean up resources.
    */
   close(code?: number, reason?: string): void {
+    this.reassembler.dispose()
     this.socket.close(code, reason)
   }
 }
