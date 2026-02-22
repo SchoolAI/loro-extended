@@ -1,41 +1,98 @@
-# loro-extended WebSocket Protocol
+# loro-extended WebSocket Protocol (v2)
 
 This document describes the native wire protocol used by `@loro-extended/adapter-websocket` for real-time document synchronization over WebSocket.
 
 ## Overview
 
-The protocol directly transmits loro-extended `ChannelMsg` types using CBOR encoding (RFC 8949). Unlike the Loro Syncing Protocol, this native protocol:
+The protocol directly transmits loro-extended `ChannelMsg` types using CBOR encoding (RFC 8949). This native protocol:
 
 - Preserves full message semantics without translation
 - Supports all loro-extended message types natively
 - Handles batching at the wire level
-- Uses a simple 4-byte frame header
+- Uses a 6-byte frame header with Uint32 payload length
 - Uses CBOR for compact binary encoding (~1KB library)
+- Supports transport-layer fragmentation for large payloads
+
+## Transport Layer
+
+All WebSocket binary messages are wrapped with a transport-layer prefix to distinguish between complete messages and fragmented payloads.
+
+### Transport Payload Types
+
+| Prefix | Name | Description |
+|--------|------|-------------|
+| `0x00` | MESSAGE_COMPLETE | Complete message (not fragmented) |
+| `0x01` | FRAGMENT_HEADER | Start of a fragmented batch |
+| `0x02` | FRAGMENT_DATA | Fragment data chunk |
+
+### Complete Message
+
+For messages that don't exceed the fragment threshold:
+
+```
+┌──────────┬────────────────────────────────────────────────────────┐
+│  Prefix  │                    Framed Message                      │
+│  (0x00)  │                                                        │
+│  1 byte  │              (6-byte header + CBOR payload)            │
+└──────────┴────────────────────────────────────────────────────────┘
+```
+
+### Fragmented Message
+
+For messages exceeding the fragment threshold (default: 100KB):
+
+```
+Fragment Header:
+┌──────────┬──────────────────┬─────────────────┬─────────────────┐
+│  Prefix  │     Batch ID     │   Fragment      │   Total Size    │
+│  (0x01)  │    (8 bytes)     │   Count (4B)    │    (4 bytes)    │
+└──────────┴──────────────────┴─────────────────┴─────────────────┘
+
+Fragment Data (repeated for each chunk):
+┌──────────┬──────────────────┬─────────────────┬─────────────────┐
+│  Prefix  │     Batch ID     │   Index (4B)    │   Chunk Data    │
+│  (0x02)  │    (8 bytes)     │   (0-based)     │   (variable)    │
+└──────────┴──────────────────┴─────────────────┴─────────────────┘
+```
+
+**Fragmentation fields:**
+
+| Field | Size | Description |
+|-------|------|-------------|
+| Batch ID | 8 bytes | Random identifier linking fragments |
+| Fragment Count | 4 bytes | Total number of data chunks (big-endian) |
+| Total Size | 4 bytes | Total payload size in bytes (big-endian) |
+| Index | 4 bytes | Zero-based fragment index (big-endian) |
+| Chunk Data | variable | Fragment payload bytes |
+
+**Reassembly:**
+
+The receiver collects all FRAGMENT_DATA chunks with matching Batch ID, orders them by index, and concatenates to reconstruct the original framed message.
 
 ## Frame Structure
 
-Each WebSocket binary message is a frame with the following structure:
+Each complete message (after transport layer unwrapping) has this structure:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Header (4 bytes)                                            │
-├─────────┬─────────┬─────────────────────────────────────────┤
-│ Version │  Flags  │        Payload Length                   │
-│ (1 byte)│ (1 byte)│         (2 bytes, big-endian)           │
-├─────────┴─────────┴─────────────────────────────────────────┤
-│                                                             │
-│              Payload (CBOR encoded, RFC 8949)               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│ Header (6 bytes)                                                    │
+├──────────┬──────────┬───────────────────────────────────────────────┤
+│ Version  │  Flags   │           Payload Length                      │
+│ (1 byte) │ (1 byte) │           (4 bytes, big-endian)               │
+├──────────┴──────────┴───────────────────────────────────────────────┤
+│                                                                     │
+│              Payload (CBOR encoded, RFC 8949)                       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Header Fields
 
 | Field | Size | Description |
 |-------|------|-------------|
-| Version | 1 byte | Protocol version (currently `0x01`) |
+| Version | 1 byte | Protocol version (`0x02` for v2) |
 | Flags | 1 byte | Bit flags (see below) |
-| Payload Length | 2 bytes | Big-endian length of payload (max 65535) |
+| Payload Length | 4 bytes | Big-endian length of payload (max ~4GB) |
 
 ### Flags
 
@@ -247,44 +304,89 @@ Ephemeral data uses this structure:
 
 VersionVector is a loro-crdt WASM class. It must be encoded using `versionVector.encode()` and decoded using `VersionVector.decode(bytes)`.
 
-## Keepalive
+## Keepalive and Ready Signal
 
-The protocol uses WebSocket text frames for keepalive:
+The protocol uses WebSocket text frames for keepalive and connection readiness:
 
+- Server sends `"ready"` when connection is fully established
 - Client sends `"ping"` every 30 seconds (configurable)
 - Server responds with `"pong"`
 
 Binary frames are reserved for protocol messages.
 
-## Limits
+## Fragment Thresholds
 
-- Maximum payload size: 65535 bytes (2-byte length field)
-- For larger documents, Loro's internal compression typically keeps payloads under this limit
+| Environment | Recommended Threshold | Rationale |
+|-------------|----------------------|-----------|
+| AWS API Gateway | 100KB | 128KB hard limit |
+| Cloudflare Workers | 500KB | 1MB limit |
+| Self-hosted | 0 (disabled) | No external limits |
+
+Default threshold: **100KB** (safe for most cloud deployments).
+
+## Configuration
+
+### Client
+
+```typescript
+const wsAdapter = new WsClientNetworkAdapter({
+  url: "wss://api.example.com/ws",
+  fragmentThreshold: 100 * 1024,  // Default: 100KB, set to 0 to disable
+})
+```
+
+### Server
+
+```typescript
+const wsAdapter = new WsServerNetworkAdapter({
+  fragmentThreshold: 100 * 1024,  // Default: 100KB, applies to all connections
+})
+```
 
 ## Example Message Flow
 
 ```
 Client                                Server
   |                                     |
-  |  [EstablishRequest]                 |
+  |  [WebSocket Connect]                |
   |------------------------------------>|
   |                                     |
-  |  [EstablishResponse]                |
+  |              "ready"                |
   |<------------------------------------|
   |                                     |
-  |  [SyncRequest doc="todo-list"]      |
+  |  [0x00 + EstablishRequest frame]    |
   |------------------------------------>|
   |                                     |
-  |  [SyncResponse snapshot]            |
+  |  [0x00 + EstablishResponse frame]   |
   |<------------------------------------|
   |                                     |
-  |  [Update incremental]               |
+  |  [0x00 + SyncRequest frame]         |
   |------------------------------------>|
   |                                     |
-  |  [Ephemeral presence]               |
-  |<----------------------------------->|
+  |  [Large response - fragmented]      |
+  |  [0x01 + Fragment Header]           |
+  |  [0x02 + Fragment 0]                |
+  |  [0x02 + Fragment 1]                |
+  |  [0x02 + Fragment 2]                |
+  |<------------------------------------|
   |                                     |
 ```
+
+## Version History
+
+| Version | Header Size | Max Payload | Transport Layer | Notes |
+|---------|-------------|-------------|-----------------|-------|
+| v1 | 4 bytes | 64KB | None | **Deprecated** - Uint16 length field |
+| v2 | 6 bytes | ~4GB | Byte-prefix + fragmentation | Current version |
+
+### Breaking Changes in v2
+
+1. **Header size**: 4 bytes → 6 bytes
+2. **Payload length**: Uint16 (2 bytes) → Uint32 (4 bytes)
+3. **Transport layer**: All messages now wrapped with `0x00` prefix or fragmented
+4. **Version byte**: `0x01` → `0x02`
+
+**v1 and v2 are not compatible.** Both client and server must use the same version.
 
 ## Comparison with Loro Syncing Protocol
 
@@ -297,3 +399,5 @@ Client                                Server
 | Directory/Delete | Supported | Not supported |
 | Bidirectional flag | Native field | Encoded in authPayload |
 | Translation needed | No | Yes |
+| Fragmentation | Built-in | Not supported |
+| Max payload | ~4GB | Protocol-dependent |

@@ -385,8 +385,8 @@ Default fragment threshold: **100KB** (safe for AWS API Gateway's 128KB limit).
 - ✅ Dispose reassemblers on connection close (prevent timer leaks)
 - ✅ Verify e2e tests still pass
 - ✅ Remove duplicate wire-format tests from adapter-websocket (now in wire-format package)
-- 🔴 Add dedicated fragmentation integration tests (>100KB payloads)
-- 🔴 Update `PROTOCOL.md` to document v2 wire format with transport layer
+- ✅ Add dedicated fragmentation integration tests (>100KB payloads)
+- ✅ Update `PROTOCOL.md` to document v2 wire format with transport layer
 
 **Wire format on the wire (after this phase):**
 
