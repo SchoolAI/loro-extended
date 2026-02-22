@@ -5,7 +5,7 @@
  * They run on the server to ensure game rules are enforced consistently.
  */
 
-import { type Draft, unwrap } from "@loro-extended/change"
+import { type Draft, value } from "@loro-extended/change"
 import type { Choice, GameDoc, GameDocShape, Result } from "../shared/schema.js"
 
 /**
@@ -49,10 +49,10 @@ export const allLockedReactor = (
   change: (fn: (draft: Draft<GameDocShape>) => void) => void,
 ) => {
   // Only trigger if we're in choosing phase
-  if (unwrap(after.game.phase) !== "choosing") return
+  if (value(after.game.phase) !== "choosing") return
 
-  const wasAllLocked = before.game.players.values().every(p => unwrap(p.locked))
-  const isAllLocked = after.game.players.values().every(p => unwrap(p.locked))
+  const wasAllLocked = before.game.players.values().every(p => value(p.locked))
+  const isAllLocked = after.game.players.values().every(p => value(p.locked))
 
   if (isAllLocked && !wasAllLocked) {
     // Transition to reveal phase
@@ -79,12 +79,12 @@ export const resolveGameReactor = (
 ) => {
   // Detect transition to reveal phase
   if (
-    unwrap(before.game.phase) === "choosing" &&
-    unwrap(after.game.phase) === "reveal"
+    value(before.game.phase) === "choosing" &&
+    value(after.game.phase) === "reveal"
   ) {
-    const aliceChoice = (unwrap(after.game.players.get("alice")?.choice) ??
+    const aliceChoice = (value(after.game.players.get("alice")?.choice) ??
       null) as Choice | null
-    const bobChoice = (unwrap(after.game.players.get("bob")?.choice) ??
+    const bobChoice = (value(after.game.players.get("bob")?.choice) ??
       null) as Choice | null
 
     const result = calculateWinner(aliceChoice, bobChoice)

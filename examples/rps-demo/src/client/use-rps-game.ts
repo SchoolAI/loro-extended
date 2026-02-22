@@ -10,7 +10,7 @@ import {
   type Draft,
   loro,
   type TypedDoc,
-  unwrap,
+  value,
 } from "@loro-extended/change"
 import { useDocument, useLens } from "@loro-extended/react"
 import { useEffect } from "react"
@@ -48,17 +48,17 @@ export function useRpsGame(playerId: string) {
 
   // Get current player state — unwrap PlainValueRef for clean consumer types
   const myPlayer = worldview.game.players[playerId]
-  const myChoice = (unwrap(myPlayer?.choice) ?? null) as Choice | null
-  const myLocked = unwrap(myPlayer?.locked) ?? false
+  const myChoice = (value(myPlayer?.choice) ?? null) as Choice | null
+  const myLocked = value(myPlayer?.locked) ?? false
 
   // Get opponent state
   const opponentId = playerId === "alice" ? "bob" : "alice"
   const opponent = worldview.game.players[opponentId]
-  const opponentLocked = unwrap(opponent?.locked) ?? false
+  const opponentLocked = value(opponent?.locked) ?? false
 
   // Game phase and result
-  const phase = unwrap(worldview.game.phase) as Phase
-  const result = (unwrap(worldview.game.result) ?? null) as Result | null
+  const phase = value(worldview.game.phase) as Phase
+  const result = (value(worldview.game.result) ?? null) as Result | null
 
   /**
    * Make a choice (rock, paper, or scissors).
@@ -110,7 +110,7 @@ export function useRpsGame(playerId: string) {
     opponentLocked,
     opponentChoice:
       phase === "resolved"
-        ? ((unwrap(opponent?.choice) ?? null) as Choice | null)
+        ? ((value(opponent?.choice) ?? null) as Choice | null)
         : null,
     isReady: !!doc && !!lens,
 
