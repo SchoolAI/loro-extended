@@ -1,0 +1,2 @@
+server: PORT=5171 tsx --watch src/server/server.ts
+client: vite
