@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, Shape, unwrap } from "../index.js"
+import { change, createTypedDoc, Shape, value } from "../index.js"
 
 /**
  * Regression tests for Shape.record() value updates across multiple change() calls.
@@ -23,12 +23,12 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.input.set("key1", 123)
       })
-      expect(unwrap(doc.input.get("key1"))).toBe(123)
+      expect(value(doc.input.get("key1"))).toBe(123)
 
       change(doc, draft => {
         draft.input.set("key1", 456)
       })
-      expect(unwrap(doc.input.get("key1"))).toBe(456)
+      expect(value(doc.input.get("key1"))).toBe(456)
     })
 
     it("updates value with indexed assignment", () => {
@@ -41,12 +41,12 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.input.key1 = 100
       })
-      expect(unwrap(doc.input.key1)).toBe(100)
+      expect(value(doc.input.key1)).toBe(100)
 
       change(doc, draft => {
         draft.input.key1 = 200
       })
-      expect(unwrap(doc.input.key1)).toBe(200)
+      expect(value(doc.input.key1)).toBe(200)
     })
 
     it("handles multiple sequential updates to same key", () => {
@@ -60,7 +60,7 @@ describe("Record value updates across change() calls", () => {
         change(doc, draft => {
           draft.counter.set("count", i)
         })
-        expect(unwrap(doc.counter.get("count"))).toBe(i)
+        expect(value(doc.counter.get("count"))).toBe(i)
       }
     })
   })
@@ -76,13 +76,13 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.input.set("key1", "hello")
       })
-      expect(unwrap(doc.input.get("key1"))).toBe("hello")
+      expect(value(doc.input.get("key1"))).toBe("hello")
 
       change(doc, draft => {
         draft.input.delete("key1")
       })
       expect(doc.input.has("key1")).toBe(false)
-      expect(unwrap(doc.input.get("key1"))).toBeUndefined()
+      expect(value(doc.input.get("key1"))).toBeUndefined()
     })
   })
 
@@ -126,7 +126,7 @@ describe("Record value updates across change() calls", () => {
         draft.data.set("x", 99)
       })
 
-      expect(unwrap(doc.data.get("x"))).toBe(99)
+      expect(value(doc.data.get("x"))).toBe(99)
     })
 
     it("handles alternating boolean values", () => {
@@ -139,17 +139,17 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.flags.set("active", false)
       })
-      expect(unwrap(doc.flags.get("active"))).toBe(false)
+      expect(value(doc.flags.get("active"))).toBe(false)
 
       change(doc, draft => {
         draft.flags.set("active", true)
       })
-      expect(unwrap(doc.flags.get("active"))).toBe(true)
+      expect(value(doc.flags.get("active"))).toBe(true)
 
       change(doc, draft => {
         draft.flags.set("active", false)
       })
-      expect(unwrap(doc.flags.get("active"))).toBe(false)
+      expect(value(doc.flags.get("active"))).toBe(false)
     })
 
     it("handles null values", () => {
@@ -162,12 +162,12 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.nullable.set("value", "initial")
       })
-      expect(unwrap(doc.nullable.get("value"))).toBe("initial")
+      expect(value(doc.nullable.get("value"))).toBe("initial")
 
       change(doc, draft => {
         draft.nullable.set("value", null)
       })
-      expect(unwrap(doc.nullable.get("value"))).toBe(null)
+      expect(value(doc.nullable.get("value"))).toBe(null)
     })
 
     it("handles reading before first change", () => {
@@ -182,12 +182,12 @@ describe("Record value updates across change() calls", () => {
       change(doc, draft => {
         draft.data.set("key", 100)
       })
-      expect(unwrap(doc.data.get("key"))).toBe(100)
+      expect(value(doc.data.get("key"))).toBe(100)
 
       change(doc, draft => {
         draft.data.set("key", 200)
       })
-      expect(unwrap(doc.data.get("key"))).toBe(200)
+      expect(value(doc.data.get("key"))).toBe(200)
     })
   })
 

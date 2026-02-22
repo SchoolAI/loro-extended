@@ -146,6 +146,5 @@ export type {
 } from "./types.js"
 // Utility exports
 export { validatePlaceholder } from "./validation.js"
-// The value() function for unwrapping reactive wrappers
-// The unwrap() helper for conditionally unwrapping PlainValueRef
-export { unwrap, value } from "./value.js"
+// The value() function for extracting plain values from reactive wrappers
+export { value } from "./value.js"

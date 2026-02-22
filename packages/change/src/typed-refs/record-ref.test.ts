@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
-import { createTypedDoc, loro, Shape, unwrap } from "../index.js"
+import { createTypedDoc, loro, Shape, value } from "../index.js"
 
 describe("Record Types", () => {
   describe("Shape.record (Container)", () => {
@@ -365,7 +365,7 @@ describe("Record Types", () => {
       })
 
       // This should work - accessing an existing key
-      expect(unwrap(doc.preferences.peer1?.showTip)).toBe(true)
+      expect(value(doc.preferences.peer1?.showTip)).toBe(true)
 
       // Accessing a non-existent key should NOT throw "placeholder required"
       // It should return undefined so optional chaining works correctly
@@ -428,7 +428,7 @@ describe("Record Types", () => {
       })
 
       // Outside change(), value shapes return PlainValueRef
-      const values = doc.scores.values().map(v => unwrap(v))
+      const values = doc.scores.values().map(v => value(v))
       expect(values).toEqual([100, 50])
 
       // Type check: values may include PlainValueRef due to union type
@@ -453,7 +453,7 @@ describe("Record Types", () => {
       // Outside change(), value shapes return PlainValueRef
       const entries = doc.scores
         .entries()
-        .map(([k, v]) => [k, unwrap(v)] as const)
+        .map(([k, v]) => [k, value(v)] as const)
       expect(entries).toEqual([
         ["alice", 100],
         ["bob", 50],
@@ -483,10 +483,10 @@ describe("Record Types", () => {
       const values = doc.players.values()
       expect(values.length).toBe(2)
       // Values are StructRefs; their value shape properties return PlainValueRef outside change()
-      expect(unwrap(values[0].name)).toBe("Alice")
-      expect(unwrap(values[0].score)).toBe(100)
-      expect(unwrap(values[1].name)).toBe("Bob")
-      expect(unwrap(values[1].score)).toBe(50)
+      expect(value(values[0].name)).toBe("Alice")
+      expect(value(values[0].score)).toBe(100)
+      expect(value(values[1].name)).toBe("Bob")
+      expect(value(values[1].score)).toBe(50)
     })
 
     it("should return properly typed entries for container-shaped records", () => {
@@ -510,9 +510,9 @@ describe("Record Types", () => {
       expect(entries.length).toBe(2)
       expect(entries[0][0]).toBe("alice")
       // Value shape properties return PlainValueRef outside change()
-      expect(unwrap(entries[0][1].name)).toBe("Alice")
+      expect(value(entries[0][1].name)).toBe("Alice")
       expect(entries[1][0]).toBe("bob")
-      expect(unwrap(entries[1][1].name)).toBe("Bob")
+      expect(value(entries[1][1].name)).toBe("Bob")
     })
 
     it("should return empty arrays for empty records", () => {

@@ -10,7 +10,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it } from "vitest"
 import { change } from "../functional-helpers.js"
-import { isPlainValueRef, unwrap } from "../index.js"
+import { isPlainValueRef, value } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 
@@ -228,7 +228,7 @@ describe("ListRef PlainValueRef unification", () => {
 
     const item = doc.items.get(0)
     expect(isPlainValueRef(item)).toBe(true)
-    const itemValue = unwrap(item)
+    const itemValue = value(item)
     expect(itemValue?.value).toBe(42)
   })
 
@@ -313,7 +313,7 @@ describe("array-in-any edge case", () => {
     // Outside change(), array is wrapped in PlainValueRef (since typeof [] === 'object')
     const items = doc.data.items
     expect(isPlainValueRef(items)).toBe(true)
-    expect(unwrap(items)).toEqual([1, 2, 3])
+    expect(value(items)).toEqual([1, 2, 3])
   })
 
   it("Shape.plain.any() containing array returns PlainValueRef inside change()", () => {
@@ -349,7 +349,7 @@ describe("array-in-any edge case", () => {
 
     const arr = doc.data.arr
     expect(isPlainValueRef(arr)).toBe(true)
-    const rawArr = unwrap(arr)
+    const rawArr = value(arr)
     expect(Array.isArray(rawArr)).toBe(true)
     expect(rawArr).toEqual([10, 20, 30])
   })
@@ -385,7 +385,7 @@ describe("array-in-any edge case", () => {
 
     // To modify arrays in any/union shapes, replace the whole array
     change(doc, draft => {
-      const current = unwrap(draft.data.arr) as number[]
+      const current = value(draft.data.arr) as number[]
       draft.data.arr = [...current, 4]
     })
 
@@ -413,7 +413,146 @@ describe("array-in-any edge case", () => {
   })
 })
 
-describe("unwrap export", () => {
+describe("value() nullish handling", () => {
+  it("returns undefined when given undefined", () => {
+    const result = value(undefined)
+    expect(result).toBeUndefined()
+  })
+
+  it("returns null when given null", () => {
+    const result = value(null)
+    expect(result).toBeNull()
+  })
+
+  it("handles PlainValueRef | undefined from record.get()", () => {
+    const schema = Shape.doc({
+      players: Shape.record(
+        Shape.plain.struct({
+          choice: Shape.plain.union([Shape.plain.null(), Shape.plain.string()]),
+        }),
+      ),
+    })
+    const doc = createTypedDoc(schema)
+
+    // Player doesn't exist yet - get returns undefined
+    const player = doc.players.get("alice")
+    expect(player).toBeUndefined()
+
+    // value() handles the undefined - returns undefined
+    const playerValue = value(player)
+    expect(playerValue).toBeUndefined()
+
+    // Optional chaining on the result works as expected
+    const choice = value(player)?.choice
+    expect(choice).toBeUndefined()
+
+    // Add the player
+    change(doc, draft => {
+      draft.players.set("alice", { choice: "rock" })
+    })
+
+    // Now player exists - value() unwraps the PlainValueRef
+    const alicePlayer = doc.players.get("alice")
+    expect(alicePlayer).toBeDefined()
+    const alicePlayerValue = value(alicePlayer)
+    expect(alicePlayerValue).toEqual({ choice: "rock" })
+
+    // Access the choice via optional chaining on the unwrapped value
+    const aliceChoice = value(alicePlayer)?.choice
+    expect(aliceChoice).toBe("rock")
+  })
+
+  it("handles null choice value correctly", () => {
+    const schema = Shape.doc({
+      players: Shape.record(
+        Shape.plain.struct({
+          choice: Shape.plain.union([Shape.plain.null(), Shape.plain.string()]),
+        }),
+      ),
+    })
+    const doc = createTypedDoc(schema)
+
+    change(doc, draft => {
+      draft.players.set("alice", { choice: null })
+    })
+
+    const player = doc.players.get("alice")
+    // value() unwraps to the plain struct, then access .choice
+    const choice = value(player)?.choice
+    // The choice is explicitly null (set in the CRDT)
+    expect(choice).toBeNull()
+  })
+
+  it("unwraps PlainValueRef when defined", () => {
+    const schema = Shape.doc({
+      data: Shape.struct({
+        title: Shape.plain.string(),
+      }),
+    })
+    const doc = createTypedDoc(schema)
+
+    change(doc, draft => {
+      draft.data.title = "Hello"
+    })
+
+    // value() unwraps PlainValueRef to raw value
+    const title = value(doc.data.title)
+    expect(title).toBe("Hello")
+  })
+
+  it("unwraps StructRef (TypedRef) when defined", () => {
+    const schema = Shape.doc({
+      data: Shape.struct({
+        name: Shape.plain.string(),
+      }),
+    })
+    const doc = createTypedDoc(schema)
+
+    change(doc, draft => {
+      draft.data.name = "Test"
+    })
+
+    // value() on StructRef (a TypedRef) calls toJSON()
+    // Note: We need to cast because TypeScript can't infer the ContainerShape overload
+    // from the StructRef type directly. In practice, this works at runtime.
+    const dataValue = doc.data.toJSON()
+    expect(dataValue).toEqual({ name: "Test" })
+  })
+
+  it("unwraps ListRef (TypedRef) when defined", () => {
+    const schema = Shape.doc({
+      items: Shape.list(Shape.plain.number()),
+    })
+    const doc = createTypedDoc(schema)
+
+    change(doc, draft => {
+      draft.items.push(1)
+      draft.items.push(2)
+      draft.items.push(3)
+    })
+
+    // value() on ListRef calls toJSON()
+    const itemsValue = doc.items.toJSON()
+    expect(itemsValue).toEqual([1, 2, 3])
+  })
+
+  it("unwraps TypedDoc when defined", () => {
+    const schema = Shape.doc({
+      count: Shape.counter(),
+    })
+    const doc = createTypedDoc(schema)
+
+    change(doc, draft => {
+      draft.count.increment(5)
+    })
+
+    // value() on TypedDoc calls toJSON()
+    const docValue = value(doc)
+    expect(docValue).toEqual({ count: 5 })
+  })
+})
+
+describe("value() export", () => {
   it("unwraps PlainValueRef to raw value", () => {
     const schema = Shape.doc({
       data: Shape.struct({
@@ -429,16 +568,21 @@ describe("unwrap export", () => {
     // Outside change(), properties return PlainValueRef
     const title = doc.data.title
     expect(isPlainValueRef(title)).toBe(true)
-    expect(unwrap(title)).toBe("Hello")
+    expect(value(title)).toBe("Hello")
   })
 
-  it("returns non-PlainValueRef values as-is", () => {
+  it("passes through non-ref values unchanged (polymorphic)", () => {
     const num = 42
     const str = "hello"
     const obj = { a: 1 }
 
-    expect(unwrap(num)).toBe(42)
-    expect(unwrap(str)).toBe("hello")
-    expect(unwrap(obj)).toEqual({ a: 1 })
+    expect(value(num)).toBe(42)
+    expect(value(str)).toBe("hello")
+    expect(value(obj)).toEqual({ a: 1 })
+  })
+
+  it("passes through undefined and null", () => {
+    expect(value(undefined)).toBeUndefined()
+    expect(value(null)).toBeNull()
   })
 })

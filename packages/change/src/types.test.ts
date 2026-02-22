@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
 import { change } from "./functional-helpers.js"
-import { unwrap } from "./index.js"
+import { value } from "./index.js"
 import type { PlainValueRef } from "./plain-value-ref/types.js"
 import type {
   ContainerShape,
@@ -222,9 +222,9 @@ describe("Mutable type helper", () => {
     const values = Object.values(participants)
 
     // Runtime check - outside change(), value shapes return PlainValueRef
-    // Use unwrap() to get plain values for comparison
+    // Use value() to get plain values for comparison
     expect(values).toHaveLength(2)
-    expect(values.map((p: any) => unwrap(p.name)).sort()).toEqual([
+    expect(values.map((p: any) => value(p.name)).sort()).toEqual([
       "Alice",
       "Bob",
     ])

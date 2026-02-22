@@ -1,6 +1,19 @@
 # Plan: Consolidate `unwrap` into `value` Function
 
-## Status: 🔴 Not Started
+## Status: 🟢 Complete
+
+## Purpose: API Consolidation and Clarity
+
+This plan consolidates `unwrap()` into `value()`, simplifying the API surface to one function per context.
+
+**Key insight**: `value()` should become **polymorphic** — absorbing `unwrap()`'s pass-through behavior. This means `value(x)` is a projection from the reactive world to the plain world: if `x` is already plain, it's a no-op. This resolves the type overload gap that blocked Phase 3.
+
+**The result**:
+
+| Context | Function | Meaning |
+|---------|----------|---------|
+| Non-React | `value(x)` | "Get the plain value" (tolerant — accepts anything) |
+| React | `useValue(ref)` | "Subscribe to the plain value" (strict — refs/docs + nullish only) |
 
 ## Background
 
@@ -9,272 +22,353 @@ The `@loro-extended/change` package exports two functions for extracting plain v
 1. **`value(ref)`** - Strict function that accepts `PlainValueRef<T>`, `TypedRef`, or `TypedDoc` and throws if given anything else
 2. **`unwrap(v)`** - Permissive function that returns raw values unchanged if not a `PlainValueRef`
 
-The `value()` function was designed as a symmetric parallel to the `useValue()` React hook:
+The original plan attempted to add nullish overloads to the strict `value()` and then mechanically replace `unwrap(` → `value(`. This failed because:
 
-| Non-reactive | Reactive |
-|--------------|----------|
-| `value(ref)` | `useValue(ref)` |
+- `value()` type overloads for `TypedRef<S> | undefined` don't match concrete subclasses like `StructRef<S, M>` (TypeScript overload resolution doesn't propagate through class hierarchies with extra generics)
+- `unwrap()` works everywhere because its signature is `<T>(v: T)` — it accepts any type
+- Many call sites pass values that are *sometimes* a PlainValueRef and *sometimes* a raw primitive (e.g., inside vs outside `change()`)
 
-Both accept the same types and return plain values. However, `unwrap()` was created as a workaround for optional chaining patterns where `value()` would throw:
-
-```typescript
-// This pattern requires unwrap() because value() throws on undefined
-const choice = unwrap(players.get("alice")?.choice) ?? null
-
-// With nullish support in value(), this becomes:
-const choice = value(players.get("alice")?.choice) ?? null
-```
+**The fix**: Make `value()` polymorphic like `unwrap()`, but also handle TypedRef/TypedDoc via `toJSON()`. The migration becomes a trivial `s/unwrap(/value(/g` with no call-site restructuring.
 
 ## Problem Statement
 
 Having both `value()` and `unwrap()` creates API confusion:
 - Users must learn two functions with subtle differences
-- The "polymorphic" use case of `unwrap()` (accepting raw values) is not actually used in practice
-- All real usages of `unwrap()` are handling `T | undefined` from optional chaining
+- The "polymorphic" use case of `unwrap()` (accepting raw values) is needed in practice but lives under a confusing name
+- `unwrap()` calls in `useLens()` patterns are misleading no-ops (the values are already plain)
+
+**Important clarification about `useLens()` patterns**:
+```typescript
+// useLens() returns { lens, doc: worldview }
+// where worldview = lens.worldview.toJSON() — already a PLAIN JSON object
+const { lens, doc: worldview } = useLens(doc, options)
+
+// These unwrap() calls are NO-OPS because worldview.game.players[id]?.choice
+// is already a plain value, not a PlainValueRef
+const myChoice = unwrap(myPlayer?.choice)  // Does nothing — value passes through
+```
+
+The `useLens()` hook handles reactivity via its own `useSyncExternalStore`. Using `useValue()` inside a `useLens()` component would create **duplicate subscriptions** and is incorrect.
 
 ## Success Criteria
 
-1. `value()` accepts nullish inputs (`undefined`, `null`) and returns them unchanged
-2. All usages of `unwrap()` are replaced with `value()`
-3. `unwrap` is removed from the public API export
-4. Tests pass
-5. Type inference remains correct for all existing patterns
+1. `value()` is polymorphic — accepts any input, passes through non-ref values
+2. `value()` handles nullish inputs (`undefined`, `null`) via pass-through
+3. `useValue()` accepts nullish inputs (`undefined`, `null`) with no-op subscriptions
+4. All usages of `unwrap()` are replaced with `value()` (mechanical substitution)
+5. `useLens()` patterns have `unwrap()` calls replaced with `value()` (still no-ops, but consistent naming)
+6. `unwrap` is removed from the public API export (deprecated alias kept temporarily)
+7. Tests pass in all affected packages
+8. Type inference remains correct for all existing patterns
 
-## The Gap
+## The Design
 
-Currently `value()` throws on non-ref inputs:
+### New `value()` semantics
 
 ```typescript
-// Current implementation
-export function value(target) {
-  if (isPlainValueRef(target)) return target.valueOf()
-  if (target && typeof target === "object" && "toJSON" in target) return target.toJSON()
-  throw new Error("value() requires a PlainValueRef, TypedRef, or TypedDoc...")
+value(plainValueRef)   // → unwraps via valueOf()
+value(typedRef)        // → extracts via toJSON()
+value(typedDoc)        // → extracts via toJSON()
+value(undefined)       // → undefined (pass-through)
+value(null)            // → null (pass-through)
+value(42)              // → 42 (pass-through, already plain)
+value("hello")         // → "hello" (pass-through)
+```
+
+### Type overloads
+
+```typescript
+// Specific overloads (checked first, provide precise return types)
+export function value<T>(ref: PlainValueRef<T>): T
+export function value<S extends ContainerShape>(ref: TypedRef<S>): Infer<S>
+export function value<D extends DocShape>(doc: TypedDoc<D>): Infer<D>
+export function value(ref: undefined): undefined
+export function value(ref: null): null
+export function value<T>(ref: PlainValueRef<T> | undefined): T | undefined
+export function value<T>(ref: PlainValueRef<T> | null): T | null
+
+// Catch-all (checked last, handles raw values and complex unions)
+export function value<T>(v: T): T
+```
+
+The catch-all `value<T>(v: T): T` is the key insight. It matches `StructRef | undefined`, `number | PlainValueRef<number>`, and any other complex union that the specific overloads miss. For refs, the runtime dispatches correctly even though the return type is `T` (less precise but correct at runtime).
+
+### Implementation
+
+```typescript
+export function value(target: unknown): unknown {
+  // Nullish: pass through
+  if (target === undefined) return undefined
+  if (target === null) return null
+
+  // PlainValueRef: call valueOf()
+  if (isPlainValueRef(target)) {
+    return target.valueOf()
+  }
+
+  // TypedRef and TypedDoc: call toJSON() (check for loro symbol to avoid matching Date, etc.)
+  if (target && typeof target === "object") {
+    const loroSymbol = Symbol.for("loro-extended:loro")
+    const extSymbol = Symbol.for("loro-extended:ext")
+    if (
+      (loroSymbol in (target as object) || extSymbol in (target as object)) &&
+      "toJSON" in target
+    ) {
+      return (target as { toJSON(): unknown }).toJSON()
+    }
+  }
+
+  // Everything else: pass through (already plain)
+  return target
 }
 ```
 
-Need to add nullish handling before the throw.
+Note: The loro symbol check (`LORO_SYMBOL` / `EXT_SYMBOL`) ensures we don't accidentally call `toJSON()` on arbitrary objects like `Date`. Only loro-extended refs and docs get the `toJSON()` treatment.
 
----
-
-## Phase 1: Extend `value()` to Handle Nullish Inputs 🔴
-
-### Tasks
-
-- 🔴 Add overload signatures for `value()` accepting `T | undefined` and `T | null`
-- 🔴 Update implementation to return nullish values unchanged (before the throw)
-- 🔴 Add unit tests for `value(undefined)` and `value(null)` returning unchanged
-- 🔴 Add unit tests for `value(ref | undefined)` pattern with optional chaining
-
-### Type Signatures to Add
+### `unwrap` becomes a deprecated alias
 
 ```typescript
-// New overloads (add before existing overloads for proper resolution)
-export function value<T>(ref: PlainValueRef<T> | undefined): T | undefined
-export function value<T>(ref: PlainValueRef<T> | null): T | null
-export function value<T>(ref: PlainValueRef<T> | null | undefined): T | null | undefined
+/** @deprecated Use `value()` instead. */
+export const unwrap = value
 ```
 
 ---
 
-## Phase 2: Replace All `unwrap` Usages with `value` 🔴
+## Commit Strategy
 
-### Tasks
+### Squash existing commits, then deliver as one PR
 
-- 🔴 Update import statements: replace `unwrap` with `value` in imports
-- 🔴 Replace all `unwrap(...)` calls with `value(...)`
-- 🔴 Run verification to ensure no regressions
+The current commit stack has three changes from the old approach:
 
-### Files Requiring Updates
+1. `nkxvtltk` — Added nullish overloads to strict `value()` (will be superseded)
+2. `nnvvpxkm` — Added nullish support to `useValue()` hook (still valid)
+3. `ywysxtym` — Partial Phase 3 attempt (detritus, should be dropped)
 
-**Examples:**
-- `examples/rps-demo/src/server/reactors.ts` (import + 2 usages)
-- `examples/rps-demo/src/shared/filters.integration.test.ts` (import + 10 usages)
+**Action**: Squash all three into a single new commit that:
+- Makes `value()` polymorphic (absorbing `unwrap()` behavior + nullish support)
+- Keeps the `useValue()` nullish support from commit 2
+- Migrates all `unwrap()` → `value()` across the codebase
+- Deprecates `unwrap` as an alias
 
-**Package: @loro-extended/change:**
-- `src/diff-overlay.test.ts` (import + 4 usages)
-- `src/ext.test.ts` (import + 2 usages)
-- `src/fork-at.test.ts` (import + 3 usages)
-- `src/functional-helpers.test.ts` (import + 2 usages)
-- `src/loro.test.ts` (import + 2 usages)
-- `src/mergeable-flattened.test.ts` (import + 18 usages)
-- `src/nested-container-materialization.test.ts` (import + 6 usages)
-- `src/plain-value-ref/plain-value-ref.test.ts` (docstring mentions "unwraps")
-- `src/readonly.test.ts` (import + 2 usages)
-- `src/shallow-fork.test.ts` (import + 8 usages)
-- `src/types.test.ts` (import + 1 usage)
-- `src/types.ts` (docstring mentions unwrap)
-- `src/typed-refs/encapsulation.test.ts` (import + 3 usages)
-- `src/typed-refs/json-compatibility.test.ts` (import + 3 usages)
-- `src/typed-refs/list-ref-value-updates.test.ts` (import + 18 usages)
-- `src/typed-refs/plainvalueref-unification.test.ts` (import + 5 usages, update test block)
-- `src/typed-refs/record-ref-value-updates.test.ts` (import + 14 usages)
-- `src/typed-refs/record-ref.test.ts` (import + 8 usages)
-- `src/typed-refs/struct-ref.test.ts` (import + 14 usages)
-- `src/typed-refs/tree-node-ref.test.ts` (import + 14 usages)
+This produces one clean PR with the commit message:
 
-**Package: @loro-extended/lens:**
-- `src/lens.test.ts` (import + 1 usage)
-- `src/peerid-edge-cases.test.ts` (import + 4 usages)
+```
+feat(change): consolidate unwrap() into polymorphic value()
 
-**Package: @loro-extended/repo:**
-- `src/tests/fork-and-merge-sync.test.ts` (import + 9 usages)
+Make value() polymorphic — it now accepts any input and extracts
+the plain value from reactive wrappers (PlainValueRef, TypedRef,
+TypedDoc), passes through nullish and raw values unchanged.
 
-### Internal Functions (Do Not Rename)
+- Replace strict value() with polymorphic version (catch-all overload)
+- Add loro symbol check for toJSON dispatch (avoids matching Date, etc.)
+- Deprecate unwrap as alias: `export const unwrap = value`
+- Migrate all unwrap() → value() across codebase (~25 files)
+- Add nullish support to useValue() hook (no-op subscriptions)
+- Update documentation and tests
+```
 
-These internal helpers have `unwrap` in their names but serve different purposes:
+### How to squash with jj
 
-- `unwrapForSet()` in `src/plain-value-ref/factory.ts` - internal proxy helper
-- `unwrapPlainValueRef()` in `src/typed-refs/plain-value-access.ts` - internal assignment helper
-- `unwrapReadonlyPrimitive()` in `src/typed-refs/utils.ts` - internal readonly helper
+```bash
+# Squash commits 1 and 3 into commit 2, then edit the result
+jj squash --from ywysxtym --into nkxvtltk   # merge detritus into phase 1
+jj squash --from nkxvtltk --into nnvvpxkm   # merge phase 1 into phase 2
+jj edit nnvvpxkm                              # edit the combined commit
+# Then implement the polymorphic value() and bulk migration on top
+```
 
-These are not part of the public API and should retain their names.
+Alternatively, start fresh:
+```bash
+jj new nkxvtltk~1    # new empty change based on parent of phase 1
+# Implement everything from scratch in one commit
+```
 
 ---
 
-## Phase 3: Remove `unwrap` from Public API 🔴
+## Implementation Phases (all within one PR)
 
-### Tasks
+### Step 1: Make `value()` Polymorphic 🟢
 
-- 🔴 Remove `unwrap` export from `src/value.ts`
-- 🔴 Remove `unwrap` from `src/index.ts` exports
-- 🔴 Update module JSDoc in `src/value.ts` to remove `unwrap` mention
-- 🔴 Update `describe("unwrap export", ...)` in `plainvalueref-unification.test.ts`:
-  - Rename to `describe("value() nullish handling", ...)`
-  - Keep first test (rename to use `value()`)
-  - Replace second test (`returns non-PlainValueRef values as-is`) with nullish tests
+Replace the strict `value()` implementation with the polymorphic version.
 
----
+**Tasks**:
+- 🟢 Replace `value()` implementation: remove throw, add pass-through
+- 🟢 Add catch-all `value<T>(v: T): T` overload after specific overloads
+- 🟢 Use loro symbol checks for toJSON dispatch (not bare `"toJSON" in target`)
+- 🟢 Make `unwrap` a deprecated alias: `export const unwrap = value`
+- 🟢 Update tests: restore "returns non-PlainValueRef values as-is" test
 
-## Phase 4: Documentation Updates 🔴
+**Key Design Decision: Loro Symbol Check**
 
-### Tasks
+The old strict `value()` used a bare `"toJSON" in target` check, which would match `Date`, custom classes, etc. The new polymorphic version MUST narrow this to loro objects only:
 
-- 🔴 Update `TECHNICAL.md` - remove references to `unwrap()` as a user-facing function
-- 🔴 Create changeset documenting the API change
-
----
-
-## Tests
-
-### Test Updates in Phase 3
-
-The existing `describe("unwrap export", ...)` block in `plainvalueref-unification.test.ts` (lines 416-444) should be transformed:
-
-**Current tests:**
-1. `it("unwraps PlainValueRef to raw value", ...)` - rename to use `value()`
-2. `it("returns non-PlainValueRef values as-is", ...)` - **remove** (tests polymorphic behavior we're eliminating)
-
-**Replace with:**
 ```typescript
-describe("value() nullish handling", () => {
-  it("extracts PlainValueRef to raw value", () => {
-    // Keep existing test, replace unwrap → value
-  })
+// ❌ Too broad (old strict value)
+if (target && typeof target === "object" && "toJSON" in target) { ... }
 
-  it("returns undefined unchanged", () => {
+// ✅ Narrow to loro objects (new polymorphic value)
+const loroSymbol = Symbol.for("loro-extended:loro")
+const extSymbol = Symbol.for("loro-extended:ext")
+if ((loroSymbol in target || extSymbol in target) && "toJSON" in target) { ... }
+```
+
+**Files to Update**:
+- `packages/change/src/value.ts` — Replace implementation, add catch-all overload
+- `packages/change/src/typed-refs/plainvalueref-unification.test.ts` — Restore pass-through test
+
+**Test Changes**:
+
+```typescript
+describe("value() export", () => {
+  it("unwraps PlainValueRef to raw value", () => { /* existing */ })
+
+  it("returns non-ref values as-is (polymorphic pass-through)", () => {
+    expect(value(42)).toBe(42)
+    expect(value("hello")).toBe("hello")
+    expect(value({ a: 1 })).toEqual({ a: 1 })
     expect(value(undefined)).toBeUndefined()
-  })
-
-  it("returns null unchanged", () => {
     expect(value(null)).toBeNull()
-  })
-
-  it("handles PlainValueRef | undefined from optional chaining", () => {
-    const schema = Shape.doc({
-      players: Shape.record(Shape.struct({
-        choice: Shape.plain.string().nullable()
-      }))
-    })
-    const doc = createTypedDoc(schema)
-    
-    // Non-existent key returns undefined
-    expect(value(doc.players.get("alice")?.choice)).toBeUndefined()
-    
-    // After setting, returns the value
-    change(doc, d => { d.players.alice = { choice: "rock" } })
-    expect(value(doc.players.get("alice")?.choice)).toBe("rock")
   })
 })
 ```
 
-### Existing Test Validation
+### Step 2: `useValue()` Nullish Support 🟢
 
-All existing tests using `unwrap()` will be updated to use `value()`. Running `pnpm turbo run verify` validates no regressions.
+**Status**: Already implemented. Kept from prior work. `useValue()` stays strict (refs/docs + nullish only). It does NOT become polymorphic like `value()`.
 
----
+**Why `useValue()` stays strict**: It's a React hook that creates CRDT subscriptions. Passing raw values would be meaningless — nothing to subscribe to. The nullish case handles `record.get("key")` returning undefined.
 
-## Transitive Effect Analysis
+**Files (already updated)**:
+- `packages/hooks-core/src/create-ref-hooks.ts` ✅
+- `packages/hooks-core/src/create-ref-hooks.test.tsx` ✅
+- `packages/react/src/hooks-core.ts` ✅
+- `packages/hono/src/hooks-core.ts` ✅
 
-### Direct Dependencies
+### Step 3: Migrate All `unwrap` → `value` 🟢
 
-| Module | Impact |
-|--------|--------|
-| `@loro-extended/change` | Source of change - update exports |
-| `@loro-extended/lens` | Test files import `unwrap` |
-| `@loro-extended/repo` | Test files import `unwrap` |
-| `examples/rps-demo` | Production code imports `unwrap` |
+Mechanical find-and-replace, now unblocked by the catch-all overload.
 
-### Downstream Effects
+**Tasks**:
+- 🟢 `s/unwrap(/value(/g` across all non-internal files
+- 🟢 Update imports: replace `unwrap` with `value` (or add `value` if not already imported)
+- 🟢 Remove unused `unwrap` imports
+- 🟢 Run full verification
 
-- **No runtime breaking changes**: `value()` gains functionality, doesn't lose any
-- **Import changes only**: All changes are import statement updates and call site renames
-- **Type compatibility**: The new overloads are additive; existing code continues to type-check
+**Files Requiring Updates**:
 
-### Risk Assessment
+**Examples:**
+- `examples/rps-demo/src/server/reactors.ts`
+- `examples/rps-demo/src/client/use-rps-game.ts`
+- `examples/rps-demo/src/shared/filters.integration.test.ts`
 
-- **Low risk**: This is a mechanical find-and-replace with added functionality
-- **TypeScript validates**: If any usage relies on `unwrap()` accepting arbitrary non-ref values (not just nullish), TypeScript will catch it
-- **Test coverage**: Existing tests exercise all the patterns that need updating
+**Package: @loro-extended/change (Test Files):**
+- `src/diff-overlay.test.ts`
+- `src/ext.test.ts`
+- `src/fork-at.test.ts`
+- `src/functional-helpers.test.ts`
+- `src/loro.test.ts`
+- `src/mergeable-flattened.test.ts`
+- `src/nested-container-materialization.test.ts`
+- `src/readonly.test.ts`
+- `src/shallow-fork.test.ts`
+- `src/types.test.ts`
+- `src/typed-refs/encapsulation.test.ts`
+- `src/typed-refs/json-compatibility.test.ts`
+- `src/typed-refs/list-ref-value-updates.test.ts`
+- `src/typed-refs/plainvalueref-unification.test.ts`
+- `src/typed-refs/record-ref-value-updates.test.ts`
+- `src/typed-refs/record-ref.test.ts`
+- `src/typed-refs/struct-ref.test.ts`
+- `src/typed-refs/tree-node-ref.test.ts`
 
----
+**Package: @loro-extended/lens:**
+- `src/lens.test.ts`
+- `src/peerid-edge-cases.test.ts`
 
-## Resources for Implementation
+**Package: @loro-extended/repo:**
+- `src/tests/fork-and-merge-sync.test.ts`
 
-### Files to Read
+**Internal Functions (Do Not Rename)**:
+- `unwrapForSet()` in `src/plain-value-ref/factory.ts` — internal proxy helper
+- `unwrapPlainValueRef()` in `src/typed-refs/plain-value-access.ts` — internal assignment helper
+- `unwrapReadonlyPrimitive()` in `src/typed-refs/utils.ts` — internal readonly helper
 
-- `packages/change/src/value.ts` - Implementation to modify
-- `packages/change/src/index.ts` - Export to update
-- `TECHNICAL.md` lines 124-174 - Value shape handling context
+### Step 4: Deprecate `unwrap`, Update Docs 🟡
 
-### Commands
+**Tasks**:
+- 🟢 Ensure `unwrap` is exported as deprecated alias with `@deprecated` JSDoc
+- 🔴 Update `TECHNICAL.md` line 139 — replace `Use value() or unwrap()` with `Use value()`
+- 🟢 Update module JSDoc in `packages/change/src/value.ts`
+- 🔴 Create changesets for affected packages
 
-```bash
-# Verify all packages after changes
-pnpm turbo run verify
-
-# Verify specific package
-pnpm turbo run verify --filter=@loro-extended/change
-
-# Run specific test file
-pnpm turbo run verify --filter=@loro-extended/change -- logic -- -t 'value()'
-```
-
----
-
-## Changeset
-
-Create `.changeset/consolidate-value-unwrap.md`:
+**Reactivity Documentation to Add**:
 
 ```markdown
----
-"@loro-extended/change": minor
----
+## Choosing Between value(), useValue(), and useLens()
 
-Consolidated `unwrap()` into `value()` function.
+| Context | Function | Why |
+|---------|----------|-----|
+| Non-React | `value(x)` | Extract plain value from any ref type (or pass through) |
+| React with Lens | `useLens()` | Already reactive — no need for useValue() on worldview |
+| React with direct ref | `useValue(ref)` | Subscribe to individual ref changes |
 
-**Breaking Change:** The `unwrap()` export has been removed. Use `value()` instead.
-
-`value()` now accepts nullish inputs (`undefined`, `null`) and returns them unchanged,
-enabling patterns like:
-
-```typescript
-// Before
-const choice = unwrap(players.get("alice")?.choice) ?? null
-
-// After
-const choice = value(players.get("alice")?.choice) ?? null
+**Common mistake**: Using `useValue()` inside a `useLens()` component creates
+duplicate subscriptions. The `doc` returned by `useLens()` is already a reactive snapshot.
 ```
 
-This aligns `value()` as the symmetric non-reactive counterpart to `useValue()`.
-```
+---
+
+## Acceptance Criteria (for the single PR)
+
+- `value(42)` returns `42` (pass-through)
+- `value(plainValueRef)` returns unwrapped value
+- `value(typedRef)` returns toJSON() (via loro symbol check)
+- `value(undefined)` returns undefined
+- `value(null)` returns null
+- `useValue(undefined)` returns undefined (no-op subscription)
+- `useValue(ref)` returns reactive value (existing behavior preserved)
+- `unwrap` still exported as deprecated alias
+- No remaining `unwrap(` calls in non-internal code
+- All test suites pass across all packages
+- No functional behavior changes
+
+---
+
+---
+
+## Lessons Learned
+
+### Why the Original Approach Failed
+
+The original plan tried to keep `value()` strict and add nullish overloads. This failed because:
+
+1. **TypeScript overload resolution**: `TypedRef<S> | undefined` overloads don't match `StructRef<S, M> | undefined` — TypeScript doesn't propagate through class hierarchies with extra generic params
+2. **False assumption**: The plan assumed `unwrap()` was only used for nullish handling. In reality, many call sites pass values that are sometimes refs and sometimes plain primitives (depending on `change()` context)
+3. **Unnecessary restructuring**: The migration attempted to change `unwrap(x?.prop)` to `value(x)?.prop`, which changed the semantics. The correct approach is `value(x?.prop)` — same structure, just rename the function
+
+### The Polymorphic Insight
+
+Making `value()` polymorphic (like `unwrap()` was) resolves all three issues:
+- The catch-all overload matches any type — no overload resolution problems
+- Pass-through behavior handles primitive/ref unions naturally
+- Migration is a mechanical find-and-replace with no restructuring
+
+### `useValue()` Correctly Remains Strict
+
+`useValue()` is a React hook that creates subscriptions. Accepting raw values would be meaningless (nothing to subscribe to). The nullish support handles `record.get("key")` returning undefined — a legitimate optional chaining pattern.
+
+### One PR Is Better Than Five
+
+The original plan proposed a 5-PR stack. Three iterations of learning revealed that the changes are tightly coupled — making `value()` polymorphic, migrating call sites, and deprecating `unwrap` are all part of one atomic idea. Splitting them only created intermediate states (strict value with nullish overloads) that were wrong and had to be undone.
+
+---
+
+## Summary
+
+**One function per context**:
+- `value(x)` — "get the plain value" (polymorphic, tolerant)
+- `useValue(ref)` — "subscribe to the plain value" (strict, reactive)
+
+**The migration is mechanical**: `s/unwrap(/value(/g` — no restructuring, no type issues, no behavior changes.
+
+**Delivered as one PR**: Squash existing commits, implement the polymorphic `value()`, migrate all call sites, deprecate `unwrap`. One atomic change, one review.

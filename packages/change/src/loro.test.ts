@@ -12,7 +12,7 @@ import {
   loro,
   Shape,
   subscribe,
-  unwrap,
+  value,
 } from "./index.js"
 
 describe("loro() function", () => {
@@ -503,7 +503,7 @@ describe("container operations via ext()", () => {
       // Use ext() to set a container
       ext(doc.settings).setContainer("nested", newMap)
 
-      expect(unwrap(doc.settings.nested.value)).toBe(42)
+      expect(value(doc.settings.nested.value)).toBe(42)
     })
   })
 
@@ -528,7 +528,7 @@ describe("container operations via ext()", () => {
       // Use ext() to set a container
       ext(doc.users).setContainer("alice", newMap)
 
-      expect(unwrap(doc.users.get("alice")?.name)).toBe("Alice via ext")
+      expect(value(doc.users.get("alice")?.name)).toBe("Alice via ext")
     })
   })
 })

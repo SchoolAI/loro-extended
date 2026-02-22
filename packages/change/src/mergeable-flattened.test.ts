@@ -11,7 +11,7 @@ import { ext } from "./ext.js"
  */
 
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, loro, Shape, unwrap } from "./index.js"
+import { change, createTypedDoc, loro, Shape, value } from "./index.js"
 
 describe("Mergeable Flattened Containers", () => {
   describe("Basic functionality", () => {
@@ -31,7 +31,7 @@ describe("Mergeable Flattened Containers", () => {
         draft.data.nested.value = "hello"
       })
 
-      expect(unwrap(doc.data.nested.value)).toBe("hello")
+      expect(value(doc.data.nested.value)).toBe("hello")
     })
 
     it("should store containers at root with path-based names when mergeable", () => {
@@ -78,8 +78,8 @@ describe("Mergeable Flattened Containers", () => {
       doc.players.alice = { score: 100, name: "Alice" }
       doc.players.bob = { score: 200, name: "Bob" }
 
-      expect(unwrap(doc.players.alice.score)).toBe(100)
-      expect(unwrap(doc.players.bob.name)).toBe("Bob")
+      expect(value(doc.players.alice.score)).toBe(100)
+      expect(value(doc.players.bob.name)).toBe("Bob")
 
       // Check root containers
       const loroDoc = loro(doc)
@@ -107,7 +107,7 @@ describe("Mergeable Flattened Containers", () => {
       // Create entry with hyphenated key
       doc.config["api-url"] = { value: "https://example.com" }
 
-      expect(unwrap(doc.config["api-url"].value)).toBe("https://example.com")
+      expect(value(doc.config["api-url"].value)).toBe("https://example.com")
 
       // Check that the root container name is properly escaped
       const loroDoc = loro(doc)
@@ -142,10 +142,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).import(exportA)
 
       // Both docs should have both items
-      expect(unwrap(docA.data.items.a)).toBe("from A")
-      expect(unwrap(docA.data.items.b)).toBe("from B")
-      expect(unwrap(docB.data.items.a)).toBe("from A")
-      expect(unwrap(docB.data.items.b)).toBe("from B")
+      expect(value(docA.data.items.a)).toBe("from A")
+      expect(value(docA.data.items.b)).toBe("from B")
+      expect(value(docB.data.items.a)).toBe("from A")
+      expect(value(docB.data.items.b)).toBe("from B")
     })
 
     it("should merge concurrent nested struct creation", () => {
@@ -175,10 +175,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).import(exportA)
 
       // Both docs should have both players
-      expect(unwrap(docA.players.alice?.score)).toBe(100)
-      expect(unwrap(docA.players.bob?.score)).toBe(200)
-      expect(unwrap(docB.players.alice?.score)).toBe(100)
-      expect(unwrap(docB.players.bob?.score)).toBe(200)
+      expect(value(docA.players.alice?.score)).toBe(100)
+      expect(value(docA.players.bob?.score)).toBe(200)
+      expect(value(docB.players.alice?.score)).toBe(100)
+      expect(value(docB.players.bob?.score)).toBe(200)
     })
   })
 
@@ -208,10 +208,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).applyDiff(diffA)
 
       // Both docs should have both items
-      expect(unwrap(docA.data.items.a)).toBe("from A")
-      expect(unwrap(docA.data.items.b)).toBe("from B")
-      expect(unwrap(docB.data.items.a)).toBe("from A")
-      expect(unwrap(docB.data.items.b)).toBe("from B")
+      expect(value(docA.data.items.a)).toBe("from A")
+      expect(value(docA.data.items.b)).toBe("from B")
+      expect(value(docB.data.items.a)).toBe("from A")
+      expect(value(docB.data.items.b)).toBe("from B")
     })
 
     it("should merge concurrent nested struct creation via applyDiff", () => {
@@ -241,10 +241,10 @@ describe("Mergeable Flattened Containers", () => {
       loro(docB).applyDiff(diffA)
 
       // Both docs should have both players
-      expect(unwrap(docA.players.alice?.score)).toBe(100)
-      expect(unwrap(docA.players.bob?.score)).toBe(200)
-      expect(unwrap(docB.players.alice?.score)).toBe(100)
-      expect(unwrap(docB.players.bob?.score)).toBe(200)
+      expect(value(docA.players.alice?.score)).toBe(100)
+      expect(value(docA.players.bob?.score)).toBe(200)
+      expect(value(docB.players.alice?.score)).toBe(100)
+      expect(value(docB.players.bob?.score)).toBe(200)
     })
   })
 
@@ -336,7 +336,7 @@ describe("Mergeable Flattened Containers", () => {
       const doc = createTypedDoc(schema, { mergeable: false })
       doc.players.alice = { score: 100 }
 
-      expect(unwrap(doc.players.alice.score)).toBe(100)
+      expect(value(doc.players.alice.score)).toBe(100)
       expect(doc.toJSON()).toEqual({
         players: {
           alice: { score: 100 },

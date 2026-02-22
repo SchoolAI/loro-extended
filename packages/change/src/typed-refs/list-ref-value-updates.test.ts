@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, Shape, unwrap } from "../index.js"
+import { change, createTypedDoc, Shape, value } from "../index.js"
 
 /**
  * Tests for List value updates across multiple change() calls.
@@ -31,18 +31,18 @@ describe("List value updates across change() calls", () => {
         draft.numbers.push(200)
         draft.numbers.push(300)
       })
-      expect(unwrap(doc.numbers.get(0))).toBe(100)
-      expect(unwrap(doc.numbers.get(1))).toBe(200)
-      expect(unwrap(doc.numbers.get(2))).toBe(300)
+      expect(value(doc.numbers.get(0))).toBe(100)
+      expect(value(doc.numbers.get(1))).toBe(200)
+      expect(value(doc.numbers.get(2))).toBe(300)
 
       // Modify by deleting and inserting
       change(doc, draft => {
         draft.numbers.delete(1, 1) // Remove 200
         draft.numbers.insert(1, 999) // Insert 999 at position 1
       })
-      expect(unwrap(doc.numbers.get(0))).toBe(100)
-      expect(unwrap(doc.numbers.get(1))).toBe(999) // Should be 999, not 200
-      expect(unwrap(doc.numbers.get(2))).toBe(300)
+      expect(value(doc.numbers.get(0))).toBe(100)
+      expect(value(doc.numbers.get(1))).toBe(999) // Should be 999, not 200
+      expect(value(doc.numbers.get(2))).toBe(300)
     })
 
     it("reads correct values after multiple push operations", () => {
@@ -55,20 +55,20 @@ describe("List value updates across change() calls", () => {
       change(doc, draft => {
         draft.items.push("first")
       })
-      expect(unwrap(doc.items.get(0))).toBe("first")
+      expect(value(doc.items.get(0))).toBe("first")
 
       change(doc, draft => {
         draft.items.push("second")
       })
-      expect(unwrap(doc.items.get(0))).toBe("first")
-      expect(unwrap(doc.items.get(1))).toBe("second")
+      expect(value(doc.items.get(0))).toBe("first")
+      expect(value(doc.items.get(1))).toBe("second")
 
       change(doc, draft => {
         draft.items.push("third")
       })
-      expect(unwrap(doc.items.get(0))).toBe("first")
-      expect(unwrap(doc.items.get(1))).toBe("second")
-      expect(unwrap(doc.items.get(2))).toBe("third")
+      expect(value(doc.items.get(0))).toBe("first")
+      expect(value(doc.items.get(1))).toBe("second")
+      expect(value(doc.items.get(2))).toBe("third")
     })
   })
 
@@ -91,7 +91,7 @@ describe("List value updates across change() calls", () => {
 
       // Access item outside of change() - this may populate cache
       const item0 = doc.items.get(0)
-      const item0Value = unwrap(item0)
+      const item0Value = value(item0)
       expect(item0Value?.name).toBe("item1")
       expect(item0Value?.value).toBe(100)
 
@@ -103,7 +103,7 @@ describe("List value updates across change() calls", () => {
 
       // Read again - should see updated values
       const item0After = doc.items.get(0)
-      const item0AfterValue = unwrap(item0After)
+      const item0AfterValue = value(item0After)
       expect(item0AfterValue?.name).toBe("updated")
       expect(item0AfterValue?.value).toBe(999)
     })
@@ -127,8 +127,8 @@ describe("List value updates across change() calls", () => {
       })
 
       // Access outside of change()
-      expect(unwrap(doc.users.get(0)?.name)).toBe("Alice")
-      expect(unwrap(doc.users.get(0)?.age)).toBe(30)
+      expect(value(doc.users.get(0)?.name)).toBe("Alice")
+      expect(value(doc.users.get(0)?.age)).toBe(30)
 
       // Modify the struct's properties in a new change()
       change(doc, draft => {
@@ -141,8 +141,8 @@ describe("List value updates across change() calls", () => {
 
       // Read again - should see updated values
       // This tests if the cached StructRef returns stale values
-      expect(unwrap(doc.users.get(0)?.name)).toBe("Bob") // May fail due to StructRef cache
-      expect(unwrap(doc.users.get(0)?.age)).toBe(25) // May fail due to StructRef cache
+      expect(value(doc.users.get(0)?.name)).toBe("Bob") // May fail due to StructRef cache
+      expect(value(doc.users.get(0)?.age)).toBe(25) // May fail due to StructRef cache
     })
 
     it("handles multiple updates to same struct in list", () => {
@@ -168,7 +168,7 @@ describe("List value updates across change() calls", () => {
             item.count = i
           }
         })
-        expect(unwrap(doc.items.get(0)?.count)).toBe(i) // May fail on i > 1
+        expect(value(doc.items.get(0)?.count)).toBe(i) // May fail on i > 1
       }
     })
   })

@@ -1,13 +1,13 @@
 import type { TreeID } from "loro-crdt"
 import { describe, expect, it } from "vitest"
-import { change, createTypedDoc, Shape, unwrap } from "../index.js"
+import { change, createTypedDoc, Shape, value } from "../index.js"
 
 /**
  * Tests for TreeNodeRef.data value updates across multiple change() calls.
  *
  * TreeNodeRef uses StructRef internally for the `.data` property. Outside of
  * change(), value shape properties return PlainValueRef objects that read fresh
- * from the CRDT container on each valueOf() call. Use unwrap() to unwrap them.
+ * from the CRDT container on each valueOf() call. Use value() to unwrap them.
  *
  * Inside change(), value shape properties return raw values for ergonomic use
  * in conditions and comparisons.
@@ -34,10 +34,10 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       })
       if (!nodeId) throw new Error("nodeId should be defined")
 
-      // Read the node data outside of change() — returns PlainValueRef, use unwrap()
+      // Read the node data outside of change() — returns PlainValueRef, use value()
       const node = doc.states.getNodeByID(nodeId)
-      expect(unwrap(node?.data.name)).toBe("initial")
-      expect(unwrap(node?.data.value)).toBe(100)
+      expect(value(node?.data.name)).toBe("initial")
+      expect(value(node?.data.value)).toBe(100)
 
       // Update the node data in a new change()
       const capturedNodeId = nodeId
@@ -56,8 +56,8 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       })
 
       // Read again — PlainValueRef reads fresh from the container, so updates are visible
-      expect(unwrap(node?.data.name)).toBe("updated")
-      expect(unwrap(node?.data.value)).toBe(999)
+      expect(value(node?.data.name)).toBe("updated")
+      expect(value(node?.data.value)).toBe(999)
     })
 
     it("handles multiple sequential updates to node data", () => {
@@ -90,7 +90,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
             data.count = i
           }
         })
-        expect(unwrap(node?.data.count)).toBe(i)
+        expect(value(node?.data.count)).toBe(i)
       }
     })
 
@@ -114,7 +114,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const capturedNodeId = nodeId
       const node = doc.nodes.getNodeByID(capturedNodeId)
-      expect(unwrap(node?.data.active)).toBe(true)
+      expect(value(node?.data.active)).toBe(true)
 
       change(doc, draft => {
         const draftNode = draft.nodes.getNodeByID(capturedNodeId)
@@ -124,7 +124,7 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
         }
       })
 
-      expect(unwrap(node?.data.active)).toBe(false)
+      expect(value(node?.data.active)).toBe(false)
     })
   })
 
@@ -151,8 +151,8 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
 
       const capturedNodeId = nodeId
       const node = doc.states.getNodeByID(capturedNodeId)
-      expect(unwrap(node?.data.name)).toBe("state1")
-      expect(unwrap(node?.data.facts.get("key1"))).toBe("value1")
+      expect(value(node?.data.name)).toBe("state1")
+      expect(value(node?.data.facts.get("key1"))).toBe("value1")
 
       // Update both the plain value and the record
       change(doc, draft => {
@@ -169,9 +169,9 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       })
 
       // PlainValueRef reads fresh from the container — all updates are visible
-      expect(unwrap(node?.data.name)).toBe("state2")
-      expect(unwrap(node?.data.facts.get("key1"))).toBe("updated")
-      expect(unwrap(node?.data.facts.get("key2"))).toBe("new")
+      expect(value(node?.data.name)).toBe("state2")
+      expect(value(node?.data.facts.get("key1"))).toBe("updated")
+      expect(value(node?.data.facts.get("key2"))).toBe("new")
     })
   })
 
@@ -202,8 +202,8 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       const parentNode = doc.tree.getNodeByID(capturedParentId)
       const childNode = doc.tree.getNodeByID(capturedChildId)
 
-      expect(unwrap(parentNode?.data.label)).toBe("parent")
-      expect(unwrap(childNode?.data.label)).toBe("child")
+      expect(value(parentNode?.data.label)).toBe("parent")
+      expect(value(childNode?.data.label)).toBe("child")
 
       // Update both nodes
       change(doc, draft => {
@@ -220,8 +220,8 @@ describe("TreeNodeRef.data value updates across change() calls", () => {
       })
 
       // PlainValueRef reads fresh — all updates visible
-      expect(unwrap(parentNode?.data.label)).toBe("parent-updated")
-      expect(unwrap(childNode?.data.label)).toBe("child-updated")
+      expect(value(parentNode?.data.label)).toBe("parent-updated")
+      expect(value(childNode?.data.label)).toBe("child-updated")
     })
   })
 

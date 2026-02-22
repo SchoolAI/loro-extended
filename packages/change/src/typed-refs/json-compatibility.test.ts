@@ -1,7 +1,7 @@
 import { LoroDoc } from "loro-crdt"
 import { describe, expect, it, vi } from "vitest"
 import { change } from "../functional-helpers.js"
-import { unwrap } from "../index.js"
+import { value } from "../index.js"
 import { Shape } from "../shape.js"
 import { createTypedDoc } from "../typed-doc.js"
 import type { Draft } from "../types.js"
@@ -85,7 +85,7 @@ describe("JSON Compatibility", () => {
     // Outside change(), value shape properties return PlainValueRef
     const entries = Object.entries(doc.meta)
     const entryMap = new Map(entries)
-    expect(unwrap(entryMap.get("title"))).toBe("Test")
+    expect(value(entryMap.get("title"))).toBe("Test")
     expect(entryMap.get("count")).toBeDefined()
   })
 
@@ -168,7 +168,7 @@ describe("JSON Compatibility", () => {
     const filtered = doc.messages.filter(m => m.timestamp > 15)
     expect(filtered).toHaveLength(1)
     // Outside change(), accessing value shape properties returns PlainValueRef
-    expect(unwrap(filtered[0].id)).toBe("2")
+    expect(value(filtered[0].id)).toBe("2")
     // filtered returns MutableItems (TypedRefs), so JSON.stringify should work on them
     expect(JSON.stringify(filtered)).toBe(
       '[{"id":"2","content":"B","timestamp":20}]',
@@ -183,7 +183,7 @@ describe("JSON Compatibility", () => {
     })
 
     // Outside change(), record value shapes return PlainValueRef
-    const values = Object.values(doc.settings).map(v => unwrap(v))
+    const values = Object.values(doc.settings).map(v => value(v))
     expect(values).toContain(true)
     expect(values).toContain(false)
     expect(values).toHaveLength(2)

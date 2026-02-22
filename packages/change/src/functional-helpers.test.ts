@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { ChangeOptions } from "./change-options.js"
 import { EXT_SYMBOL, type ExtRefBase, ext } from "./ext.js"
 import { change, getTransition, subscribe } from "./functional-helpers.js"
-import { unwrap } from "./index.js"
+import { value } from "./index.js"
 import { loro } from "./loro.js"
 import { Shape } from "./shape.js"
 import { createTypedDoc, type TypedDoc } from "./typed-doc.js"
@@ -539,8 +539,8 @@ describe("functional helpers", () => {
       const unsubscribe = loro(doc).subscribe(event => {
         const { before, after } = getTransition(doc, event)
         transitions.push({
-          beforeLocked: unwrap(before.game.players.get("bob")?.locked) ?? false,
-          afterLocked: unwrap(after.game.players.get("bob")?.locked) ?? false,
+          beforeLocked: value(before.game.players.get("bob")?.locked) ?? false,
+          afterLocked: value(after.game.players.get("bob")?.locked) ?? false,
         })
       })
 
