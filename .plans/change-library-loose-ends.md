@@ -138,19 +138,21 @@ The shared logic covers: `hasContainerConstructor` guard → mergeable path (nul
 
 ---
 
-## Phase 5: Extract `withBatchedCommit` helper 🔴
+## Phase 5: Extract `withBatchedCommit` helper ✅
 
 ### Tasks
 
-1. **Add `withBatchedCommit`** method to `BaseRefInternals` in `base.ts`. Signature: `withBatchedCommit(fn: () => void): void`. It encapsulates the suppress/restore/commitIfAuto pattern. 🔴
+1. **Add `withBatchedCommit`** method to `BaseRefInternals` in `base.ts`. Signature: `withBatchedCommit(fn: () => void): void`. It encapsulates the suppress/restore/commitIfAuto pattern. ✅
 
 2. **Replace** the 5 call sites with `this.withBatchedCommit(() => { ... })` or `internals.withBatchedCommit(() => { ... })`:
-   - `assignPlainValueToTypedRef` in `utils.ts` (struct/record branch and list branch) 🔴
-   - `RecordRefInternals.replace()` 🔴
-   - `RecordRefInternals.merge()` 🔴
-   - `RecordRefInternals.clear()` 🔴
+   - `assignPlainValueToTypedRef` in `utils.ts` (struct/record branch and list branch) ✅
+   - `RecordRefInternals.replace()` ✅
+   - `RecordRefInternals.merge()` ✅
+   - `RecordRefInternals.clear()` ✅
 
-3. **Run `verify`**. 🔴
+   > Also removed the unused `skipCommit` parameter from `assignPlainValueToTypedRef` — no caller ever passed `true`.
+
+3. **Run `verify`**. ✅ (format 112 files, types passed, 909/909 tests passed)
 
 **Resources**: `packages/change/src/typed-refs/base.ts`, `packages/change/src/typed-refs/utils.ts`, `packages/change/src/typed-refs/record-ref-internals.ts`
 

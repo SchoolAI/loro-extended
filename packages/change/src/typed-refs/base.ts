@@ -106,6 +106,29 @@ export abstract class BaseRefInternals<Shape extends DocShape | ContainerShape>
     return this._suppressAutoCommit
   }
 
+  /**
+   * Execute a function with auto-commit suppressed, then commit once at the end.
+   * This batches multiple mutations into a single commit to avoid intermediate
+   * subscription notifications with partial data.
+   *
+   * Reentrant-safe: if auto-commit is already suppressed (e.g., nested call),
+   * the inner call runs without double-restoring.
+   */
+  withBatchedCommit(fn: () => void): void {
+    const wasSuppressed = this._suppressAutoCommit
+    if (!wasSuppressed) {
+      this._suppressAutoCommit = true
+    }
+    try {
+      fn()
+    } finally {
+      if (!wasSuppressed) {
+        this._suppressAutoCommit = false
+      }
+    }
+    this.commitIfAuto()
+  }
+
   /** Get the shape for this ref */
   getShape(): Shape {
     return this.params.shape

@@ -251,13 +251,11 @@ export function createContainerTypedRef(
  *
  * @param ref - The TypedRef to assign to
  * @param value - The plain value to assign
- * @param skipCommit - If true, skip the final commit (caller will handle it)
  * @returns true if assignment was successful, false otherwise
  */
 export function assignPlainValueToTypedRef(
   ref: TypedRef<any>,
   value: any,
-  skipCommit = false,
 ): boolean {
   // Access internals via INTERNAL_SYMBOL
   const internals = ref[INTERNAL_SYMBOL]
@@ -271,27 +269,11 @@ export function assignPlainValueToTypedRef(
   const shapeType = shape?._type
 
   if (shapeType === "struct" || shapeType === "record") {
-    // Suppress auto-commit during batch assignment to avoid multiple notifications
-    const wasSuppressed = internals?.isSuppressAutoCommit?.() ?? false
-    if (internals && !wasSuppressed) {
-      internals.setSuppressAutoCommit(true)
-    }
-
-    try {
+    internals.withBatchedCommit(() => {
       for (const k in value) {
         ;(ref as any)[k] = value[k]
       }
-    } finally {
-      // Restore auto-commit state
-      if (internals && !wasSuppressed) {
-        internals.setSuppressAutoCommit(false)
-      }
-    }
-
-    // Commit once after all properties are assigned (unless skipCommit is true)
-    if (!skipCommit && internals?.getAutoCommit?.()) {
-      internals.getDoc().commit()
-    }
+    })
 
     return true
   }
@@ -300,29 +282,14 @@ export function assignPlainValueToTypedRef(
     if (Array.isArray(value)) {
       const listRef = ref as any
 
-      // Suppress auto-commit during batch operations
-      const wasSuppressed = internals?.isSuppressAutoCommit?.() ?? false
-      if (internals && !wasSuppressed) {
-        internals.setSuppressAutoCommit(true)
-      }
-
-      try {
+      internals.withBatchedCommit(() => {
         if (listRef.length > 0) {
           listRef.delete(0, listRef.length)
         }
         for (const item of value) {
           listRef.push(item)
         }
-      } finally {
-        if (internals && !wasSuppressed) {
-          internals.setSuppressAutoCommit(false)
-        }
-      }
-
-      // Commit once after all items are added (unless skipCommit is true)
-      if (!skipCommit && internals?.getAutoCommit?.()) {
-        internals.getDoc().commit()
-      }
+      })
 
       return true
     }

@@ -148,13 +148,7 @@ export class RecordRefInternals<
     const currentKeys = new Set(container.keys())
     const newKeys = new Set(Object.keys(values))
 
-    // Suppress auto-commit during batch operations
-    const wasSuppressed = this.isSuppressAutoCommit()
-    if (!wasSuppressed) {
-      this.setSuppressAutoCommit(true)
-    }
-
-    try {
+    this.withBatchedCommit(() => {
       // Delete keys that are not in the new values
       for (const key of currentKeys) {
         if (!newKeys.has(key)) {
@@ -167,15 +161,7 @@ export class RecordRefInternals<
       for (const key of newKeys) {
         this.set(key, values[key])
       }
-    } finally {
-      // Restore auto-commit state
-      if (!wasSuppressed) {
-        this.setSuppressAutoCommit(false)
-      }
-    }
-
-    // Commit once after all operations
-    this.commitIfAuto()
+    })
   }
 
   /**
@@ -183,26 +169,11 @@ export class RecordRefInternals<
    * Existing keys not in `values` are kept.
    */
   merge(values: Record<string, any>): void {
-    // Suppress auto-commit during batch operations
-    const wasSuppressed = this.isSuppressAutoCommit()
-    if (!wasSuppressed) {
-      this.setSuppressAutoCommit(true)
-    }
-
-    try {
-      // Set new/updated values (no deletions)
+    this.withBatchedCommit(() => {
       for (const key of Object.keys(values)) {
         this.set(key, values[key])
       }
-    } finally {
-      // Restore auto-commit state
-      if (!wasSuppressed) {
-        this.setSuppressAutoCommit(false)
-      }
-    }
-
-    // Commit once after all operations
-    this.commitIfAuto()
+    })
   }
 
   /**
@@ -216,27 +187,12 @@ export class RecordRefInternals<
       return // No-op on empty record
     }
 
-    // Suppress auto-commit during batch operations
-    const wasSuppressed = this.isSuppressAutoCommit()
-    if (!wasSuppressed) {
-      this.setSuppressAutoCommit(true)
-    }
-
-    try {
-      // Delete all keys
+    this.withBatchedCommit(() => {
       for (const key of keys) {
         container.delete(key)
         this.refCache.delete(key)
       }
-    } finally {
-      // Restore auto-commit state
-      if (!wasSuppressed) {
-        this.setSuppressAutoCommit(false)
-      }
-    }
-
-    // Commit once after all operations
-    this.commitIfAuto()
+    })
   }
 
   /** Recursively finalize nested container refs */
