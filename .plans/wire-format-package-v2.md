@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🟡 In Progress (Phase 1 Complete)
+## Status: 🟡 In Progress (Phase 2 Complete)
 
 ## Background
 
@@ -256,30 +256,30 @@ export function decode(data: Uint8Array): ChannelMsg  // throws DecodeError
 export function decodeFrame(frame: Uint8Array): ChannelMsg[]  // throws DecodeError
 ```
 
-### Phase 2: Implement Transport Fragmentation 🔴
+### Phase 2: Implement Transport Fragmentation ✅
 
 Add fragmentation primitives for large payloads. **Follows Functional Core / Imperative Shell**: pure functions handle all data transformation; a thin stateful class manages batch tracking and timers.
 
 **Tasks:**
 
-- 🔴 Create `fragment.ts` with byte-prefix discriminator constants and pure functions
-- 🔴 Implement `fragmentPayload(data: Uint8Array, maxSize: number): Uint8Array[]` (pure)
-- 🔴 Implement `parseTransportPayload(data: Uint8Array): TransportPayload` (pure)
-- 🔴 Implement `reassembleFragments(header, fragments): Uint8Array` (pure, throws on incomplete)
-- 🔴 Implement `generateBatchId(): Uint8Array` (pure, crypto.getRandomValues)
-- 🔴 Implement `batchIdToKey(id: Uint8Array): string` helper (hex encoding, pure)
-- 🔴 Create `reassembler.ts` with thin `FragmentReassembler` class (imperative shell)
-- 🔴 FragmentReassembler: manages `Map<string, BatchState>` and timer lifecycle only
-- 🔴 FragmentReassembler: delegates to pure `reassembleFragments()` when complete
-- 🔴 Implement timeout-based cleanup (configurable, default 10s)
-- 🔴 Implement `maxTotalReassemblyBytes` limit with LRU eviction
-- 🔴 Write unit tests for pure functions (fragmentPayload, reassembleFragments, parseTransportPayload)
-- 🔴 Write unit tests for FragmentReassembler state management
-- 🔴 Write unit tests for concurrent batch handling
-- 🔴 Write unit tests for timeout cleanup
-- 🔴 Write unit tests for complete message during fragment reassembly
-- 🔴 Write unit tests for timer edge cases (race conditions, dispose cleanup)
-- 🔴 Write unit tests for memory limit enforcement
+- ✅ Create `fragment.ts` with byte-prefix discriminator constants and pure functions
+- ✅ Implement `fragmentPayload(data: Uint8Array, maxSize: number): Uint8Array[]` (pure)
+- ✅ Implement `parseTransportPayload(data: Uint8Array): TransportPayload` (pure)
+- ✅ Implement `reassembleFragments(header, fragments): Uint8Array` (pure, throws on incomplete)
+- ✅ Implement `generateBatchId(): Uint8Array` (pure, crypto.getRandomValues)
+- ✅ Implement `batchIdToKey(id: Uint8Array): string` helper (hex encoding, pure)
+- ✅ Create `reassembler.ts` with thin `FragmentReassembler` class (imperative shell)
+- ✅ FragmentReassembler: manages `Map<string, BatchState>` and timer lifecycle only
+- ✅ FragmentReassembler: delegates to pure `reassembleFragments()` when complete
+- ✅ Implement timeout-based cleanup (configurable, default 10s)
+- ✅ Implement `maxTotalReassemblyBytes` limit with LRU eviction
+- ✅ Write unit tests for pure functions (fragmentPayload, reassembleFragments, parseTransportPayload)
+- ✅ Write unit tests for FragmentReassembler state management
+- ✅ Write unit tests for concurrent batch handling
+- ✅ Write unit tests for timeout cleanup
+- ✅ Write unit tests for complete message during fragment reassembly
+- ✅ Write unit tests for timer edge cases (race conditions, dispose cleanup)
+- ✅ Write unit tests for memory limit enforcement
 
 **Key Types:**
 

@@ -10,6 +10,7 @@
  * - 6-byte frame header with Uint32 payload length (supports up to 4GB)
  * - Compact field names for bandwidth efficiency
  * - Type-safe encoding/decoding with proper error handling
+ * - Transport-level fragmentation for large payloads
  *
  * @example
  * ```typescript
@@ -35,6 +36,33 @@
  *   }
  * }
  * ```
+ *
+ * @example Fragmentation
+ * ```typescript
+ * import {
+ *   fragmentPayload,
+ *   FragmentReassembler,
+ *   wrapCompleteMessage,
+ * } from "@loro-extended/wire-format"
+ *
+ * // Fragment a large payload
+ * const maxSize = 200 * 1024 // 200KB per fragment
+ * if (payload.length > maxSize) {
+ *   const fragments = fragmentPayload(payload, maxSize)
+ *   for (const fragment of fragments) {
+ *     send(fragment)
+ *   }
+ * } else {
+ *   send(wrapCompleteMessage(payload))
+ * }
+ *
+ * // Reassemble on receive
+ * const reassembler = new FragmentReassembler({ timeoutMs: 10000 })
+ * const result = reassembler.receiveRaw(data)
+ * if (result.status === "complete") {
+ *   process(result.data)
+ * }
+ * ```
  */
 
 // Constants
@@ -57,7 +85,37 @@ export {
 } from "./encode.js"
 // Errors
 export { DecodeError, type DecodeErrorCode } from "./errors.js"
-
+// Fragmentation
+export {
+  BATCH_ID_SIZE,
+  batchIdToKey,
+  calculateFragmentationOverhead,
+  createFragmentData,
+  createFragmentHeader,
+  FRAGMENT_DATA,
+  FRAGMENT_DATA_MIN_SIZE,
+  FRAGMENT_HEADER,
+  FRAGMENT_HEADER_PAYLOAD_SIZE,
+  FragmentParseError,
+  FragmentReassembleError,
+  fragmentPayload,
+  generateBatchId,
+  keyToBatchId,
+  MESSAGE_COMPLETE,
+  parseTransportPayload,
+  reassembleFragments,
+  shouldFragment,
+  type TransportPayload,
+  wrapCompleteMessage,
+} from "./fragment.js"
+// Reassembler
+export {
+  FragmentReassembler,
+  type ReassembleError,
+  type ReassembleResult,
+  type ReassemblerConfig,
+  type TimerAPI,
+} from "./reassembler.js"
 // Wire types (for advanced use cases)
 export type {
   WireBatch,
