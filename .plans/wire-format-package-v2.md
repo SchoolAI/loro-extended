@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🟡 In Progress (Phase 6 Complete)
+## Status: ✅ Complete (All Phases Done)
 
 ## Background
 
@@ -469,19 +469,19 @@ HTTP-Polling uses binary CBOR for POST with fragmentation, keeps JSON for GET re
 - ✅ Write unit tests for `parsePostBody` handler
 - ✅ Update client tests for binary encoding
 
-### Phase 7: Documentation and Cleanup 🔴
+### Phase 7: Documentation and Cleanup ✅
 
 Finalize documentation and deprecate old exports.
 
 **Tasks:**
 
-- 🔴 Update root TECHNICAL.md with wire format architecture section
-- 🔴 Create README.md for wire-format package
-- 🔴 Document deployment requirements for v1→v2 migration in PROTOCOL.md
-- 🔴 Update examples if any directly import from adapter wire-format
-- 🔴 Add `@deprecated` JSDoc to `serializeChannelMsg` and `deserializeChannelMsg`
-- 🔴 Point deprecation to `@loro-extended/wire-format` for binary transports
-- 🔴 Note: `channel-json.ts` still used internally by SSE EventSource (server→client)
+- ✅ Update root TECHNICAL.md with wire format architecture section
+- ✅ Create README.md for wire-format package
+- ✅ Document deployment requirements for v1→v2 migration in PROTOCOL.md (done in Phase 3)
+- ✅ Update examples if any directly import from adapter wire-format (none found)
+- ✅ Add `@deprecated` JSDoc to `serializeChannelMsg` and `deserializeChannelMsg`
+- ✅ Point deprecation to `@loro-extended/wire-format` for binary transports
+- ✅ Note: `channel-json.ts` still used internally by SSE EventSource (server→client) and HTTP-Polling GET
 
 **Cleanup completed during earlier phases:**
 

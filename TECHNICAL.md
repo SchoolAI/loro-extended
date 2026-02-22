@@ -475,6 +475,81 @@ expect(handleB.doc.toJSON().text).toBe("hello")
 
 The Synchronizer uses a `WorkQueue` to prevent infinite recursion when adapters deliver messages. Messages are queued and processed iteratively, not recursively. However, this doesn't change timing - with `BridgeAdapter`, messages are still delivered in a different microtask.
 
+## Wire Format Architecture
+
+The `@loro-extended/wire-format` package provides unified binary encoding for all network adapters. This replaces the previous split between WebSocket (CBOR) and other adapters (JSON+base64).
+
+### Encoding Pipeline
+
+```
+ChannelMsg → WireMessage (compact names) → CBOR → Frame (6-byte header)
+```
+
+**WireMessage** uses compact field names for bandwidth efficiency:
+| Domain Field | Wire Field |
+|--------------|------------|
+| `type` | `t` (numeric enum) |
+| `docId` | `doc` |
+| `requesterDocVersion` | `v` |
+| `bidirectional` | `bi` |
+| `transmission` | `tx` |
+
+**Frame Header (v2)**:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ Header (6 bytes)                                                   │
+├──────────┬──────────┬──────────────────────────────────────────────┤
+│ Version  │  Flags   │           Payload Length                     │
+│ (1 byte) │ (1 byte) │           (4 bytes, big-endian)              │
+└──────────┴──────────┴──────────────────────────────────────────────┘
+```
+
+Version 2 fixes the v1 64KB payload limit bug (Uint16 → Uint32).
+
+### Transport Fragmentation
+
+For transports with size limits, payloads are fragmented using byte-prefix discriminators:
+
+| Prefix | Type | Followed By |
+|--------|------|-------------|
+| `0x00` | Complete message | Framed CBOR payload |
+| `0x01` | Fragment header | batchId[8], count[4], totalSize[4] |
+| `0x02` | Fragment data | batchId[8], index[4], payload[...] |
+
+**FragmentReassembler** is a stateful class (imperative shell) that:
+- Tracks concurrent batches via `Map<string, BatchState>`
+- Handles timeout cleanup (default 10s)
+- Enforces memory limits (default 50MB total)
+- Supports complete messages interleaved with fragments
+- Delegates to pure `reassembleFragments()` function (functional core)
+
+### Transport-Specific Encoding
+
+| Transport | Direction | Encoding | Fragment Threshold | Rationale |
+|-----------|-----------|----------|-------------------|-----------|
+| WebSocket | Both | Binary CBOR | 100KB | AWS API Gateway 128KB limit |
+| WebRTC | Both | Binary CBOR | 200KB | SCTP 256KB limit |
+| SSE | POST (client→server) | Binary CBOR | 80KB | body-parser 100KB default |
+| SSE | EventSource (server→client) | JSON | N/A | Text-only protocol |
+| HTTP-Polling | POST | Binary CBOR | 80KB | body-parser 100KB default |
+| HTTP-Polling | GET response | JSON | N/A | No size limits on response |
+
+**Note:** WebSocket fragmentation is required for cloud deployments (AWS API Gateway, Cloudflare Workers) but can be disabled (`fragmentThreshold: 0`) for self-hosted deployments without proxy limits.
+
+### SSE and HTTP-Polling Asymmetric Encoding
+
+SSE and HTTP-Polling use different encodings per direction:
+- **POST (client→server)**: Binary CBOR with fragmentation for large ephemeral payloads
+- **EventSource/GET (server→client)**: JSON via `channel-json.ts` (text-only SSE protocol constraint, simpler polling responses)
+
+### Deployment Considerations
+
+Wire format v2 is **not backward compatible**. Clients and servers must upgrade together:
+- v1 clients cannot decode v2 frames (different header size)
+- v2 introduces transport-layer prefixes (0x00, 0x01, 0x02) that v1 doesn't understand
+
+For mixed deployments during migration, use separate endpoints or feature flags.
+
 ## Testing Patterns
 
 ### Investigating Loro Behavior

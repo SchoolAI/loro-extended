@@ -182,7 +182,11 @@ export function uint8ArrayFromJSON(json: BinaryDataJSON): Uint8Array {
 }
 
 /**
- * Serialize a channel message to JSON-compatible format
+ * Serialize a channel message to JSON-compatible format.
+ *
+ * @deprecated For binary transports (WebSocket, WebRTC, HTTP POST), use
+ * `@loro-extended/wire-format` instead. This function is still used internally
+ * for SSE EventSource (server→client) which requires text-based JSON encoding.
  */
 export function serializeChannelMsg(msg: ChannelMsg): ChannelMsgJSON {
   switch (msg.type) {
@@ -282,7 +286,12 @@ function serializeSyncTransmission(
 }
 
 /**
- * Deserialize a JSON-compatible message back to channel message
+ * Deserialize a JSON-compatible message back to channel message.
+ *
+ * @deprecated For binary transports (WebSocket, WebRTC, HTTP POST), use
+ * `@loro-extended/wire-format` instead. This function is still used internally
+ * for SSE EventSource (server→client) and HTTP-Polling GET responses which
+ * use text-based JSON encoding.
  */
 export function deserializeChannelMsg(json: ChannelMsgJSON): ChannelMsg {
   switch (json.type) {
