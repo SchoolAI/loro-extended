@@ -1,0 +1,43 @@
+{
+  "name": "@loro-extended/wire-format",
+  "version": "0.1.0",
+  "description": "Binary wire format encoding/decoding for loro-extended network adapters",
+  "author": "Duane Johnson",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./src": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "verify logic",
+    "verify": "verify"
+  },
+  "dependencies": {
+    "@levischuck/tiny-cbor": "^0.3.2",
+    "@loro-extended/repo": "workspace:^"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@typescript/native-preview": "7.0.0-dev.20260103.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.17"
+  }
+}

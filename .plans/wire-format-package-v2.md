@@ -1,6 +1,6 @@
 # Wire Format Package Plan v2
 
-## Status: 🔴 Not Started
+## Status: 🟡 In Progress (Phase 1 Complete)
 
 ## Background
 
@@ -208,22 +208,22 @@ If `maxTotalReassemblyBytes` is exceeded, the oldest batch is evicted.
 
 ## Phases
 
-### Phase 1: Create Wire Format Package 🔴
+### Phase 1: Create Wire Format Package ✅
 
 Extract and enhance wire format into shared package.
 
 **Tasks:**
 
-- 🔴 Create `packages/wire-format/` directory structure with `package.json`
-- 🔴 Add `@levischuck/tiny-cbor` dependency
-- 🔴 Move `WireMessage` types from `adapter-websocket/wire-format.ts`
-- 🔴 Create `encode.ts` with `encode(msg: ChannelMsg): Uint8Array`
-- 🔴 Create `decode.ts` with `decode(data: Uint8Array): ChannelMsg` (throws DecodeError)
-- 🔴 Create `frame.ts` with 6-byte header (Uint32 length), version 2
-- 🔴 Create `errors.ts` with `DecodeError` class and `DecodeErrorCode` type
-- 🔴 Write unit tests for CBOR round-trips (all 12 ChannelMsg types)
-- 🔴 Write unit tests for >64KB payloads (regression test for bug)
-- 🔴 Export all public APIs from `index.ts`
+- ✅ Create `packages/wire-format/` directory structure with `package.json`
+- ✅ Add `@levischuck/tiny-cbor` dependency
+- ✅ Move `WireMessage` types from `adapter-websocket/wire-format.ts`
+- ✅ Create `encode.ts` with `encode(msg: ChannelMsg): Uint8Array`
+- ✅ Create `decode.ts` with `decode(data: Uint8Array): ChannelMsg` (throws DecodeError)
+- ✅ Create `frame.ts` with 6-byte header (Uint32 length), version 2 (in encode.ts/decode.ts)
+- ✅ Create `errors.ts` with `DecodeError` class and `DecodeErrorCode` type
+- ✅ Write unit tests for CBOR round-trips (all 12 ChannelMsg types)
+- ✅ Write unit tests for >64KB payloads (regression test for bug)
+- ✅ Export all public APIs from `index.ts`
 
 **Key Types:**
 
