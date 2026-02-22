@@ -3,7 +3,7 @@ import {
   createSseExpressRouter,
   SseServerNetworkAdapter,
 } from "@loro-extended/adapter-sse/express"
-import { change, loro } from "@loro-extended/change"
+import { change, loro, value } from "@loro-extended/change"
 import {
   type Doc,
   type DocId,
@@ -18,7 +18,6 @@ import {
   ChatEphemeralDeclarations,
   ChatSchema,
   type Message,
-  type MutableChatDoc,
   type MutableMessage,
   type Presence,
 } from "../shared/types.js"
@@ -48,17 +47,18 @@ async function streamLLMResponse(
 ): Promise<void> {
   try {
     // Convert chat history in document to LLM message context
+    const targetId = value(targetMessage.id)
     const messages: Array<{ role: "user" | "assistant"; content: string }> =
       doc.messages.toArray().flatMap((msg: Message) =>
-        msg.id === targetMessage.id
+        value(msg.id) === targetId
           ? []
           : [
               {
                 role:
-                  msg.role === "assistant"
+                  value(msg.role) === "assistant"
                     ? ("assistant" as const)
                     : ("user" as const),
-                content: msg.content,
+                content: value(msg.content),
               },
             ],
       )
@@ -90,7 +90,7 @@ async function streamLLMResponse(
 function appendAssistantMessage(doc: ChatDoc, content: string): MutableMessage {
   const id = generateUUID()
 
-  change(doc, (draft: MutableChatDoc) => {
+  change(doc, draft => {
     draft.messages.push({
       id,
       role: "assistant",
@@ -126,14 +126,18 @@ function processDocumentUpdate(docId: DocId, doc: ChatDoc) {
     logger.debug`Doc ${docId} updated. Last message: ${lastMsg.role} - ${lastMsg.content.toString().substring(0, 20)}...`
 
     // Only process user messages
-    if (lastMsg.role !== "user") return
+    if (value(lastMsg.role) !== "user") return
 
     // Only reply if needed
-    if (!lastMsg.needsAiReply) return
+    if (!value(lastMsg.needsAiReply)) return
 
     // Check this off as taken care of
-    change(doc, () => {
-      lastMsg.needsAiReply = false
+    const lastMsgIndex = messagesRef.length - 1
+    change(doc, draft => {
+      const draftMsg = draft.messages.get(lastMsgIndex)
+      if (draftMsg) {
+        draftMsg.needsAiReply = false
+      }
     })
 
     let userCount = 0
