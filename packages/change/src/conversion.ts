@@ -154,6 +154,9 @@ function convertStructInput(
   // So it allowed extra keys.
   for (const [k, v] of Object.entries(value)) {
     if (!shape.shapes[k]) {
+      console.warn(
+        `convertStructInput: key "${k}" is not in the struct schema and will be ignored by typed access`,
+      )
       map.set(k, v)
     }
   }

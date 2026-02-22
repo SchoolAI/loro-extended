@@ -176,17 +176,19 @@ The shared logic covers: `hasContainerConstructor` guard → mergeable path (nul
 
 ---
 
-## Phase 7: Smaller cleanups 🔴
+## Phase 7: Smaller cleanups ✅
 
 ### Tasks
 
-1. **`convertStructInput` extra key warning**: Add a `console.warn` in the extra-keys loop in `conversion.ts` when `process.env.NODE_ENV !== 'production'` (or equivalent check). Message: `"convertStructInput: key "${k}" is not in the struct schema and will be ignored by typed access"`. This preserves backward compatibility while surfacing typos during development. 🔴
+1. **`convertStructInput` extra key warning**: Add a `console.warn` in the extra-keys loop in `conversion.ts` when `process.env.NODE_ENV !== 'production'` (or equivalent check). Message: `"convertStructInput: key "${k}" is not in the struct schema and will be ignored by typed access"`. This preserves backward compatibility while surfacing typos during development. ✅
 
-2. **Remove `biome-ignore-all`** from `typed-doc.ts` line 1. Add targeted `// biome-ignore lint/suspicious/noExplicitAny: <reason>` comments on specific lines that genuinely need `any` (e.g., proxy handler casts, placeholder casts). Inspect each `any` usage and replace with proper types where feasible. 🔴
+2. **Remove `biome-ignore-all`** from `typed-doc.ts` line 1. Add targeted `// biome-ignore lint/suspicious/noExplicitAny: <reason>` comments on specific lines that genuinely need `any` (e.g., proxy handler casts, placeholder casts). Inspect each `any` usage and replace with proper types where feasible. ✅
 
-3. **Fix bogus issue link**: In `overlay-recursion.test.ts` ~L258, remove the `@see https://github.com/loro-dev/loro-extended/issues/XXX` line. 🔴
+   > Removed blanket `biome-ignore-all`, added 5 targeted inline suppressions (all placeholder type bridge casts), and changed `rawValue` return type from `any` to `unknown`.
 
-4. **Run full `verify`**: `pnpm turbo run verify --filter=@loro-extended/change`. 🔴
+3. **Fix bogus issue link**: In `overlay-recursion.test.ts` ~L258, remove the `@see https://github.com/loro-dev/loro-extended/issues/XXX` line. ✅
+
+4. **Run full `verify`**: `pnpm turbo run verify --filter=@loro-extended/change`. ✅ (format 112 files, types passed, 909/909 tests passed)
 
 **Resources**: `packages/change/src/conversion.ts`, `packages/change/src/typed-doc.ts`, `packages/change/src/overlay-recursion.test.ts`
 

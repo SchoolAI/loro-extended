@@ -253,8 +253,6 @@ describe("Overlay and Placeholder Handling", () => {
    * The nullish coalescing operator (??) treats null as a nullish value,
    * but in CRDT systems null is a valid intentional value that should be
    * preserved. Only undefined should trigger fallback to placeholder.
-   *
-   * @see https://github.com/loro-dev/loro-extended/issues/XXX
    */
   describe("Null value preservation", () => {
     it("should preserve null when crdtValue is null and placeholder is empty string", () => {

@@ -1,6 +1,6 @@
 import type { LoroDoc } from "loro-crdt"
-import type { Infer } from "../index.js"
 import type { DocShape } from "../shape.js"
+import type { Infer, InferPlaceholderType } from "../types.js"
 import { INTERNAL_SYMBOL, TypedRef, type TypedRefParams } from "./base.js"
 import { DocRefInternals } from "./doc-ref-internals.js"
 import { serializeRefToJSON } from "./utils.js"
@@ -13,15 +13,18 @@ export class DocRef<Shape extends DocShape> extends TypedRef<Shape> {
   [INTERNAL_SYMBOL]: DocRefInternals<Shape>
 
   constructor(
-    params: Omit<TypedRefParams<Shape>, "getContainer" | "getDoc"> & {
+    params: Omit<
+      TypedRefParams<Shape>,
+      "getContainer" | "getDoc" | "placeholder"
+    > & {
       doc: LoroDoc
+      placeholder: InferPlaceholderType<Shape>
       autoCommit?: boolean
       batchedMutation?: boolean
       mergeable?: boolean
     },
   ) {
     super()
-    if (!params.placeholder) throw new Error("placeholder required")
     this[INTERNAL_SYMBOL] = new DocRefInternals(params)
     this.createLazyProperties()
   }

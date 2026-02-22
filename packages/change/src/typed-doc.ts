@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: fix later */
-
 import { LoroDoc, type PeerID, type Value } from "loro-crdt"
 import { type ChangeOptions, serializeCommitMessage } from "./change-options.js"
 import { derivePlaceholder } from "./derive-placeholder.js"
@@ -247,7 +245,7 @@ class TypedDocInternal<Shape extends DocShape> {
     if (!this.valueRef) {
       this.valueRef = new DocRef({
         shape: this.shape,
-        placeholder: this.placeholder as any,
+        placeholder: this.placeholder,
         doc: this.doc,
         autoCommit: true,
         overlay: this.overlay,
@@ -289,7 +287,7 @@ class TypedDocInternal<Shape extends DocShape> {
   change(fn: (draft: Draft<Shape>) => void, options?: ChangeOptions): void {
     const draft = new DocRef({
       shape: this.shape,
-      placeholder: this.placeholder as any,
+      placeholder: this.placeholder,
       doc: this.doc,
       autoCommit: false,
       batchedMutation: true, // Enable value shape caching for find-and-mutate patterns
@@ -334,7 +332,7 @@ class TypedDocInternal<Shape extends DocShape> {
     return this.shape
   }
 
-  get rawValue(): any {
+  get rawValue(): unknown {
     // Filter out reserved keys from raw value
     return filterReservedKeys(this.doc.toJSON())
   }

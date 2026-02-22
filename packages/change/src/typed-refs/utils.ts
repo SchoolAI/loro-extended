@@ -17,6 +17,7 @@ import type {
   TextContainerShape,
   TreeContainerShape,
 } from "../shape.js"
+
 import {
   type BaseRefInternals,
   INTERNAL_SYMBOL,
@@ -96,7 +97,7 @@ export function buildChildTypedRefParams(
   internals: BaseRefInternals<any>,
   key: string,
   shape: ContainerShape,
-  placeholder: unknown,
+  placeholder: TypedRefParams<ContainerShape>["placeholder"],
 ): TypedRefParams<ContainerShape> {
   // AnyContainerShape is an escape hatch - it doesn't have a constructor
   if (!hasContainerConstructor(shape._type)) {

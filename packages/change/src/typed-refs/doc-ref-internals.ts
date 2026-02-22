@@ -1,6 +1,6 @@
 import type { LoroDoc } from "loro-crdt"
-import type { Infer } from "../index.js"
 import type { ContainerShape, DocShape } from "../shape.js"
+import type { InferPlaceholderType } from "../types.js"
 import {
   BaseRefInternals,
   INTERNAL_SYMBOL,
@@ -18,12 +18,16 @@ export class DocRefInternals<
 > extends BaseRefInternals<Shape> {
   private propertyCache = new Map<string, TypedRef<ContainerShape>>()
   private doc: LoroDoc
-  private requiredPlaceholder: Infer<Shape>
+  private requiredPlaceholder: InferPlaceholderType<Shape>
   private _mergeable: boolean
 
   constructor(
-    params: Omit<TypedRefParams<Shape>, "getContainer" | "getDoc"> & {
+    params: Omit<
+      TypedRefParams<Shape>,
+      "getContainer" | "getDoc" | "placeholder"
+    > & {
       doc: LoroDoc
+      placeholder: InferPlaceholderType<Shape>
       autoCommit?: boolean
       batchedMutation?: boolean
       mergeable?: boolean
@@ -39,7 +43,7 @@ export class DocRefInternals<
     } as TypedRefParams<Shape>)
 
     this.doc = params.doc
-    this.requiredPlaceholder = params.placeholder as Infer<Shape>
+    this.requiredPlaceholder = params.placeholder
     this._mergeable = !!params.mergeable
   }
 
