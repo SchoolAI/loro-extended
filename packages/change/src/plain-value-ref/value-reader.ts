@@ -5,13 +5,7 @@
  * @module plain-value-ref/value-reader
  */
 
-import type {
-  ListDiff,
-  LoroList,
-  LoroMap,
-  LoroMovableList,
-  MapDiff,
-} from "loro-crdt"
+import type { LoroList, LoroMap, LoroMovableList, MapDiff } from "loro-crdt"
 import type { BaseRefInternals } from "../typed-refs/base.js"
 import { getAtPath } from "../utils/path-ops.js"
 
@@ -106,32 +100,38 @@ export function resolveValue<T>(
 // ============================================================================
 
 /**
- * Get a value from a list's diff overlay (if present).
+ * Get a value from the diff overlay for a list item.
  * Used for "before" views in getTransition().
  *
- * @param internals - The list ref's internals
+ * The internals parameter is expected to be a ListRefBaseInternals which has
+ * a getOverlayList() method that caches the reconstructed "before" list.
+ *
+ * @param internals - The list ref's internals (must have getOverlayList method)
  * @param index - The list index
  * @returns The value from the overlay, or undefined if not in overlay
  */
 export function getListOverlayValue(
   internals: BaseRefInternals<any>,
-  _index: number,
+  index: number,
 ): unknown | undefined {
   const overlay = internals.getOverlay()
   if (!overlay) return undefined
 
-  const container = internals.getContainer() as LoroList | LoroMovableList
-  const containerId = (container as any).id
-  const diff = overlay.get(containerId)
+  // Check if internals has getOverlayList method (ListRefBaseInternals)
+  // This method caches the reconstructed "before" list using applyListDelta
+  if (
+    "getOverlayList" in internals &&
+    typeof (internals as any).getOverlayList === "function"
+  ) {
+    const overlayList = (internals as any).getOverlayList() as
+      | unknown[]
+      | undefined
+    if (overlayList) {
+      return overlayList[index]
+    }
+  }
 
-  if (diff?.type !== "list") return undefined
-  const _listDiff = diff as ListDiff
-
-  // Check if this index was affected by the diff
-  // ListDiff contains insert/delete/retain operations
-  // For simplicity, we check if the item at this index exists in the current state
-  // and fall back to container value
-  // TODO: More sophisticated overlay handling for list diffs
+  // Fallback: no overlay list available
   return undefined
 }
 

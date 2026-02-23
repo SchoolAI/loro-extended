@@ -345,17 +345,15 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
 
 ---
 
-## Phase 6: Complete List Overlay for getTransition() 🔴
+## Phase 6: Complete List Overlay for getTransition() ✅
 
 **Goal**: Make `getTransition()` work correctly for list values.
 
-**Key Discovery**: `applyListDelta(input, delta)` already exists in `list-ref-base.ts` (lines 603-623). Rather than creating duplicate delta application logic, we follow FC/IS by:
-1. Creating a pure function to reverse a delta
-2. Reusing the existing `applyListDelta` for application
+**Key Discovery**: `applyListDelta(input, delta)` already exists in `list-ref-base.ts` (lines 603-623). The `getOverlayList()` method in `ListRefBaseInternals` already correctly applies the reverse delta (since `createDiffOverlay` uses `doc.diff(to, from)` which produces a reverse diff). The missing piece was that `getListOverlayValue()` wasn't using `getOverlayList()`.
 
 ### Tasks
 
-1. 🔴 **Create `reverseListDelta`** pure function in `list-ref-base.ts`:
+1. 🔵 **SKIPPED: Create `reverseListDelta`** — Not needed! Loro's `doc.diff(to, from)` already returns the reverse delta. The existing `applyListDelta` + reverse diff correctly reconstructs the "before" state.
    ```typescript
    /**
     * Reverses a list delta to reconstruct the "before" state.
@@ -377,54 +375,23 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
    ): Delta<T[]>[]
    ```
 
-2. 🔴 **Export `applyListDelta`** from `list-ref-base.ts`:
-   - Currently a private function
-   - Export it for use in `value-reader.ts`
+2. 🔵 **SKIPPED: Export `applyListDelta`** — Not needed, the logic stays internal to `list-ref-base.ts`.
 
-3. 🔴 **Update `getListOverlayValue`** in `value-reader.ts`:
-   - Import `reverseListDelta` and `applyListDelta` from `list-ref-base.js`
-   - Reconstruct the "before" array using: `applyListDelta(afterValues, reverseListDelta(delta, afterValues, beforeLength))`
-   - Return the value at the requested index from the reconstructed array
-   - Remove the TODO comment
+3. ✅ **Update `getListOverlayValue`** in `value-reader.ts`:
+   - Now checks if internals has `getOverlayList()` method (duck typing for `ListRefBaseInternals`)
+   - Uses the cached overlay list to return the value at the requested index
+   - Removed the TODO comment
 
-4. 🔴 **Update `getOverlayList`** in `list-ref-base.ts`:
-   - Use the same `reverseListDelta` + `applyListDelta` pattern
-   - Replace the existing partial implementation
+4. 🔵 **SKIPPED: Update `getOverlayList`** — Already correctly implemented! Uses `applyListDelta` with the reverse diff from the overlay.
 
-5. 🔴 **Write tests** for list transitions:
+5. ✅ **Write tests** for list transitions:
    ```typescript
-   describe('reverseListDelta', () => {
-     it('reverses insert operations', () => {
-       const delta = [{ retain: 1 }, { insert: ['b'] }]
-       const afterValues = ['a', 'b']
-       const reversed = reverseListDelta(delta, afterValues, 1)
-       const before = applyListDelta(afterValues, reversed)
-       expect(before).toEqual(['a'])
-     })
+   Added 3 tests in `functional-helpers.test.ts`:
+   - `should return correct before/after for list push`
+   - `should return correct before/after for list delete`  
+   - `should return correct before/after for list item access via get()`
 
-     it('reverses delete operations', () => {
-       // ... test delete reversal
-     })
-   })
-
-   describe('getTransition with lists', () => {
-     it('returns correct before/after for list push', () => {
-       const doc = createTypedDoc(schema)
-       doc.items.push('first')
-
-       const unsubscribe = subscribe(doc, event => {
-         const { before, after } = getTransition(doc, event)
-         expect(before.items.toJSON()).toEqual([])
-         expect(after.items.toJSON()).toEqual(['first'])
-       })
-
-       doc.items.push('second')
-       unsubscribe()
-     })
-   })
-   ```
-
-6. 🔴 **Run `verify`**
+6. ✅ **Run `verify`** — All 912 tests pass (3 new)
 
 **Resources**: `list-ref-base.ts` (existing `applyListDelta`), `value-reader.ts`, `diff-overlay.ts`
 

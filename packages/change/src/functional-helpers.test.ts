@@ -576,6 +576,117 @@ describe("functional helpers", () => {
 
       unsubscribe()
     })
+
+    it("should return correct before/after for list push", () => {
+      const listSchema = Shape.doc({
+        items: Shape.list(Shape.plain.string()),
+      })
+      const doc = createTypedDoc(listSchema)
+
+      change(doc, draft => {
+        draft.items.push("first")
+      })
+
+      const transitions: Array<{
+        beforeItems: string[]
+        afterItems: string[]
+      }> = []
+
+      const unsubscribe = loro(doc).subscribe(event => {
+        const { before, after } = getTransition(doc, event)
+        transitions.push({
+          beforeItems: before.items.toArray(),
+          afterItems: after.items.toArray(),
+        })
+      })
+
+      change(doc, draft => {
+        draft.items.push("second")
+      })
+
+      expect(transitions).toHaveLength(1)
+      expect(transitions[0].beforeItems).toEqual(["first"])
+      expect(transitions[0].afterItems).toEqual(["first", "second"])
+
+      unsubscribe()
+    })
+
+    it("should return correct before/after for list delete", () => {
+      const listSchema = Shape.doc({
+        items: Shape.list(Shape.plain.string()),
+      })
+      const doc = createTypedDoc(listSchema)
+
+      change(doc, draft => {
+        draft.items.push("a")
+        draft.items.push("b")
+        draft.items.push("c")
+      })
+
+      const transitions: Array<{
+        beforeItems: string[]
+        afterItems: string[]
+      }> = []
+
+      const unsubscribe = loro(doc).subscribe(event => {
+        const { before, after } = getTransition(doc, event)
+        transitions.push({
+          beforeItems: before.items.toArray(),
+          afterItems: after.items.toArray(),
+        })
+      })
+
+      change(doc, draft => {
+        draft.items.delete(1, 1) // delete 'b'
+      })
+
+      expect(transitions).toHaveLength(1)
+      expect(transitions[0].beforeItems).toEqual(["a", "b", "c"])
+      expect(transitions[0].afterItems).toEqual(["a", "c"])
+
+      unsubscribe()
+    })
+
+    it("should return correct before/after for list item access via get()", () => {
+      const listSchema = Shape.doc({
+        items: Shape.list(Shape.plain.number()),
+      })
+      const doc = createTypedDoc(listSchema)
+
+      change(doc, draft => {
+        draft.items.push(10)
+        draft.items.push(20)
+      })
+
+      const transitions: Array<{
+        beforeFirst: number | undefined
+        afterFirst: number | undefined
+        beforeSecond: number | undefined
+        afterSecond: number | undefined
+      }> = []
+
+      const unsubscribe = loro(doc).subscribe(event => {
+        const { before, after } = getTransition(doc, event)
+        transitions.push({
+          beforeFirst: before.items.get(0)?.get(),
+          afterFirst: after.items.get(0)?.get(),
+          beforeSecond: before.items.get(1)?.get(),
+          afterSecond: after.items.get(1)?.get(),
+        })
+      })
+
+      change(doc, draft => {
+        draft.items.push(30)
+      })
+
+      expect(transitions).toHaveLength(1)
+      expect(transitions[0].beforeFirst).toBe(10)
+      expect(transitions[0].afterFirst).toBe(10)
+      expect(transitions[0].beforeSecond).toBe(20)
+      expect(transitions[0].afterSecond).toBe(20)
+
+      unsubscribe()
+    })
   })
 
   describe("ext(ref).doc", () => {
