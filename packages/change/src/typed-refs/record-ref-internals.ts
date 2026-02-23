@@ -1,59 +1,60 @@
-import type { Container, LoroDoc, LoroMap } from "loro-crdt"
+import type { LoroMap } from "loro-crdt"
 import { deriveShapePlaceholder } from "../derive-placeholder.js"
-import type { ExtMapRef } from "../ext.js"
-import type {
-  ContainerOrValueShape,
-  ContainerShape,
-  RecordContainerShape,
-  ValueShape,
-} from "../shape.js"
-import { isValueShape } from "../utils/type-guards.js"
-import {
-  BaseRefInternals,
-  INTERNAL_SYMBOL,
-  type TypedRef,
-  type TypedRefParams,
-} from "./base.js"
-import {
-  createPlainValueRefForProperty,
-  resolveValueForBatchedMutation,
-  unwrapPlainValueRef,
-} from "./plain-value-access.js"
-import {
-  assignPlainValueToTypedRef,
-  buildChildTypedRefParams,
-  createContainerTypedRef,
-} from "./utils.js"
+import type { ContainerOrValueShape, RecordContainerShape } from "../shape.js"
+import { MapBasedRefInternals } from "./map-based-ref-internals.js"
 
 /**
  * Internal implementation for RecordRef.
- * Contains all logic, state, and implementation details.
+ * Extends MapBasedRefInternals with record-specific behavior.
+ *
+ * Key differences from StructRefInternals:
+ * - getNestedShape: returns recordShape.shape (same shape for all keys)
+ * - getChildPlaceholder: uses derive fallback when placeholder[key] is undefined
+ * - getRef: checks existence before creating (supports optional chaining)
+ * - Provides replace(), merge(), clear() batch operations
  */
 export class RecordRefInternals<
   NestedShape extends ContainerOrValueShape,
-> extends BaseRefInternals<any> {
-  // Cache only container refs - value shapes now return PlainValueRef (no caching needed)
-  private refCache = new Map<string, TypedRef<ContainerShape>>()
-
-  /** Get typed ref params for creating child refs at a key */
-  getChildTypedRefParams(
-    key: string,
-    shape: ContainerShape,
-  ): TypedRefParams<ContainerShape> {
-    // First try to get placeholder from the Record's placeholder (if it has an entry for this key)
-    let placeholder = (this.getPlaceholder() as any)?.[key]
-
-    // If no placeholder exists for this key, derive one from the schema's shape
-    // This is critical for Records where the placeholder is always {} but nested
-    // containers need valid placeholders to fall back to for missing values
-    if (placeholder === undefined) {
-      placeholder = deriveShapePlaceholder(shape)
-    }
-
-    return buildChildTypedRefParams(this, key, shape, placeholder)
+> extends MapBasedRefInternals {
+  /**
+   * Get the record shape cast to the correct type.
+   */
+  private get recordShape(): RecordContainerShape<NestedShape> {
+    return this.getShape() as RecordContainerShape<NestedShape>
   }
 
-  /** Get a ref for a key without creating (returns undefined for non-existent container keys) */
+  /**
+   * Get the nested shape for a given key.
+   * For records, all keys share the same shape (recordShape.shape).
+   */
+  override getNestedShape(_key: string): ContainerOrValueShape | undefined {
+    return this.recordShape.shape
+  }
+
+  /**
+   * Get the placeholder value for a child ref at a given key.
+   * For records, falls back to deriveShapePlaceholder when the key is not in the placeholder.
+   * This is critical because record placeholders are always {} but nested containers
+   * need valid placeholders to fall back to for missing values.
+   */
+  override getChildPlaceholder(key: string): unknown {
+    // First try to get placeholder from the Record's placeholder (if it has an entry for this key)
+    let placeholder = (
+      this.getPlaceholder() as Record<string, unknown> | undefined
+    )?.[key]
+
+    // If no placeholder exists for this key, derive one from the schema's shape
+    if (placeholder === undefined && this.recordShape.shape) {
+      placeholder = deriveShapePlaceholder(this.recordShape.shape)
+    }
+
+    return placeholder
+  }
+
+  /**
+   * Get a ref for a key without creating (returns undefined for non-existent keys).
+   * This allows optional chaining (?.) to work for non-existent record entries.
+   */
   getRef(key: string): unknown {
     const container = this.getContainer() as LoroMap
 
@@ -70,80 +71,33 @@ export class RecordRefInternals<
     return this.getOrCreateRef(key)
   }
 
-  /** Get or create a ref for a key (always creates for container shapes) */
-  getOrCreateRef(key: string): unknown {
-    const recordShape = this.getShape() as RecordContainerShape<NestedShape>
-    const shape = recordShape.shape
+  /**
+   * Set a value at a key.
+   * Delegates to the shared setValueAtKey method with the record's shape.
+   */
+  set(key: string, value: unknown): void {
+    const shape = this.recordShape.shape
 
-    if (isValueShape(shape)) {
-      if (this.getBatchedMutation()) {
-        // Inside change() — use runtime typeof check to decide:
-        // - Primitive values (string, number, boolean, null): return raw value
-        //   for ergonomic boolean logic (`if (record[key])`, `!record[key]`)
-        // - Object/array values: return PlainValueRef for nested mutation tracking
-        //   (`item.metadata.author = "Alice"`)
-        //
-        // This replaces the old schema-based valueType heuristic which was
-        // semantically wrong for union and any shapes that can contain either
-        // primitives or objects at runtime.
-        return resolveValueForBatchedMutation(this, key, shape as ValueShape)
-      }
-      // Outside change() — return PlainValueRef for reactive subscriptions
-      return createPlainValueRefForProperty(this, key, shape as ValueShape)
+    if (!shape) {
+      throw new Error("Record shape is undefined")
     }
 
-    // For container shapes, we can safely cache the ref since it's a handle
-    // to the underlying Loro container, not a value copy.
-    let ref = this.refCache.get(key)
-    if (!ref) {
-      ref = createContainerTypedRef(
-        this.getChildTypedRefParams(key, shape as ContainerShape),
-      )
-      this.refCache.set(key, ref)
-    }
-
-    return ref as any
+    this.setValueAtKey(key, value, shape)
   }
 
-  /** Set a value at a key */
-  set(key: string, value: any): void {
-    const recordShape = this.getShape() as RecordContainerShape<NestedShape>
-    const shape = recordShape.shape
-    const container = this.getContainer() as LoroMap
-
-    if (isValueShape(shape)) {
-      // Unwrap PlainValueRef if the value is one (supports ref = otherRef assignment)
-      const unwrapped = unwrapPlainValueRef(value)
-      container.set(key, unwrapped)
-      this.commitIfAuto()
-    } else {
-      // For container shapes, try to assign the plain value
-      // Use getOrCreateRef to ensure the container is created
-      // assignPlainValueToTypedRef handles batching and commits internally
-      const ref = this.getOrCreateRef(key)
-      if (assignPlainValueToTypedRef(ref as TypedRef<any>, value)) {
-        // Don't call commitIfAuto here - assignPlainValueToTypedRef handles it
-        return
-      }
-      throw new Error(
-        "Cannot set container directly, modify the typed ref instead",
-      )
-    }
-  }
-
-  /** Delete a key */
+  /**
+   * Delete a key from the record.
+   * Delegates to the shared deleteKey method.
+   */
   delete(key: string): void {
-    const container = this.getContainer() as LoroMap
-    container.delete(key)
-    this.refCache.delete(key)
-    this.commitIfAuto()
+    this.deleteKey(key)
   }
 
   /**
    * Replace entire contents with new values.
    * Keys not in `values` are removed.
    */
-  replace(values: Record<string, any>): void {
+  replace(values: Record<string, unknown>): void {
     const container = this.getContainer() as LoroMap
     const currentKeys = new Set(container.keys())
     const newKeys = new Set(Object.keys(values))
@@ -152,8 +106,7 @@ export class RecordRefInternals<
       // Delete keys that are not in the new values
       for (const key of currentKeys) {
         if (!newKeys.has(key)) {
-          container.delete(key)
-          this.refCache.delete(key)
+          this.deleteKey(key)
         }
       }
 
@@ -168,7 +121,7 @@ export class RecordRefInternals<
    * Merge values into record.
    * Existing keys not in `values` are kept.
    */
-  merge(values: Record<string, any>): void {
+  merge(values: Record<string, unknown>): void {
     this.withBatchedCommit(() => {
       for (const key of Object.keys(values)) {
         this.set(key, values[key])
@@ -189,36 +142,21 @@ export class RecordRefInternals<
 
     this.withBatchedCommit(() => {
       for (const key of keys) {
-        container.delete(key)
-        this.refCache.delete(key)
+        this.deleteKey(key)
       }
     })
   }
 
-  /** Recursively finalize nested container refs */
-  override finalizeTransaction(): void {
-    for (const ref of this.refCache.values()) {
-      if (ref && INTERNAL_SYMBOL in ref) {
-        ref[INTERNAL_SYMBOL].finalizeTransaction?.()
-      }
-    }
-  }
+  /**
+   * Force materialization of the container.
+   * For records, we only materialize the record itself, not its dynamic entries.
+   * Unlike structs, records don't have a fixed set of keys to materialize.
+   */
+  override materialize(): void {
+    // Ensure this container exists
+    this.getContainer()
 
-  /** Create the ext namespace for record */
-  protected override createExtNamespace(): ExtMapRef {
-    const self = this
-    return {
-      get doc(): LoroDoc {
-        return self.getDoc()
-      },
-      setContainer(key: string, container: Container): Container {
-        const result = (self.getContainer() as LoroMap).setContainer(
-          key,
-          container,
-        )
-        self.commitIfAuto()
-        return result
-      },
-    }
+    // Records don't pre-materialize entries - they are created on demand via set()
+    // This is different from structs which have a fixed schema of nested containers
   }
 }
