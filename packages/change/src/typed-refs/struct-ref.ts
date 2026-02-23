@@ -45,13 +45,13 @@ class StructRefImpl<
   }
 
   // Deprecated methods - kept for backward compatibility
-  // @deprecated Use property access instead: obj.key
+  // @deprecated Use property access: `obj.key.get()`
   get(key: string): any {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.get(key)
   }
 
-  // @deprecated Use property assignment instead: obj.key = value
+  // @deprecated Use `.set()` on the property's PlainValueRef: `obj.key.set(value)`
   set(key: string, value: Value): void {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     container.set(key, value)
@@ -66,32 +66,32 @@ class StructRefImpl<
     return result
   }
 
-  // @deprecated Use delete obj.key instead
+  // @deprecated Struct properties cannot be deleted. Use `.set()` to set to null/undefined if the schema allows.
   delete(key: string): void {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     container.delete(key)
     this[INTERNAL_SYMBOL].commitIfAuto()
   }
 
-  // @deprecated Use 'key' in obj instead
+  // @deprecated Use property access to check: `obj.key.get() !== undefined`
   has(key: string): boolean {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.get(key) !== undefined
   }
 
-  // @deprecated Use Object.keys(obj) instead
+  // @deprecated `Object.keys(obj)` works correctly
   keys(): string[] {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.keys()
   }
 
-  // @deprecated Use Object.values(obj) instead
+  // @deprecated `Object.values(obj)` returns PlainValueRefs; use `.get()` to unwrap
   values(): any[] {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.values()
   }
 
-  // @deprecated Not standard for objects
+  // @deprecated Use `Object.keys(obj).length` instead
   get size(): number {
     const container = this[INTERNAL_SYMBOL].getContainer() as LoroMap
     return container.size

@@ -120,13 +120,13 @@ Following a major refactor that unified the API around method-based read/write (
 
 ---
 
-## Phase 2: Fix Deprecated Method Comments 🔴
+## Phase 2: Fix Deprecated Method Comments ✅
 
 **Goal**: Correct outdated JSDoc comments in `StructRef`.
 
 ### Tasks
 
-1. 🔴 **Update deprecated comments** in `struct-ref.ts`:
+1. ✅ **Update deprecated comments** in `struct-ref.ts`:
 
    | Method | Old Comment | New Comment |
    |--------|-------------|-------------|
@@ -138,7 +138,7 @@ Following a major refactor that unified the API around method-based read/write (
    | `values()` | "Use Object.values(obj) instead" | "`Object.values(obj)` returns PlainValueRefs; use `.get()` to unwrap" |
    | `size` | "Not standard for objects" | "Use `Object.keys(obj).length` instead" |
 
-2. 🔴 **Run `verify`** — types and format
+2. ✅ **Run `verify`** — types and format
 
 **Resources**: `struct-ref.ts`
 
