@@ -136,7 +136,7 @@ function processDocumentUpdate(docId: DocId, doc: ChatDoc) {
     change(doc, draft => {
       const draftMsg = draft.messages.get(lastMsgIndex)
       if (draftMsg) {
-        draftMsg.needsAiReply = false
+        draftMsg.needsAiReply.set(false)
       }
     })
 
