@@ -159,13 +159,13 @@ const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
         // Step 1: Save scroll position to current route before leaving
         // This is a separate change() so UndoManager captures it
         change(doc, (draft) => {
-          (draft.navigation.route as any).scrollY = msg.currentScrollY;
+          (draft.navigation.route as any).scrollY.set(msg.currentScrollY);
         });
 
         // Step 2: Navigate to new route with scrollY: 0
         // UndoManager captures this as part of the same undo step
         change(doc, (draft) => {
-          draft.navigation.route = { ...msg.route, scrollY: 0 };
+          draft.navigation.route.set({ ...msg.route, scrollY: 0 });
         });
         break;
       }
@@ -173,7 +173,7 @@ const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
       case "REPLACE_ROUTE": {
         // Replace without creating undo step (e.g., redirects, URL sync)
         change(doc, (draft) => {
-          draft.navigation.route = msg.route;
+          draft.navigation.route.set(msg.route);
         });
         break;
       }
@@ -183,28 +183,28 @@ const viewUpdate = createUpdate<typeof ViewDocSchema, ViewMsg>(
 
       case "SELECT_ITEMS": {
         change(doc, (draft) => {
-          draft.ui.selectedItems = msg.ids;
+          draft.ui.selectedItems.set(msg.ids);
         });
         break;
       }
 
       case "TOGGLE_SIDEBAR": {
         change(doc, (draft) => {
-          draft.ui.sidebarCollapsed = !doc.ui.sidebarCollapsed;
+          draft.ui.sidebarCollapsed.set(!doc.ui.sidebarCollapsed.get());
         });
         break;
       }
 
       case "OPEN_MODAL": {
         change(doc, (draft) => {
-          draft.modal = msg.modal;
+          draft.modal.set(msg.modal);
         });
         break;
       }
 
       case "CLOSE_MODAL": {
         change(doc, (draft) => {
-          draft.modal = { type: "none" };
+          draft.modal.set({ type: "none" });
         });
         break;
       }
@@ -330,7 +330,7 @@ function createBrowserHistoryReactor(
   // Handle initial URL on page load
   const initialRoute = urlToRoute(window.location.href);
   change(viewDoc, (draft) => {
-    draft.navigation.route = { ...initialRoute, scrollY: 0 };
+    draft.navigation.route.set({ ...initialRoute, scrollY: 0 });
   });
   window.history.replaceState({ position: 0 }, "", window.location.href);
 
@@ -602,11 +602,11 @@ function createLeaderBroadcastReactor(
       !deepEqual(before.ui.selectedItems, after.ui.selectedItems)
     ) {
       change(followDoc, (draft) => {
-        draft.leaderView = {
+        draft.leaderView.set({
           route: after.route,
           scrollPosition: after.ui.scrollPositions.main || 0,
           selections: after.ui.selectedItems,
-        };
+        });
       });
     }
   };

@@ -352,8 +352,8 @@ In LEA, **there is no separate effect system**. When you write `{ status: "revie
 ```typescript
 // Client writes state
 change(doc, (draft) => {
-  draft.status = "reviewing";
-  draft.requestId = generateId();
+  draft.status.set("reviewing");
+  draft.requestId.set(generateId());
 });
 
 // Server reactor (runs on server only) sees the transition
@@ -364,7 +364,7 @@ const serverReactor: Reactor<Schema, Msg> = async ({ before, after }) => {
 
     // Write result back to document (syncs to all clients)
     change(doc, (draft) => {
-      draft.sensors.responses[after.requestId] = result;
+      draft.sensors.responses.set(after.requestId, result);
     });
   }
 };
@@ -894,7 +894,7 @@ describe("state derivation", () => {
   it("derives state at a specific frontier", () => {
     const doc = createTypedDoc(RPSSchema);
     change(doc, (draft) => {
-      draft.game = { status: "choosing", players: {}, result: null };
+      draft.game.set({ status: "choosing", players: {}, result: null });
     });
     const frontier = loro(doc).frontiers();
 

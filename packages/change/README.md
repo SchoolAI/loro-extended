@@ -189,9 +189,9 @@ change(doc, (draft) => {
   draft.tags.insert(0, "loro");
   draft.tags.delete(1, 1);
 
-  // Struct operations (property assignment)
-  draft.metadata.author = "John Doe";
-  delete draft.metadata.featured;
+  // Struct operations (use .set() on PlainValueRef)
+  draft.metadata.author.set("John Doe");
+  draft.metadata.featured.set(false);
 
   // Movable list operations
   draft.sections.push({
@@ -441,8 +441,8 @@ const doc = createTypedDoc(complexSchema);
 change(doc, (draft) => {
   draft.article.title.insert(0, "Deep Nesting Example");
   draft.article.metadata.views.increment(5);
-  draft.article.metadata.author.name = "Alice"; // plain string update is captured and applied after closure
-  draft.article.metadata.author.email = "alice@example.com"; // same here
+  draft.article.metadata.author.name.set("Alice");
+  draft.article.metadata.author.email.set("alice@example.com");
 });
 ```
 
@@ -460,10 +460,10 @@ const schema = Shape.doc({
 });
 
 change(doc, (draft) => {
-  // Set individual values
-  draft.settings.theme = "dark";
-  draft.settings.collapsed = true;
-  draft.settings.width = 250;
+  // Set individual values using .set()
+  draft.settings.theme.set("dark");
+  draft.settings.collapsed.set(true);
+  draft.settings.width.set(250);
 });
 ```
 
@@ -935,7 +935,7 @@ draft.title.applyDelta(delta); // Apply Delta operations
 ```typescript
 draft.count.increment(value);
 draft.count.decrement(value);
-const current = draft.count.value;
+const current = draft.count.get();
 ```
 
 ### List Operations
@@ -981,16 +981,16 @@ Methods like `find()` and `filter()` return **mutable draft objects** that you c
 ```typescript
 change(doc, (draft) => {
   // Find and mutate pattern - very common!
-  const todo = draft.todos.find((t) => t.id === "123");
+  const todo = draft.todos.find((t) => t.id.get() === "123");
   if (todo) {
-    todo.completed = true; // ✅ This mutation will persist!
-    todo.text = "Updated text"; // ✅ This too!
+    todo.completed.set(true); // ✅ This mutation will persist!
+    todo.text.set("Updated text"); // ✅ This too!
   }
 
   // Filter and modify multiple items
-  const activeTodos = draft.todos.filter((t) => !t.completed);
+  const activeTodos = draft.todos.filter((t) => !t.completed.get());
   activeTodos.forEach((todo) => {
-    todo.priority = "high"; // ✅ All mutations persist!
+    todo.priority.set("high"); // ✅ All mutations persist!
   });
 });
 ```

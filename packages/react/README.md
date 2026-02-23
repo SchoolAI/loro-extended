@@ -75,7 +75,7 @@ function TodoApp() {
   const toggleTodo = (index: number) => {
     const todo = doc.todos.get(index)
     if (todo) {
-      todo.completed = !todo.completed
+      todo.completed.set(!todo.completed.get())
     }
   }
 
@@ -260,7 +260,7 @@ doc.todos.insert(0, { ... })
 doc.todos.delete(0)
 
 // Struct operations
-doc.settings.theme = "dark"
+doc.settings.theme.set("dark")
 ```
 
 ## Fine-Grained Reactivity

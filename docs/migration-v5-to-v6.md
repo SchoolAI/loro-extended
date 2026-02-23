@@ -10,6 +10,7 @@ The v6 release is a major API simplification that:
 - Consolidates mutation through the `change()` function
 - Simplifies `loro()` to return native Loro types directly
 - Defaults documents to `mergeable: true` storage mode
+- Unifies plain value access with method-based API (`.get()` / `.set()`)
 
 ---
 
@@ -30,6 +31,9 @@ The v6 release is a major API simplification that:
 | `loro(ref).container`        | `loro(ref)`                             |
 | `handle.change(fn)`          | `change(doc, fn)`                       |
 | `lens.change(fn)`            | `change(lens, fn)`                      |
+| `draft.field = value`        | `draft.field.set(value)`                |
+| `doc.counter.value`          | `doc.counter.get()`                     |
+| `list[index] = value`        | `list.set(index, value)`                |
 
 ---
 
@@ -334,6 +338,18 @@ change(doc, (d) => d.title.insert(0, "Hello"));
 // - Draft-style mutation patterns
 ```
 
+### Note on Plain Value Mutations
+
+For plain value properties (strings, numbers, booleans, structs), use the `.set()` method:
+
+```typescript
+// Plain values use .set() both inside and outside change()
+doc.meta.title.set("New Title");  // Outside change() - auto-commits
+change(doc, (d) => d.meta.title.set("New Title"));  // Inside change() - batched
+```
+
+See [Section 10: Unified Method-Based API](#10-unified-method-based-api-for-plain-values) for the complete plain value API.
+
 ---
 
 ## 6. Subscriptions Migration
@@ -521,6 +537,147 @@ change(
 
 ---
 
+## 10. Unified Method-Based API for Plain Values
+
+v6 introduces a consistent method-based API for reading and writing plain values (strings, numbers, booleans, structs). The same `PlainValueRef<T>` type is returned **both inside and outside `change()`**, enabling a unified programming model.
+
+### The Principle
+
+1. **Traversal** — Use dot notation for schema paths (e.g., `doc.meta.title`)
+2. **Read/Write** — Use methods: `.get()` to read, `.set()` to write
+3. **Uniform** — Same API inside and outside `change()` blocks
+
+### Before (v5)
+
+```typescript
+// Outside change() - property access returned raw values or PlainValueRef
+const title = doc.meta.title; // string | PlainValueRef<string>
+
+// Inside change() - used assignment
+change(doc, (draft) => {
+  draft.meta.title = "New Title";
+  draft.meta.count = 42;
+  draft.settings.darkMode = true;
+});
+```
+
+### After (v6)
+
+```typescript
+// Outside change() - returns PlainValueRef with .get() and .set()
+const titleRef = doc.meta.title; // PlainValueRef<string>
+const title = titleRef.get(); // string
+titleRef.set("New Title"); // writes immediately
+
+// Inside change() - same API, use .set()
+change(doc, (draft) => {
+  draft.meta.title.set("New Title");
+  draft.meta.count.set(42);
+  draft.settings.darkMode.set(true);
+});
+```
+
+### Migration Patterns
+
+| Old Pattern (v5)                       | New Pattern (v6)                              |
+| -------------------------------------- | --------------------------------------------- |
+| `draft.meta.title = "New"`             | `draft.meta.title.set("New")`                 |
+| `draft.data.tags = ["a", "b"]`         | `draft.data.tags.set(["a", "b"])`             |
+| `item.completed = !item.completed`     | `item.completed.set(!item.completed.get())`   |
+| `draft.scores.alice = 100`             | `draft.scores.set("alice", 100)`              |
+| `doc.counter.value`                    | `doc.counter.get()`                           |
+
+### React Integration: Pass Refs to Components
+
+`PlainValueRef` can be passed directly to child components, enabling clean separation of concerns:
+
+```typescript
+import { useValue, type PlainValueRef } from "@loro-extended/react";
+
+// Child component receives a ref
+function TitleInput({ titleRef }: { titleRef: PlainValueRef<string> }) {
+  const title = useValue(titleRef); // Reactive subscription
+
+  return (
+    <input
+      value={title}
+      onChange={(e) => titleRef.set(e.target.value)} // Direct write
+    />
+  );
+}
+
+// Parent passes the ref
+function Editor() {
+  const doc = useDocument("my-doc", MySchema);
+  return <TitleInput titleRef={doc.meta.title} />;
+}
+```
+
+### Critical Gotcha: PlainValueRef is a Live Reference
+
+`PlainValueRef` points to a path in the CRDT, not a snapshot. When mutating lists, capture values **before** the mutation:
+
+```typescript
+// ❌ WRONG: ref reads from shifted index after delete
+change(doc, (draft) => {
+  const ref = draft.items.get(0);
+  draft.items.delete(0, 1);
+  draft.items.insert(2, ref.get()); // ref now points to wrong item!
+});
+
+// ✅ RIGHT: capture value before mutating
+change(doc, (draft) => {
+  const value = draft.items.get(0)?.get();
+  draft.items.delete(0, 1);
+  draft.items.insert(2, value);
+});
+```
+
+---
+
+## 11. The `value()` Function
+
+The `value()` function extracts plain values from reactive wrappers. It is **polymorphic** — it accepts any input and passes through values that are already plain.
+
+### Usage
+
+```typescript
+import { value } from "@loro-extended/change";
+
+value(doc.meta.title); // PlainValueRef<string> → string
+value(doc.meta); // StructRef → { title: string, ... }
+value(doc); // TypedDoc → full snapshot
+value(undefined); // → undefined (pass-through)
+value(null); // → null (pass-through)
+value(42); // → 42 (already plain, pass-through)
+value("hello"); // → "hello" (already plain)
+```
+
+### Choosing Between `value()`, `useValue()`, and `.get()`
+
+| Method        | Context    | Use When                                                        |
+| ------------- | ---------- | --------------------------------------------------------------- |
+| `ref.get()`   | Any        | You have a `PlainValueRef` and want its current value           |
+| `value(x)`    | Non-React  | You need to unwrap any ref type, or handle mixed ref/plain values |
+| `useValue(ref)` | React    | Component needs reactive subscription to a ref                  |
+
+### Note on `useLens()` Patterns
+
+When using `useLens()`, the returned `worldview` is already a plain JSON object — **not** a ref. Using `value()` on worldview properties is a no-op (but harmless):
+
+```typescript
+const { lens, doc: worldview } = useLens(doc, options);
+
+// worldview.game.players[id] is already plain JSON, not a ref
+const myChoice = worldview.game.players[playerId]?.choice; // Already plain!
+const myChoice = value(worldview.game.players[playerId]?.choice); // Also works (no-op)
+
+// Do NOT use useValue() here — worldview is not a ref
+// useLens() handles the reactivity internally
+```
+
+---
+
 ## Migration Checklist
 
 Use this checklist to track your migration:
@@ -566,6 +723,16 @@ Use this checklist to track your migration:
 - [ ] Replace `lens.change(fn)` with `change(lens, fn)`
 - [ ] Replace `ext(ref).change(fn)` with `change(ref, fn)`
 
+### Plain Value API
+
+- [ ] Replace property assignment with `.set()`:
+  - `draft.field = value` → `draft.field.set(value)`
+- [ ] Replace `.value` with `.get()` on CounterRef:
+  - `counter.value` → `counter.get()`
+- [ ] Replace list bracket assignment with `.set()`:
+  - `list[0] = value` → `list.set(0, value)`
+- [ ] Update find-and-mutate patterns to capture values before mutation
+
 ### Subscriptions
 
 - [ ] Replace `ext(doc).subscribe(cb)` with `subscribe(doc, cb)`
@@ -600,6 +767,12 @@ grep -r "\.\(handle\|lens\)\.change\|handle\.change\|lens\.change" --include="*.
 
 # Find ext().subscribe or sync().subscribe
 grep -r "ext(.*).subscribe\|sync(.*).subscribe" --include="*.ts" --include="*.tsx"
+
+# Find property assignment patterns in change() blocks
+grep -r "draft\.[a-zA-Z]* =" --include="*.ts" --include="*.tsx"
+
+# Find counter.value usage
+grep -r "\.value" --include="*.ts" --include="*.tsx" | grep -i counter
 ```
 
 ---

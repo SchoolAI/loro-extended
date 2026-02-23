@@ -116,7 +116,7 @@ change(doc, draft => {
   })
   const todo = draft.todos.get(0)
   if (todo) {
-    todo.completed = true
+    todo.completed.set(true)
   }
 })
 ```

@@ -22,14 +22,16 @@ Unlike traditional REST APIs where the client explicitly calls an endpoint, this
 
 ```typescript
 // Server subscribes to document changes
-handle.doc.subscribe(() => {
-  const messages = typedDoc.value.messages
+import { loro, subscribe } from "@loro-extended/change"
+
+subscribe(loro(doc), () => {
+  const messages = doc.messages.toArray()
   const lastMsg = messages[messages.length - 1]
 
   // Check for @mentions or auto-mention in single-user mode
-  if (shouldRespondToMessage(lastMsg, typedDoc)) {
+  if (shouldRespondToMessage(lastMsg, doc)) {
     // Create assistant message and stream LLM response into it
-    streamLLMResponse(repo, docId, lastMsg.id)
+    streamLLMResponse(repo, docId, lastMsg.id.get())
   }
 })
 ```

@@ -226,7 +226,7 @@ This monorepo is a collection of packages designed to work together:
 Here is a complete collaborative "Counter" app in React.
 
 ```tsx
-import { useDocument, Shape } from "@loro-extended/react";
+import { useDocument, useValue, Shape } from "@loro-extended/react";
 
 // 1. Define Schema (with placeholder defaults)
 const counterSchema = Shape.doc({
@@ -235,21 +235,22 @@ const counterSchema = Shape.doc({
 });
 
 function App() {
-  // 2. Use the hook (Auto-syncs, Auto-persists)
-  // Returns [value, changeDoc, handle] - value has placeholder defaults applied
-  const [doc, changeDoc] = useDocument("global-counter", counterSchema);
+  // 2. Get the document (stable reference, auto-syncs)
+  const doc = useDocument("global-counter", counterSchema);
+
+  // 3. Subscribe to values reactively
+  const count = useValue(doc.count);
+  const users = useValue(doc.users);
 
   return (
     <div>
-      <h1>Count: {doc.count}</h1>
+      <h1>Count: {count}</h1>
 
-      <button onClick={() => changeDoc((d) => d.count.increment(1))}>+1</button>
+      <button onClick={() => doc.count.increment(1)}>+1</button>
 
-      <button onClick={() => changeDoc((d) => d.users.push("New User"))}>
-        Join
-      </button>
+      <button onClick={() => doc.users.push("New User")}>Join</button>
 
-      <pre>{JSON.stringify(doc.users, null, 2)}</pre>
+      <pre>{JSON.stringify(users, null, 2)}</pre>
     </div>
   );
 }

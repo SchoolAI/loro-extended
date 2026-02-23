@@ -850,11 +850,11 @@ const undoManager = new UndoManager(loro(viewDoc), {
 case "NAVIGATE": {
   // Step 1: Save scroll to current route
   change(doc, draft => {
-    draft.navigation.route.scrollY = msg.currentScrollY
+    draft.navigation.route.scrollY.set(msg.currentScrollY)
   })
   // Step 2: Replace with new route
   change(doc, draft => {
-    draft.navigation.route = { ...msg.route, scrollY: 0 }
+    draft.navigation.route.set({ ...msg.route, scrollY: 0 })
   })
   break
 }

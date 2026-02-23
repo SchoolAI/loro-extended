@@ -24,7 +24,9 @@ The app uses two key packages from this monorepo, via `@loro-extended/react`:
 Provides an Immer-style API for mutating Loro documents. Instead of using Loro's low-level operations, you can write natural JavaScript:
 
 ```typescript
-changeDoc((d) => {
+import { change } from "@loro-extended/change";
+
+change(doc, (d) => {
   d.todos.push({ id: "...", text: "New todo", completed: false });
 });
 ```
@@ -69,27 +71,45 @@ Open multiple browser windows to see real-time collaboration in action!
 The heart of the integration is the `useDocument` hook:
 
 ```typescript
-const [doc, changeDoc, state] = useDocument<TodoDoc>(TODO_DOC_ID);
+import { useDocument, useValue } from "@loro-extended/react";
+import { change, Shape } from "@loro-extended/change";
 
-const addTodo = (text: string) => {
-  changeDoc((d) => {
-    if (!d.todos) {
-      d.todos = [];
-    }
-    d.todos.push({
+const TodoSchema = Shape.doc({
+  todos: Shape.list(
+    Shape.struct({
+      id: Shape.plain.string(),
+      text: Shape.plain.string(),
+      completed: Shape.plain.boolean(),
+    })
+  ),
+});
+
+function TodoApp() {
+  const doc = useDocument("todo-doc", TodoSchema);
+  const todos = useValue(doc.todos);
+
+  const addTodo = (text: string) => {
+    doc.todos.push({
       id: crypto.randomUUID(),
       text,
       completed: false,
     });
-  });
-};
+  };
+
+  return (
+    <ul>
+      {todos.map((todo) => (
+        <li key={todo.id}>{todo.text}</li>
+      ))}
+    </ul>
+  );
+}
 ```
 
 ### Hook Returns
 
-- `doc` - The current document state (reactive - updates automatically)
-- `changeDoc` - Function to mutate the document using natural JavaScript syntax
-- `state` - Loading state (`'loading'` | `'ready'` | `'unavailable'`)
+- `doc` - A typed document reference (stable, auto-syncs)
+- `useValue(doc.field)` - Subscribe to reactive updates for a specific field
 
 ## Key Features
 
