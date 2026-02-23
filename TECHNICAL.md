@@ -183,6 +183,8 @@ Loro's `commit()` is **idempotent** - calling it multiple times without changes 
 
 ## @loro-extended/change Architecture
 
+> **See also**: [packages/change/TECHNICAL.md](./packages/change/TECHNICAL.md) for implementation details, file organization, and package-specific gotchas.
+
 ### Symbol-Based Escape Hatches
 
 The library uses well-known symbols to provide clean separation between different access patterns:

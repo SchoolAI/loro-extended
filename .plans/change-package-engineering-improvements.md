@@ -144,13 +144,13 @@ Following a major refactor that unified the API around method-based read/write (
 
 ---
 
-## Phase 3: Create Package-Level TECHNICAL.md 🔴
+## Phase 3: Create Package-Level TECHNICAL.md ✅
 
 **Goal**: Document architecture, design decisions, and gotchas for the `change` package.
 
 ### Tasks
 
-1. 🔴 **Create `packages/change/TECHNICAL.md`** with sections:
+1. ✅ **Create `packages/change/TECHNICAL.md`** with sections:
 
    - **Architecture Overview**: Shape system, TypedDoc, TypedRefs, PlainValueRef
    - **Symbol-Based Escape Hatches**: `LORO_SYMBOL`, `EXT_SYMBOL`, `INTERNAL_SYMBOL`
@@ -161,7 +161,7 @@ Following a major refactor that unified the API around method-based read/write (
    - **Known Limitations**: Stale list refs, list overlay TODO, no runtime validation
    - **Gotchas**: Numbered list matching TECHNICAL.md root but specific to this package
 
-2. 🔴 **Cross-reference from root TECHNICAL.md**: Add a note in the `@loro-extended/change Architecture` section pointing to the package-level doc for implementation details.
+2. ✅ **Cross-reference from root TECHNICAL.md**: Add a note in the `@loro-extended/change Architecture` section pointing to the package-level doc for implementation details.
 
 **Resources**: Root `TECHNICAL.md`, `README.md` in `packages/change/`
 
