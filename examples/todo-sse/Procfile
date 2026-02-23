@@ -1,2 +1,2 @@
-server: tsx --watch src/server/server.ts
+server: PORT=8001 tsx --watch src/server/server.ts
 client: vite
