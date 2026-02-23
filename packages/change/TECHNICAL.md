@@ -92,13 +92,17 @@ BaseRefInternals (abstract)
 ├── TextRefInternals
 ├── TreeRefInternals
 ├── TreeNodeRefInternals
-├── ListRefBaseInternals (abstract)
+├── ListRefBaseInternals
 │   ├── ListRefInternals
 │   └── MovableListRefInternals
 └── MapBasedRefInternals (abstract)
     ├── StructRefInternals
     └── RecordRefInternals
 ```
+
+Note: `ListRefBaseInternals` is not abstract because it's fully functional on its own.
+The subclasses (`ListRefInternals`, `MovableListRefInternals`) only add container-specific
+methods like `absorbValueAtIndex()`.
 
 **MapBasedRefInternals** extracts shared logic for struct and record refs:
 - Child ref caching
@@ -271,7 +275,7 @@ src/
     ├── record-ref.ts              # RecordRef facade
     ├── record-ref-internals.ts    # RecordRef implementation
     ├── list-ref.ts                # ListRef facade
-    ├── list-ref-base-internals.ts # Shared list internals
+    ├── list-ref-base.ts           # ListRefBaseInternals + ListRefBase
     ├── list-ref-internals.ts      # ListRef implementation
     ├── movable-list-ref.ts        # MovableListRef facade
     ├── movable-list-ref-internals.ts
