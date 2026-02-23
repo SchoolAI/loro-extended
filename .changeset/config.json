@@ -8,6 +8,7 @@
       "@loro-extended/adapter-sse",
       "@loro-extended/adapter-webrtc",
       "@loro-extended/adapter-websocket",
+      "@loro-extended/adapter-websocket-compat",
 
       "@loro-extended/adapter-indexeddb",
       "@loro-extended/adapter-leveldb",
@@ -16,8 +17,10 @@
       "@loro-extended/change",
       "@loro-extended/hooks-core",
       "@loro-extended/hono",
+      "@loro-extended/lens",
       "@loro-extended/react",
-      "@loro-extended/repo"
+      "@loro-extended/repo",
+      "@loro-extended/wire-format"
     ]
   ],
   "linked": [],
