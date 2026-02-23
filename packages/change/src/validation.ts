@@ -1,3 +1,4 @@
+import { SchemaViolationError } from "./errors.js"
 import type {
   ArrayValueShape,
   ContainerOrValueShape,
@@ -23,11 +24,11 @@ export function validateValue(
   schema: ContainerOrValueShape,
   path: string = "",
 ): unknown {
-  if (!schema || typeof schema !== "object" || !("_type" in schema)) {
-    throw new Error(`Invalid schema at path ${path}: missing _type`)
-  }
-
   const currentPath = path || "root"
+
+  if (!schema || typeof schema !== "object" || !("_type" in schema)) {
+    throw new SchemaViolationError(currentPath, "valid schema", schema)
+  }
 
   // Handle AnyContainerShape - no validation, accept anything
   if (schema._type === "any") {
@@ -37,27 +38,21 @@ export function validateValue(
   // Handle ContainerShape types
   if (schema._type === "text") {
     if (typeof value !== "string") {
-      throw new Error(
-        `Expected string at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "string", value)
     }
     return value
   }
 
   if (schema._type === "counter") {
     if (typeof value !== "number") {
-      throw new Error(
-        `Expected number at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "number", value)
     }
     return value
   }
 
   if (schema._type === "list" || schema._type === "movableList") {
     if (!Array.isArray(value)) {
-      throw new Error(
-        `Expected array at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "array", value)
     }
     const listSchema = schema as ListContainerShape | MovableListContainerShape
     return value.map((item, index) =>
@@ -67,9 +62,7 @@ export function validateValue(
 
   if (schema._type === "struct") {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error(
-        `Expected object at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "object", value)
     }
     const structSchema = schema as StructContainerShape
     const result: Record<string, unknown> = {}
@@ -85,9 +78,7 @@ export function validateValue(
 
   if (schema._type === "record") {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error(
-        `Expected object at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "object", value)
     }
     const recordSchema = schema as RecordContainerShape
     const result: Record<string, unknown> = {}
@@ -102,9 +93,7 @@ export function validateValue(
 
   if (schema._type === "tree") {
     if (!Array.isArray(value)) {
-      throw new Error(
-        `Expected array for tree at path ${currentPath}, got ${typeof value}`,
-      )
+      throw new SchemaViolationError(currentPath, "array (tree)", value)
     }
     // Trees can contain any structure, so we just validate it's an array
     return value
@@ -121,14 +110,14 @@ export function validateValue(
 
       case "string": {
         if (typeof value !== "string") {
-          throw new Error(
-            `Expected string at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "string", value)
         }
         const stringSchema = valueSchema as StringValueShape
         if (stringSchema.options && !stringSchema.options.includes(value)) {
-          throw new Error(
-            `Expected one of [${stringSchema.options.join(", ")}] at path ${currentPath}, got "${value}"`,
+          throw new SchemaViolationError(
+            currentPath,
+            `one of [${stringSchema.options.join(", ")}]`,
+            value,
           )
         }
         return value
@@ -136,49 +125,37 @@ export function validateValue(
 
       case "number":
         if (typeof value !== "number") {
-          throw new Error(
-            `Expected number at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "number", value)
         }
         return value
 
       case "boolean":
         if (typeof value !== "boolean") {
-          throw new Error(
-            `Expected boolean at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "boolean", value)
         }
         return value
 
       case "null":
         if (value !== null) {
-          throw new Error(
-            `Expected null at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "null", value)
         }
         return value
 
       case "undefined":
         if (value !== undefined) {
-          throw new Error(
-            `Expected undefined at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "undefined", value)
         }
         return value
 
       case "uint8array":
         if (!(value instanceof Uint8Array)) {
-          throw new Error(
-            `Expected Uint8Array at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "Uint8Array", value)
         }
         return value
 
       case "struct": {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
-          throw new Error(
-            `Expected object at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "object", value)
         }
         const structSchema = valueSchema as StructValueShape
         const result: Record<string, unknown> = {}
@@ -194,9 +171,7 @@ export function validateValue(
 
       case "record": {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
-          throw new Error(
-            `Expected object at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "object", value)
         }
         const recordSchema = valueSchema as RecordValueShape
         const result: Record<string, unknown> = {}
@@ -215,9 +190,7 @@ export function validateValue(
 
       case "array": {
         if (!Array.isArray(value)) {
-          throw new Error(
-            `Expected array at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "array", value)
         }
         const arraySchema = valueSchema as ArrayValueShape
         return value.map((item, index) =>
@@ -227,27 +200,22 @@ export function validateValue(
 
       case "union": {
         const unionSchema = valueSchema as UnionValueShape
-        let lastError: Error | null = null
 
         // Try to validate against each shape in the union
         for (const shape of unionSchema.shapes) {
           try {
             return validateValue(value, shape, currentPath)
-          } catch (error) {
-            lastError = error as Error
+          } catch {
+            // Continue to next shape in union
           }
         }
 
-        throw new Error(
-          `Value at path ${currentPath} does not match any union type: ${lastError?.message}`,
-        )
+        throw new SchemaViolationError(currentPath, "one of union types", value)
       }
 
       case "discriminatedUnion": {
         if (!value || typeof value !== "object" || Array.isArray(value)) {
-          throw new Error(
-            `Expected object at path ${currentPath}, got ${typeof value}`,
-          )
+          throw new SchemaViolationError(currentPath, "object", value)
         }
 
         const unionSchema = valueSchema as DiscriminatedUnionValueShape
@@ -257,18 +225,20 @@ export function validateValue(
         ]
 
         if (typeof discriminantValue !== "string") {
-          throw new Error(
-            `Expected string for discriminant key "${discriminantKey}" at path ${currentPath}, got ${typeof discriminantValue}`,
+          throw new SchemaViolationError(
+            `${currentPath}.${discriminantKey}`,
+            "string (discriminant)",
+            discriminantValue,
           )
         }
 
         const variantSchema = unionSchema.variants[discriminantValue]
 
         if (!variantSchema) {
-          throw new Error(
-            `Invalid discriminant value "${discriminantValue}" at path ${currentPath}. Expected one of: ${Object.keys(
-              unionSchema.variants,
-            ).join(", ")}`,
+          throw new SchemaViolationError(
+            `${currentPath}.${discriminantKey}`,
+            `one of [${Object.keys(unionSchema.variants).join(", ")}]`,
+            discriminantValue,
           )
         }
 
@@ -276,11 +246,15 @@ export function validateValue(
       }
 
       default:
-        throw new Error(`Unknown value type: ${(valueSchema as any).valueType}`)
+        throw new SchemaViolationError(
+          currentPath,
+          "known value type",
+          (valueSchema as any).valueType,
+        )
     }
   }
 
-  throw new Error(`Unknown schema type: ${(schema as any)._type}`)
+  throw new SchemaViolationError(currentPath, "known schema type", schema)
 }
 
 /**

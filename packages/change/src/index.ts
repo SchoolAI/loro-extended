@@ -11,6 +11,14 @@ export {
 } from "./derive-placeholder.js"
 // Diff overlay--make the TypedDoc return values as if a diff is applied
 export { createDiffOverlay } from "./diff-overlay.js"
+// Custom error types for structured error handling
+export {
+  ContainerTypeError,
+  LoroExtendedError,
+  PathNavigationError,
+  SchemaViolationError,
+  StaleRefError,
+} from "./errors.js"
 // The ext() function for loro-extended-specific features
 export {
   EXT_SYMBOL,

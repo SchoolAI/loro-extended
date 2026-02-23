@@ -20,7 +20,7 @@ describe("String Literal Shape", () => {
     expect(validateValue("ai", schema)).toBe("ai")
 
     expect(() => validateValue("other", schema)).toThrow(
-      'Expected one of [user, ai] at path root, got "other"',
+      "Schema violation at root: expected one of [user, ai], got string",
     )
   })
 
@@ -29,7 +29,7 @@ describe("String Literal Shape", () => {
 
     expect(validateValue("fixed", schema)).toBe("fixed")
     expect(() => validateValue("other", schema)).toThrow(
-      'Expected one of [fixed] at path root, got "other"',
+      "Schema violation at root: expected one of [fixed], got string",
     )
   })
 

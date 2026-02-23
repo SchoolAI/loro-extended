@@ -40,7 +40,6 @@ import {
  * Note: Uses `any` for Shape parameter to avoid complex type gymnastics.
  * The subclasses (StructRefInternals, RecordRefInternals) provide proper typing.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Shape parameter uses any to avoid complex type constraints between StructContainerShape and RecordContainerShape
 export abstract class MapBasedRefInternals extends BaseRefInternals<any> {
   /**
    * Cache for container shape refs only.

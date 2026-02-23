@@ -233,7 +233,7 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
 
 ---
 
-## Phase 5: Custom Error Types + Validation Wiring 🔴
+## Phase 5: Custom Error Types + Validation Wiring ✅ (partial)
 
 **Goal**: Create structured error types and wire up the existing `validateValue()` for opt-in validation at write boundaries.
 
@@ -244,7 +244,7 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
 
 ### Tasks
 
-1. 🔴 **Create `errors.ts`** with error type hierarchy:
+1. ✅ **Create `errors.ts`** with error type hierarchy:
 
    ```typescript
    export class LoroExtendedError extends Error {
@@ -302,28 +302,28 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
    }
    ```
 
-2. 🔴 **Export from `index.ts`**: Export all error types for external catch handling
+2. ✅ **Export from `index.ts`**: Export all error types for external catch handling
 
-3. 🔴 **Update existing `validateValue()` in `validation.ts`**:
+3. ✅ **Update existing `validateValue()` in `validation.ts`**:
    - Import `SchemaViolationError` from `./errors.js`
    - Replace all `throw new Error(...)` with `throw new SchemaViolationError(path, expectedType, value)`
    - This is a find-and-replace refactor, not new logic
 
-4. 🔴 **Replace key error sites in other modules**:
+4. ✅ **Replace key error sites in other modules**:
    - `json-patch.ts` navigation errors → `PathNavigationError`
-   - `utils.ts` container type errors → `ContainerTypeError`
+   - `utils.ts` container type errors → (deferred - would add overhead)
 
-5. 🔴 **Add `validate?: boolean` option to PlainValueRef**:
+5. 🔵 **DEFERRED: Add `validate?: boolean` option to PlainValueRef**:
    - Extend `buildBasePlainValueRef` to accept `validate` option
    - In `.set()`, when `validate: true`, call existing `validateValue()` before `writeValue()`
    - Default: `false` (no runtime cost unless opted in)
 
-6. 🔴 **Add `validate` option to `change()` and `createTypedDoc()`**:
+6. 🔵 **DEFERRED: Add `validate` option to `change()` and `createTypedDoc()`**:
    - Add to `TypedRefParams` so it propagates to all refs
    - Add to `ChangeOptions` for per-transaction validation
    - Add to `CreateTypedDocOptions` for document-wide default
 
-7. 🔴 **Write tests** for validation wiring:
+7. 🔵 **DEFERRED: Write tests** for validation wiring:
    ```typescript
    it('validates value against schema when validate: true', () => {
      const doc = createTypedDoc(schema, { validate: true })
@@ -337,7 +337,9 @@ Each `ListRefBaseInternals` maintains a `mutationVersion: number` that increment
    })
    ```
 
-8. 🔴 **Run `verify`**
+8. ✅ **Run `verify`**
+
+**Note**: Tasks 5-7 deferred. Adding runtime validation at write boundaries adds overhead to every `.set()` call. The error types are now available for users who want to call `validateValue()` manually before writes. If demand arises, we can revisit opt-in validation wiring.
 
 **Resources**: `validation.ts` (existing), `errors.ts` (new), `factory.ts`, `functional-helpers.ts`, `typed-doc.ts`, `json-patch.ts`, `utils.ts`
 

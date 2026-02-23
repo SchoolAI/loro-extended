@@ -191,14 +191,14 @@ describe("discriminatedUnion", () => {
     it("should throw an error for an invalid discriminant value", () => {
       const value = { type: "unknown", name: "Bob" }
       expect(() => validateValue(value, GamePresenceSchema)).toThrow(
-        'Invalid discriminant value "unknown" at path root. Expected one of: client, server',
+        "Schema violation at root.type: expected one of [client, server], got string",
       )
     })
 
     it("should throw an error for a missing discriminant key", () => {
       const value = { name: "Bob" }
       expect(() => validateValue(value, GamePresenceSchema)).toThrow(
-        'Expected string for discriminant key "type" at path root, got undefined',
+        "Schema violation at root.type: expected string (discriminant), got undefined",
       )
     })
 
@@ -209,7 +209,7 @@ describe("discriminatedUnion", () => {
         input: { force: "invalid", angle: 90 }, // force should be number
       }
       expect(() => validateValue(value, GamePresenceSchema)).toThrow(
-        "Expected number at path root.input.force, got string",
+        "Schema violation at root.input.force: expected number, got string",
       )
     })
 

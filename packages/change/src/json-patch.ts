@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: JSON Patch values can be any type */
 
+import { PathNavigationError } from "./errors.js"
 import { isPlainValueRef } from "./plain-value-ref/index.js"
 import type { DocShape } from "./shape.js"
 import { INTERNAL_SYMBOL } from "./typed-refs/base.js"
@@ -113,7 +114,7 @@ function navigateToPath<T extends DocShape>(
   path: (string | number)[],
 ): { parent: any; key: string | number } {
   if (path.length === 0) {
-    throw new Error("Cannot navigate to empty path")
+    throw new PathNavigationError([], "", "Cannot navigate to empty path")
   }
 
   let current = draft as any
@@ -126,20 +127,32 @@ function navigateToPath<T extends DocShape>(
       // Use natural property access - this leverages existing DraftNode lazy creation
       current = current[segment]
       if (current === undefined) {
-        throw new Error(`Cannot navigate to path segment: ${segment}`)
+        throw new PathNavigationError(path, segment)
       }
     } else if (typeof segment === "number") {
       // List/array access using get() method (following existing patterns)
       if (current.get && typeof current.get === "function") {
         current = current.get(segment)
         if (current === undefined) {
-          throw new Error(`List index ${segment} does not exist`)
+          throw new PathNavigationError(
+            path,
+            segment,
+            `List index ${segment} does not exist`,
+          )
         }
       } else {
-        throw new Error(`Cannot use numeric index ${segment} on non-list`)
+        throw new PathNavigationError(
+          path,
+          segment,
+          `Cannot use numeric index ${segment} on non-list`,
+        )
       }
     } else {
-      throw new Error(`Invalid path segment type: ${typeof segment}`)
+      throw new PathNavigationError(
+        path,
+        segment,
+        `Invalid path segment type: ${typeof segment}`,
+      )
     }
   }
 
