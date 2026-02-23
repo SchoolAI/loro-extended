@@ -1,5 +1,93 @@
 # @loro-extended/hono
 
+## 6.0.0-beta.0
+
+### Major Changes
+
+- 50c0083: # PlainValueRef: Reactive subscriptions for plain values
+
+  Plain value properties (from `Shape.plain.*`) now return `PlainValueRef<T>` instead of raw values. This enables reactive subscriptions via `useValue()` and `subscribe()`.
+
+  ## New APIs
+
+  - `value(ref)` - Get current value from PlainValueRef, TypedRef, or TypedDoc
+  - `useValue(doc.meta.title)` - Now works with plain value properties
+  - `subscribe(doc.meta.title, cb)` - Now works with plain value properties
+
+  ## Breaking Changes
+
+  Plain value property access now returns `PlainValueRef<T>` instead of `T`:
+
+  ```typescript
+  // Before
+  const title: string = doc.meta.title;
+
+  // After
+  const title: PlainValueRef<string> = doc.meta.title;
+  const titleValue: string = value(doc.meta.title);
+  ```
+
+  Strict equality comparisons become TypeScript errors (guiding correct usage):
+
+  ```typescript
+  // Before (worked)
+  if (doc.meta.title === "foo") { ... }
+
+  // After (type error - use value())
+  if (value(doc.meta.title) === "foo") { ... }
+  ```
+
+  ## Coercion Still Works
+
+  Template literals, string concatenation, and JSON serialization work transparently:
+
+  ```typescript
+  console.log(`Title: ${doc.meta.title}`); // Works via valueOf()
+  JSON.stringify(doc.meta.title); // Works via toJSON()
+  ```
+
+  ## Assignment Still Works
+
+  ```typescript
+  doc.meta.title = "new value"; // Still works
+  ```
+
+### Minor Changes
+
+- 5039c52: Add `useDocIdFromHash` hook for syncing document ID with URL hash
+
+  This hook enables shareable URLs where the hash contains the document ID (e.g., `https://app.example.com/#doc-abc123`).
+
+  Features:
+
+  - Uses `useSyncExternalStore` for concurrent mode safety
+  - SSR-safe with server snapshot support
+  - Automatically writes hash on mount if empty
+  - Caches generated default ID across renders
+
+  Also exports pure utility functions `parseHash()` and `getDocIdFromHash()` for testing and custom implementations.
+
+  ```typescript
+  import { useDocIdFromHash, useDocument } from "@loro-extended/react";
+  import { generateUUID } from "@loro-extended/repo";
+
+  function App() {
+    const docId = useDocIdFromHash(() => generateUUID());
+    const doc = useDocument(docId, MySchema);
+    // ...
+  }
+  ```
+
+### Patch Changes
+
+- Updated dependencies [f90c7f7]
+- Updated dependencies [50c0083]
+- Updated dependencies [a3f151f]
+- Updated dependencies [29853c3]
+- Updated dependencies [5039c52]
+  - @loro-extended/repo@6.0.0-beta.0
+  - @loro-extended/hooks-core@6.0.0-beta.0
+
 ## 5.4.2
 
 ### Patch Changes

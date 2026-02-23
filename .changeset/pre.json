@@ -1,0 +1,43 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@loro-extended/adapter-http-polling": "5.4.2",
+    "@loro-extended/adapter-indexeddb": "5.4.2",
+    "@loro-extended/adapter-leveldb": "5.4.2",
+    "@loro-extended/adapter-postgres": "5.4.2",
+    "@loro-extended/adapter-sse": "5.4.2",
+    "@loro-extended/adapter-webrtc": "5.4.2",
+    "@loro-extended/adapter-websocket": "5.4.2",
+    "@loro-extended/adapter-websocket-compat": "3.0.2",
+    "example-bumper-cars": "0.1.11",
+    "example-chat": "0.2.9",
+    "example-hono-counter": "0.1.10",
+    "example-postgres": "0.1.11",
+    "example-prosemirror-collab": "0.1.4",
+    "example-todo-sse": "0.2.8",
+    "example-video-conference": "1.2.8",
+    "@loro-extended/change": "5.4.2",
+    "@loro-extended/hono": "5.4.2",
+    "@loro-extended/hooks-core": "5.4.2",
+    "@loro-extended/lens": "0.2.0",
+    "@loro-extended/react": "5.4.2",
+    "@loro-extended/repo": "5.4.2",
+    "@loro-extended/wire-format": "0.1.0",
+    "loro-explorer": "0.0.2"
+  },
+  "changesets": [
+    "api-consistency-methods",
+    "consolidate-change-for-lens",
+    "factory-consolidation",
+    "lens-simplification",
+    "loro-extended-meta-container",
+    "mergeable-flattened-containers",
+    "plain-value-ref",
+    "react-api-simplification",
+    "remove-ext-change-and-handle-change",
+    "typeddoc-ext-symbol-type",
+    "use-doc-id-from-hash",
+    "websocket-client-state-machine"
+  ]
+}

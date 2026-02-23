@@ -1,7 +1,7 @@
 {
   "name": "example-todo-sse",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.9-beta.0",
   "type": "module",
   "scripts": {
     "build:all": "pnpm build:client && pnpm build:server",

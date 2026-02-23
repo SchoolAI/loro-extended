@@ -1,6 +1,6 @@
 {
   "name": "@loro-extended/adapter-http-polling",
-  "version": "5.4.2",
+  "version": "6.0.0-beta.0",
   "description": "HTTP polling network adapter for @loro-extended/repo with long-polling support",
   "author": "Duane Johnson",
   "license": "MIT",

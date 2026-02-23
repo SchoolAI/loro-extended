@@ -1,5 +1,538 @@
 # @loro-extended/change
 
+## 6.0.0-beta.0
+
+### Major Changes
+
+- 3a1cbed: ### API Consistency: Unify read/write using methods
+
+  **Breaking Changes:**
+
+  - `PlainValueRef`: Property assignment removed; use `.set(value)` instead
+  - `CounterRef`: `.value` getter removed; use `.get()` instead
+  - `ListRef`/`MovableListRef`: Bracket assignment removed; use `.set(index, value)` instead
+  - `StructRef`: Property assignment removed; use `ref.prop.set(value)` instead
+  - `RecordRef`: Bracket assignment removed; use `.set(key, value)` instead
+
+  **New API:**
+
+  - `PlainValueRef.get()` — read the current value
+  - `PlainValueRef.set(value)` — write a new value
+  - `ListRef.set(index, value)` — update item at index
+  - Uniform API inside and outside `change()` blocks
+
+  **Type System:**
+
+  - `_draft` and `_mutable` type parameters unified (both return `PlainValueRef<T>`)
+  - New `DeepPlainValueRef<T>` type for recursive nested property access
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  draft.title = "New";
+  draft.scores.alice = 100;
+  list[0] = "updated";
+  counter.value;
+
+  // After
+  draft.title.set("New");
+  draft.scores.set("alice", 100);
+  list.set(0, "updated");
+  counter.get();
+  ```
+
+- 50c0083: # PlainValueRef: Reactive subscriptions for plain values
+
+  Plain value properties (from `Shape.plain.*`) now return `PlainValueRef<T>` instead of raw values. This enables reactive subscriptions via `useValue()` and `subscribe()`.
+
+  ## New APIs
+
+  - `value(ref)` - Get current value from PlainValueRef, TypedRef, or TypedDoc
+  - `useValue(doc.meta.title)` - Now works with plain value properties
+  - `subscribe(doc.meta.title, cb)` - Now works with plain value properties
+
+  ## Breaking Changes
+
+  Plain value property access now returns `PlainValueRef<T>` instead of `T`:
+
+  ```typescript
+  // Before
+  const title: string = doc.meta.title;
+
+  // After
+  const title: PlainValueRef<string> = doc.meta.title;
+  const titleValue: string = value(doc.meta.title);
+  ```
+
+  Strict equality comparisons become TypeScript errors (guiding correct usage):
+
+  ```typescript
+  // Before (worked)
+  if (doc.meta.title === "foo") { ... }
+
+  // After (type error - use value())
+  if (value(doc.meta.title) === "foo") { ... }
+  ```
+
+  ## Coercion Still Works
+
+  Template literals, string concatenation, and JSON serialization work transparently:
+
+  ```typescript
+  console.log(`Title: ${doc.meta.title}`); // Works via valueOf()
+  JSON.stringify(doc.meta.title); // Works via toJSON()
+  ```
+
+  ## Assignment Still Works
+
+  ```typescript
+  doc.meta.title = "new value"; // Still works
+  ```
+
+- 29853c3: # Breaking: Major API Simplification
+
+  This release introduces significant breaking changes to simplify the loro-extended API. The changes consolidate mutation patterns, simplify native Loro access, and remove redundant APIs.
+
+  ## Summary of Breaking Changes
+
+  1. **`Handle.change()` removed** - Use `change(handle.doc, fn)` instead
+  2. **`loro()` now returns native types directly** - No more `.doc` or `.container` indirection
+  3. **`ext(ref).change()` removed** - Use `change(ref, fn)` instead
+  4. **`getLoroDoc()` removed** - Use `loro(doc)` instead
+  5. **`loro(ref).doc` removed** - Use `ext(ref).doc` instead
+  6. **`loro(ref).container` removed** - Use `loro(ref)` directly
+
+  ***
+
+  ## Breaking Change Details
+
+  ### 1. `Handle.change()` Removed
+
+  The `Handle.change()` method has been removed from `@loro-extended/repo` to narrow its focus as a handle. Use the `change()` functional helper instead.
+
+  **Before:**
+
+  ```typescript
+  handle.change((draft) => {
+    draft.title.insert(0, "Hello");
+    draft.count.increment(5);
+  });
+  ```
+
+  **After:**
+
+  ```typescript
+  import { change } from "@loro-extended/change";
+
+  change(handle.doc, (draft) => {
+    draft.title.insert(0, "Hello");
+    draft.count.increment(5);
+  });
+  ```
+
+  ### 2. `loro()` Returns Native Types Directly
+
+  The `loro()` function now returns native Loro types directly, without the `.doc` or `.container` indirection.
+
+  **Before:**
+
+  ```typescript
+  // For TypedDoc
+  const loroDoc = loro(doc).doc;
+  const frontiers = loro(doc).doc.frontiers();
+  loro(doc).doc.subscribe(callback);
+  loro(doc).doc.import(bytes);
+
+  // For TypedRef
+  const loroText = loro(textRef).container;
+  const loroList = loro(listRef).container;
+  ```
+
+  **After:**
+
+  ```typescript
+  // For TypedDoc - loro() returns LoroDoc directly
+  const loroDoc = loro(doc);
+  const frontiers = loro(doc).frontiers();
+  loro(doc).subscribe(callback);
+  loro(doc).import(bytes);
+
+  // For TypedRef - loro() returns the container directly
+  const loroText = loro(textRef); // Returns LoroText
+  const loroList = loro(listRef); // Returns LoroList
+  ```
+
+  ### 3. `loro(ref).change()` Removed
+
+  The `change()` method has been deprecated from the `loro()` namespace for refs. Use the `change()` functional helper instead.
+
+  **Before:**
+
+  ```typescript
+  loro(ref).change((draft) => {
+    // mutations
+  });
+  ```
+
+  **After:**
+
+  ```typescript
+  import { change } from "@loro-extended/change";
+
+  change(ref, (draft) => {
+    // mutations
+  });
+  ```
+
+  ### 4. `getLoroDoc()` Removed
+
+  The `getLoroDoc()` function has been removed. Use `loro(doc)` directly.
+
+  **Before:**
+
+  ```typescript
+  import { getLoroDoc } from "@loro-extended/change";
+
+  const loroDoc = getLoroDoc(typedDoc);
+  ```
+
+  **After:**
+
+  ```typescript
+  import { loro } from "@loro-extended/change";
+
+  const loroDoc = loro(typedDoc);
+  ```
+
+  ### 5. Accessing LoroDoc from Refs
+
+  To get the underlying `LoroDoc` from a ref, use `ext(ref).doc` instead of `loro(ref).doc`. This belongs on `ext()` because loro's native containers don't point back to their LoroDoc.
+
+  **Before:**
+
+  ```typescript
+  const loroDoc = loro(textRef).doc;
+  ```
+
+  **After:**
+
+  ```typescript
+  import { ext } from "@loro-extended/change";
+
+  const loroDoc = ext(textRef).doc;
+  ```
+
+  ***
+
+  ## Migration Guide
+
+  ### Step-by-Step Migration
+
+  1. **Update imports:**
+
+     ```typescript
+     // Add these imports where needed
+     import { change, loro, ext } from "@loro-extended/change";
+     ```
+
+  2. **Replace `handle.change(fn)` with `change(handle.doc, fn)`:**
+
+     ```bash
+     # Find all usages
+     grep -r "handle\.change(" --include="*.ts" --include="*.tsx"
+     ```
+
+  3. **Replace `loro(x).doc` with `loro(x)`:**
+
+     ```bash
+     # Find all usages
+     grep -r "loro(.*).doc" --include="*.ts" --include="*.tsx"
+     ```
+
+  4. **Replace `loro(ref).container` with `loro(ref)`:**
+
+     ```bash
+     # Find all usages
+     grep -r "loro(.*).container" --include="*.ts" --include="*.tsx"
+     ```
+
+  5. **Replace `getLoroDoc(x)` with `loro(x)`:**
+
+     ```bash
+     # Find all usages
+     grep -r "getLoroDoc(" --include="*.ts" --include="*.tsx"
+     ```
+
+  6. **Replace `loro(ref).doc` with `ext(ref).doc`:**
+
+     ```bash
+     # For refs (not docs), use ext() to access the LoroDoc
+     # Before: loro(textRef).doc
+     # After: ext(textRef).doc
+     ```
+
+  ### Common Patterns
+
+  | Old Pattern                   | New Pattern               |
+  | ----------------------------- | ------------------------- |
+  | `handle.change(fn)`           | `change(handle.doc, fn)`  |
+  | `loro(doc).doc`               | `loro(doc)`               |
+  | `loro(doc).doc.frontiers()`   | `loro(doc).frontiers()`   |
+  | `loro(doc).doc.subscribe(cb)` | `loro(doc).subscribe(cb)` |
+  | `loro(doc).doc.import(bytes)` | `loro(doc).import(bytes)` |
+  | `loro(doc).doc.export(opts)`  | `loro(doc).export(opts)`  |
+  | `loro(ref).container`         | `loro(ref)`               |
+  | `loro(ref).doc`               | `ext(ref).doc`            |
+  | `getLoroDoc(doc)`             | `loro(doc)`               |
+  | `ext(ref).change(fn)`         | `change(ref, fn)`         |
+
+  ***
+
+  ## Recommended API
+
+  ### Mutations
+
+  The `change(doc, fn)` functional helper is the canonical way to mutate documents:
+
+  ```typescript
+  import { change } from "@loro-extended/change";
+
+  // Mutate a TypedDoc
+  change(doc, (draft) => {
+    draft.title.insert(0, "Hello");
+    draft.count.increment(5);
+    draft.items.push("new item");
+  });
+
+  // Mutate via a Handle
+  change(handle.doc, (draft) => {
+    draft.title.insert(0, "Hello");
+  });
+  ```
+
+  Note: `ext(doc).change(fn)` is also available for method-chaining scenarios, but `change(doc, fn)` is preferred.
+
+  ### Native Loro Access
+
+  Use `loro()` to access native Loro types:
+
+  ```typescript
+  import { loro } from "@loro-extended/change";
+
+  // Get LoroDoc from TypedDoc
+  const loroDoc = loro(doc);
+  const frontiers = loro(doc).frontiers();
+  const version = loro(doc).version();
+
+  // Get native containers from refs
+  const loroText: LoroText = loro(doc.title);
+  const loroList: LoroList = loro(doc.items);
+  const loroCounter: LoroCounter = loro(doc.count);
+  ```
+
+  ### Extended Features
+
+  Use `ext()` for loro-extended-specific features:
+
+  ```typescript
+  import { ext } from "@loro-extended/change";
+
+  // Document-level features
+  ext(doc).fork(); // Fork the TypedDoc
+  ext(doc).forkAt(frontiers); // Fork TypedDoc at specific version
+  ext(doc).shallowForkAt(frontiers); // Shallow fork of TypedDoc
+  ext(doc).initialize(); // Initialize metadata
+  ext(doc).applyPatch(patch); // Apply JSON patch
+  ext(doc).docShape; // Get the schema
+  ext(doc).rawValue; // Get raw JSON value, no overlay or diff
+  ext(doc).mergeable; // Check mergeable flag
+
+  // Ref-level features
+  ext(ref).doc; // Get LoroDoc from any ref
+  ext(listRef).pushContainer(c); // Push container to list
+  ext(listRef).insertContainer(i, c); // Insert container at index
+  ext(mapRef).setContainer(key, c); // Set container on map
+
+  // Subscriptions via subscribe() functional helper
+  subscribe(doc, callback); // Subscribe to all document changes
+  subscribe(doc, (p) => p.config.theme, callback); // Subscribe to specific path
+  subscribe(ref, callback); // Subscribe to container changes
+
+  // Or use loro() for native Loro subscription access
+  loro(doc).subscribe(callback); // Native LoroDoc subscription
+  ```
+
+  ***
+
+  ## Rationale
+
+  These changes simplify the API by:
+
+  1. **Consolidating mutation patterns** - One canonical way to mutate: `change(doc, fn)`
+  2. **Removing indirection** - `loro()` returns native types directly, no `.doc` or `.container`
+  3. **Clear separation** - `loro()` for native Loro access, `ext()` for loro-extended features
+  4. **Reducing cognitive load** - Fewer ways to do the same thing
+
+  The previous API had multiple ways to mutate documents (`handle.change()`, `ext(doc).change()`, `change(doc, fn)`) and required extra property access to get native types (`loro(doc).doc`). The new API is more consistent and easier to learn.
+
+### Minor Changes
+
+- 39fa800: feat(change): Add ChangeOptions support to change() function
+
+  The `change()` function now accepts an optional `ChangeOptions` parameter for all target types:
+
+  - `change(doc, fn, options?)` - TypedDoc with optional commit message
+  - `change(ref, fn, options?)` - TypedRef with optional commit message
+  - `change(lens, fn, options?)` - Lens with optional commit message (via EXT_SYMBOL detection)
+
+  **BREAKING CHANGE in @loro-extended/lens**: The `lens.change()` method has been removed. Use the unified `change(lens, fn, options?)` API instead.
+
+  Migration:
+
+  ```typescript
+  // Before
+  lens.change((d) => d.counter.increment(1), { commitMessage: "inc" });
+
+  // After - Option A: import from lens package
+  import { createLens, change } from "@loro-extended/lens";
+  change(lens, (d) => d.counter.increment(1), { commitMessage: "inc" });
+
+  // After - Option B: import from change package
+  import { createLens } from "@loro-extended/lens";
+  import { change } from "@loro-extended/change";
+  change(lens, (d) => d.counter.increment(1), { commitMessage: "inc" });
+  ```
+
+  This unifies the API so that `change()` works consistently with docs, refs, and lenses.
+
+  Exports from @loro-extended/change:
+
+  - `ChangeOptions` interface
+  - `serializeCommitMessage()` helper function
+
+  Re-exports from @loro-extended/lens (for convenience):
+
+  - `change` function
+  - `ChangeOptions` interface
+
+- f90c7f7: Add schema-level mergeable configuration and document metadata
+
+  - `Shape.doc()` now accepts an options parameter with `mergeable?: boolean`
+  - Document metadata is stored in `_loro_extended_meta_` root container
+  - Metadata includes `mergeable` flag for peer agreement
+  - `toJSON()` excludes all `_loro_extended*` prefixed keys from output
+  - Reserved prefix `_loro_extended` for future internal use
+  - `loro(doc).mergeable` exposes the effective mergeable value
+  - Handle now exposes `isMergeable` getter (delegates to TypedDoc)
+  - New `skipInitialize` option to defer metadata writing
+  - New `doc.initialize()` method for manual metadata initialization
+
+  Usage:
+
+  ```typescript
+  const schema = Shape.doc(
+    {
+      players: Shape.record(Shape.struct({ score: Shape.plain.number() })),
+    },
+    { mergeable: true }
+  );
+
+  // Auto-initialize (default) - writes metadata immediately
+  const doc = createTypedDoc(schema);
+
+  // Skip initialization for advanced use cases
+  const doc2 = createTypedDoc(schema, { skipInitialize: true });
+  // Later, when ready:
+  doc2.initialize();
+
+  // Access effective mergeable value
+  loro(doc).mergeable; // true
+  ```
+
+- 32b9abb: Add flattened root container storage for mergeable documents
+
+  When `mergeable: true` is set on a TypedDoc, all containers are stored at the
+  document root with path-based names (e.g., `data-nested-items`). This ensures
+  container IDs are deterministic and survive `applyDiff`, enabling proper merging
+  of concurrent container creation.
+
+  **Usage:**
+
+  ```typescript
+  const doc = createTypedDoc(schema, { mergeable: true });
+  ```
+
+  **Path encoding:**
+
+  - Path separator: `-` (hyphen)
+  - Escape character: `\` (backslash)
+  - Literal hyphen: `\-`
+  - Literal backslash: `\\`
+
+  **Limitations:**
+
+  - Lists of containers (`Shape.list(Shape.struct({...}))`) are NOT supported with `mergeable: true`
+  - Use `Shape.record(Shape.struct({...}))` with string keys instead
+
+  This is a breaking change for existing mergeable documents. Non-mergeable
+  documents are unaffected.
+
+### Patch Changes
+
+- 50c0083: ### PlainValueRef proxy consolidation
+
+  **Refactored:**
+
+  - Extracted shared proxy boilerplate (GET preamble, SET unwrap, runtime primitive check) into reusable helpers
+  - Extracted shared PlainValueRef base builder to eliminate 3 duplicated construction blocks
+  - Replaced `setNestedValueInObject` with existing `setAtPath`; added `transformAtPath` to `utils/path-ops.ts`
+
+  **Removed:**
+
+  - Dead `absorbValueAtIndex` method from `ListRefBaseInternals`, `ListRefInternals`, and `MovableListRefInternals`
+  - Duplicated `setNestedValue` and `setNestedValueInObject` from `factory.ts`
+
+  **Added:**
+
+  - `transformAtPath` utility in `utils/path-ops.ts`
+  - Edge case tests for array values in `Shape.plain.any()`
+  - Runtime assertion in `getMutableItem` to guard `itemCache` type invariant
+
+  **Documentation:**
+
+  - Updated TECHNICAL.md with PlainValueRef test assertion guidance
+  - Updated TECHNICAL.md with proxy boilerplate extraction details
+  - Updated TECHNICAL.md with array-in-any behavior documentation
+
+- d9570ea: fix(change): Add `[EXT_SYMBOL]` to TypedDoc type for robust change() support
+
+  Fixed a TypeScript type inference issue where `change(doc, fn)` would fail to compile when `TypedDoc<T>` was "flattened" across module boundaries (e.g., in `.d.ts` files or re-exported type aliases).
+
+  **Root cause**: TypeScript's generic inference for `change<Shape>(doc: TypedDoc<Shape>, ...)` requires the argument to match the `TypedDoc<T>` pattern. When types get expanded/flattened, the wrapper is lost and inference fails, causing TypeScript to fall through to the `[EXT_SYMBOL]` fallback overload—which previously failed because `TypedDoc` didn't include `[EXT_SYMBOL]` in its type.
+
+  **The fix**: Added the `[EXT_SYMBOL]` property (with the `change` method signature) to the `TypedDoc` type. This:
+
+  1. Matches runtime behavior (the proxy already exposes this symbol)
+  2. Provides a fallback path when type flattening breaks the primary overload
+  3. Aligns with how `Lens<D>` is already typed
+
+  Before (required workaround):
+
+  ```typescript
+  function MyComponent({ doc }: { doc: any }) {  // had to use 'any'
+    change(doc, draft => { ... })
+  }
+  ```
+
+  After:
+
+  ```typescript
+  function MyComponent({ doc }: { doc: TypedDoc<MySchema> }) {
+    change(doc, draft => { ... })  // ✅ Works correctly
+  }
+  ```
+
 ## 5.4.2
 
 ### Patch Changes

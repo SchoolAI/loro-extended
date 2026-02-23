@@ -1,5 +1,21 @@
 # example-prosemirror-collab
 
+## 0.1.5-beta.0
+
+### Patch Changes
+
+- Updated dependencies [f90c7f7]
+- Updated dependencies [50c0083]
+- Updated dependencies [a3f151f]
+- Updated dependencies [29853c3]
+- Updated dependencies [5039c52]
+- Updated dependencies [7f11f55]
+  - @loro-extended/repo@6.0.0-beta.0
+  - @loro-extended/react@6.0.0-beta.0
+  - @loro-extended/adapter-websocket@6.0.0-beta.0
+  - @loro-extended/adapter-indexeddb@6.0.0-beta.0
+  - @loro-extended/adapter-leveldb@6.0.0-beta.0
+
 ## 0.1.4
 
 ### Patch Changes

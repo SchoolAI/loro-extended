@@ -1,7 +1,7 @@
 {
   "name": "example-prosemirror-collab",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5-beta.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --ignore ./data src/server/server.ts",
