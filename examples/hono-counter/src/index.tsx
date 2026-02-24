@@ -1,10 +1,8 @@
-import { SseServerNetworkAdapter } from "@loro-extended/adapter-sse/server"
 import {
-  deserializeChannelMsg,
-  type PeerID,
-  Repo,
-  serializeChannelMsg,
-} from "@loro-extended/repo"
+  parsePostBody,
+  SseServerNetworkAdapter,
+} from "@loro-extended/adapter-sse/server"
+import { type PeerID, Repo, serializeChannelMsg } from "@loro-extended/repo"
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 
@@ -67,23 +65,34 @@ const routes = app
     })
   })
 
-  // POST endpoint for client to send messages
+  // POST endpoint for client to send messages (binary CBOR)
   .post("/sync/post", async c => {
     const peerId = c.req.header("x-peer-id") as PeerID | undefined
     if (!peerId) {
       return c.json({ error: "x-peer-id header is required" }, 400)
     }
 
-    const serialized = await c.req.json()
-    const message = deserializeChannelMsg(serialized)
     const connection = sseAdapter.getConnection(peerId)
 
     if (!connection) {
       return c.json({ error: "Connection not found. Subscribe first." }, 404)
     }
 
-    connection.receive(message)
-    return c.json({ ok: true })
+    // Read binary body - client sends CBOR with transport-layer prefixes
+    const arrayBuffer = await c.req.arrayBuffer()
+    const body = new Uint8Array(arrayBuffer)
+
+    // Use the proper wire-format parser with fragment reassembly
+    const result = parsePostBody(connection.reassembler, body)
+
+    // Handle the result
+    if (result.type === "messages") {
+      for (const msg of result.messages) {
+        connection.receive(msg)
+      }
+    }
+
+    return c.json(result.response.body, result.response.status)
   })
 
 export type AppType = typeof routes
