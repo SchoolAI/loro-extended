@@ -166,7 +166,7 @@ export function handleSyncRequest(
       docState = createDocState({ docId, peerId: model.identity.peerId })
       docState.pendingStorageChannels = new Set(storageChannelIds)
       docState.pendingNetworkRequests = [
-        { channelId: fromChannelId, requesterDocVersion },
+        { channelId: fromChannelId, requesterDocVersion, bidirectional },
       ]
       model.documents.set(docId, docState)
 
@@ -229,6 +229,7 @@ export function handleSyncRequest(
     docState.pendingNetworkRequests.push({
       channelId: fromChannelId,
       requesterDocVersion,
+      bidirectional,
     })
 
     // Don't respond yet - wait for storage

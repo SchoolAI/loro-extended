@@ -60,6 +60,8 @@ export type PeerState = {
 export type PendingNetworkRequest = {
   channelId: ChannelId
   requesterDocVersion: VersionVector
+  /** Whether the original sync-request was bidirectional (requires reciprocal sync-request) */
+  bidirectional: boolean
 }
 
 export type DocState = {

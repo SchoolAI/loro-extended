@@ -294,10 +294,160 @@ describe("Storage-First Sync", () => {
       )
       expect(networkResponses).toHaveLength(1)
 
+      // Assert: Should have sent reciprocal sync-request since bidirectional=true
+      const networkSyncRequests = sentMessages.filter(
+        m =>
+          m.channelId === networkChannelId &&
+          m.message.type === "channel/sync-request",
+      )
+      expect(networkSyncRequests).toHaveLength(1)
+      expect(networkSyncRequests[0].message.bidirectional).toBe(false) // Prevent infinite loop
+
       // Assert: Pending state should be cleared
       const docState = model.documents.get("doc-123" as DocId)
       expect(docState?.pendingStorageChannels).toBeUndefined()
       expect(docState?.pendingNetworkRequests).toHaveLength(0)
+    })
+
+    it("should send reciprocal sync-request when bidirectional=true after storage responds", () => {
+      // This test verifies the fix for the bug where ephemeral/presence data
+      // wasn't being relayed because the server didn't send a reciprocal sync-request
+      // when using storage-first sync. The client needs to receive a sync-request
+      // from the server to know that the server is subscribed to the document.
+
+      // Setup: Add storage and network channels
+      const storageChannelId = addEstablishedChannel(
+        "storage",
+        "storage-1" as PeerID,
+      )
+      const networkChannelId = addEstablishedChannel(
+        "network",
+        "client-1" as PeerID,
+      )
+
+      // Network client requests unknown document with bidirectional=true
+      const [model1, cmd1] = update(
+        {
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: networkChannelId,
+            message: {
+              type: "channel/sync-request",
+              docId: "doc-456" as DocId,
+              requesterDocVersion: new VersionVector(null),
+              bidirectional: true, // This is the key - client wants reciprocal sync
+            },
+          },
+        },
+        model,
+      )
+      model = model1
+      executeCommand(cmd1)
+
+      // Clear sent messages to focus on what happens after storage responds
+      sentMessages.length = 0
+
+      // Storage responds with unavailable (document doesn't exist in storage)
+      const [model2, cmd2] = update(
+        {
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: storageChannelId,
+            message: {
+              type: "channel/sync-response",
+              docId: "doc-456" as DocId,
+              transmission: { type: "unavailable" },
+            },
+          },
+        },
+        model,
+      )
+      model = model2
+      executeCommand(cmd2)
+
+      // Assert: Should have sent BOTH sync-response AND reciprocal sync-request
+      const networkResponses = sentMessages.filter(
+        m =>
+          m.channelId === networkChannelId &&
+          m.message.type === "channel/sync-response",
+      )
+      expect(networkResponses).toHaveLength(1)
+
+      const networkSyncRequests = sentMessages.filter(
+        m =>
+          m.channelId === networkChannelId &&
+          m.message.type === "channel/sync-request",
+      )
+      expect(networkSyncRequests).toHaveLength(1)
+      // The reciprocal sync-request should have bidirectional=false to prevent loops
+      expect(networkSyncRequests[0].message.bidirectional).toBe(false)
+    })
+
+    it("should NOT send reciprocal sync-request when bidirectional=false", () => {
+      // Setup: Add storage and network channels
+      const storageChannelId = addEstablishedChannel(
+        "storage",
+        "storage-1" as PeerID,
+      )
+      const networkChannelId = addEstablishedChannel(
+        "network",
+        "client-1" as PeerID,
+      )
+
+      // Network client requests unknown document with bidirectional=false
+      const [model1, cmd1] = update(
+        {
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: networkChannelId,
+            message: {
+              type: "channel/sync-request",
+              docId: "doc-789" as DocId,
+              requesterDocVersion: new VersionVector(null),
+              bidirectional: false, // No reciprocal sync needed
+            },
+          },
+        },
+        model,
+      )
+      model = model1
+      executeCommand(cmd1)
+
+      // Clear sent messages
+      sentMessages.length = 0
+
+      // Storage responds
+      const [model2, cmd2] = update(
+        {
+          type: "synchronizer/channel-receive-message",
+          envelope: {
+            fromChannelId: storageChannelId,
+            message: {
+              type: "channel/sync-response",
+              docId: "doc-789" as DocId,
+              transmission: { type: "unavailable" },
+            },
+          },
+        },
+        model,
+      )
+      model = model2
+      executeCommand(cmd2)
+
+      // Assert: Should have sent sync-response but NOT reciprocal sync-request
+      const networkResponses = sentMessages.filter(
+        m =>
+          m.channelId === networkChannelId &&
+          m.message.type === "channel/sync-response",
+      )
+      expect(networkResponses).toHaveLength(1)
+
+      const networkSyncRequests = sentMessages.filter(
+        m =>
+          m.channelId === networkChannelId &&
+          m.message.type === "channel/sync-request",
+      )
+      expect(networkSyncRequests).toHaveLength(0) // No reciprocal sync-request
     })
 
     it("should respond to network after storage responds with unavailable", () => {

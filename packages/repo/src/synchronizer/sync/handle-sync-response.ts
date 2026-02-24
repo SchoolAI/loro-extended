@@ -166,6 +166,24 @@ export function handleSyncResponse(
             requesterDocVersion: req.requesterDocVersion,
             includeEphemeral: true,
           })
+
+          // Send reciprocal sync-request if the original request was bidirectional
+          // This is critical for the client to know we're subscribed to this document,
+          // enabling ephemeral/presence data to be relayed to us
+          if (req.bidirectional) {
+            commands.push({
+              type: "cmd/send-message",
+              envelope: {
+                toChannelIds: [req.channelId],
+                message: {
+                  type: "channel/sync-request",
+                  docId: message.docId,
+                  requesterDocVersion: docState.doc.version(),
+                  bidirectional: false, // Prevent infinite loops
+                },
+              },
+            })
+          }
         }
 
         // Clear the pending requests
