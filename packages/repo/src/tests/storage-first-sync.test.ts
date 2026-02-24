@@ -301,7 +301,9 @@ describe("Storage-First Sync", () => {
           m.message.type === "channel/sync-request",
       )
       expect(networkSyncRequests).toHaveLength(1)
-      expect(networkSyncRequests[0].message.bidirectional).toBe(false) // Prevent infinite loop
+      expect(
+        (networkSyncRequests[0].message as ChannelMsgSyncRequest).bidirectional,
+      ).toBe(false) // Prevent infinite loop
 
       // Assert: Pending state should be cleared
       const docState = model.documents.get("doc-123" as DocId)
@@ -380,7 +382,9 @@ describe("Storage-First Sync", () => {
       )
       expect(networkSyncRequests).toHaveLength(1)
       // The reciprocal sync-request should have bidirectional=false to prevent loops
-      expect(networkSyncRequests[0].message.bidirectional).toBe(false)
+      expect(
+        (networkSyncRequests[0].message as ChannelMsgSyncRequest).bidirectional,
+      ).toBe(false)
     })
 
     it("should NOT send reciprocal sync-request when bidirectional=false", () => {

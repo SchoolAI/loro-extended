@@ -196,16 +196,18 @@ export function createStructRef<
  * Typed ref for struct containers (objects with fixed keys).
  * Uses LoroMap as the underlying container.
  *
- * The `Mode` parameter controls property types:
- * - `"mutable"` (default): Properties return `PlainValueRef<T>` for reactive access outside `change()`
- * - `"draft"`: Properties return plain `T` for ergonomic mutation inside `change()` callbacks
+ * The `Mode` parameter exists for type-level compatibility but both modes
+ * return `PlainValueRef<T>` for value shape properties. Use `.get()` to read
+ * and `.set()` to write values.
  *
  * Supports JavaScript-native object behavior:
- * - Property access: obj.key
- * - Property assignment: obj.key = value
+ * - Property access: obj.key (returns PlainValueRef or nested Ref)
  * - Object.keys(obj)
  * - 'key' in obj
- * - delete obj.key
+ *
+ * Note: Property assignment is NOT supported. Use `.set()` on the PlainValueRef:
+ *   doc.settings.darkMode.set(true)   // Correct
+ *   doc.settings.darkMode = true      // NOT supported
  *
  * @example
  * ```typescript
@@ -218,18 +220,23 @@ export function createStructRef<
  *
  * const doc = createTypedDoc(schema);
  *
- * // Property access
- * doc.settings.darkMode = true;
- * console.log(doc.settings.darkMode); // true
+ * // Reading values
+ * const isDark = doc.settings.darkMode.get();
+ *
+ * // Writing values
+ * doc.settings.darkMode.set(true);
+ * doc.settings.fontSize.set(16);
+ *
+ * // Inside change() - same API
+ * change(doc, draft => {
+ *   draft.settings.darkMode.set(false);
+ * });
  *
  * // Object.keys()
  * console.log(Object.keys(doc.settings)); // ['darkMode', 'fontSize']
  *
  * // 'key' in obj
  * console.log('darkMode' in doc.settings); // true
- *
- * // delete obj.key
- * delete doc.settings.darkMode;
  *
  * // CRDT access via loro()
  * import { loro } from "@loro-extended/change";

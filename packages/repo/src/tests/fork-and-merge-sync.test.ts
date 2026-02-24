@@ -99,7 +99,7 @@ describe("fork-and-merge synchronization", () => {
     const update = createUpdate<TestDocSchema, { value: string }>(
       (doc, msg) => {
         change(doc, draft => {
-          draft.data.value = msg.value
+          draft.data.value.set(msg.value)
           draft.counter.increment(1)
         })
       },
@@ -114,7 +114,7 @@ describe("fork-and-merge synchronization", () => {
 
     // Verify peer2 received the changes
     expect(value(doc2.data.value)).toBe("hello from peer1")
-    expect(doc2.counter.value).toBe(1)
+    expect(doc2.counter.get()).toBe(1)
   })
 
   it("should allow undo of fork-and-merge changes", async () => {
@@ -127,7 +127,7 @@ describe("fork-and-merge synchronization", () => {
     const update = createUpdate<TestDocSchema, { value: string }>(
       (typedDoc, msg) => {
         change(typedDoc, draft => {
-          draft.data.value = msg.value
+          draft.data.value.set(msg.value)
           draft.counter.increment(1)
         })
       },
@@ -139,14 +139,14 @@ describe("fork-and-merge synchronization", () => {
 
     // Verify the change was applied
     expect(value(doc.data.value)).toBe("first")
-    expect(doc.counter.value).toBe(1)
+    expect(doc.counter.get()).toBe(1)
 
     // Apply second update
     frontier = update(doc, frontier, { value: "second" })
 
     // Verify the second change
     expect(value(doc.data.value)).toBe("second")
-    expect(doc.counter.value).toBe(2)
+    expect(doc.counter.get()).toBe(2)
 
     // Undo should work
     expect(undoManager.canUndo()).toBe(true)
@@ -154,21 +154,21 @@ describe("fork-and-merge synchronization", () => {
 
     // After undo, should be back to first state
     expect(value(doc.data.value)).toBe("first")
-    expect(doc.counter.value).toBe(1)
+    expect(doc.counter.get()).toBe(1)
 
     // Undo again
     undoManager.undo()
 
     // After second undo, should be back to initial state
     expect(value(doc.data.value)).toBe("")
-    expect(doc.counter.value).toBe(0)
+    expect(doc.counter.get()).toBe(0)
 
     // Redo should work
     expect(undoManager.canRedo()).toBe(true)
     undoManager.redo()
 
     expect(value(doc.data.value)).toBe("first")
-    expect(doc.counter.value).toBe(1)
+    expect(doc.counter.get()).toBe(1)
   })
 
   it("should fire subscribeLocalUpdates for fork-and-merge changes", async () => {
@@ -184,7 +184,7 @@ describe("fork-and-merge synchronization", () => {
     const update = createUpdate<TestDocSchema, { value: string }>(
       (typedDoc, msg) => {
         change(typedDoc, draft => {
-          draft.data.value = msg.value
+          draft.data.value.set(msg.value)
         })
       },
     )
@@ -223,7 +223,7 @@ describe("fork-and-merge synchronization", () => {
     const update = createUpdate<TestDocSchema, { value: string }>(
       (doc, msg) => {
         change(doc, draft => {
-          draft.data.value = msg.value
+          draft.data.value.set(msg.value)
           draft.counter.increment(1)
         })
       },
@@ -240,7 +240,7 @@ describe("fork-and-merge synchronization", () => {
 
     // Verify peer2 received all changes
     expect(value(doc2.data.value)).toBe("update3")
-    expect(doc2.counter.value).toBe(3)
+    expect(doc2.counter.get()).toBe(3)
   })
 
   it("should handle concurrent fork-and-merge updates from both peers", async () => {
@@ -282,7 +282,7 @@ describe("fork-and-merge synchronization", () => {
     await new Promise(resolve => setTimeout(resolve, 300))
 
     // Both peers should have counter = 2 (both increments merged)
-    expect(doc1.counter.value).toBe(2)
-    expect(doc2.counter.value).toBe(2)
+    expect(doc1.counter.get()).toBe(2)
+    expect(doc2.counter.get()).toBe(2)
   })
 })

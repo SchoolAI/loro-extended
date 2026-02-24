@@ -44,7 +44,7 @@ describe("Document subscription via subscribe()/loro()", () => {
 
       // Make a change
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
 
       // Listener should have been called
@@ -57,7 +57,7 @@ describe("Document subscription via subscribe()/loro()", () => {
       listener.mockClear()
 
       change(doc, draft => {
-        draft.config.theme = "light"
+        draft.config.theme.set("light")
       })
 
       // Listener should not be called after unsubscribe
@@ -84,7 +84,7 @@ describe("Document subscription via subscribe()/loro()", () => {
 
       // Make a change to the matching path
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
 
       // Listener should have been called
@@ -259,7 +259,7 @@ describe("Document subscription via subscribe()/loro()", () => {
 
       // Make a change to config
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
 
       expect(listener).toHaveBeenCalled()
@@ -358,7 +358,7 @@ describe("Document subscription via subscribe()/loro()", () => {
       const unsub2 = subscribe(doc, listener2)
 
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
 
       expect(listener1).toHaveBeenCalled()
@@ -387,7 +387,7 @@ describe("Document subscription via subscribe()/loro()", () => {
       unsub1()
 
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
 
       // Only listener2 should be called
@@ -413,7 +413,7 @@ describe("Document subscription via subscribe()/loro()", () => {
 
       // First change - should trigger
       change(doc, draft => {
-        draft.config.theme = "dark"
+        draft.config.theme.set("dark")
       })
       expect(listener).toHaveBeenCalledTimes(1)
 
@@ -423,7 +423,7 @@ describe("Document subscription via subscribe()/loro()", () => {
 
       // Second change - should not trigger
       change(doc, draft => {
-        draft.config.theme = "light"
+        draft.config.theme.set("light")
       })
       expect(listener).not.toHaveBeenCalled()
 

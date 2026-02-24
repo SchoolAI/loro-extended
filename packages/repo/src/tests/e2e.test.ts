@@ -286,9 +286,9 @@ describe("Repo E2E", () => {
 
       // Add some content
       change(doc1, draft => {
-        draft.data.title = "My Document"
-        draft.data.content = "This should persist"
-        draft.data.count = 42
+        draft.data.title.set("My Document")
+        draft.data.content.set("This should persist")
+        draft.data.count.set(42)
       })
 
       // Get the snapshot for comparison
