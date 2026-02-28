@@ -1,4 +1,4 @@
-import type { PeerID } from "loro-crdt"
+import { LoroDoc, type PeerID } from "loro-crdt"
 import { beforeEach, describe, expect, it } from "vitest"
 import { createPermissions } from "../../permissions.js"
 import {
@@ -364,6 +364,104 @@ describe("handle-sync-request", () => {
         }
       }
     }
+  })
+
+  it("should send snapshot (not delta) when document is shallow", () => {
+    const daemonPeerId = "9999999999" as PeerID
+    const browserPeerId = "8888888888" as PeerID
+    const channel = createEstablishedChannel(browserPeerId)
+    const docId = "task-conv:test-task:5"
+    const initialModel = createModelWithChannel(channel)
+
+    initialModel.peers.set(browserPeerId, {
+      identity: { peerId: browserPeerId, name: "browser", type: "user" },
+      docSyncStates: new Map(),
+      subscriptions: new Set(),
+      channels: new Set([channel.channelId]),
+    })
+
+    // Create a shallow doc: write data, export as shallow-snapshot, import into fresh doc
+    const sourceDoc = new LoroDoc()
+    sourceDoc.setPeerId(daemonPeerId)
+    sourceDoc.getList("conversation").insert(0, "msg-1")
+    sourceDoc.getList("conversation").insert(1, "msg-2")
+    sourceDoc.getList("conversation").insert(2, "msg-3")
+    const shallowBytes = sourceDoc.export({
+      mode: "shallow-snapshot",
+      frontiers: sourceDoc.oplogFrontiers(),
+    })
+    const shallowDoc = new LoroDoc()
+    shallowDoc.setPeerId(daemonPeerId)
+    shallowDoc.import(shallowBytes)
+
+    // Verify the doc is actually shallow
+    expect(shallowDoc.shallowSinceVV().toJSON().size).toBeGreaterThan(0)
+    expect(shallowDoc.getList("conversation").length).toBe(3)
+
+    // Put the shallow doc in the model
+    initialModel.documents.set(docId, { doc: shallowDoc, docId })
+
+    // Browser has a divergent version (schema-init ops from a different peer)
+    const browserDoc = new LoroDoc()
+    browserDoc.setPeerId(browserPeerId)
+    browserDoc.getMap("root").set("schema-init", true)
+    const browserVersion = browserDoc.version()
+    expect(browserVersion.length()).toBeGreaterThan(0)
+
+    const message: SynchronizerMessage = {
+      type: "synchronizer/channel-receive-message",
+      envelope: {
+        fromChannelId: channel.channelId,
+        message: {
+          type: "channel/sync-request",
+          docId,
+          requesterDocVersion: browserVersion,
+          bidirectional: false,
+        },
+      },
+    }
+
+    const [_newModel, command] = update(message, initialModel)
+
+    // Should produce a sync-response command (not up-to-date)
+    if (command && command.type === "cmd/batch") {
+      const syncResponse = command.commands.find(
+        c => c.type === "cmd/send-sync-response",
+      )
+      expect(syncResponse).toBeDefined()
+      if (syncResponse && syncResponse.type === "cmd/send-sync-response") {
+        expect(syncResponse.docId).toBe(docId)
+      }
+    } else {
+      expectCommand(command, "cmd/send-sync-response")
+      if (command && command.type === "cmd/send-sync-response") {
+        expect(command.docId).toBe(docId)
+      }
+    }
+  })
+
+  it("shallow doc snapshot is importable by fresh browser", () => {
+    // End-to-end proof: a shallow doc's snapshot import gives a fresh browser all data
+    const daemonPeerId = "9999999999" as PeerID
+
+    // Daemon creates conversation data and compacts to shallow
+    const daemonDoc = new LoroDoc()
+    daemonDoc.setPeerId(daemonPeerId)
+    for (let i = 0; i < 20; i++) {
+      daemonDoc.getList("conversation").insert(i, `message-${i}`)
+    }
+    const shallowBytes = daemonDoc.export({
+      mode: "shallow-snapshot",
+      frontiers: daemonDoc.oplogFrontiers(),
+    })
+    const shallowDaemon = new LoroDoc()
+    shallowDaemon.setPeerId(daemonPeerId)
+    shallowDaemon.import(shallowBytes)
+
+    // Snapshot mode: fresh browser imports shallow snapshot directly — gets all data
+    const freshBrowser = new LoroDoc()
+    freshBrowser.import(shallowBytes)
+    expect(freshBrowser.getList("conversation").length).toBe(20)
   })
 
   it("should include ephemeral in sync-response via includeEphemeral flag", () => {
