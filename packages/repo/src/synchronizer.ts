@@ -846,10 +846,14 @@ export class Synchronizer {
     } else {
       // Export the document data to send as sync response
       // If requester has empty version, send full snapshot
+      // If the doc is shallow (compacted), also send snapshot — delta export
+      // fails when the peer has ops from unknown peers not in the truncated oplog
       // Otherwise send update delta from their version
+      const isShallow = docState.doc.shallowSinceVV().toJSON().size > 0
+      const useSnapshot = isEmpty || isShallow
       const data = docState.doc.export({
-        mode: isEmpty ? "snapshot" : "update",
-        from: isEmpty ? undefined : requesterDocVersion,
+        mode: useSnapshot ? "snapshot" : "update",
+        from: useSnapshot ? undefined : requesterDocVersion,
       })
 
       this.logger.debug(
@@ -858,11 +862,12 @@ export class Synchronizer {
           channelId: toChannelId,
           docId,
           isEmpty,
-          transmissionType: isEmpty ? "snapshot" : "update",
+          isShallow,
+          transmissionType: useSnapshot ? "snapshot" : "update",
         },
       )
 
-      transmission = isEmpty
+      transmission = useSnapshot
         ? {
             type: "snapshot" as const,
             data,
