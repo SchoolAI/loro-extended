@@ -14,7 +14,6 @@ import { handleEstablishChannel } from "./connection/handle-establish-channel.js
 import { handleDocDelete } from "./sync/handle-doc-delete.js"
 import { handleDocEnsure } from "./sync/handle-doc-ensure.js"
 import { handleDocImported } from "./sync/handle-doc-imported.js"
-import { handleDocUnload } from "./sync/handle-doc-unload.js"
 import { handleLocalDocChange } from "./sync/handle-local-doc-change.js"
 
 export function synchronizerDispatcher(
@@ -108,9 +107,6 @@ export function synchronizerDispatcher(
 
     case "synchronizer/doc-delete":
       return handleDocDelete(msg, model, logger)
-
-    case "synchronizer/doc-unload":
-      return handleDocUnload(msg, model, logger)
 
     case "synchronizer/channel-receive-message":
       // Channel messages are routed through the channel dispatcher
