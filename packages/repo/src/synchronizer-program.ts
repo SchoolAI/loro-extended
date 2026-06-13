@@ -133,6 +133,7 @@ export type SynchronizerMessage =
   | { type: "synchronizer/doc-ensure"; docId: DocId }
   | { type: "synchronizer/local-doc-change"; docId: DocId }
   | { type: "synchronizer/doc-delete"; docId: DocId }
+  | { type: "synchronizer/doc-unload"; docId: DocId }
   | {
       type: "synchronizer/doc-imported"
       docId: DocId

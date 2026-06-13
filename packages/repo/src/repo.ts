@@ -261,6 +261,34 @@ export class Repo {
   }
 
   /**
+   * Unloads a document from memory while retaining its persisted storage.
+   *
+   * This evicts the in-memory document — freeing the wasm-backed LoroDoc and
+   * its per-doc bookkeeping — but, unlike {@link delete}, sends NO
+   * `channel/delete-request` to any peer and does NOT touch storage. Persisted
+   * chunks survive, so calling {@link get} again rehydrates the document from
+   * the storage adapter via storage-first sync.
+   *
+   * Use this for resource management — LRU caches, idle sweeps — where you want
+   * to release memory without signalling that the document is gone (it isn't;
+   * it lives on disk and on other replicas).
+   *
+   * To await rehydration after a re-get, use
+   * `sync(doc).waitForSync({ kind: "storage" })`, which resolves once storage
+   * has been consulted (whether or not it held data).
+   *
+   * Caveat: unloading a document with in-flight storage/network requests
+   * orphans those queued requests; a late storage sync-response then re-creates
+   * the doc via the snapshot path. Unload only quiescent documents.
+   *
+   * @param docId The ID of the document to unload from memory
+   */
+  async unload(docId: DocId): Promise<void> {
+    this.#docCache.delete(docId)
+    await this.#synchronizer.unloadDocument(docId)
+  }
+
+  /**
    * Disconnects all network adapters and cleans up resources.
    * This should be called when the Repo is no longer needed.
    *
