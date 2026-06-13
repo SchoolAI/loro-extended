@@ -266,6 +266,32 @@ export class EphemeralStoreManager {
   }
 
   /**
+   * Remove all namespaced stores for a document and unsubscribe from each.
+   *
+   * Used when a document is unloaded from memory: the ephemeral stores belong
+   * to the in-memory doc lifecycle, so they must be released too. Re-creating
+   * the doc via `get()` lazily re-creates its stores on first ephemeral access.
+   *
+   * @param docId - The document ID whose stores should be released
+   */
+  removeDoc(docId: DocId): void {
+    const namespaceStores = this.stores.get(docId)
+    if (!namespaceStores) {
+      return
+    }
+
+    for (const store of namespaceStores.values()) {
+      const unsub = this.#subscriptions.get(store)
+      if (unsub) {
+        unsub()
+        this.#subscriptions.delete(store)
+      }
+    }
+
+    this.stores.delete(docId)
+  }
+
+  /**
    * Unsubscribe from all stores and clean up.
    */
   unsubscribeAll(): void {

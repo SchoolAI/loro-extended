@@ -964,6 +964,43 @@ export class Synchronizer {
     this.#dispatch({ type: "synchronizer/doc-delete", docId })
   }
 
+  /**
+   * Unload a document from memory while retaining storage.
+   *
+   * Unlike {@link removeDocument}, this sends NO delete-request to any peer and
+   * does NOT touch storage. It removes the in-memory document from the model
+   * (via the `synchronizer/doc-unload` message), then clears the runtime-side
+   * per-doc bookkeeping the model can't reach: the `readyStates` entry and the
+   * doc's namespaced ephemeral stores. Persisted chunks survive, so a later
+   * `repo.get(docId)` runs a fresh doc-ensure → sync-request cycle and
+   * storage-first sync rehydrates the doc from disk.
+   *
+   * Peer `subscriptions` entries are intentionally left intact (stale but
+   * harmless; the re-get's sync-request re-establishes them).
+   *
+   * Use this for resource management (LRU eviction, idle sweeps), not deletion.
+   */
+  public async unloadDocument(docId: DocId): Promise<void> {
+    const docState = this.model.documents.get(docId)
+
+    if (!docState) {
+      this.logger.debug("unloadDocument: document {docId} not found", { docId })
+      return
+    }
+
+    // Removes the doc from the model. No delete-request, storage untouched.
+    this.#dispatch({ type: "synchronizer/doc-unload", docId })
+
+    // The doc-unload dispatch removes the doc from model.documents, which the
+    // work-queue's #emitReadyStateChanges already collapses to an empty
+    // readyStates entry at quiescence. Delete the entry outright so the doc
+    // leaves no per-doc bookkeeping behind.
+    this.readyStates.delete(docId)
+
+    // Ephemeral stores are tied to the in-memory doc lifecycle; release them.
+    this.#ephemeralManager.removeDoc(docId)
+  }
+
   public async reset() {
     // TODO(duane): Should we stop/start the heartbeat? It doesn't seem to add value to do so. Maybe we should have a stop/start function on Synchronizer?
 
